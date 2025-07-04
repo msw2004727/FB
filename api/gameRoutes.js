@@ -98,7 +98,6 @@ router.get('/latest-game', async (req, res) => {
             prequel = await getAIPrequel('gemini', historyForPrequel);
         }
 
-        // 【已修正】將此處寫死的 'gemini' 改為 'deepseek'
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
         res.json({
@@ -176,6 +175,62 @@ router.post('/restart', async (req, res) => {
     } catch (error) {
         console.error(`[UserID: ${userId}] /restart 錯誤:`, error);
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
+    }
+});
+
+// 【新增】強制自殺路由
+router.post('/force-suicide', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+
+        // 1. 直接更新玩家為死亡狀態
+        await userDocRef.update({ isDeceased: true });
+
+        // 2. 獲取當前回合數，以建立下一個回合
+        const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const lastRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
+        const newRoundNumber = lastRound + 1;
+
+        // 3. 手動建立一個必死的最終回合資料
+        const finalRoundData = {
+            R: newRoundNumber,
+            playerState: 'dead',
+            ATM: ['決絕', '悲壯'],
+            EVT: '英雄末路',
+            LOC: ['原地', {}],
+            PSY: '江湖路遠，就此終焉。',
+            PC: `${username}引動內力，逆轉經脈，在一陣刺目的光芒中...化為塵土。`,
+            NPC: [],
+            ITM: '隨身物品盡數焚毀。',
+            QST: '所有恩怨情仇，煙消雲散。',
+            WRD: '一聲巨響傳遍數里，驚動了遠方的勢力。',
+            LOR: '',
+            CLS: '',
+            IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
+        };
+
+        // 4. 為這個結局生成小說旁白並儲存
+        const finalNarrative = await getNarrative('deepseek', finalRoundData); // 使用預設模型
+        const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
+        await novelCacheRef.set({ 
+            paragraphs: admin.firestore.FieldValue.arrayUnion({ text: finalNarrative, npcs: [] }) 
+        }, { merge: true });
+        
+        // 5. 儲存最終回合的存檔
+        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
+        
+        // 6. 回傳給前端，觸發死亡畫面
+        res.json({
+            story: finalNarrative,
+            roundData: finalRoundData,
+            suggestion: '你的江湖路已到盡頭...'
+        });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /force-suicide 錯誤:`, error);
+        res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
 
