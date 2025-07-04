@@ -287,7 +287,6 @@ body.dark-theme .info-card h4 { color: var(--dark-accent); border-bottom: 1px so
     .dashboard-header {
         padding-right: 60px; /* 為右上角的選單鈕留出空間 */
     }
-    /* --- 【新增】修正窄版情報總覽標題換行問題 --- */
     .dashboard-header h3 {
         font-size: 1.1em; /* 稍微縮小字體以避免尷尬換行 */
     }
@@ -434,67 +433,8 @@ body.dark-theme .npc-neutral {
     color: var(--dark-text-secondary); /* 中立灰 - 深色主題 */
 }
 
-/* --- 遊戲讀取提示樣式 --- */
-.prequel-loader {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 1.5rem;
-    background: var(--light-surface-bg);
-    z-index: 10;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-    pointer-events: none;
-}
-
-.prequel-loader.visible {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-}
-
-body.dark-theme .prequel-loader {
-    background: var(--dark-surface-bg);
-}
-
-.prequel-loader-text {
-    font-family: var(--font-serif);
-    font-size: 1.2rem;
-    color: var(--light-text-secondary);
-}
-
-body.dark-theme .prequel-loader-text {
-    color: var(--dark-text-secondary);
-}
-
-.prequel-loader-dots span {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background-color: var(--light-accent);
-    margin: 0 5px;
-    animation: prequel-bounce 1.4s infinite ease-in-out both;
-}
-
-body.dark-theme .prequel-loader-dots span {
-    background-color: var(--dark-accent);
-}
-
-.prequel-loader-dots span:nth-of-type(1) {
-    animation-delay: -0.32s;
-}
-
-.prequel-loader-dots span:nth-of-type(2) {
-    animation-delay: -0.16s;
-}
+/* --- 【已移除】遊戲讀取提示樣式 (prequel-loader) --- */
+/* 我們不再需要 prequel-loader，因為將統一使用 ai-thinking-loader */
 
 @keyframes prequel-bounce {
     0%, 80%, 100% {
@@ -654,7 +594,7 @@ body.dark-theme .deceased-btn.restart-btn {
     opacity: 0.85;
 }
 
-/* --- AI 回應等待動畫 --- */
+/* --- 【已修改】統一的 AI 回應等待動畫 --- */
 .ai-thinking-loader {
     position: absolute;
     top: 0;
@@ -683,6 +623,17 @@ body.dark-theme .deceased-btn.restart-btn {
 body.dark-theme .ai-thinking-loader {
     background: rgba(26, 26, 29, 0.7);
 }
+
+/* 【新增】載入動畫中的文字樣式 */
+.ai-thinking-loader .loader-text {
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .ai-thinking-loader .loader-text {
+    color: var(--dark-text-secondary);
+}
+
 
 .ai-thinking-loader .loader-dots span {
     display: inline-block;
