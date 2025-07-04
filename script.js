@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-btn');
     const actionSuggestion = document.getElementById('action-suggestion');
     
-    // 【新增】獲取自殺與死亡畫面的元素
     const suicideButton = document.getElementById('suicide-btn');
     const deceasedOverlay = document.getElementById('deceased-overlay');
     const deceasedTitle = document.getElementById('deceased-title');
@@ -78,12 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     });
     
-    // 【新增】自殺按鈕的事件監聽
     suicideButton.addEventListener('click', () => {
-        if (isRequesting) return; // 如果正在請求中，則不執行
+        if (isRequesting) return;
         const confirmation = window.confirm("你確定要了卻此生，重新輪迴嗎？");
         if (confirmation) {
-            playerInput.value = "決定了結自己的性命"; // 設定一個明確的自殺指令
+            playerInput.value = "決定了結自己的性命";
             handlePlayerAction();
         }
     });
@@ -202,7 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.prequel) {
                 const prequelDiv = document.createElement('div');
-                prequelDiv.className = 'system-message prequel-summary';
+                // 【已修正】移除衝突的 'system-message' 樣式
+                prequelDiv.className = 'prequel-summary';
                 prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
                 storyTextContainer.appendChild(prequelDiv);
             }
