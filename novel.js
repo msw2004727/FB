@@ -18,6 +18,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         novelTitle.textContent = `${username}的江湖路`;
     }
 
+    // 【新增】高亮NPC姓名的輔助函式
+    function highlightNpcNames(text, npcs) {
+        let highlightedText = text;
+        if (npcs && Array.isArray(npcs) && npcs.length > 0) {
+            // 根據名字長度排序，避免短名字覆蓋長名字 (例如 "阿" 覆蓋 "阿牛")
+            const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
+            sortedNpcs.forEach(npc => {
+                const regex = new RegExp(npc.name, 'g');
+                const replacement = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>`;
+                highlightedText = highlightedText.replace(regex, replacement);
+            });
+        }
+        return highlightedText;
+    }
+
     try {
         const response = await fetch(`${backendBaseUrl}/api/game/get-novel`, {
             headers: {
@@ -34,18 +49,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         novelContent.innerHTML = ''; // 清空載入中訊息
 
         if (data.novel && data.novel.length > 0) {
-            // 【已修改】將 paragraph 變數改為 chapterData，並正確讀取其下的 .text 屬性
             data.novel.forEach((chapterData, index) => {
                 if(chapterData && chapterData.text && chapterData.text.trim() !== '') {
                     const chapterDiv = document.createElement('div');
                     chapterDiv.className = 'chapter';
 
                     const title = document.createElement('h2');
-                    title.textContent = `第 ${index + 1} 章`;
+                    title.textContent = `第 ${index + 1} 回`; // 將章改為回，更符合武俠小說風格
 
                     const content = document.createElement('p');
-                    // 將換行符 \n 轉換為 <br> 標籤，以保留段落格式
-                    content.innerHTML = chapterData.text.replace(/\n/g, '<br>');
+                    
+                    // 【已修改】使用輔助函式處理文字，並將換行符轉換
+                    const processedText = highlightNpcNames(chapterData.text, chapterData.npcs);
+                    content.innerHTML = processedText.replace(/\n/g, '<br>');
 
                     chapterDiv.appendChild(title);
                     chapterDiv.appendChild(content);
@@ -60,6 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('獲取小說時出錯:', error);
         novelContent.innerHTML = `<p class="loading">錯誤：無法從世界中讀取您的傳奇。<br>(${error.message})</p>`;
         
+        // 如果是授權問題，3秒後跳轉回登入頁
         if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
             setTimeout(() => {
                 window.location.href = 'login.html';
