@@ -29,8 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeSwitcher = document.getElementById('theme-switcher');
     const themeIcon = themeSwitcher.querySelector('i');
     const logoutButton = document.getElementById('logout-btn');
+    const actionSuggestion = document.getElementById('action-suggestion'); // 【新增】獲取建議容器
 
-    // --- 【新增】動態創建並注入讀取提示元素 ---
     const prequelLoader = document.createElement('div');
     prequelLoader.className = 'prequel-loader';
     prequelLoader.innerHTML = `
@@ -43,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     storyPanelWrapper.appendChild(prequelLoader);
 
-    // 在儀表板顯示歡迎訊息
     if (welcomeMessage && username) {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
     }
@@ -99,12 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 【已修改】玩家行動處理函式
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
         if (!actionText || isRequesting) return;
 
-        playerInput.value = ''; // 【新增】送出後立刻清空輸入框
+        playerInput.value = '';
+        actionSuggestion.textContent = ''; // 【新增】送出動作後，清空舊建議
 
         const selectedModel = aiModelSelector.value;
         setLoadingState(true);
@@ -118,8 +117,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
+            
             currentRound = data.roundData.R;
             updateUI(data.story, data.roundData);
+            
+            // 【新增】更新建議文字
+            if (data.suggestion) {
+                actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+            }
+
         } catch (error) {
             handleApiError(error);
         } finally {
@@ -127,10 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 初始化遊戲函式
     async function initializeGame() {
         setLoadingState(true);
-        prequelLoader.classList.add('visible'); // 顯示讀取提示
+        prequelLoader.classList.add('visible');
 
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
@@ -155,9 +160,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 updateUI(data.story, data.roundData);
+                
+                // 【新增】遊戲載入時也更新建議
+                if (data.suggestion) {
+                    actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+                }
             }
-        } catch (error)
- {
+        } catch (error) {
             handleApiError(error);
         } finally {
             setLoadingState(false);
@@ -181,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'],
             PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: ''
         });
+        actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`; // 新遊戲的預設建議
     }
 
     function appendMessageToStory(htmlContent, className) {
