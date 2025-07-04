@@ -102,7 +102,8 @@ async function getAIPrequel(modelName, recentHistory) {
         return text;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖說書人任務:", error);
-        return null;
+        // 【已修改】在任務失敗時，回傳一段友善的提示文字
+        return "江湖說書人今日嗓子不適，未能道出前情提要...";
     }
 }
 
