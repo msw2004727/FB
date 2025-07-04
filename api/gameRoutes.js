@@ -17,11 +17,18 @@ router.post('/interact', async (req, res) => {
     const userId = req.user.id; // 從守衛中取得使用者 ID
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
-        
+
+        // --- 【新增】從資料庫讀取使用者個人資料 ---
+        const userDocRef = db.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        const userProfile = userDoc.exists ? userDoc.data() : {}; // 取得包含 gender 的物件
+
+        // --- 讀取遊戲摘要 ---
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
 
+        // --- 讀取近期歷史紀錄 ---
         let recentHistoryRounds = [];
         const memoryDepth = 3;
         if (currentRound > 0) {
@@ -33,7 +40,8 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction);
+        // 【已修改】呼叫 AI 時，傳入 userProfile
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
