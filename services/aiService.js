@@ -22,7 +22,7 @@ const { getStoryPrompt } = require('../prompts/storyPrompt');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt');
 const { getSummaryPrompt } = require('../prompts/summaryPrompt');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt');
-const { getSuggestionPrompt } = require('../prompts/suggestionPrompt'); // 【新增】導入動作建議指令
+const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt) {
@@ -81,8 +81,9 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
 }
 
 // 任務三：生成主要故事
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile);
+// 【已修改】增加 username 參數，並將其傳遞給 getStoryPrompt
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username);
     try {
         const text = await callAI(modelName, prompt);
         const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
@@ -105,12 +106,11 @@ async function getAIPrequel(modelName, recentHistory) {
     }
 }
 
-// 【新增】任務五：生成動作建議
+// 任務五：生成動作建議
 async function getAISuggestion(modelName, roundData) {
     const prompt = getSuggestionPrompt(roundData);
     try {
         const text = await callAI(modelName, prompt);
-        // 去除可能的引號
         return text.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 機靈書僮任務:", error);
@@ -125,5 +125,5 @@ module.exports = {
     getAISummary,
     getAIStory,
     getAIPrequel,
-    getAISuggestion // 【新增】匯出新函式
+    getAISuggestion
 };
