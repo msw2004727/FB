@@ -27,6 +27,11 @@ router.post('/interact', async (req, res) => {
         }
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
+        // 【新增】讀取玩家武功數值
+        const playerPower = {
+            internal: userProfile.internalPower || 5,
+            external: userProfile.externalPower || 5
+        };
 
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
@@ -43,33 +48,48 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay);
+        // 【修改】將武功數值傳給AI
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
+
+        let nextTimeOfDay = currentTimeOfDay;
+        if (aiResponse.roundData.shouldAdvanceTime) {
+            const currentIndex = timeSequence.indexOf(currentTimeOfDay);
+            const nextIndex = (currentIndex + 1) % timeSequence.length;
+            nextTimeOfDay = timeSequence[nextIndex];
+        }
+        aiResponse.roundData.timeOfDay = nextTimeOfDay;
+
+        // 【新增】處理武功數值變化
+        const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
+        const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
+        const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
+        // 將更新後的數值加入回傳資料
+        aiResponse.roundData.internalPower = newInternalPower;
+        aiResponse.roundData.externalPower = newExternalPower;
+        
+        // 一次性更新所有玩家狀態
+        await userDocRef.update({ 
+            timeOfDay: nextTimeOfDay,
+            internalPower: newInternalPower,
+            externalPower: newExternalPower
+        });
+
+
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
             aiResponse.suggestion = "你的江湖路已到盡頭...";
-            aiResponse.roundData.timeOfDay = currentTimeOfDay; // 死亡時記錄當前時間
+            aiResponse.roundData.timeOfDay = currentTimeOfDay;
             const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
 
         } else {
-            // 【已修改】修正時間推進邏輯的順序
-            let nextTimeOfDay = currentTimeOfDay;
-            if (aiResponse.roundData.shouldAdvanceTime) {
-                const currentIndex = timeSequence.indexOf(currentTimeOfDay);
-                const nextIndex = (currentIndex + 1) % timeSequence.length;
-                nextTimeOfDay = timeSequence[nextIndex];
-                await userDocRef.update({ timeOfDay: nextTimeOfDay });
-            }
-            // 先將時間加入回傳資料
-            aiResponse.roundData.timeOfDay = nextTimeOfDay;
-
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
@@ -79,7 +99,6 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
-        // 將包含正確時間的 roundData 存檔
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
         res.json(aiResponse);
@@ -109,8 +128,10 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        // 【已修改】直接使用存檔中的時間，若無則使用全域時間
+        // 【新增】加入武功數值
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
+        latestGameData.internalPower = userData.internalPower || 5;
+        latestGameData.externalPower = userData.externalPower || 5;
 
         let prequel = null;
         if (recentHistory.length > 1) {
@@ -186,9 +207,12 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
+        // 【新增】重置武功數值
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
-            timeOfDay: admin.firestore.FieldValue.delete()
+            timeOfDay: admin.firestore.FieldValue.delete(),
+            internalPower: admin.firestore.FieldValue.delete(),
+            externalPower: admin.firestore.FieldValue.delete()
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -217,6 +241,8 @@ router.post('/force-suicide', async (req, res) => {
             R: newRoundNumber,
             playerState: 'dead',
             timeOfDay: userProfile.timeOfDay || '上午',
+            internalPower: userProfile.internalPower || 5,
+            externalPower: userProfile.externalPower || 5,
             ATM: ['決絕', '悲壯'],
             EVT: '英雄末路',
             LOC: ['原地', {}],
