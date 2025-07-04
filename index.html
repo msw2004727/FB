@@ -7,32 +7,29 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>AI 文字互動小說</h1>
+    <div id="game-container">
+        <header class="game-header">
+            <h1>你的史詩</h1>
         </header>
 
-        <main>
-            <div id="story-display" class="story-panel">
-                <p>遊戲即將開始...</p>
+        <main class="game-main">
+            <div id="story-panel" class="panel">
+                <p class="system-message">歡迎來到你的世界。故事，即將開始...</p>
             </div>
-
-            <div id="info-panel" class="info-panel">
-                <h2>本回合資訊</h2>
+            <div id="info-panel" class="panel">
+                <h2><span class="highlight">R<span id="round-number">0</span></span> | 回合資訊</h2>
                 <pre id="round-info"></pre>
             </div>
         </main>
 
-        <footer>
+        <footer class="game-footer">
             <div class="input-area">
-                <input type="text" id="player-action" placeholder="你想要做什麼？">
-                <button id="submit-action">送出</button>
+                <input type="text" id="player-input" placeholder="你決定..." autocomplete="off">
+                <button id="submit-button">送出行動</button>
             </div>
         </footer>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
