@@ -9,18 +9,21 @@ const db = admin.firestore();
 
 router.use(authMiddleware);
 
-// 【已修改】互動路由，現在會傳遞玩家暱稱給AI
 router.post('/interact', async (req, res) => {
-    // 從守衛中取得使用者ID和使用者名稱
     const userId = req.user.id;
-    const username = req.user.username; // 【重要】獲取玩家暱稱
+    const username = req.user.username;
 
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
 
         const userDocRef = db.collection('users').doc(userId);
-        const userDoc = await userDocRef.get();
+        const userDoc = await userDoc.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
+        
+        // 【新增】如果玩家已死亡，則不允許互動
+        if (userProfile.isDeceased) {
+            return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
+        }
 
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
@@ -37,19 +40,26 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【已修改】呼叫 getAIStory 時，傳入 username
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
-        aiResponse.suggestion = suggestion;
+        // 【新增】處理死亡判定的核心邏輯
+        if (aiResponse.roundData.playerState === 'dead') {
+            await userDocRef.update({ isDeceased: true });
+            aiResponse.suggestion = "你的江湖路已到盡頭...";
+        } else {
+            // 只有在玩家活著的時候才獲取建議和更新摘要
+            const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
+            aiResponse.suggestion = suggestion;
+            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
+            await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        }
 
+        // 無論生死，都儲存最後一回合的紀錄
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
-        const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
-        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
         res.json(aiResponse);
 
@@ -59,9 +69,18 @@ router.post('/interact', async (req, res) => {
     }
 });
 
+// 【已修改】讀取最新進度時，加入死亡狀態檢查
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+
+        // 【新增】如果玩家已死亡，回傳特殊狀態
+        if (userData && userData.isDeceased) {
+            return res.json({ gameState: 'deceased' });
+        }
+        
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(7).get();
         if (snapshot.empty) {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
