@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 獲取所有需要的DOM元素 ---
     const storyPanelWrapper = document.querySelector('.story-panel');
     const storyTextContainer = document.getElementById('story-text-wrapper');
-    // ... 其他元素 ...
     const playerInput = document.getElementById('player-input');
     const submitButton = document.getElementById('submit-button');
     const roundTitleEl = document.getElementById('round-title');
@@ -100,9 +99,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 【已修改】玩家行動處理函式
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
         if (!actionText || isRequesting) return;
+
+        playerInput.value = ''; // 【新增】送出後立刻清空輸入框
 
         const selectedModel = aiModelSelector.value;
         setLoadingState(true);
@@ -125,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 【已修改】初始化函式，整合讀取提示與前情提要
+    // 初始化遊戲函式
     async function initializeGame() {
         setLoadingState(true);
         prequelLoader.classList.add('visible'); // 顯示讀取提示
@@ -143,23 +145,23 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 const data = await response.json();
                 currentRound = data.roundData.R;
-                storyTextContainer.innerHTML = ''; // 清空畫面
+                storyTextContainer.innerHTML = '';
 
-                // 如果後端傳來了前情提要，就顯示它
                 if (data.prequel) {
                     const prequelDiv = document.createElement('div');
-                    prequelDiv.className = 'system-message prequel-summary'; // 給予特殊樣式
+                    prequelDiv.className = 'system-message prequel-summary';
                     prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
                     storyTextContainer.appendChild(prequelDiv);
                 }
                 
                 updateUI(data.story, data.roundData);
             }
-        } catch (error) {
+        } catch (error)
+ {
             handleApiError(error);
         } finally {
             setLoadingState(false);
-            prequelLoader.classList.remove('visible'); // 無論成功失敗，都隱藏讀取提示
+            prequelLoader.classList.remove('visible');
         }
     }
 
@@ -168,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isRequesting = isLoading;
         playerInput.disabled = isLoading;
         submitButton.disabled = isLoading;
-        submitButton.textContent = isLoading ? '運算中...' : '運功';
+        submitButton.textContent = isLoading ? '撰寫中...' : '動作';
         if (!isLoading) playerInput.focus();
     }
     
