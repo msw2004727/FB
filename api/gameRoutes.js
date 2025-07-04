@@ -95,9 +95,11 @@ router.get('/latest-game', async (req, res) => {
         let prequel = null;
         if (recentHistory.length > 1) {
             const historyForPrequel = [...recentHistory].reverse();
-            prequel = await getAIPrequel('gemini', historyForPrequel);
+            // 【已修正】將此處寫死的 'gemini' 改為 'deepseek'
+            prequel = await getAIPrequel('deepseek', historyForPrequel);
         }
 
+        // 【已修正】統一使用 'deepseek'
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
         res.json({
@@ -178,22 +180,18 @@ router.post('/restart', async (req, res) => {
     }
 });
 
-// 【新增】強制自殺路由
 router.post('/force-suicide', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     try {
         const userDocRef = db.collection('users').doc(userId);
 
-        // 1. 直接更新玩家為死亡狀態
         await userDocRef.update({ isDeceased: true });
 
-        // 2. 獲取當前回合數，以建立下一個回合
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
         const newRoundNumber = lastRound + 1;
 
-        // 3. 手動建立一個必死的最終回合資料
         const finalRoundData = {
             R: newRoundNumber,
             playerState: 'dead',
@@ -211,17 +209,14 @@ router.post('/force-suicide', async (req, res) => {
             IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
         };
 
-        // 4. 為這個結局生成小說旁白並儲存
-        const finalNarrative = await getNarrative('deepseek', finalRoundData); // 使用預設模型
+        const finalNarrative = await getNarrative('deepseek', finalRoundData);
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
         await novelCacheRef.set({ 
             paragraphs: admin.firestore.FieldValue.arrayUnion({ text: finalNarrative, npcs: [] }) 
         }, { merge: true });
         
-        // 5. 儲存最終回合的存檔
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
         
-        // 6. 回傳給前端，觸發死亡畫面
         res.json({
             story: finalNarrative,
             roundData: finalRoundData,
