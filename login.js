@@ -1,31 +1,56 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入 - AI武俠世界</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
-</head>
-<body class="auth-page">
-    <div class="auth-container">
-        <h2 class="auth-title">重返江湖</h2>
-        <form id="login-form" class="auth-form">
-            <div class="input-group">
-                <i class="fas fa-user"></i>
-                <input type="text" id="username" placeholder="請輸入你的名號" required>
-            </div>
-            <div class="input-group">
-                <i class="fas fa-lock"></i>
-                <input type="password" id="password" placeholder="請輸入你的密碼" required>
-            </div>
-            <button type="submit" id="submit-btn">進入江湖</button>
-        </form>
-        <p id="message" class="message"></p>
-        <div class="auth-switch">
-            <span>還沒有帳號？</span> <a href="register.html">立即註冊</a>
-        </div>
-    </div>
-    <script src="login.js"></script>
-</body>
-</html>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('login-form');
+    const messageElement = document.getElementById('message');
+    const backendBaseUrl = 'https://ai-novel-final.onrender.com';
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault(); // 防止表單預設的提交行為
+
+        // 清空之前的訊息
+        messageElement.textContent = '';
+        messageElement.className = 'message';
+
+        // 獲取表單資料
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value.trim();
+
+        if (!username || !password) {
+            messageElement.textContent = '所有欄位皆為必填。';
+            messageElement.classList.add('error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${backendBaseUrl}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // 如果伺服器回傳錯誤 (如 401, 500), 拋出錯誤
+                throw new Error(data.message || '發生未知錯誤');
+            }
+
+            // 登入成功
+            messageElement.textContent = data.message + ' 即將進入遊戲...';
+            messageElement.classList.add('success');
+
+            // 【重要】將 token 和 username 存儲到瀏覽器的 localStorage
+            localStorage.setItem('jwt_token', data.token);
+            localStorage.setItem('username', data.username);
+
+            // 1.5秒後自動跳轉到主遊戲頁面
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1500);
+
+        } catch (error) {
+            console.error('登入失敗:', error);
+            messageElement.textContent = error.message;
+            messageElement.classList.add('error');
+        }
+    });
+});
