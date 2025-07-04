@@ -3,33 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 文字互動小說</title>
+    <title>AI 武俠世界</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <header class="game-header">
-            <h1>你的史詩</h1>
-        </header>
-
-        <main class="game-main">
+    <div class="game-world">
+        <main class="story-container">
+            <header class="story-header">
+                <h1>江湖一夢</h1>
+                <button id="theme-switcher" title="切換主題"><i class="fas fa-sun"></i></button>
+            </header>
             <div id="story-panel" class="panel">
                 <p class="system-message">正在連接你的世界，讀取記憶中...</p>
             </div>
-            <div id="info-panel" class="panel">
-                <h2><span class="highlight">R<span id="round-number">0</span></span> | 回合資訊</h2>
-                <pre id="round-info"></pre>
-            </div>
+            <footer class="story-footer">
+                <input type="text" id="player-input" placeholder="你心念一動..." autocomplete="off">
+                <button id="submit-button">送出</button>
+            </footer>
         </main>
 
-        <footer class="game-footer">
-            <div class="input-area">
-                <input type="text" id="player-input" placeholder="你決定..." autocomplete="off">
-                <button id="submit-button">送出行動</button>
+        <aside class="info-dashboard" id="info-dashboard">
+            <div class="info-card" id="card-pc">
+                <div class="card-header"><i class="fas fa-user"></i> 角色狀態 (PC)</div>
+                <div class="card-content" id="pc-content"></div>
             </div>
-        </footer>
+            <div class="info-card" id="card-psy">
+                <div class="card-header"><i class="fas fa-brain"></i> 內心獨白 (PSY)</div>
+                <div class="card-content" id="psy-content"></div>
+            </div>
+            <div class="info-card" id="card-itm">
+                <div class="card-header"><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</div>
+                <div class="card-content" id="itm-content"></div>
+            </div>
+            <div class="info-card" id="card-qst">
+                <div class="card-header"><i class="fas fa-scroll"></i> 任務日誌 (QST)</div>
+                <div class="card-content" id="qst-content"></div>
+            </div>
+            <div class="info-card" id="card-npc">
+                <div class="card-header"><i class="fas fa-users"></i> 人物見聞 (NPC)</div>
+                <div class="card-content" id="npc-content"></div>
+            </div>
+            <div class="info-card" id="card-cls">
+                <div class="card-header"><i class="fas fa-key"></i> 關鍵線索 (CLS)</div>
+                <div class="card-content" id="cls-content"></div>
+            </div>
+            <div class="info-card" id="card-lor">
+                <div class="card-header"><i class="fas fa-book-open"></i> 江湖傳聞 (LOR)</div>
+                <div class="card-content" id="lor-content"></div>
+            </div>
+            <div class="info-card" id="card-loc">
+                <div class="card-header"><i class="fas fa-map-marker-alt"></i> 當前地點 (LOC)</div>
+                <div class="card-content" id="loc-content"></div>
+            </div>
+            <div class="info-card" id="card-atm">
+                <div class="card-header"><i class="fas fa-wind"></i> 場景氛圍 (ATM)</div>
+                <div class="card-content" id="atm-content"></div>
+            </div>
+            <div class="info-card" id="card-wrd">
+                <div class="card-header"><i class="fas fa-globe-asia"></i> 世界局勢 (WRD)</div>
+                <div class="card-content" id="wrd-content"></div>
+            </div>
+            <div class="info-card" id="card-evt">
+                <div class="card-header"><i class="fas fa-bolt"></i> 事件摘要 (EVT)</div>
+                <div class="card-content" id="evt-content"></div>
+            </div>
+            <div class="info-card" id="card-imp">
+                <div class="card-header"><i class="fas fa-link"></i> 行動影響 (IMP)</div>
+                <div class="card-content" id="imp-content"></div>
+            </div>
+        </aside>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
