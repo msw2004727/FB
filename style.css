@@ -1,0 +1,93 @@
+body {
+    font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+    background-color: #f0f2f5;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+header {
+    background-color: #4a69bd;
+    color: white;
+    padding: 15px 20px;
+    text-align: center;
+}
+
+main {
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+}
+
+.story-panel {
+    flex: 3;
+    min-height: 300px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.info-panel {
+    flex: 2;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+.info-panel h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+    color: #4a69bd;
+    border-bottom: 2px solid #4a69bd;
+    padding-bottom: 5px;
+}
+
+pre#round-info {
+    white-space: pre-wrap; /* 自動換行 */
+    word-wrap: break-word;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+}
+
+footer {
+    padding: 20px;
+    background-color: #f0f2f5;
+    border-top: 1px solid #ddd;
+}
+
+.input-area {
+    display: flex;
+}
+
+#player-action {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px 0 0 5px;
+}
+
+#submit-action {
+    padding: 10px 20px;
+    border: none;
+    background-color: #5d8aa8;
+    color: white;
+    cursor: pointer;
+    border-radius: 0 5px 5px 0;
+    transition: background-color 0.3s;
+}
+
+#submit-action:hover {
+    background-color: #4a69bd;
+}
