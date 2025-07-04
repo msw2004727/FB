@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 文字互動小說</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI 文字互動小說</h1>
+        </header>
+
+        <main>
+            <div id="story-display" class="story-panel">
+                <p>遊戲即將開始...</p>
+            </div>
+
+            <div id="info-panel" class="info-panel">
+                <h2>本回合資訊</h2>
+                <pre id="round-info"></pre>
+            </div>
+        </main>
+
+        <footer>
+            <div class="input-area">
+                <input type="text" id="player-action" placeholder="你想要做什麼？">
+                <button id="submit-action">送出</button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
