@@ -104,6 +104,7 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
+// 【已修改】小說生成路由
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -114,7 +115,8 @@ router.get('/get-novel', async (req, res) => {
         
         const narrativePromises = snapshot.docs.map(async (doc) => {
             const roundData = doc.data();
-            const narrativeText = await getNarrative('gemini', roundData);
+            // 【已修改】將 'gemini' 更改為 'deepseek'
+            const narrativeText = await getNarrative('deepseek', roundData);
             
             return {
                 text: narrativeText,
@@ -131,13 +133,11 @@ router.get('/get-novel', async (req, res) => {
     }
 });
 
-// 【已修改】使用更穩定、更簡潔的方式處理重新開始
 router.post('/restart', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDocRef = db.collection('users').doc(userId);
         
-        // 刪除舊的存檔集合
         const savesCollectionRef = userDocRef.collection('game_saves');
         const savesSnapshot = await savesCollectionRef.get();
         const batch = db.batch();
@@ -146,11 +146,9 @@ router.post('/restart', async (req, res) => {
         });
         await batch.commit();
 
-        // 刪除舊的遊戲狀態 (摘要和建議)
         await userDocRef.collection('game_state').doc('summary').delete().catch(() => {});
         await userDocRef.collection('game_state').doc('suggestion').delete().catch(() => {});
         
-        // 移除玩家的死亡標記
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete()
         });
