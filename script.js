@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     });
 
-    // --- 【新增】AI核心切換提示 ---
+    // --- AI核心切換提示 ---
     aiModelSelector.addEventListener('change', (event) => {
         const selectedModelName = event.target.options[event.target.selectedIndex].text;
         const notification = document.createElement('p');
@@ -173,20 +173,40 @@ document.addEventListener('DOMContentLoaded', () => {
         storyTextContainer.innerHTML = '';
         updateUI('你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。', {
             R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'],
-            PC: '身體虛弱，內息紊亂', NPC: '', ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: ''
+            PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: ''
         });
     }
 
-    function appendMessageToStory(text, className) {
+    // 【已修改】將 textContent 改為 innerHTML 以支援HTML標籤渲染
+    function appendMessageToStory(htmlContent, className) {
         const p = document.createElement('p');
-        p.textContent = text;
+        p.innerHTML = htmlContent; // 使用 innerHTML 讓 span 標籤生效
         if (className) p.className = className;
         storyTextContainer.appendChild(p);
         storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
     }
 
+    // 【新增】用於在高亮NPC姓名的輔助函式
+    function highlightNpcNames(text, npcs) {
+        let highlightedText = text;
+        if (npcs && Array.isArray(npcs) && npcs.length > 0) {
+            // 根據名字長度排序，長的先替換，避免 "李四" 被 "李" 先替換掉的問題
+            const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
+            sortedNpcs.forEach(npc => {
+                const regex = new RegExp(npc.name, 'g');
+                const replacement = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>`;
+                highlightedText = highlightedText.replace(regex, replacement);
+            });
+        }
+        return highlightedText;
+    }
+
+    // 【已修改】更新UI函式，以處理新的NPC資料結構和高亮姓名
     function updateUI(storyText, data) {
-        appendMessageToStory(storyText, 'story-text');
+        // 高亮處理故事內文
+        const processedStory = highlightNpcNames(storyText, data.NPC);
+        appendMessageToStory(processedStory, 'story-text');
+
         roundTitleEl.textContent = data.EVT || `第 ${data.R} 回`;
         const atmosphere = data.ATM?.[0] || '未知';
         const weather = data.WRD || '晴朗';
@@ -197,7 +217,19 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="status-item"><i class="fas fa-map-marked-alt"></i> 地點: ${location}</div>
         `;
         pcContent.textContent = data.PC || '狀態穩定';
-        npcContent.textContent = data.NPC || '未見人煙';
+        
+        // 更新儀表板中的NPC列表
+        npcContent.innerHTML = ''; // 清空舊內容
+        if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
+            data.NPC.forEach(npc => {
+                const npcLine = document.createElement('div');
+                npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
+                npcContent.appendChild(npcLine);
+            });
+        } else {
+            npcContent.textContent = '未見人煙';
+        }
+
         itmContent.textContent = data.ITM || '行囊空空';
         qstContent.textContent = data.QST || '暫無要事';
         psyContent.textContent = data.PSY || '心如止水';
