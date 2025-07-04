@@ -48,6 +48,19 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     storyPanelWrapper.appendChild(prequelLoader);
 
+    // 【新增】建立 AI 回應等待動畫元素
+    const aiThinkingLoader = document.createElement('div');
+    aiThinkingLoader.className = 'ai-thinking-loader';
+    aiThinkingLoader.innerHTML = `
+        <div class="loader-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    `;
+    storyPanelWrapper.appendChild(aiThinkingLoader);
+
+
     if (welcomeMessage && username) {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
     }
@@ -200,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.prequel) {
                 const prequelDiv = document.createElement('div');
-                // 【已修正】移除衝突的 'system-message' 樣式
                 prequelDiv.className = 'prequel-summary';
                 prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
                 storyTextContainer.appendChild(prequelDiv);
@@ -221,11 +233,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 輔助函式 ---
+    // 【已修改】加入動畫顯示/隱藏的控制
     function setLoadingState(isLoading) {
         isRequesting = isLoading;
         playerInput.disabled = isLoading;
         submitButton.disabled = isLoading;
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+
+        if (isLoading) {
+            aiThinkingLoader.classList.add('visible');
+        } else {
+            aiThinkingLoader.classList.remove('visible');
+        }
+
         if (!isLoading) playerInput.focus();
     }
     
