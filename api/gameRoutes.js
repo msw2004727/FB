@@ -9,9 +9,12 @@ const db = admin.firestore();
 
 router.use(authMiddleware);
 
-// 【已修改】互動路由，同步獲取建議
+// 【已修改】互動路由，現在會傳遞玩家暱稱給AI
 router.post('/interact', async (req, res) => {
+    // 從守衛中取得使用者ID和使用者名稱
     const userId = req.user.id;
+    const username = req.user.username; // 【重要】獲取玩家暱稱
+
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
 
@@ -34,25 +37,20 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 1. 生成主要故事
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile);
+        // 【已修改】呼叫 getAIStory 時，傳入 username
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
-
-        // 2. 【已修改】同步等待 AI 生成建議
-        const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
         
-        // 3. 將建議加入到主要回應中
+        const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
         aiResponse.suggestion = suggestion;
 
-        // 4. 儲存遊戲進度與摘要
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
         const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-        // 5. 將包含建議的完整資料回傳給前端
         res.json(aiResponse);
 
     } catch (error) {
@@ -61,7 +59,6 @@ router.post('/interact', async (req, res) => {
     }
 });
 
-// 【已修改】讀取最新進度時，也一併獲取對應的建議
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -79,7 +76,6 @@ router.get('/latest-game', async (req, res) => {
             prequel = await getAIPrequel('gemini', historyForPrequel);
         }
 
-        // 為最新的一回合也產生一次建議
         const suggestion = await getAISuggestion('gemini', latestGameData);
 
         res.json({
