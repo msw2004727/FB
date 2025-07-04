@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3001;
 // --- CORS 設定 (最終明確版) ---
 const corsOptions = {
   origin: 'https://msw2004727.github.io', // 只允許您的GitHub Pages來源的請求
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200 
 };
 app.use(cors(corsOptions));
 // --- CORS 設定結束 ---
