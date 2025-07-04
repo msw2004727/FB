@@ -184,15 +184,50 @@ body.dark-theme .round-title { color: var(--dark-accent); }
 body.dark-theme .player-action-log { color: var(--dark-text-secondary); }
 .system-message { text-align: center; font-style: italic; color: var(--light-text-secondary); }
 body.dark-theme .system-message { color: var(--dark-text-secondary); }
-.story-footer { display: flex; border-top: 1px solid var(--light-border); background: var(--light-surface-bg); }
+
+/* 【已修改】調整 footer 佈局以容納提示文字 */
+.story-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    border-top: 1px solid var(--light-border);
+    background: var(--light-surface-bg);
+}
 body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); background: var(--dark-surface-bg); }
-#player-input { flex-grow: 1; padding: 1.25rem 2rem; border: none; background: transparent; color: var(--light-text-primary); font-family: var(--font-sans); font-size: 1.1rem; }
+
+/* 【已修改】調整 input 樣式 */
+#player-input {
+    flex-grow: 1;
+    padding: 1.25rem 2rem;
+    border: none;
+    background: transparent;
+    color: var(--light-text-primary);
+    font-family: var(--font-sans);
+    font-size: 1.1rem;
+    min-width: 100px;
+}
 body.dark-theme #player-input { color: var(--dark-text-primary); }
 #player-input:focus { outline: none; }
-#submit-button { padding: 0 2rem; border: none; border-left: 1px solid var(--light-border); background-color: var(--light-accent); color: #fff; font-family: var(--font-sans); font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+
+/* 【已修改】調整按鈕寬度 */
+#submit-button {
+    flex-shrink: 0; /* 防止按鈕被壓縮 */
+    min-width: 120px; /* 設定最小寬度 */
+    padding: 1.25rem 2rem; /* 統一垂直內距 */
+    border: none;
+    border-left: 1px solid var(--light-border);
+    background-color: var(--light-accent);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
 body.dark-theme #submit-button { border-left: 1px solid var(--dark-border); }
 #submit-button:hover { opacity: 0.8; }
 #submit-button:disabled { background-color: var(--light-text-secondary); cursor: not-allowed; }
+
 .dashboard-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--light-border); flex-shrink: 0; }
 body.dark-theme .dashboard-header { border-bottom: 1px solid var(--dark-border); }
 .dashboard-header h3 { margin: 0; font-family: var(--font-sans); }
@@ -352,7 +387,7 @@ body.dark-theme .npc-neutral {
     color: var(--dark-text-secondary); /* 中立灰 - 深色主題 */
 }
 
-/* --- 【新增】遊戲讀取提示樣式 --- */
+/* --- 遊戲讀取提示樣式 --- */
 .prequel-loader {
     position: absolute;
     top: 0;
@@ -421,4 +456,21 @@ body.dark-theme .prequel-loader-dots span {
     40% {
         transform: scale(1.0);
     }
+}
+
+/* --- 【新增】動作提示句樣式 --- */
+.action-suggestion {
+    width: 100%;
+    order: -1; /* 將此元素排到最前面 (最上方) */
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--light-text-secondary);
+    padding: 0.5rem 1rem 0.25rem 1rem;
+    box-sizing: border-box;
+    min-height: 1.2em; /* 預留空間防止畫面跳動 */
+    transition: color 0.3s;
+}
+
+body.dark-theme .action-suggestion {
+    color: var(--dark-text-secondary);
 }
