@@ -12,30 +12,79 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// --- Google AI 設定 ---
+// --- 所有 AI SDK 初始化 ---
+// 1. Google Gemini
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+
+// 2. OpenAI
+const { OpenAI } = require("openai");
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+
+// 3. DeepSeek (使用OpenAI相容的API格式)
+const deepseek = new OpenAI({
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseURL: "https://api.deepseek.com/v1",
+});
+
 
 // --- Express App 設定 ---
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// --- CORS 設定 ---
 const corsOptions = {
   origin: 'https://msw2004727.github.io', 
   optionsSuccessStatus: 200 
 };
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
 
 // =================================================================
-// ============== 三大核心 AI 函式 (小說家, 檔案管理員, 故事大師) ==============
+// ============== 統一的AI調度中心 (Central AI Dispatcher) ==============
+// =================================================================
+async function callAI(modelName, prompt) {
+    console.log(`正在使用模型: ${modelName}`);
+    try {
+        let textResponse = "";
+        switch (modelName) {
+            case 'openai':
+                const openaiResult = await openai.chat.completions.create({
+                    model: "gpt-4o",
+                    messages: [{ role: "user", content: prompt }],
+                });
+                textResponse = openaiResult.choices[0].message.content;
+                break;
+            case 'deepseek':
+                const deepseekResult = await deepseek.chat.completions.create({
+                    model: "deepseek-chat",
+                    messages: [{ role: "user", content: prompt }],
+                });
+                textResponse = deepseekResult.choices[0].message.content;
+                break;
+            case 'gemini':
+            default: // 若無指定或指定錯誤，一律使用Gemini
+                const geminiResult = await geminiModel.generateContent(prompt);
+                textResponse = (await geminiResult.response).text();
+        }
+        return textResponse;
+    } catch (error) {
+        console.error(`使用模型 ${modelName} 時出錯:`, error);
+        throw new Error(`AI模型 ${modelName} 呼叫失敗`);
+    }
+}
+
+
+// =================================================================
+// ============== 三大核心 AI 任務 (現在都透過調度中心) ==============
 // =================================================================
 
-async function getNarrative(roundData) {
+/**
+ * AI 角色 1: 小說家 (將結構化數據轉為小說文字)
+ */
+async function getNarrative(modelName, roundData) {
     const prompt = `
     你是一位功力深厚的武俠小說家，風格近似金庸。你的任務是將以下提供的結構化遊戲數據，改寫成一段充滿意境、文筆流暢、富有細節的敘述性小說段落。請自然地將所有數據融入到段落中，不要生硬地條列。重點是創造沉浸感。
 
@@ -45,16 +94,17 @@ async function getNarrative(roundData) {
     現在，請將以上數據改寫成一段精彩的小說段落。
     `;
     try {
-        const result = await aiModel.generateContent(prompt);
-        const response = await result.response;
-        return response.text();
+        return await callAI(modelName, prompt);
     } catch (error) {
-        console.error("AI(小說家)生成段落時出錯:", error);
+        console.error("AI(小說家)任務失敗:", error);
         return "在那一刻，時間的長河似乎出現了斷層，記憶的碎片未能拼湊成完整的畫面...";
     }
 }
 
-async function getAISummary(oldSummary, newRoundData) {
+/**
+ * AI 角色 2: 檔案管理員 (更新長期記憶摘要)
+ */
+async function getAISummary(modelName, oldSummary, newRoundData) {
     const prompt = `
     你是一位專業的「故事檔案管理員」。你的任務是將新發生的事件，精煉並整合進舊的故事摘要中，產出一個更新、更簡潔的摘要。
 
@@ -72,20 +122,20 @@ async function getAISummary(oldSummary, newRoundData) {
     現在，請根據以上資訊，產出更新後的JSON格式摘要。
     `;
     try {
-        const result = await aiModel.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        const text = await callAI(modelName, prompt);
         const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
         const parsedJson = JSON.parse(cleanJsonText);
         return parsedJson.summary;
-    } catch (error)
-    {
-        console.error("AI(檔案管理員)生成摘要時出錯:", error);
-        return oldSummary;
+    } catch (error) {
+        console.error("AI(檔案管理員)任務失敗:", error);
+        return oldSummary; // 解析失敗則保留舊摘要
     }
 }
 
-async function getAIStory(longTermSummary, recentHistory, playerAction) {
+/**
+ * AI 角色 3: 故事大師 (生成下一回合的遊戲內容)
+ */
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction) {
     const prompt = `
     你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。
 
@@ -93,14 +143,14 @@ async function getAIStory(longTermSummary, recentHistory, playerAction) {
     ${longTermSummary}
     
     ## 核心世界觀：
-    1.  **時代背景**: 這是一個類似金庸世界觀，但架空的武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節。
-    2.  **主角設定**: 主角是一個從21世紀現代社會，靈魂穿越到這個世界的年輕人。他附身在一個不知名、約20歲的少年身上。這具身體骨骼清奇、經脈異於常人，是萬中無一的練武奇才，但因為不明原因，正處於重傷瀕死的狀態。
+    1.  **時代背景**: 這是一個類似明朝中葉，但架空的武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節。
+    2.  **主角設定**: 主角是一個從21世紀現代社會，靈魂穿越到這個世界的年輕人。他附身在一個不知名、約15歲的少年身上。這具身體骨骼清奇、經脈異於常人，是萬中無一的練武奇才，但因為不明原因，正處於重傷瀕死的狀態。
     3.  **開場地點**: 主角目前在一個名為「無名村」的偏遠小村落。這個村莊地處偏僻，但周圍的山賊、惡霸、甚至不入流的小門派等惡勢力橫行，村民長年受到脅迫，生活困苦。
 
     ## 你必須嚴格遵守以下的規則：
     1. 你的所有回應都必須是一個完整的JSON物件，不要在前後添加任何額外的文字或 "\\\`\\\`\\\`json" 標記。
     2. JSON物件必須包含 "story" 和 "roundData" 兩個頂層鍵。
-    3. "story" 鍵的值是一個字串，用來生動地描述故事發展，回覆必須用繁體中文，且字數控制在300字以內。
+    3. "story" 鍵的值是一個字串，用來生動地描述故事發展，回覆必須用繁體中文，且字數控制在150字以內。
     4. "roundData" 鍵的值是一個物件，必須包含以下所有欄位，即使沒有內容也要用空字串""表示：
         - R: (數字) 新的回合編號
         - ATM: (陣列) [氛圍, 感官細節]
@@ -129,13 +179,11 @@ async function getAIStory(longTermSummary, recentHistory, playerAction) {
     `;
 
     try {
-        const result = await aiModel.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        const text = await callAI(modelName, prompt);
         const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
         return JSON.parse(cleanJsonText);
     } catch (error) {
-        console.error("AI(故事大師)生成故事時出錯:", error);
+        console.error("AI(故事大師)任務失敗:", error);
         return null;
     }
 }
@@ -145,16 +193,18 @@ async function getAIStory(longTermSummary, recentHistory, playerAction) {
 // ========================== API 路由 ===========================
 // =================================================================
 
+// 核心互動路由
 app.post('/interact', async (req, res) => {
     try {
-        const playerAction = req.body.action;
-        const currentRound = req.body.round;
-        console.log(`接收到玩家行動 (R${currentRound}): ${playerAction}`);
+        const { action: playerAction, round: currentRound, model: modelName } = req.body;
+        console.log(`接收到玩家行動 (R${currentRound}), 請求模型: ${modelName}`);
 
+        // 1. 讀取長期摘要
         const summaryDocRef = db.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始，一切都是未知的。";
 
+        // 2. 讀取近期歷史 (滑動窗口)
         let recentHistoryRounds = [];
         const memoryDepth = 3;
         if (currentRound > 0) {
@@ -166,33 +216,32 @@ app.post('/interact', async (req, res) => {
                 }
             }
             const snapshots = await Promise.all(queries);
-            snapshots.forEach(doc => {
-                if (doc.exists) {
-                    recentHistoryRounds.push(doc.data());
-                }
-            });
+            snapshots.forEach(doc => { if (doc.exists) { recentHistoryRounds.push(doc.data()); } });
             recentHistoryRounds.sort((a, b) => a.R - b.R);
         }
         const recentHistoryJson = JSON.stringify(recentHistoryRounds, null, 2);
 
-        const aiResponse = await getAIStory(longTermSummary, recentHistoryJson, playerAction);
+        // 3. 呼叫主AI生成新回合 (傳入模型名稱)
+        const aiResponse = await getAIStory(modelName, longTermSummary, recentHistoryJson, playerAction);
 
-        if (!aiResponse) {
-             throw new Error("主AI未能生成有效的回應。");
-        }
+        if (!aiResponse) { throw new Error("主AI未能生成有效的回應。"); }
         
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
 
+        // 4. 儲存新回合的詳細紀錄
         const newRoundDocId = `R${newRoundNumber}`;
         await db.collection('game_saves').doc(newRoundDocId).set(aiResponse.roundData);
         console.log(`回合 ${newRoundDocId} 已成功寫入Firebase!`);
 
-        const newSummary = await getAISummary(longTermSummary, aiResponse.roundData);
+        // 5. 呼叫摘要AI更新長期記憶 (傳入模型名稱)
+        const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
         
+        // 6. 儲存更新後的摘要
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         console.log(`故事摘要已更新至第 ${newRoundNumber} 回合。`);
 
+        // 7. 回傳結果給前端
         res.json(aiResponse);
 
     } catch (error) {
@@ -204,6 +253,7 @@ app.post('/interact', async (req, res) => {
     }
 });
 
+// 讀取最新進度路由 (給遊戲主頁用)
 app.get('/latest-game', async (req, res) => {
     try {
         const snapshot = await db.collection('game_saves').orderBy('R', 'desc').limit(1).get();
@@ -222,6 +272,7 @@ app.get('/latest-game', async (req, res) => {
     }
 });
 
+// 讀取完整小說路由 (給小說頁面用)
 app.get('/get-novel', async (req, res) => {
     try {
         const snapshot = await db.collection('game_saves').orderBy('R', 'asc').get();
@@ -229,7 +280,8 @@ app.get('/get-novel', async (req, res) => {
             res.status(404).json({ novel: ["故事尚未開始..."] });
             return;
         }
-        const narrativePromises = snapshot.docs.map(doc => getNarrative(doc.data()));
+        // 為節省成本與統一風格，小說生成預設使用gemini
+        const narrativePromises = snapshot.docs.map(doc => getNarrative('gemini', doc.data()));
         const novelParagraphs = await Promise.all(narrativePromises);
         res.json({ novel: novelParagraphs });
     } catch (error) {
@@ -238,6 +290,7 @@ app.get('/get-novel', async (req, res) => {
     }
 });
 
+// 根路由 (用於健康檢查)
 app.get('/', (req, res) => {
     res.send('AI 小說伺服器已啟動，並已連接到Firebase和Google AI！');
 });
