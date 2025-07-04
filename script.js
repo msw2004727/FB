@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
-    // 【新增】獲取武功數值顯示元素
     const internalPowerEl = document.getElementById('internal-power-display');
     const externalPowerEl = document.getElementById('external-power-display');
     const npcContent = document.getElementById('npc-content');
@@ -152,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 【已修改】徹底改造此函式以處理串流回應
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
         if (!actionText || isRequesting) return;
@@ -163,24 +163,74 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoadingState(true);
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
+        let finalRoundData = null;
+
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ action: actionText, round: currentRound, model: selectedModel })
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `伺服器錯誤: ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let storyStarted = false;
             
-            currentRound = data.roundData.R;
-            updateUI(data.story, data.roundData);
-            
-            if (data.suggestion) {
-                actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+            // 預先建立一個空的 story <p> 元素
+            const storyElement = document.createElement('p');
+            storyElement.className = 'story-text';
+            storyTextContainer.appendChild(storyElement);
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    // 串流結束後，檢查是否死亡
+                    if (finalRoundData && finalRoundData.playerState === 'dead') {
+                        showDeceasedScreen();
+                    }
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                
+                // 如果故事尚未開始，尋找分隔符號
+                if (!storyStarted) {
+                    const separatorIndex = buffer.indexOf('\n<STREAM_SEPARATOR>\n');
+                    if (separatorIndex !== -1) {
+                        const jsonDataString = buffer.substring(0, separatorIndex);
+                        const initialData = JSON.parse(jsonDataString);
+                        finalRoundData = initialData.roundData; // 儲存完整的 roundData
+
+                        // 更新除了故事以外的所有UI
+                        updateUI(null, finalRoundData); 
+                        if (initialData.suggestion) {
+                            actionSuggestion.textContent = `書僮小聲說：${initialData.suggestion}`;
+                        }
+                        
+                        storyStarted = true;
+                        // 處理分隔符號後可能跟著的文字
+                        buffer = buffer.substring(separatorIndex + '\n<STREAM_SEPARATOR>\n'.length);
+                    }
+                }
+
+                // 如果故事已經開始，將文字附加到畫面
+                if (storyStarted) {
+                    // 使用 innerHTML 以便稍後高亮NPC
+                    storyElement.innerHTML += buffer.replace(/\n/g, '<br>');
+                    buffer = '';
+                    storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
+                }
             }
             
-            if (data.roundData.playerState === 'dead') {
-                showDeceasedScreen();
+            // 故事全部顯示完畢後，執行一次NPC高亮
+            if (storyElement && finalRoundData) {
+                storyElement.innerHTML = highlightNpcNames(storyElement.innerHTML, finalRoundData.NPC);
             }
 
         } catch (error) {
@@ -298,10 +348,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return highlightedText;
     }
 
+    // 【已修改】讓 storyText 參數可選
     function updateUI(storyText, data) {
-        const processedStory = highlightNpcNames(storyText, data.NPC);
-        appendMessageToStory(processedStory, 'story-text');
+        if (storyText) {
+            const processedStory = highlightNpcNames(storyText, data.NPC);
+            appendMessageToStory(processedStory, 'story-text');
+        }
 
+        currentRound = data.R;
         roundTitleEl.textContent = data.EVT || `第 ${data.R} 回`;
         
         const atmosphere = data.ATM?.[0] || '未知';
@@ -316,7 +370,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         pcContent.textContent = data.PC || '狀態穩定';
-        // 【新增】更新武功數值顯示
         internalPowerEl.textContent = `內功: ${data.internalPower || 0}`;
         externalPowerEl.textContent = `外功: ${data.externalPower || 0}`;
         
