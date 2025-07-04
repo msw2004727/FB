@@ -197,17 +197,15 @@ body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); backgr
     align-items: stretch; /* 讓子元素填滿容器高度 */
 }
 
-/* 【已修改】為輸入框和按鈕設定通用樣式以確保高度一致 */
 #player-input,
 #submit-button {
-    padding: 1.1rem 2rem; /* 統一垂直內距 */
-    font-size: 1.1rem;      /* 統一字體大小 */
-    line-height: 1.5;       /* 統一線高 */
-    border: none;           /* 統一無邊框 */
-    box-sizing: border-box; /* 統一盒模型計算方式 */
+    padding: 1.1rem 2rem;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    border: none;
+    box-sizing: border-box;
 }
 
-/* 【已修改】只保留輸入框的獨特樣式 */
 #player-input {
     flex-grow: 1;
     min-width: 100px;
@@ -217,7 +215,6 @@ body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); backgr
 body.dark-theme #player-input { color: var(--dark-text-primary); }
 #player-input:focus { outline: none; }
 
-/* 【已修改】只保留按鈕的獨特樣式 */
 #submit-button {
     flex-shrink: 0;
     min-width: 120px;
@@ -476,4 +473,127 @@ body.dark-theme .prequel-loader-dots span {
 
 body.dark-theme .action-suggestion {
     color: var(--dark-text-secondary);
+}
+
+/* --- 【新增】死亡畫面樣式 --- */
+.deceased-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 1002;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+    backdrop-filter: blur(5px);
+}
+
+.deceased-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.deceased-content {
+    background-color: var(--light-surface-bg);
+    padding: 3rem;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 480px;
+    width: 90%;
+    font-family: var(--font-serif);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+body.dark-theme .deceased-content {
+    background-color: var(--dark-surface-bg);
+}
+
+.deceased-content .fa-book-dead {
+    font-size: 4rem;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .deceased-content .fa-book-dead {
+    color: var(--dark-text-secondary);
+}
+
+.deceased-content h2 {
+    font-size: 2.2rem;
+    margin: 0;
+    color: var(--light-text-primary);
+}
+body.dark-theme .deceased-content h2 {
+    color: var(--dark-text-primary);
+}
+
+.deceased-content p {
+    font-size: 1.1rem;
+    color: var(--light-text-secondary);
+    margin: 0;
+    line-height: 1.8;
+}
+body.dark-theme .deceased-content p {
+    color: var(--dark-text-secondary);
+}
+
+.deceased-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+
+.deceased-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.deceased-btn.review-btn {
+    background-color: transparent;
+    border-color: var(--light-border);
+    color: var(--light-text-secondary);
+}
+body.dark-theme .deceased-btn.review-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+.deceased-btn.review-btn:hover {
+    background-color: var(--light-bg);
+    color: var(--light-text-primary);
+}
+body.dark-theme .deceased-btn.review-btn:hover {
+    background-color: var(--dark-bg);
+    color: var(--dark-text-primary);
+}
+
+.deceased-btn.restart-btn {
+    background-color: var(--light-accent);
+    color: #fff;
+}
+body.dark-theme .deceased-btn.restart-btn {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+}
+.deceased-btn.restart-btn:hover {
+    opacity: 0.85;
 }
