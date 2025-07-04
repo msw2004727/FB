@@ -11,13 +11,11 @@ const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚'
 
 router.use(authMiddleware);
 
-// 【已修改】此路由現在會將資料以串流形式推送給前端
 router.post('/interact', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
 
     try {
-        // --- 1. 正常接收請求與準備資料 ---
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
 
         const userDocRef = db.collection('users').doc(userId);
@@ -49,103 +47,68 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        const stream = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
-        if (!stream) throw new Error("AI未能生成有效回應。");
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
+        if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
-        // --- 2. 在後端完整接收AI的回應 ---
-        let fullResponseText = '';
-        for await (const chunk of stream) {
-            const chunkText = chunk.choices?.[0]?.delta?.content || chunk.text();
-            fullResponseText += chunkText;
-        }
-        
-        const cleanJsonText = fullResponseText.replace(/^```json\s*|```\s*$/g, '');
-        const aiResponse = JSON.parse(cleanJsonText);
-
-        // --- 3. 執行所有後端資料庫更新 ---
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
-
-        let nextTimeOfDay = currentTimeOfDay;
-        if (aiResponse.roundData.shouldAdvanceTime) {
-            const currentIndex = timeSequence.indexOf(currentTimeOfDay);
-            const nextIndex = (currentIndex + 1) % timeSequence.length;
-            nextTimeOfDay = timeSequence[nextIndex];
-        }
-        aiResponse.roundData.timeOfDay = nextTimeOfDay;
-
-        const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
-        const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
-        const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
-        aiResponse.roundData.internalPower = newInternalPower;
-        aiResponse.roundData.externalPower = newExternalPower;
-        
-        await userDocRef.update({ 
-            timeOfDay: nextTimeOfDay,
-            internalPower: newInternalPower,
-            externalPower: newExternalPower
-        });
-        
-        const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
-        aiResponse.suggestion = suggestion; // 將建議也加入，稍後一起傳送
+        const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
-        // --- 4. 將結果以串流方式推送給前端 ---
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader('X-Content-Type-Options', 'nosniff'); // 安全標頭
-        
-        // 4.1. 先將 roundData 和 suggestion 打包成 JSON 字串，一次性傳送
-        const initialData = {
-            roundData: aiResponse.roundData,
-            suggestion: aiResponse.suggestion
-        };
-        res.write(JSON.stringify(initialData));
-
-        // 4.2. 傳送一個明確的分隔符號
-        res.write('\n<STREAM_SEPARATOR>\n');
-
-        // 4.3. 逐字傳送故事內容，模擬打字效果
-        const storyText = aiResponse.story;
-        for (const char of storyText) {
-            res.write(char);
-            // 加入一個極短的延遲，讓打字效果更明顯
-            await new Promise(resolve => setTimeout(resolve, 5)); 
-        }
-
-        // 4.4. 結束響應流
-        res.end();
-
-        // --- 5. 在背景完成不影響前端顯示的儲存工作 ---
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
+            aiResponse.suggestion = "你的江湖路已到盡頭...";
+            aiResponse.roundData.timeOfDay = currentTimeOfDay;
+            const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
+            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
+
+        } else {
+            let nextTimeOfDay = currentTimeOfDay;
+            if (aiResponse.roundData.shouldAdvanceTime) {
+                const currentIndex = timeSequence.indexOf(currentTimeOfDay);
+                const nextIndex = (currentIndex + 1) % timeSequence.length;
+                nextTimeOfDay = timeSequence[nextIndex];
+            }
+            aiResponse.roundData.timeOfDay = nextTimeOfDay;
+
+            const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
+            const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
+            const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
+            
+            aiResponse.roundData.internalPower = newInternalPower;
+            aiResponse.roundData.externalPower = newExternalPower;
+            
+            await userDocRef.update({ 
+                timeOfDay: nextTimeOfDay,
+                internalPower: newInternalPower,
+                externalPower: newExternalPower
+            });
+
+            const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
+            aiResponse.suggestion = suggestion;
+            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
+            await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+            
+            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
+            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
-        const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
-        await db.collection('users').doc(userId).collection('game_state').doc('summary').set({ text: newSummary, lastUpdated: newRoundNumber });
-        
-        const narrativeText = await getNarrative(modelName, aiResponse.roundData);
-        await db.collection('users').doc(userId).collection('game_state').doc('novel_cache').set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
 
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
+        res.json(aiResponse);
+
     } catch (error) {
         console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
-        // 如果在串流開始前出錯，可以回傳錯誤JSON
-        if (!res.headersSent) {
-            res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
-        } else {
-            // 如果串流已經開始，只能中斷連線
-            res.end();
-        }
+        res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
     }
 });
 
 
-// 其他路由... (保持不變)
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.data();
+        const userData = userDoc.exists ? userDoc.data() : {};
 
         if (userData && userData.isDeceased) {
             return res.json({ gameState: 'deceased' });
@@ -171,9 +134,12 @@ router.get('/latest-game', async (req, res) => {
         
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
+        // 【已修改】增加安全性檢查，防止因資料缺失而崩潰
+        const locationName = latestGameData?.LOC?.[0] || '一個未知的地方';
+
         res.json({
             prequel: prequel,
-            story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
+            story: `[進度已讀取] 你回到了 ${locationName}，繼續你的冒險...`,
             roundData: latestGameData,
             suggestion: suggestion
         });
