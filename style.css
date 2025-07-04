@@ -185,17 +185,20 @@ body.dark-theme .player-action-log { color: var(--dark-text-secondary); }
 .system-message { text-align: center; font-style: italic; color: var(--light-text-secondary); }
 body.dark-theme .system-message { color: var(--dark-text-secondary); }
 
-/* 【已修改】調整 footer 佈局以容納提示文字 */
+/* 【已修改】簡化 footer 佈局 */
 .story-footer {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    padding-top: 0.5rem; /* 給提示句留出空間 */
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
 }
 body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); background: var(--dark-surface-bg); }
 
-/* 【已修改】調整 input 樣式 */
+/* 【新增】輸入框與按鈕的包裹容器樣式 */
+.input-action-wrapper {
+    display: flex;
+    align-items: center;
+}
+
 #player-input {
     flex-grow: 1;
     padding: 1.25rem 2rem;
@@ -209,11 +212,10 @@ body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); backgr
 body.dark-theme #player-input { color: var(--dark-text-primary); }
 #player-input:focus { outline: none; }
 
-/* 【已修改】調整按鈕寬度 */
 #submit-button {
-    flex-shrink: 0; /* 防止按鈕被壓縮 */
-    min-width: 120px; /* 設定最小寬度 */
-    padding: 1.25rem 2rem; /* 統一垂直內距 */
+    flex-shrink: 0;
+    min-width: 120px;
+    padding: 1.25rem 2rem;
     border: none;
     border-left: 1px solid var(--light-border);
     background-color: var(--light-accent);
@@ -458,16 +460,15 @@ body.dark-theme .prequel-loader-dots span {
     }
 }
 
-/* --- 【新增】動作提示句樣式 --- */
+/* --- 動作提示句樣式 --- */
 .action-suggestion {
     width: 100%;
-    order: -1; /* 將此元素排到最前面 (最上方) */
     text-align: center;
     font-size: 0.85rem;
     color: var(--light-text-secondary);
-    padding: 0.5rem 1rem 0.25rem 1rem;
+    padding: 0 1rem 0.25rem 1rem; /* 移除頂部內距，讓它更貼近 wrapper */
     box-sizing: border-box;
-    min-height: 1.2em; /* 預留空間防止畫面跳動 */
+    min-height: 1.2em;
     transition: color 0.3s;
 }
 
