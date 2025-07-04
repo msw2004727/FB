@@ -1,162 +1,127 @@
-// --- DOM 元素 ---
-const storyPanel = document.getElementById('story-panel');
-const roundInfoPanel = document.getElementById('round-info');
-const roundNumberDisplay = document.getElementById('round-number');
-const playerInput = document.getElementById('player-input');
-const submitButton = document.getElementById('submit-button');
+// --- 基礎設定 ---
+require('dotenv').config(); // 在最頂部載入 .env 檔案的設定
+const express = require('express');
+const cors = require('cors');
 
-// --- 遊戲狀態 ---
-let currentRound = 0;
+// --- Firebase 設定 ---
+const admin = require('firebase-admin');
+const serviceAccount = require('./serviceAccountKey.json');
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+const db = admin.firestore();
 
-// --- 事件監聽 ---
-submitButton.addEventListener('click', handlePlayerAction);
-playerInput.addEventListener('keypress', function(event) {
-    if (event.key === 'Enter') {
-        handlePlayerAction();
+// --- Google AI 設定 ---
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+// 從 .env 檔案讀取API金鑰並初始化模型
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"}); // 使用最新的Flash模型，速度快且強大
+
+// --- Express App 設定 ---
+const app = express();
+const PORT = process.env.PORT || 3001;
+app.use(cors());
+app.use(express.json());
+
+// --- 核心：AI 互動函式 ---
+async function getAIStory(history, playerAction) {
+    // 這是我們給AI的「人設」和「指令」，是整個專案的靈魂！
+    const prompt = `
+    你是一個名為「世界管理者（World Master）」的AI，負責一款沉浸式文字互動小說。你的任務是根據玩家的歷史和當前行動，生成富有創意、符合邏輯且引人入勝的故事發展。
+
+    你必須嚴格遵守以下的規則：
+    1. 你的所有回應都必須是一個完整的JSON物件，不要在前後添加任何額外的文字或 "```json" 標記。
+    2. JSON物件必須包含 "story" 和 "roundData" 兩個頂層鍵。
+    3. "story" 鍵的值是一個字串，用來生動地描述故事發展。
+    4. "roundData" 鍵的值是一個物件，必須包含以下所有欄位，即使沒有內容也要用空字串""表示：
+        - R: (數字) 新的回合編號
+        - ATM: (陣列) [氛圍, 感官細節]
+        - EVT: (字串) 事件摘要
+        - LOC: (陣列) [地點名稱, {地點狀態}]
+        - PSY: (字串) 角色內心獨白或感受
+        - PC: (字串) 玩家狀態變化
+        - NPC: (字串) NPC狀態變化
+        - ITM: (字串) 物品變化
+        - QST: (字串) 任務變化
+        - WRD: (字串) 世界/局勢變化
+        - LOR: (字串) 獲得的背景知識
+        - CLS: (字串) 關鍵線索
+        - IMP: (字串) 行動造成的直接影響
+
+    這是遊戲的歷史紀錄 (JSON格式):
+    ${history}
+
+    這是玩家的最新行動:
+    "${playerAction}"
+
+    現在，請根據歷史和玩家的行動，生成下一回合的JSON物件。
+    `;
+
+    try {
+        const result = await aiModel.generateContent(prompt);
+        const response = await result.response;
+        // 我們直接取得AI生成的純文字，並嘗試解析它
+        const text = response.text();
+        // 清理AI可能多給的頭尾標記
+        const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
+        return JSON.parse(cleanJsonText); // 將純文字JSON解析成物件
+    } catch (error) {
+        console.error("AI生成或解析JSON時出錯:", error);
+        return null; // 如果出錯就返回null
+    }
+}
+
+
+// --- API 路由 ---
+app.post('/interact', async (req, res) => {
+    try {
+        const playerAction = req.body.action;
+        const currentRound = req.body.round;
+
+        console.log(`接收到玩家行動 (R${currentRound}): ${playerAction}`);
+
+        // 讀取上一回合的歷史紀錄作為AI的上下文
+        let historyJson = "{}"; // 預設為空物件
+        if (currentRound > 0) {
+            const historyDoc = await db.collection('game_saves').doc(`R${currentRound}`).get();
+            if (historyDoc.exists) {
+                historyJson = JSON.stringify(historyDoc.data(), null, 2);
+            }
+        }
+
+        // --- 呼叫AI生成故事 ---
+        const aiResponse = await getAIStory(historyJson, playerAction);
+
+        if (!aiResponse) {
+             throw new Error("AI未能生成有效的回應。");
+        }
+        
+        // 確保回合數正確
+        aiResponse.roundData.R = currentRound + 1;
+
+        // --- 將新回合資料寫入Firebase ---
+        const docId = `R${aiResponse.roundData.R}`;
+        await db.collection('game_saves').doc(docId).set(aiResponse.roundData);
+        console.log(`回合 ${docId} 已成功寫入Firebase!`);
+
+        // 將AI生成的回應完整回傳給前端
+        res.json(aiResponse);
+
+    } catch (error) {
+        console.error("處理請求時發生錯誤:", error);
+        res.status(500).json({ 
+            story: "[系統內部錯誤] 世界管理者的大腦出現了混亂，無法回應你的行動。請查看後端伺服器的日誌。",
+            roundData: { R: req.body.round, EVT: "系統錯誤" } 
+        });
     }
 });
 
-// --- 函式 ---
+// 根路由，用於測試伺服器是否正常
+app.get('/', (req, res) => {
+    res.send('AI 小說伺服器已啟動，並已連接到Firebase和Google AI！');
+});
 
-/**
- * 處理玩家的行動
- */
-async function handlePlayerAction() {
-    const actionText = playerInput.value.trim();
-    if (!actionText) return; // 如果沒輸入東西就返回
-
-    // 顯示玩家的行動
-    appendPlayerActionToStory(actionText);
-
-    // 清空輸入框並暫時禁用按鈕
-    playerInput.value = '';
-    submitButton.disabled = true;
-    submitButton.textContent = '思考中...';
-
-    // *** 核心：從後端獲取真實的回應 ***
-    const aiResponse = await getRealAIResponse(actionText);
-
-    // 如果成功獲取回應，就更新介面
-    if (aiResponse) {
-        updateUI(aiResponse.story, aiResponse.roundData);
-    }
-    
-    // 重新啟用按鈕
-    submitButton.disabled = false;
-    submitButton.textContent = '送出行動';
-    playerInput.focus();
-}
-
-/**
- * 將玩家的行動顯示在故事面板上
- * @param {string} text - 玩家輸入的文字
- */
-function appendPlayerActionToStory(text) {
-    const p = document.createElement('p');
-    p.className = 'player-action-log';
-    p.textContent = `> ${text}`;
-    storyPanel.appendChild(p);
-    storyPanel.scrollTop = storyPanel.scrollHeight; // 自動滾動到底部
-}
-
-/**
- * 將AI生成的故事顯示在故事面板上
- * @param {string} text - AI生成的故事文字
- */
-function appendStoryText(text) {
-    const p = document.createElement('p');
-    p.className = 'story-text';
-    p.textContent = text;
-    storyPanel.appendChild(p);
-    storyPanel.scrollTop = storyPanel.scrollHeight; // 自動滾動到底部
-}
-
-/**
- * 更新整個UI介面
- * @param {string} storyText - 新的故事文本
- * @param {object} roundData - 回合資料物件
- */
-function updateUI(storyText, roundData) {
-    // 1. 更新故事面板
-    appendStoryText(storyText);
-
-    // 2. 更新回合資訊
-    roundNumberDisplay.textContent = roundData.R || currentRound;
-    
-    let infoText = '';
-    // 使用我們設計的新格式來顯示，並檢查屬性是否存在
-    if(roundData.ATM) infoText += `ATM: ${Array.isArray(roundData.ATM) ? roundData.ATM.join(', ') : roundData.ATM}\n`;
-    if(roundData.EVT) infoText += `EVT: ${roundData.EVT}\n`;
-    if(roundData.LOC) infoText += `LOC: ${Array.isArray(roundData.LOC) ? roundData.LOC.join(', ') : roundData.LOC}\n`;
-    if(roundData.PSY) infoText += `PSY: ${roundData.PSY}\n`;
-    if(roundData.PC) infoText += `PC: ${roundData.PC}\n`;
-    if(roundData.NPC) infoText += `NPC: ${roundData.NPC}\n`;
-    if(roundData.ITM) infoText += `ITM: ${roundData.ITM}\n`;
-    if(roundData.QST) infoText += `QST: ${roundData.QST}\n`;
-    if(roundData.WRD) infoText += `WRD: ${roundData.WRD}\n`;
-    if(roundData.LOR) infoText += `LOR: ${roundData.LOR}\n`;
-    if(roundData.CLS) infoText += `CLS: ${roundData.CLS}\n`;
-    if(roundData.IMP) infoText += `IMP: ${roundData.IMP}\n`;
-    
-    roundInfoPanel.textContent = infoText;
-}
-
-/**
- * (*** 核心 ***)
- * 連接到後端伺服器，獲取AI的回應
- * @param {string} playerAction - 玩家的行動
- * @returns {Promise<object|null>} - 包含故事和回合資料的物件，或是在失敗時返回null
- */
-async function getRealAIResponse(playerAction) {
-    const backendUrl = 'http://localhost:3001/interact';
-
-    try {
-        const response = await fetch(backendUrl, {
-            method: 'POST', // 請求方法為 POST
-            headers: {
-                'Content-Type': 'application/json', // 告訴伺服器我們送的是JSON
-            },
-            // 將玩家的行動和當前回合數包裝成JSON格式
-            body: JSON.stringify({ action: playerAction, round: currentRound })
-        });
-
-        // 檢查伺服器是否成功回應
-        if (!response.ok) {
-            throw new Error(`伺服器錯誤: ${response.status}`);
-        }
-
-        // 將伺服器回傳的JSON回應轉換為JavaScript物件
-        const data = await response.json();
-        
-        // 使用後端回傳的新回合數，來更新前端的當前回合數
-        currentRound = data.roundData.R;
-
-        return data;
-
-    } catch (error) {
-        console.error('無法連接到後端伺服器:', error);
-        // 當連線失敗時，也在UI上顯示錯誤訊息
-        return {
-            story: `[系統錯誤] 無法連接到你的意識深處（後端伺服器）。請確認伺服器是否已啟動，或檢查網路連線與API權限。`,
-            roundData: { R: currentRound, EVT: "連線中斷" }
-        };
-    }
-}
-
-/**
- * 遊戲開始時的初始訊息
- */
-function initializeGame() {
-    const initialInfo = `
-ATM: [未知, {萬籟俱寂}]
-EVT: 故事開始
-LOC: [未知的荒野, {黃昏}]
-PSY: [頭腦昏沉，不知身在何處]
-QST: [我是誰？, 開始]
-    `;
-    roundInfoPanel.textContent = initialInfo.trim();
-    playerInput.focus();
-}
-
-// 執行遊戲初始化函式
-initializeGame();
+// --- 啟動伺服器 ---
+app.listen(PORT, () => {
+    console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
+});
