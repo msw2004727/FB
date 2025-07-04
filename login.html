@@ -1,18 +1,30 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登入 - AI武俠世界</title>
-    <link rel="stylesheet" href="style.css"> </head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
 <body>
     <div class="auth-container">
         <h2>登入江湖</h2>
         <form id="login-form">
-            <input type="text" id="username" placeholder="姓名" required>
-            <input type="password" id="password" placeholder="密碼" required>
-            <button type="submit">進入</button>
+            <div class="input-group">
+                <i class="fas fa-user"></i>
+                <input type="text" id="username" placeholder="姓名" required>
+            </div>
+            <div class="input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="password" placeholder="密碼" required>
+            </div>
+            <button type="submit" id="submit-btn">進入</button>
         </form>
-        <p>還沒有帳號？ <a href="register.html">立即註冊</a></p>
-        <p id="error-message" class="error"></p>
+        <p id="message" class="message"></p>
+        <div class="auth-switch">
+            還沒有帳號？ <a href="register.html">立即註冊</a>
+        </div>
     </div>
     <script src="login.js"></script>
 </body>
