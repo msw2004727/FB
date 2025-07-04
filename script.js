@@ -29,7 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeSwitcher = document.getElementById('theme-switcher');
     const themeIcon = themeSwitcher.querySelector('i');
     const logoutButton = document.getElementById('logout-btn');
-    const actionSuggestion = document.getElementById('action-suggestion'); // 【新增】獲取建議容器
+    const actionSuggestion = document.getElementById('action-suggestion');
+    
+    // 【新增】獲取死亡畫面的元素
+    const deceasedOverlay = document.getElementById('deceased-overlay');
+    const deceasedTitle = document.getElementById('deceased-title');
+    const restartButton = document.getElementById('restart-btn');
 
     const prequelLoader = document.createElement('div');
     prequelLoader.className = 'prequel-loader';
@@ -65,11 +70,32 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(currentTheme);
     });
     
-    // --- 登出邏輯 ---
+    // --- 登出與重新開始的邏輯 ---
     logoutButton.addEventListener('click', () => {
         localStorage.removeItem('jwt_token');
         localStorage.removeItem('username');
         window.location.href = 'login.html';
+    });
+
+    // 【新增】重新開始按鈕的事件監聽
+    restartButton.addEventListener('click', async () => {
+        try {
+            const response = await fetch(`${backendBaseUrl}/api/restart`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || '開啟輪迴失敗');
+            }
+            // 成功後，重新載入頁面以開始新遊戲
+            window.location.reload();
+        } catch (error) {
+            console.error('重新開始失敗:', error);
+            alert(`開啟新的輪迴時發生錯誤：${error.message}`);
+        }
     });
 
     // --- AI核心切換提示 ---
@@ -103,14 +129,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!actionText || isRequesting) return;
 
         playerInput.value = '';
-        actionSuggestion.textContent = ''; // 【新增】送出動作後，清空舊建議
+        actionSuggestion.textContent = '';
 
         const selectedModel = aiModelSelector.value;
         setLoadingState(true);
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
         try {
-            const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
+            const response = await fetch(`${backendBaseUrl}/api/interact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ action: actionText, round: currentRound, model: selectedModel })
@@ -121,9 +147,13 @@ document.addEventListener('DOMContentLoaded', () => {
             currentRound = data.roundData.R;
             updateUI(data.story, data.roundData);
             
-            // 【新增】更新建議文字
             if (data.suggestion) {
                 actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+            }
+            
+            // 【新增】在互動後檢查死亡狀態
+            if (data.roundData.playerState === 'dead') {
+                showDeceasedScreen();
             }
 
         } catch (error) {
@@ -138,17 +168,26 @@ document.addEventListener('DOMContentLoaded', () => {
         prequelLoader.classList.add('visible');
 
         try {
-            const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
+            const response = await fetch(`${backendBaseUrl}/api/latest-game`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
+            if (!response.ok) {
+                 const errorData = await response.json();
+                 throw new Error(errorData.message || '無法讀取遊戲進度');
+            }
+
+            const data = await response.json();
+
+            // 【新增】在讀取時檢查死亡狀態
+            if (data.gameState === 'deceased') {
+                showDeceasedScreen();
+                return; // 中斷後續遊戲載入
+            }
+            
             if (response.status === 404) {
-                startNewGame();
-            } else if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || '無法讀取遊戲進度');
+                 startNewGame();
             } else {
-                const data = await response.json();
                 currentRound = data.roundData.R;
                 storyTextContainer.innerHTML = '';
 
@@ -161,7 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 updateUI(data.story, data.roundData);
                 
-                // 【新增】遊戲載入時也更新建議
                 if (data.suggestion) {
                     actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
                 }
@@ -183,6 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isLoading) playerInput.focus();
     }
     
+    // 【新增】顯示死亡畫面的函式
+    function showDeceasedScreen() {
+        deceasedTitle.textContent = `${username || '你'}的江湖路已到盡頭`;
+        deceasedOverlay.classList.add('visible');
+        setLoadingState(true); // 鎖定輸入框
+    }
+
     function startNewGame() {
         currentRound = 0;
         storyTextContainer.innerHTML = '';
@@ -190,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'],
             PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: ''
         });
-        actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`; // 新遊戲的預設建議
+        actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
 
     function appendMessageToStory(htmlContent, className) {
