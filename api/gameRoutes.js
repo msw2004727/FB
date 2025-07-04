@@ -45,7 +45,6 @@ router.post('/interact', async (req, res) => {
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // 【已修改】將小說段落生成與儲存移至此處
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
         if (aiResponse.roundData.playerState === 'dead') {
@@ -60,7 +59,6 @@ router.post('/interact', async (req, res) => {
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
             
-            // 為新回合生成小說旁白並儲存
             const narrativeText = await getNarrative(modelName, aiResponse.roundData);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
@@ -100,7 +98,8 @@ router.get('/latest-game', async (req, res) => {
             prequel = await getAIPrequel('gemini', historyForPrequel);
         }
 
-        const suggestion = await getAISuggestion('gemini', latestGameData);
+        // 【已修正】將此處寫死的 'gemini' 改為 'deepseek'
+        const suggestion = await getAISuggestion('deepseek', latestGameData);
 
         res.json({
             prequel: prequel,
@@ -115,7 +114,6 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
-// 【已修改】小說生成路由，現在會讀取快取
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -123,10 +121,8 @@ router.get('/get-novel', async (req, res) => {
         const novelCacheDoc = await novelCacheRef.get();
 
         if (novelCacheDoc.exists && novelCacheDoc.data().paragraphs) {
-            // 如果快取存在，直接回傳
             res.json({ novel: novelCacheDoc.data().paragraphs });
         } else {
-            // 快取不存在 (相容舊玩家)，為其生成一次並儲存
             const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
             if (snapshot.empty) {
                 return res.json({ novel: [] });
@@ -143,7 +139,6 @@ router.get('/get-novel', async (req, res) => {
 
             const novelParagraphs = await Promise.all(narrativePromises);
             
-            // 寫入快取供未來使用
             await novelCacheRef.set({ paragraphs: novelParagraphs });
             
             res.json({ novel: novelParagraphs });
@@ -170,7 +165,6 @@ router.post('/restart', async (req, res) => {
         await userDocRef.collection('game_state').doc('summary').delete().catch(() => {});
         await userDocRef.collection('game_state').doc('suggestion').delete().catch(() => {});
         
-        // 【已修改】一併刪除小說快取
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
         await userDocRef.update({
