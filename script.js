@@ -4,37 +4,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const username = localStorage.getItem('username');
 
     if (!token) {
-        // 如果沒有令牌，直接重定向到登入頁面
         window.location.href = 'login.html';
-        return; // 停止執行後續程式碼
+        return;
     }
 
     // --- 獲取所有需要的DOM元素 ---
-    const menuToggle = document.getElementById('menu-toggle');
-    const gameContainer = document.querySelector('.game-container');
-    const mainContent = document.getElementById('main-content');
-    const themeSwitcher = document.getElementById('theme-switcher');
-    const themeIcon = themeSwitcher.querySelector('i');
-    
-    const logoutButton = document.getElementById('logout-btn');
-
-    const playerInput = document.getElementById('player-input');
-    const submitButton = document.getElementById('submit-button');
     const storyPanelWrapper = document.querySelector('.story-panel');
     const storyTextContainer = document.getElementById('story-text-wrapper');
+    // ... 其他元素 ...
+    const playerInput = document.getElementById('player-input');
+    const submitButton = document.getElementById('submit-button');
     const roundTitleEl = document.getElementById('round-title');
     const statusBarEl = document.getElementById('status-bar');
     const aiModelSelector = document.getElementById('ai-model-selector');
-
     const pcContent = document.getElementById('pc-content');
     const npcContent = document.getElementById('npc-content');
     const itmContent = document.getElementById('itm-content');
     const qstContent = document.getElementById('qst-content');
     const psyContent = document.getElementById('psy-content');
     const clsContent = document.getElementById('cls-content');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const menuToggle = document.getElementById('menu-toggle');
+    const gameContainer = document.querySelector('.game-container');
+    const mainContent = document.getElementById('main-content');
+    const themeSwitcher = document.getElementById('theme-switcher');
+    const themeIcon = themeSwitcher.querySelector('i');
+    const logoutButton = document.getElementById('logout-btn');
+
+    // --- 【新增】動態創建並注入讀取提示元素 ---
+    const prequelLoader = document.createElement('div');
+    prequelLoader.className = 'prequel-loader';
+    prequelLoader.innerHTML = `
+        <div class="prequel-loader-text">江湖說書人正在努力撰寫中...</div>
+        <div class="prequel-loader-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    `;
+    storyPanelWrapper.appendChild(prequelLoader);
 
     // 在儀表板顯示歡迎訊息
-    const welcomeMessage = document.getElementById('welcome-message');
     if (welcomeMessage && username) {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
     }
@@ -70,18 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const notification = document.createElement('p');
         notification.textContent = `[系統] AI 核心已切換為 ${selectedModelName}。`;
         notification.className = 'system-message';
-        notification.style.color = '#28a745'; // 直接設定為綠色
+        notification.style.color = '#28a745';
         notification.style.fontWeight = 'bold';
-        
         storyTextContainer.appendChild(notification);
         storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
-
-        // 4秒後自動移除提示訊息
-        setTimeout(() => {
-            notification.remove();
-        }, 4000);
+        setTimeout(() => { notification.remove(); }, 4000);
     });
-
 
     // --- 遊戲核心邏輯 ---
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
@@ -96,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 玩家行動處理函式
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
         if (!actionText || isRequesting) return;
@@ -108,19 +111,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    action: actionText,
-                    round: currentRound,
-                    model: selectedModel
-                })
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ action: actionText, round: currentRound, model: selectedModel })
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
-
             currentRound = data.roundData.R;
             updateUI(data.story, data.roundData);
         } catch (error) {
@@ -130,10 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 初始化遊戲
+    // 【已修改】初始化函式，整合讀取提示與前情提要
     async function initializeGame() {
         setLoadingState(true);
-        appendMessageToStory('正在連接你的世界，讀取記憶中...', 'system-message');
+        prequelLoader.classList.add('visible'); // 顯示讀取提示
 
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
@@ -148,18 +143,27 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 const data = await response.json();
                 currentRound = data.roundData.R;
-                storyTextContainer.innerHTML = '';
+                storyTextContainer.innerHTML = ''; // 清空畫面
+
+                // 如果後端傳來了前情提要，就顯示它
+                if (data.prequel) {
+                    const prequelDiv = document.createElement('div');
+                    prequelDiv.className = 'system-message prequel-summary'; // 給予特殊樣式
+                    prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
+                    storyTextContainer.appendChild(prequelDiv);
+                }
+                
                 updateUI(data.story, data.roundData);
             }
         } catch (error) {
             handleApiError(error);
         } finally {
             setLoadingState(false);
+            prequelLoader.classList.remove('visible'); // 無論成功失敗，都隱藏讀取提示
         }
     }
 
     // --- 輔助函式 ---
-
     function setLoadingState(isLoading) {
         isRequesting = isLoading;
         playerInput.disabled = isLoading;
@@ -177,20 +181,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 【已修改】將 textContent 改為 innerHTML 以支援HTML標籤渲染
     function appendMessageToStory(htmlContent, className) {
         const p = document.createElement('p');
-        p.innerHTML = htmlContent; // 使用 innerHTML 讓 span 標籤生效
+        p.innerHTML = htmlContent;
         if (className) p.className = className;
         storyTextContainer.appendChild(p);
         storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
     }
 
-    // 【新增】用於在高亮NPC姓名的輔助函式
     function highlightNpcNames(text, npcs) {
         let highlightedText = text;
         if (npcs && Array.isArray(npcs) && npcs.length > 0) {
-            // 根據名字長度排序，長的先替換，避免 "李四" 被 "李" 先替換掉的問題
             const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
             sortedNpcs.forEach(npc => {
                 const regex = new RegExp(npc.name, 'g');
@@ -201,9 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return highlightedText;
     }
 
-    // 【已修改】更新UI函式，以處理新的NPC資料結構和高亮姓名
     function updateUI(storyText, data) {
-        // 高亮處理故事內文
         const processedStory = highlightNpcNames(storyText, data.NPC);
         appendMessageToStory(processedStory, 'story-text');
 
@@ -218,8 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         pcContent.textContent = data.PC || '狀態穩定';
         
-        // 更新儀表板中的NPC列表
-        npcContent.innerHTML = ''; // 清空舊內容
+        npcContent.innerHTML = '';
         if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
             data.NPC.forEach(npc => {
                 const npcLine = document.createElement('div');
@@ -248,6 +246,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 遊戲開始
     initializeGame();
 });
