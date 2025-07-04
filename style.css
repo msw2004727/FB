@@ -189,15 +189,35 @@ body.dark-theme #submit-button { border-left: 1px solid var(--dark-border); }
 body.dark-theme .dashboard-header { border-bottom: 1px solid var(--dark-border); }
 .dashboard-header h3 { margin: 0; font-family: var(--font-sans); }
 
-.theme-switcher {
+/* 【修改】將按鈕包裝起來，方便對齊 */
+.header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 【修改】統一樣式，讓 a 和 button 看起來一樣 */
+.theme-switcher, .header-link-btn {
     background: none;
     border: none;
     color: var(--light-text-secondary);
     font-size: 1.2rem;
     cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-body.dark-theme .theme-switcher {
+body.dark-theme .theme-switcher,
+body.dark-theme .header-link-btn {
     color: var(--dark-text-secondary);
+}
+.header-link-btn:hover, .theme-switcher:hover {
+    color: var(--light-accent);
+}
+body.dark-theme .header-link-btn:hover,
+body.dark-theme .theme-switcher:hover {
+    color: var(--dark-accent);
 }
 
 .dashboard-content {
