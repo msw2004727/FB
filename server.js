@@ -1,5 +1,5 @@
 // --- 基礎設定 ---
-require('dotenv').config(); // 在最頂部載入 .env 檔案的設定
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
@@ -8,14 +8,12 @@ const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  // 請確保這裡的URL是您自己的
-  databaseURL: "https://ai-novel-final-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  databaseURL: "https://md-server-main-default-rtdb.asia-southeast1.firebasedatabase.app" // 您的 Firebase Realtime DB URL
 });
 const db = admin.firestore();
 
 // --- Google AI 設定 ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-// 從 .env 檔案讀取API金鑰並初始化模型
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 
@@ -27,7 +25,6 @@ app.use(express.json());
 
 // --- 核心：AI 互動函式 ---
 async function getAIStory(history, playerAction) {
-    // 這是我們給AI的「人設」和「指令」，是整個專案的靈魂！
     const prompt = `
     你是一個名為「世界管理者（World Master）」的AI，負責一款沉浸式文字互動小說。你的任務是根據玩家的歷史和當前行動，生成富有創意、符合邏輯且引人入勝的故事發展。
 
@@ -62,14 +59,12 @@ async function getAIStory(history, playerAction) {
     try {
         const result = await aiModel.generateContent(prompt);
         const response = await result.response;
-        // 我們直接取得AI生成的純文字，並嘗試解析它
         const text = response.text();
-        // 清理AI可能多給的頭尾標記
         const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
-        return JSON.parse(cleanJsonText); // 將純文字JSON解析成物件
+        return JSON.parse(cleanJsonText);
     } catch (error) {
         console.error("AI生成或解析JSON時出錯:", error);
-        return null; // 如果出錯就返回null
+        return null;
     }
 }
 
@@ -82,8 +77,7 @@ app.post('/interact', async (req, res) => {
 
         console.log(`接收到玩家行動 (R${currentRound}): ${playerAction}`);
 
-        // 讀取上一回合的歷史紀錄作為AI的上下文
-        let historyJson = "{}"; // 預設為空物件
+        let historyJson = "{}";
         if (currentRound > 0) {
             const historyDoc = await db.collection('game_saves').doc(`R${currentRound}`).get();
             if (historyDoc.exists) {
@@ -91,22 +85,18 @@ app.post('/interact', async (req, res) => {
             }
         }
 
-        // --- 呼叫AI生成故事 ---
         const aiResponse = await getAIStory(historyJson, playerAction);
 
         if (!aiResponse) {
              throw new Error("AI未能生成有效的回應。");
         }
         
-        // 確保回合數正確
         aiResponse.roundData.R = currentRound + 1;
 
-        // --- 將新回合資料寫入Firebase ---
         const docId = `R${aiResponse.roundData.R}`;
         await db.collection('game_saves').doc(docId).set(aiResponse.roundData);
         console.log(`回合 ${docId} 已成功寫入Firebase!`);
 
-        // 將AI生成的回應完整回傳給前端
         res.json(aiResponse);
 
     } catch (error) {
@@ -118,7 +108,26 @@ app.post('/interact', async (req, res) => {
     }
 });
 
-// 根路由，用於測試伺服器是否正常
+app.get('/latest-game', async (req, res) => {
+    try {
+        const snapshot = await db.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+
+        if (snapshot.empty) {
+            res.status(404).json({ message: 'No saved games found.' });
+        } else {
+            const latestGameData = snapshot.docs[0].data();
+            res.json({
+                story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
+                roundData: latestGameData
+            });
+        }
+    } catch (error) {
+        console.error("讀取最新進度時發生錯誤:", error);
+        res.status(500).json({ message: 'Failed to load game.' });
+    }
+});
+
+// 根路由
 app.get('/', (req, res) => {
     res.send('AI 小說伺服器已啟動，並已連接到Firebase和Google AI！');
 });
