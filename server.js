@@ -12,7 +12,7 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// --- 所有 AI SDK 初始化 ---
+// --- AI SDK 初始化 ---
 // 1. Google Gemini
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -81,9 +81,6 @@ async function callAI(modelName, prompt) {
 // ============== 三大核心 AI 任務 (現在都透過調度中心) ==============
 // =================================================================
 
-/**
- * AI 角色 1: 小說家 (將結構化數據轉為小說文字)
- */
 async function getNarrative(modelName, roundData) {
     const prompt = `
     你是一位功力深厚的武俠小說家，風格近似金庸。你的任務是將以下提供的結構化遊戲數據，改寫成一段充滿意境、文筆流暢、富有細節的敘述性小說段落。請自然地將所有數據融入到段落中，不要生硬地條列。重點是創造沉浸感。
@@ -101,9 +98,6 @@ async function getNarrative(modelName, roundData) {
     }
 }
 
-/**
- * AI 角色 2: 檔案管理員 (更新長期記憶摘要)
- */
 async function getAISummary(modelName, oldSummary, newRoundData) {
     const prompt = `
     你是一位專業的「故事檔案管理員」。你的任務是將新發生的事件，精煉並整合進舊的故事摘要中，產出一個更新、更簡潔的摘要。
@@ -128,13 +122,10 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
         return parsedJson.summary;
     } catch (error) {
         console.error("AI(檔案管理員)任務失敗:", error);
-        return oldSummary; // 解析失敗則保留舊摘要
+        return oldSummary;
     }
 }
 
-/**
- * AI 角色 3: 故事大師 (生成下一回合的遊戲內容)
- */
 async function getAIStory(modelName, longTermSummary, recentHistory, playerAction) {
     const prompt = `
     你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。
@@ -193,18 +184,15 @@ async function getAIStory(modelName, longTermSummary, recentHistory, playerActio
 // ========================== API 路由 ===========================
 // =================================================================
 
-// 核心互動路由
 app.post('/interact', async (req, res) => {
     try {
         const { action: playerAction, round: currentRound, model: modelName } = req.body;
         console.log(`接收到玩家行動 (R${currentRound}), 請求模型: ${modelName}`);
 
-        // 1. 讀取長期摘要
         const summaryDocRef = db.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始，一切都是未知的。";
 
-        // 2. 讀取近期歷史 (滑動窗口)
         let recentHistoryRounds = [];
         const memoryDepth = 3;
         if (currentRound > 0) {
@@ -221,7 +209,6 @@ app.post('/interact', async (req, res) => {
         }
         const recentHistoryJson = JSON.stringify(recentHistoryRounds, null, 2);
 
-        // 3. 呼叫主AI生成新回合 (傳入模型名稱)
         const aiResponse = await getAIStory(modelName, longTermSummary, recentHistoryJson, playerAction);
 
         if (!aiResponse) { throw new Error("主AI未能生成有效的回應。"); }
@@ -229,19 +216,15 @@ app.post('/interact', async (req, res) => {
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
 
-        // 4. 儲存新回合的詳細紀錄
         const newRoundDocId = `R${newRoundNumber}`;
         await db.collection('game_saves').doc(newRoundDocId).set(aiResponse.roundData);
         console.log(`回合 ${newRoundDocId} 已成功寫入Firebase!`);
 
-        // 5. 呼叫摘要AI更新長期記憶 (傳入模型名稱)
         const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
         
-        // 6. 儲存更新後的摘要
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         console.log(`故事摘要已更新至第 ${newRoundNumber} 回合。`);
 
-        // 7. 回傳結果給前端
         res.json(aiResponse);
 
     } catch (error) {
@@ -253,7 +236,6 @@ app.post('/interact', async (req, res) => {
     }
 });
 
-// 讀取最新進度路由 (給遊戲主頁用)
 app.get('/latest-game', async (req, res) => {
     try {
         const snapshot = await db.collection('game_saves').orderBy('R', 'desc').limit(1).get();
@@ -272,7 +254,6 @@ app.get('/latest-game', async (req, res) => {
     }
 });
 
-// 讀取完整小說路由 (給小說頁面用)
 app.get('/get-novel', async (req, res) => {
     try {
         const snapshot = await db.collection('game_saves').orderBy('R', 'asc').get();
@@ -280,7 +261,6 @@ app.get('/get-novel', async (req, res) => {
             res.status(404).json({ novel: ["故事尚未開始..."] });
             return;
         }
-        // 為節省成本與統一風格，小說生成預設使用gemini
         const narrativePromises = snapshot.docs.map(doc => getNarrative('gemini', doc.data()));
         const novelParagraphs = await Promise.all(narrativePromises);
         res.json({ novel: novelParagraphs });
@@ -290,7 +270,6 @@ app.get('/get-novel', async (req, res) => {
     }
 });
 
-// 根路由 (用於健康檢查)
 app.get('/', (req, res) => {
     res.send('AI 小說伺服器已啟動，並已連接到Firebase和Google AI！');
 });
