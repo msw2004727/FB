@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeSwitcher = document.getElementById('theme-switcher');
     const themeIcon = themeSwitcher.querySelector('i');
     
-    // 【新增】登出按鈕
     const logoutButton = document.getElementById('logout-btn');
 
     const playerInput = document.getElementById('player-input');
@@ -40,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
     }
 
-    // --- 漢堡選單與主題切換 (邏輯不變) ---
+    // --- 漢堡選單與主題切換 ---
     menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
     mainContent.addEventListener('click', () => {
         if (window.innerWidth <= 1024) gameContainer.classList.remove('sidebar-open');
@@ -58,11 +57,29 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(currentTheme);
     });
     
-    // --- 【新增】登出邏輯 ---
+    // --- 登出邏輯 ---
     logoutButton.addEventListener('click', () => {
         localStorage.removeItem('jwt_token');
         localStorage.removeItem('username');
         window.location.href = 'login.html';
+    });
+
+    // --- 【新增】AI核心切換提示 ---
+    aiModelSelector.addEventListener('change', (event) => {
+        const selectedModelName = event.target.options[event.target.selectedIndex].text;
+        const notification = document.createElement('p');
+        notification.textContent = `[系統] AI 核心已切換為 ${selectedModelName}。`;
+        notification.className = 'system-message';
+        notification.style.color = '#28a745'; // 直接設定為綠色
+        notification.style.fontWeight = 'bold';
+        
+        storyTextContainer.appendChild(notification);
+        storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
+
+        // 4秒後自動移除提示訊息
+        setTimeout(() => {
+            notification.remove();
+        }, 4000);
     });
 
 
@@ -89,7 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
         try {
-            // 【已修正】將 /api/interact 修改為 /api/game/interact
             const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
                 method: 'POST',
                 headers: {
@@ -120,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory('正在連接你的世界，讀取記憶中...', 'system-message');
 
         try {
-            // 【已修正】將 /api/latest-game 修改為 /api/game/latest-game
             const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -192,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleApiError(error) {
         console.error('API 錯誤:', error);
         appendMessageToStory(`[系統] 連接失敗... (${error.message})`, 'system-message');
-        // 如果錯誤是401 (未授權)，可能令牌已過期，強制登出
         if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
             setTimeout(() => {
                 localStorage.removeItem('jwt_token');
