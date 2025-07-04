@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 
 const db = admin.firestore();
 
-// API Route: /api/auth/register
+// API 路由: /api/auth/register
 router.post('/register', async (req, res) => {
     try {
         const { username, gender, password } = req.body;
@@ -36,7 +36,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// API Route: /api/auth/login
+// API 路由: /api/auth/login
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
