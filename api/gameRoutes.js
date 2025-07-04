@@ -7,7 +7,6 @@ const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion } 
 
 const db = admin.firestore();
 
-// 【新增】定義時間序列
 const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 
 router.use(authMiddleware);
@@ -27,7 +26,6 @@ router.post('/interact', async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
-        // 【新增】讀取當前時間
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
 
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
@@ -45,34 +43,33 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【修改】將當前時間傳給AI
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // 【新增】處理時間推進邏輯
-        let nextTimeOfDay = currentTimeOfDay;
-        if (aiResponse.roundData.shouldAdvanceTime) {
-            const currentIndex = timeSequence.indexOf(currentTimeOfDay);
-            const nextIndex = (currentIndex + 1) % timeSequence.length;
-            nextTimeOfDay = timeSequence[nextIndex];
-            await userDocRef.update({ timeOfDay: nextTimeOfDay });
-        }
-        // 將時間加入回傳資料
-        aiResponse.roundData.timeOfDay = nextTimeOfDay;
-
-
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
             aiResponse.suggestion = "你的江湖路已到盡頭...";
+            aiResponse.roundData.timeOfDay = currentTimeOfDay; // 死亡時記錄當前時間
             const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
 
         } else {
+            // 【已修改】修正時間推進邏輯的順序
+            let nextTimeOfDay = currentTimeOfDay;
+            if (aiResponse.roundData.shouldAdvanceTime) {
+                const currentIndex = timeSequence.indexOf(currentTimeOfDay);
+                const nextIndex = (currentIndex + 1) % timeSequence.length;
+                nextTimeOfDay = timeSequence[nextIndex];
+                await userDocRef.update({ timeOfDay: nextTimeOfDay });
+            }
+            // 先將時間加入回傳資料
+            aiResponse.roundData.timeOfDay = nextTimeOfDay;
+
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
@@ -82,6 +79,7 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
+        // 將包含正確時間的 roundData 存檔
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
         res.json(aiResponse);
@@ -111,8 +109,8 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        // 【新增】將時間資訊加入回傳
-        latestGameData.timeOfDay = userData.timeOfDay || '上午';
+        // 【已修改】直接使用存檔中的時間，若無則使用全域時間
+        latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
 
         let prequel = null;
         if (recentHistory.length > 1) {
@@ -188,7 +186,6 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
-        // 【新增】重置時間
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete()
@@ -219,7 +216,7 @@ router.post('/force-suicide', async (req, res) => {
         const finalRoundData = {
             R: newRoundNumber,
             playerState: 'dead',
-            timeOfDay: userProfile.timeOfDay || '上午', // 【新增】加入時間
+            timeOfDay: userProfile.timeOfDay || '上午',
             ATM: ['決絕', '悲壯'],
             EVT: '英雄末路',
             LOC: ['原地', {}],
