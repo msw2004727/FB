@@ -1,19 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const authMiddleware = require('../middleware/auth'); // Import the guard
+const authMiddleware = require('../middleware/auth'); // 導入身份驗證守衛
 
-// Import AI services (assuming they are in ../services/aiService.js)
+// 導入 AI 服務 (假設檔案路徑正確)
 const { getAIStory, getAISummary, getNarrative } = require('../services/aiService');
 
 const db = admin.firestore();
 
-// IMPORTANT: Apply the middleware to all routes in this file
+// 【重要】將守衛應用於此檔案中的所有路由
+// 任何訪問 /api/game/* 的請求，都必須先通過 authMiddleware 的檢查
 router.use(authMiddleware);
 
-// API Route: /api/game/interact
+// API 路由: /api/game/interact
 router.post('/interact', async (req, res) => {
-    const userId = req.user.id; // Get user ID from the middleware
+    const userId = req.user.id; // 從守衛中取得使用者 ID
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
         
@@ -25,9 +26,11 @@ router.post('/interact', async (req, res) => {
         const memoryDepth = 3;
         if (currentRound > 0) {
             const roundsToFetch = Array.from({length: memoryDepth}, (_, i) => currentRound - i).filter(r => r > 0);
-            const roundDocs = await db.collection('users').doc(userId).collection('game_saves').where('R', 'in', roundsToFetch).get();
-            roundDocs.forEach(doc => recentHistoryRounds.push(doc.data()));
-            recentHistoryRounds.sort((a, b) => a.R - b.R);
+            if (roundsToFetch.length > 0) {
+                const roundDocs = await db.collection('users').doc(userId).collection('game_saves').where('R', 'in', roundsToFetch).get();
+                roundDocs.forEach(doc => recentHistoryRounds.push(doc.data()));
+                recentHistoryRounds.sort((a, b) => a.R - b.R);
+            }
         }
         
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction);
@@ -47,7 +50,7 @@ router.post('/interact', async (req, res) => {
     }
 });
 
-// API Route: /api/game/latest-game
+// API 路由: /api/game/latest-game
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -66,13 +69,14 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
-// API Route: /api/game/get-novel
+// API 路由: /api/game/get-novel
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (snapshot.empty) {
-            return res.status(404).json({ novel: [] });
+            // 返回一個空的 novel 陣列，而不是 404，這樣前端更容易處理
+            return res.json({ novel: ["您的故事還未寫下第一筆..."] });
         }
         const narrativePromises = snapshot.docs.map(doc => getNarrative('gemini', doc.data()));
         const novelParagraphs = await Promise.all(narrativePromises);
