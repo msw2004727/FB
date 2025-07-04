@@ -185,44 +185,43 @@ body.dark-theme .player-action-log { color: var(--dark-text-secondary); }
 .system-message { text-align: center; font-style: italic; color: var(--light-text-secondary); }
 body.dark-theme .system-message { color: var(--dark-text-secondary); }
 
-/* 【已修改】簡化 footer 佈局 */
 .story-footer {
-    padding-top: 0.5rem; /* 給提示句留出空間 */
+    padding-top: 0.5rem;
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
 }
 body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); background: var(--dark-surface-bg); }
 
-/* 【新增】輸入框與按鈕的包裹容器樣式 */
 .input-action-wrapper {
     display: flex;
-    align-items: center;
 }
 
+/* 【已修改】重寫此處樣式以確保高度一致 */
 #player-input {
     flex-grow: 1;
+    min-width: 100px;
     padding: 1.25rem 2rem;
-    border: none;
     background: transparent;
-    color: var(--light-text-primary);
+    border: none;
     font-family: var(--font-sans);
     font-size: 1.1rem;
-    min-width: 100px;
+    color: var(--light-text-primary);
 }
 body.dark-theme #player-input { color: var(--dark-text-primary); }
 #player-input:focus { outline: none; }
 
+/* 【已修改】重寫此處樣式以確保高度一致 */
 #submit-button {
     flex-shrink: 0;
     min-width: 120px;
     padding: 1.25rem 2rem;
+    background-color: var(--light-accent);
     border: none;
     border-left: 1px solid var(--light-border);
-    background-color: var(--light-accent);
-    color: #fff;
     font-family: var(--font-sans);
     font-size: 1rem;
     font-weight: bold;
+    color: #fff;
     cursor: pointer;
     transition: background-color 0.3s;
 }
@@ -406,13 +405,13 @@ body.dark-theme .npc-neutral {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-    pointer-events: none; /* 讓滑鼠可以穿透 */
+    pointer-events: none;
 }
 
 .prequel-loader.visible {
     opacity: 1;
     visibility: visible;
-    pointer-events: auto; /* 可見時恢復滑鼠事件 */
+    pointer-events: auto;
 }
 
 body.dark-theme .prequel-loader {
@@ -466,7 +465,7 @@ body.dark-theme .prequel-loader-dots span {
     text-align: center;
     font-size: 0.85rem;
     color: var(--light-text-secondary);
-    padding: 0 1rem 0.25rem 1rem; /* 移除頂部內距，讓它更貼近 wrapper */
+    padding: 0 1rem 0.25rem 1rem;
     box-sizing: border-box;
     min-height: 1.2em;
     transition: color 0.3s;
