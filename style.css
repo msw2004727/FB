@@ -32,76 +32,140 @@ body.dark-theme {
     color: var(--dark-text-primary);
 }
 
-/* --- 登入/註冊頁面樣式 --- */
+/* --- 【新增】登入/註冊頁面專用樣式 --- */
+body.auth-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
 .auth-container {
-    max-width: 400px;
-    margin: 10vh auto;
-    padding: 2rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    padding: 2.5rem;
     background-color: var(--light-surface-bg);
     border: 1px solid var(--light-border);
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
     text-align: center;
+    box-sizing: border-box;
 }
 body.dark-theme .auth-container {
     background-color: var(--dark-surface-bg);
     border-color: var(--dark-border);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
 }
-.auth-container h2 {
+
+.auth-title {
     font-family: var(--font-serif);
     color: var(--light-accent);
+    font-size: 2.5rem;
+    font-weight: 600;
     margin-top: 0;
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
 }
-body.dark-theme .auth-container h2 {
+body.dark-theme .auth-title {
     color: var(--dark-accent);
 }
-.auth-container .input-group {
+
+.input-group {
     position: relative;
     margin-bottom: 1.5rem;
 }
-.auth-container .input-group i {
+.input-group i {
     position: absolute;
-    left: 15px;
+    left: 18px;
     top: 50%;
     transform: translateY(-50%);
     color: var(--light-text-secondary);
+    transition: color 0.3s;
 }
-.auth-container input, .auth-container select {
+.input-group input:focus + i, .input-group select:focus + i {
+    color: var(--light-accent);
+}
+body.dark-theme .input-group input:focus + i, body.dark-theme .input-group select:focus + i {
+    color: var(--dark-accent);
+}
+
+.auth-form input, .auth-form select {
     width: 100%;
-    padding: 12px 15px 12px 40px; /* 左側內邊距給圖示留空間 */
+    padding: 14px 18px 14px 50px; /* 左側內邊距給圖示留空間 */
     box-sizing: border-box;
     border: 1px solid var(--light-border);
-    border-radius: 6px;
-    background-color: transparent;
+    border-radius: 8px;
+    background-color: var(--light-bg);
     color: var(--light-text-primary);
+    font-size: 1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
-body.dark-theme .auth-container input, body.dark-theme .auth-container select {
+body.dark-theme .auth-form input, body.dark-theme .auth-form select {
+    background-color: var(--dark-bg);
     border-color: var(--dark-border);
     color: var(--dark-text-primary);
 }
-.auth-container button {
+.auth-form input:focus, .auth-form select:focus {
+    outline: none;
+    border-color: var(--light-accent);
+    box-shadow: 0 0 0 3px rgba(140, 111, 84, 0.2);
+}
+body.dark-theme .auth-form input:focus, body.dark-theme .auth-form select:focus {
+    border-color: var(--dark-accent);
+    box-shadow: 0 0 0 3px rgba(195, 169, 138, 0.2);
+}
+
+.auth-form button {
     width: 100%;
-    padding: 12px;
+    padding: 14px;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: var(--light-accent);
     color: #fff;
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: bold;
     cursor: pointer;
-    transition: opacity 0.3s;
+    transition: all 0.3s;
+    margin-top: 1rem;
 }
-.auth-container button:hover { opacity: 0.8; }
-.auth-container button:disabled { background-color: var(--light-text-secondary); cursor: not-allowed; }
-.auth-switch { margin-top: 2rem; }
-.message { min-height: 1.5em; margin-top: 1rem; }
+.auth-form button:hover {
+    opacity: 0.85;
+    transform: translateY(-2px);
+}
+.auth-form button:disabled {
+    background-color: var(--light-text-secondary);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.auth-switch {
+    margin-top: 2rem;
+    color: var(--light-text-secondary);
+}
+.auth-switch a {
+    color: var(--light-accent);
+    text-decoration: none;
+    font-weight: bold;
+}
+body.dark-theme .auth-switch a {
+    color: var(--dark-accent);
+}
+
+.message {
+    min-height: 1.5em;
+    margin-top: 1.5rem;
+    font-weight: bold;
+}
 .message.success { color: #28a745; }
 .message.error { color: #dc3545; }
 
 
-/* --- 遊戲主頁面樣式 --- */
-
+/* --- 遊戲主頁面樣式 (保持不變) --- */
+/* 以下是您原有的遊戲主頁面樣式，我將其保持原樣，確保新樣式不會影響到它 */
 .game-container { display: flex; height: 100vh; width: 100%; overflow: hidden; }
 .main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100%; transition: margin-right 0.4s ease; }
 .dashboard { width: 320px; flex-shrink: 0; background-color: var(--light-surface-bg); border-left: 1px solid var(--light-border); display: flex; flex-direction: column; transition: background-color 0.3s, border-color 0.3s; }
