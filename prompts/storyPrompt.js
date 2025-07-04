@@ -1,6 +1,6 @@
 // prompts/storyPrompt.js
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午') => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5 }) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -15,6 +15,16 @@ ${longTermSummary}
 1.  **時代背景**: 這是一個類似金庸小說世界觀的宋朝，架空的金庸武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節，各種驚險與傳說故事。
 2.  **主角設定**: 主角是一個從21世紀現代社會，靈魂穿越到這個世界的年輕人。${protagonistDescription} 這具身體骨骼清奇、經脈異於常人，是萬中無一的練武奇才，但因為不明原因，正處於重傷瀕死的狀態。
 3.  **開場地點**: 主角目前在一個名為「無名村」的偏遠小村落。這個村莊地處偏僻，但周圍的山賊、惡霸、甚至不入流的小門派等惡勢力橫行，村民長年受到脅迫，生活困苦。
+	
+## 武功規則 (非常重要)：
+1.  **玩家目前的武功修為是：** 內功: ${playerPower.internal} / 999, 外功: ${playerPower.external} / 999。
+2.  **內功** 代表真氣、內力，影響招式威力和持久力。**外功** 代表招式技巧、筋骨強度，影響命中和防禦。
+3.  你在判斷任何與NPC的實力對比、戰鬥、或任何需要體力/技巧的行動結果時，**必須**將這兩個數值作為**最核心的判斷依據**。
+4.  你的回傳資料中，`roundData` 物件**必須**包含一個名為 \`powerChange\` 的物件，格式為 \`{ "internal": X, "external": Y }\`，其中X和Y代表本回合內功與外功的變化值。
+    * 如果玩家學習或練習**外功招式** (如劍法、拳法)，你應該增加 \`external\` 的值。
+    * 如果玩家打坐、修練**內功心法**，你應該增加 \`internal\` 的值。
+    * 如果玩家受傷，你應該**減少**對應的數值（例如內傷減內功，外傷減外功）。
+    * 如果沒有任何變化，則回傳 \`{ "internal": 0, "external": 0 }\`。
 
 ## 時間規則 (非常重要)：
 1.  **目前的時辰是：** [ ${currentTimeOfDay} ]
@@ -36,6 +46,7 @@ ${longTermSummary}
     - R: (數字) 新的回合編號
     - playerState: (字串) 玩家的存活狀態。只能是 'alive' (存活) 或 'dead' (死亡)。
     - shouldAdvanceTime: (布林) 是否要推進到下一個時辰 (true/false)。
+    - powerChange: (物件) 武功數值的變化，格式為 {"internal": X, "external": Y}。
     - ATM: (陣列) [氛圍, 感官細節]
     - EVT: (字串) 事件摘要
     - LOC: (陣列) [地點名稱, {地點狀態}]
