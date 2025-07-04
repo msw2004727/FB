@@ -469,6 +469,8 @@ body.dark-theme .prequel-loader-dots span {
     box-sizing: border-box;
     min-height: 1.2em;
     transition: color 0.3s;
+    /* 【修改】調整淺色主題下提示詞的背景顏色 */
+    background-color: #ede7de; /* 一個稍微深一點的米色 */
 }
 
 body.dark-theme .action-suggestion {
