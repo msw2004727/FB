@@ -36,18 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const deceasedTitle = document.getElementById('deceased-title');
     const restartButton = document.getElementById('restart-btn');
 
-    const prequelLoader = document.createElement('div');
-    prequelLoader.className = 'prequel-loader';
-    prequelLoader.innerHTML = `
-        <div class="prequel-loader-text">江湖說書人正在努力撰寫中...</div>
-        <div class="prequel-loader-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-    `;
-    storyPanelWrapper.appendChild(prequelLoader);
-
+    // 【已修改】只建立一個統一的 AI 回應等待動畫元素
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
@@ -58,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     `;
     storyPanelWrapper.appendChild(aiThinkingLoader);
-
 
     if (welcomeMessage && username) {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
@@ -89,12 +77,27 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     });
     
-    suicideButton.addEventListener('click', () => {
+    // 【已修改】修正自殺API呼叫
+    suicideButton.addEventListener('click', async () => {
         if (isRequesting) return;
         const confirmation = window.confirm("你確定要了卻此生，重新輪迴嗎？");
         if (confirmation) {
-            playerInput.value = "決定了結自己的性命";
-            handlePlayerAction();
+            setLoadingState(true);
+            try {
+                const response = await fetch(`${backendBaseUrl}/api/game/force-suicide`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
+
+                updateUI(data.story, data.roundData);
+                showDeceasedScreen();
+                
+            } catch (error) {
+                handleApiError(error);
+                setLoadingState(false); // 確保錯誤時也關閉動畫
+            }
         }
     });
 
@@ -182,8 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initializeGame() {
-        setLoadingState(true); // 這裡會顯示 aiThinkingLoader，但沒關係，因為 prequelLoader 會蓋在它上面
-        prequelLoader.classList.add('visible');
+        setLoadingState(true); // 【已修改】現在只會觸發通用的載入動畫
 
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
@@ -226,9 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
-            // 【已修改】確保在初始化結束時，兩個動畫都隱藏
             setLoadingState(false);
-            prequelLoader.classList.remove('visible');
         }
     }
 
@@ -239,10 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = isLoading;
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
 
-        // 【已修改】確保兩個動畫不會同時出現
+        // 【已修改】現在只控制這一個統一的動畫
         if (isLoading) {
-            prequelLoader.classList.remove('visible'); // 先隱藏說書人
-            aiThinkingLoader.classList.add('visible'); // 再顯示互動中動畫
+            aiThinkingLoader.classList.add('visible');
         } else {
             aiThinkingLoader.classList.remove('visible');
         }
