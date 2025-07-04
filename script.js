@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submit-button');
     const roundTitleEl = document.getElementById('round-title');
     const statusBarEl = document.getElementById('status-bar');
+    // 【新增】獲取時間狀態元素
+    const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
     const npcContent = document.getElementById('npc-content');
@@ -36,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const deceasedTitle = document.getElementById('deceased-title');
     const restartButton = document.getElementById('restart-btn');
 
-    // 【已修改】建立一個統一且可變文字的 AI 回應等待動畫元素
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 handleApiError(error);
             } finally {
-                // 自殺成功後，按鈕應保持鎖定，直到玩家重啟
                 if(!deceasedOverlay.classList.contains('visible')) {
                     setLoadingState(false);
                 }
@@ -189,7 +189,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initializeGame() {
-        // 【已修改】使用帶有特定文字的統一載入動畫
         setLoadingState(true, '江湖說書人正在努力撰寫中...');
 
         try {
@@ -238,7 +237,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 輔助函式 ---
-    // 【已修改】函式現在可以接收文字參數來改變提示語
     function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
         playerInput.disabled = isLoading;
@@ -252,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
             aiThinkingLoader.classList.add('visible');
         } else {
             aiThinkingLoader.classList.remove('visible');
-            loaderTextElement.textContent = ''; // 清空文字以便下次使用
+            loaderTextElement.textContent = '';
         }
 
         if (!isLoading) playerInput.focus();
@@ -269,7 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
         storyTextContainer.innerHTML = '';
         updateUI('你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。', {
             R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'],
-            PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: ''
+            PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '',
+            timeOfDay: '上午' // 新玩家預設時間
         });
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
@@ -300,14 +299,19 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory(processedStory, 'story-text');
 
         roundTitleEl.textContent = data.EVT || `第 ${data.R} 回`;
+        
         const atmosphere = data.ATM?.[0] || '未知';
         const weather = data.WRD || '晴朗';
         const location = data.LOC?.[0] || '未知之地';
+        
+        // 【已修改】更新狀態欄，現在包含時間
         statusBarEl.innerHTML = `
+            <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
             <div class="status-item"><i class="fas fa-cloud-sun"></i> 天氣: ${weather}</div>
             <div class="status-item"><i class="fas fa-theater-masks"></i> 氛圍: ${atmosphere}</div>
             <div class="status-item"><i class="fas fa-map-marked-alt"></i> 地點: ${location}</div>
         `;
+
         pcContent.textContent = data.PC || '狀態穩定';
         
         npcContent.innerHTML = '';
