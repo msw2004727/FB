@@ -172,38 +172,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
+            // 【已修改】處理新玩家 (404) 和其他錯誤的邏輯
+            if (response.status === 404) {
+                startNewGame();
+                return; // 流程結束
+            }
+            
             if (!response.ok) {
-                 const errorData = await response.json();
-                 throw new Error(errorData.message || '無法讀取遊戲進度');
+                 const errorData = await response.json(); // 嘗試解析JSON錯誤訊息
+                 throw new Error(errorData.message || `伺服器錯誤: ${response.status}`);
             }
 
             const data = await response.json();
 
-            // 【新增】在讀取時檢查死亡狀態
+            // 在讀取時檢查死亡狀態
             if (data.gameState === 'deceased') {
                 showDeceasedScreen();
                 return; // 中斷後續遊戲載入
             }
             
-            if (response.status === 404) {
-                 startNewGame();
-            } else {
-                currentRound = data.roundData.R;
-                storyTextContainer.innerHTML = '';
+            // 正常載入遊戲進度
+            currentRound = data.roundData.R;
+            storyTextContainer.innerHTML = '';
 
-                if (data.prequel) {
-                    const prequelDiv = document.createElement('div');
-                    prequelDiv.className = 'system-message prequel-summary';
-                    prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
-                    storyTextContainer.appendChild(prequelDiv);
-                }
-                
-                updateUI(data.story, data.roundData);
-                
-                if (data.suggestion) {
-                    actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
-                }
+            if (data.prequel) {
+                const prequelDiv = document.createElement('div');
+                prequelDiv.className = 'system-message prequel-summary';
+                prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
+                storyTextContainer.appendChild(prequelDiv);
             }
+            
+            updateUI(data.story, data.roundData);
+            
+            if (data.suggestion) {
+                actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+            }
+
         } catch (error) {
             handleApiError(error);
         } finally {
