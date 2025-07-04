@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+
+body {
+    font-family: 'Noto Serif TC', serif;
+    line-height: 2;
+    background-color: #fdfaf4;
+    color: #3a2d21;
+    margin: 0;
+    padding: 2rem 0;
+}
+
+.novel-header {
+    text-align: center;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #dcd1c4;
+    margin: 0 2rem 2rem 2rem;
+}
+
+.novel-header h1 {
+    font-size: 2.5rem;
+    margin: 0;
+}
+
+.novel-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.chapter {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px dashed #dcd1c4;
+}
+
+.chapter:last-child {
+    border-bottom: none;
+}
+
+.chapter h2 {
+    font-size: 1.5rem;
+    color: #8c6f54;
+}
+
+.chapter p {
+    font-size: 1.1rem;
+    text-indent: 2em;
+}
+
+.loading {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #8c6f54;
+}
+.loading i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
