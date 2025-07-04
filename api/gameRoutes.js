@@ -17,10 +17,9 @@ router.post('/interact', async (req, res) => {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
 
         const userDocRef = db.collection('users').doc(userId);
-        const userDoc = await userDoc.get();
+        const userDoc = await userDocRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
         
-        // 【新增】如果玩家已死亡，則不允許互動
         if (userProfile.isDeceased) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
@@ -46,19 +45,16 @@ router.post('/interact', async (req, res) => {
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // 【新增】處理死亡判定的核心邏輯
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
             aiResponse.suggestion = "你的江湖路已到盡頭...";
         } else {
-            // 只有在玩家活著的時候才獲取建議和更新摘要
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         }
 
-        // 無論生死，都儲存最後一回合的紀錄
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
         res.json(aiResponse);
@@ -69,14 +65,12 @@ router.post('/interact', async (req, res) => {
     }
 });
 
-// 【已修改】讀取最新進度時，加入死亡狀態檢查
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
         const userData = userDoc.data();
 
-        // 【新增】如果玩家已死亡，回傳特殊狀態
         if (userData && userData.isDeceased) {
             return res.json({ gameState: 'deceased' });
         }
@@ -110,7 +104,6 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
-
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -137,5 +130,50 @@ router.get('/get-novel', async (req, res) => {
         res.status(500).json({ message: "生成小說時出錯。" });
     }
 });
+
+// 【新增】重新開始遊戲的API路由
+router.post('/restart', authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+
+        // 1. 我們不刪除舊的存檔，而是將它們作為「傳奇」保留。
+        //    首先移除玩家的死亡標記。
+        await userDocRef.update({
+            isDeceased: admin.firestore.FieldValue.delete()
+        });
+
+        // 2. 為了開啟新人生，我們可以選擇性地清除舊的遊戲進程。
+        //    這裡我們採用歸檔的方式，而不是直接刪除。
+        //    我們將舊的存檔集合命名為一個帶有時間戳的新名字。
+        const oldSavesRef = db.collection('users').doc(userId).collection('game_saves');
+        const snapshot = await oldSavesRef.get();
+        if (!snapshot.empty) {
+            const archiveCollectionName = `saves_${Date.now()}`;
+            const archiveSavesRef = db.collection('users').doc(userId).collection(archiveCollectionName);
+            
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                // 複製到新集合
+                const newDocRef = archiveSavesRef.doc(doc.id);
+                batch.set(newDocRef, doc.data());
+                // 從舊集合刪除
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
+        
+        // 3. 刪除舊的遊戲狀態 (摘要和建議)
+        await db.collection('users').doc(userId).collection('game_state').doc('summary').delete();
+        await db.collection('users').doc(userId).collection('game_state').doc('suggestion').delete();
+        
+        res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /restart 錯誤:`, error);
+        res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
+    }
+});
+
 
 module.exports = router;
