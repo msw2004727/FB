@@ -8,7 +8,6 @@ const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  // 請確保這裡的URL是您自己的
   databaseURL: "https://md-server-main-default-rtdb.asia-southeast1.firebasedatabase.app"
 });
 const db = admin.firestore();
@@ -24,11 +23,50 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// --- 核心：AI 互動函式 ---
-async function getAIStory(history, playerAction) {
+// *** 新增：摘要AI函式 ***
+async function getAISummary(oldSummary, newRoundData) {
+    const prompt = `
+    你是一位專業的「故事檔案管理員」。你的任務是將新發生的事件，精煉並整合進舊的故事摘要中，產出一個更新、更簡潔的摘要。
+
+    規則：
+    1. 你的回應必須是一個單一的JSON物件，格式為 {"summary": "更新後的摘要內容..."}。不要添加任何額外文字。
+    2. 摘要的目的是記錄遊戲的核心進展，忽略不重要的細節。
+    3. 重點關注以下資訊的變化：
+        - 主角和重要NPC的關係、狀態變化。
+        - 主要任務的關鍵進展或狀態改變。
+        - 獲得或失去的關鍵物品或線索。
+        - 對世界局勢有重大影響的事件。
+
+    這是【舊的故事摘要】:
+    ${oldSummary}
+
+    這是【剛剛發生的新事件】的數據:
+    ${JSON.stringify(newRoundData, null, 2)}
+
+    現在，請根據以上資訊，產出更新後的JSON格式摘要。
+    `;
+    try {
+        const result = await aiModel.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
+        const parsedJson = JSON.parse(cleanJsonText);
+        return parsedJson.summary; // 只回傳摘要文字
+    } catch (error) {
+        console.error("AI生成摘要時出錯:", error);
+        return oldSummary; // 如果出錯，至少保留舊的摘要
+    }
+}
+
+
+// --- 核心：AI 互動函式 (升級版) ---
+async function getAIStory(longTermSummary, recentHistory, playerAction) {
     // 這是我們給AI的「人設」和「指令」，是整個專案的靈魂！
     const prompt = `
     你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。
+
+    ## 長期故事摘要 (世界核心記憶):
+    ${longTermSummary}
 
     ## 核心世界觀：
     1.  **時代背景**: 這是一個類似明朝中葉，但架空的武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節。
@@ -36,7 +74,7 @@ async function getAIStory(history, playerAction) {
     3.  **開場地點**: 主角目前在一個名為「無名村」的偏遠小村落。這個村莊地處偏僻，但周圍的山賊、惡霸、甚至不入流的小門派等惡勢力橫行，村民長年受到脅迫，生活困苦。
 
     你必須嚴格遵守以下的規則：
-    1. 你的所有回應都必須是一個完整的JSON物件，不要在前後添加任何額外的文字或 "\`\`\`json" 標記。
+    1. 你的所有回應都必須是一個完整的JSON物件，不要在前後添加任何額外的文字或 "\\\`\\\`\\\`json" 標記。
     2. JSON物件必須包含 "story" 和 "roundData" 兩個頂層鍵。
     3. "story" 鍵的值是一個字串，用來生動地描述故事發展，回覆必須用繁體中文。
     4. "roundData" 鍵的值是一個物件，必須包含以下所有欄位，即使沒有內容也要用空字串""表示：
@@ -53,14 +91,14 @@ async function getAIStory(history, playerAction) {
         - LOR: (字串) 獲得的背景知識
         - CLS: (字串) 關鍵線索
         - IMP: (字串) 行動造成的直接影響
-
-    這是遊戲的歷史紀錄 (JSON格式):
-    ${history}
+    
+    ## 最近發生的事件 (短期記憶):
+    ${recentHistory}
 
     這是玩家的最新行動:
     "${playerAction}"
 
-    現在，請根據歷史和玩家的行動，生成下一回合的JSON物件。
+    現在，請根據以上的長期摘要、世界觀、規則、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
     `;
 
     try {
@@ -70,40 +108,68 @@ async function getAIStory(history, playerAction) {
         const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
         return JSON.parse(cleanJsonText);
     } catch (error) {
-        console.error("AI生成或解析JSON時出錯:", error);
+        console.error("AI生成故事時出錯:", error);
         return null;
     }
 }
 
 
-// --- API 路由 ---
+// --- API 路由 (重構成為方案二) ---
 app.post('/interact', async (req, res) => {
     try {
         const playerAction = req.body.action;
         const currentRound = req.body.round;
-
         console.log(`接收到玩家行動 (R${currentRound}): ${playerAction}`);
 
-        let historyJson = "{}";
-        if (currentRound > 0) {
-            const historyDoc = await db.collection('game_saves').doc(`R${currentRound}`).get();
-            if (historyDoc.exists) {
-                historyJson = JSON.stringify(historyDoc.data(), null, 2);
-            }
-        }
+        // 1. 讀取長期摘要
+        const summaryDocRef = db.collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始，一切都是未知的。";
 
-        const aiResponse = await getAIStory(historyJson, playerAction);
+        // 2. 讀取近期歷史 (滑動窗口)
+        let recentHistoryRounds = [];
+        const memoryDepth = 3; // 最近3回合的詳細歷史
+        if (currentRound > 0) {
+            const queries = [];
+            for (let i = 0; i < memoryDepth; i++) {
+                const roundToFetch = currentRound - i;
+                if (roundToFetch > 0) {
+                    queries.push(db.collection('game_saves').doc(`R${roundToFetch}`).get());
+                }
+            }
+            const snapshots = await Promise.all(queries);
+            snapshots.forEach(doc => {
+                if (doc.exists) {
+                    recentHistoryRounds.push(doc.data());
+                }
+            });
+            recentHistoryRounds.sort((a, b) => a.R - b.R);
+        }
+        const recentHistoryJson = JSON.stringify(recentHistoryRounds, null, 2);
+
+        // 3. 呼叫主AI，傳入長期摘要和近期歷史，生成新回合
+        const aiResponse = await getAIStory(longTermSummary, recentHistoryJson, playerAction);
 
         if (!aiResponse) {
-             throw new Error("AI未能生成有效的回應。");
+             throw new Error("主AI未能生成有效的回應。");
         }
         
-        aiResponse.roundData.R = currentRound + 1;
+        const newRoundNumber = currentRound + 1;
+        aiResponse.roundData.R = newRoundNumber;
 
-        const docId = `R${aiResponse.roundData.R}`;
-        await db.collection('game_saves').doc(docId).set(aiResponse.roundData);
-        console.log(`回合 ${docId} 已成功寫入Firebase!`);
+        // 4. 儲存新回合的詳細紀錄
+        const newRoundDocId = `R${newRoundNumber}`;
+        await db.collection('game_saves').doc(newRoundDocId).set(aiResponse.roundData);
+        console.log(`回合 ${newRoundDocId} 已成功寫入Firebase!`);
 
+        // 5. 呼叫摘要AI，傳入舊摘要和新回合數據，更新長期記憶
+        const newSummary = await getAISummary(longTermSummary, aiResponse.roundData);
+        
+        // 6. 儲存更新後的摘要
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        console.log(`故事摘要已更新至第 ${newRoundNumber} 回合。`);
+
+        // 7. 回傳結果給前端
         res.json(aiResponse);
 
     } catch (error) {
