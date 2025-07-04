@@ -187,7 +187,7 @@ body.dark-theme .system-message { color: var(--dark-text-secondary); }
 
 /* 【已修改】為提示詞的絕對定位提供基準 */
 .story-footer {
-    position: relative; 
+    position: relative;
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
 }
@@ -607,4 +607,56 @@ body.dark-theme .deceased-btn.restart-btn {
 }
 .deceased-btn.restart-btn:hover {
     opacity: 0.85;
+}
+
+/* --- AI 回應等待動畫 --- */
+.ai-thinking-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    z-index: 15;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    pointer-events: none;
+}
+
+.ai-thinking-loader.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+body.dark-theme .ai-thinking-loader {
+    background: rgba(26, 26, 29, 0.7);
+}
+
+.ai-thinking-loader .loader-dots span {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--light-accent);
+    margin: 0 5px;
+    animation: prequel-bounce 1.4s infinite ease-in-out both;
+}
+
+body.dark-theme .ai-thinking-loader .loader-dots span {
+    background-color: var(--dark-accent);
+}
+
+.ai-thinking-loader .loader-dots span:nth-of-type(1) {
+    animation-delay: -0.32s;
+}
+
+.ai-thinking-loader .loader-dots span:nth-of-type(2) {
+    animation-delay: -0.16s;
 }
