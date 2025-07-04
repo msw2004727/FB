@@ -131,41 +131,29 @@ router.get('/get-novel', async (req, res) => {
     }
 });
 
-// 【新增】重新開始遊戲的API路由
-router.post('/restart', authMiddleware, async (req, res) => {
+// 【已修改】使用更穩定、更簡潔的方式處理重新開始
+router.post('/restart', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDocRef = db.collection('users').doc(userId);
+        
+        // 刪除舊的存檔集合
+        const savesCollectionRef = userDocRef.collection('game_saves');
+        const savesSnapshot = await savesCollectionRef.get();
+        const batch = db.batch();
+        savesSnapshot.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
 
-        // 1. 我們不刪除舊的存檔，而是將它們作為「傳奇」保留。
-        //    首先移除玩家的死亡標記。
+        // 刪除舊的遊戲狀態 (摘要和建議)
+        await userDocRef.collection('game_state').doc('summary').delete().catch(() => {});
+        await userDocRef.collection('game_state').doc('suggestion').delete().catch(() => {});
+        
+        // 移除玩家的死亡標記
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete()
         });
-
-        // 2. 為了開啟新人生，我們可以選擇性地清除舊的遊戲進程。
-        //    這裡我們採用歸檔的方式，而不是直接刪除。
-        //    我們將舊的存檔集合命名為一個帶有時間戳的新名字。
-        const oldSavesRef = db.collection('users').doc(userId).collection('game_saves');
-        const snapshot = await oldSavesRef.get();
-        if (!snapshot.empty) {
-            const archiveCollectionName = `saves_${Date.now()}`;
-            const archiveSavesRef = db.collection('users').doc(userId).collection(archiveCollectionName);
-            
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => {
-                // 複製到新集合
-                const newDocRef = archiveSavesRef.doc(doc.id);
-                batch.set(newDocRef, doc.data());
-                // 從舊集合刪除
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-        }
-        
-        // 3. 刪除舊的遊戲狀態 (摘要和建議)
-        await db.collection('users').doc(userId).collection('game_state').doc('summary').delete();
-        await db.collection('users').doc(userId).collection('game_state').doc('suggestion').delete();
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
 
@@ -174,6 +162,5 @@ router.post('/restart', authMiddleware, async (req, res) => {
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
-
 
 module.exports = router;
