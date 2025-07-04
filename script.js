@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- 遊戲核心邏輯 ---
     // (這部分與您之前的版本相似，但updateUI函式完全重寫)
-    const backendBaseUrl = '您的Render後端網址'; // <--- 請填入您的後端網址
+    const backendBaseUrl = 'https://ai-novel-final.onrender.com'; // <--- 請填入您的後端網址
     let currentRound = 0;
 
     submitButton.addEventListener('click', handlePlayerAction);
