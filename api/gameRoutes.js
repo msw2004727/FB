@@ -52,7 +52,29 @@ router.post('/interact', async (req, res) => {
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
+
+        let nextTimeOfDay = currentTimeOfDay;
+        if (aiResponse.roundData.shouldAdvanceTime) {
+            const currentIndex = timeSequence.indexOf(currentTimeOfDay);
+            const nextIndex = (currentIndex + 1) % timeSequence.length;
+            nextTimeOfDay = timeSequence[nextIndex];
+        }
+        aiResponse.roundData.timeOfDay = nextTimeOfDay;
+
+        const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
+        const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
+        const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
+        aiResponse.roundData.internalPower = newInternalPower;
+        aiResponse.roundData.externalPower = newExternalPower;
+        
+        await userDocRef.update({ 
+            timeOfDay: nextTimeOfDay,
+            internalPower: newInternalPower,
+            externalPower: newExternalPower
+        });
+
+
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
         if (aiResponse.roundData.playerState === 'dead') {
@@ -63,27 +85,6 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
 
         } else {
-            let nextTimeOfDay = currentTimeOfDay;
-            if (aiResponse.roundData.shouldAdvanceTime) {
-                const currentIndex = timeSequence.indexOf(currentTimeOfDay);
-                const nextIndex = (currentIndex + 1) % timeSequence.length;
-                nextTimeOfDay = timeSequence[nextIndex];
-            }
-            aiResponse.roundData.timeOfDay = nextTimeOfDay;
-
-            const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
-            const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
-            const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
-            
-            aiResponse.roundData.internalPower = newInternalPower;
-            aiResponse.roundData.externalPower = newExternalPower;
-            
-            await userDocRef.update({ 
-                timeOfDay: nextTimeOfDay,
-                internalPower: newInternalPower,
-                externalPower: newExternalPower
-            });
-
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
@@ -119,7 +120,16 @@ router.get('/latest-game', async (req, res) => {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
         
-        const recentHistory = snapshot.docs.map(doc => doc.data());
+        // 【已修改】新增了 .filter() 來過濾掉任何可能的損毀資料
+        const recentHistory = snapshot.docs
+            .map(doc => doc.data())
+            .filter(data => data != null);
+
+        // 如果過濾後沒有任何有效的歷史紀錄
+        if (recentHistory.length === 0) {
+            return res.status(404).json({ message: '找不到有效的存檔紀錄。' });
+        }
+
         const latestGameData = recentHistory[0];
 
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
@@ -134,7 +144,6 @@ router.get('/latest-game', async (req, res) => {
         
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
-        // 【已修改】增加安全性檢查，防止因資料缺失而崩潰
         const locationName = latestGameData?.LOC?.[0] || '一個未知的地方';
 
         res.json({
