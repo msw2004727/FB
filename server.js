@@ -98,7 +98,7 @@ async function getAIStory(longTermSummary, recentHistory, playerAction) {
         - LOR: (字串) 獲得的背景知識
         - CLS: (字串) 關鍵線索
         - IMP: (字串) 行動造成的直接影響
-    5.  **字數限制**: 「story」欄位的敘述文字，請務必控制在150個字元以內，保持文字精煉簡潔。
+    5.  **字數限制**: 「story」欄位的敘述文字，請務必控制在300個字元以內，保持文字精煉簡潔。
 
     ## 最近發生的事件 (短期記憶):
     ${recentHistory}
