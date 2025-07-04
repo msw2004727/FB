@@ -4,7 +4,7 @@
 :root {
     --font-serif: 'Noto Serif TC', serif; /* 襯線體，用於故事 */
     --font-sans: 'Noto Sans TC', sans-serif; /* 非襯線體，用於UI */
-    
+
     /* Light Theme (淺色主題) */
     --light-bg: #f5f1ea;
     --light-surface-bg: #fff;
@@ -130,6 +130,14 @@ body.dark-theme .round-title { color: var(--dark-accent); }
 }
 body.dark-theme .player-action-log { color: var(--dark-text-secondary); }
 
+.system-message {
+    text-align: center;
+    font-style: italic;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .system-message { color: var(--dark-text-secondary); }
+
+
 .story-footer {
     display: flex;
     border-top: 1px solid var(--light-border);
@@ -164,6 +172,10 @@ body.dark-theme #player-input { color: var(--dark-text-primary); }
 }
 body.dark-theme #submit-button { border-left: 1px solid var(--dark-border); }
 #submit-button:hover { opacity: 0.8; }
+#submit-button:disabled {
+    background-color: var(--light-text-secondary);
+    cursor: not-allowed;
+}
 
 /* --- 儀表板側邊欄 --- */
 .dashboard-header {
@@ -176,7 +188,18 @@ body.dark-theme #submit-button { border-left: 1px solid var(--dark-border); }
 }
 body.dark-theme .dashboard-header { border-bottom: 1px solid var(--dark-border); }
 .dashboard-header h3 { margin: 0; font-family: var(--font-sans); }
-.theme-switcher { /* ...與舊的theme-switcher樣式類似... */ }
+
+.theme-switcher {
+    background: none;
+    border: none;
+    color: var(--light-text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+body.dark-theme .theme-switcher {
+    color: var(--dark-text-secondary);
+}
+
 .dashboard-content {
     padding: 1.5rem;
     overflow-y: auto;
@@ -217,4 +240,58 @@ body.dark-theme .info-card h4 {
     .game-container.sidebar-open .dashboard {
         transform: translateX(0); /* 側邊欄滑入 */
     }
+}
+
+/* --- 下拉選單樣式 --- */
+.select-wrapper {
+    position: relative;
+}
+
+#ai-model-selector {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--light-border);
+    background-color: var(--light-surface-bg);
+    color: var(--light-text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+/* 深色主題下的下拉選單樣式 */
+body.dark-theme #ai-model-selector {
+    border-color: var(--dark-border);
+    background-color: var(--dark-surface-bg);
+    color: var(--dark-text-primary);
+}
+
+/* 下拉箭頭圖示 */
+.select-wrapper::after {
+    content: '\f078'; /* Font Awesome down arrow */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .select-wrapper::after {
+    color: var(--dark-text-secondary);
+}
+
+#ai-model-selector:focus {
+    outline: none;
+    border-color: var(--light-accent);
+    box-shadow: 0 0 0 2px rgba(140, 111, 84, 0.2);
+}
+
+body.dark-theme #ai-model-selector:focus {
+    border-color: var(--dark-accent);
+    box-shadow: 0 0 0 2px rgba(195, 169, 138, 0.2);
 }
