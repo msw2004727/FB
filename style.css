@@ -219,7 +219,7 @@ body.dark-theme .select-wrapper::after { color: var(--dark-text-secondary); }
 body.dark-theme #ai-model-selector:focus { border-color: var(--dark-accent); box-shadow: 0 0 0 2px rgba(195, 169, 138, 0.2); }
 
 
-/* --- 【新增】小說閱讀頁面 (Novel Page) 樣式 --- */
+/* --- 小說閱讀頁面 (Novel Page) 樣式 --- */
 .novel-container {
     max-width: 800px;
     margin: 0 auto;
@@ -320,4 +320,34 @@ body.dark-theme .novel-content .chapter h2 {
 .novel-content .loading i {
     font-size: 2rem;
     margin-bottom: 1rem;
+}
+
+/* --- 【新增】NPC 姓名高亮樣式 --- */
+.npc-name {
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+
+.npc-friendly {
+    color: #28a745; /* 友善綠 */
+}
+
+.npc-hostile {
+    color: #dc3545; /* 敵對紅 */
+}
+
+.npc-neutral {
+    color: var(--light-text-secondary); /* 中立灰 - 淺色主題 */
+}
+
+body.dark-theme .npc-friendly {
+    color: #33d45f; /* 友善綠 - 深色主題 */
+}
+
+body.dark-theme .npc-hostile {
+    color: #ff5263; /* 敵對紅 - 深色主題 */
+}
+
+body.dark-theme .npc-neutral {
+    color: var(--dark-text-secondary); /* 中立灰 - 深色主題 */
 }
