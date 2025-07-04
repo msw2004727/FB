@@ -20,7 +20,8 @@ const deepseek = new OpenAI({
 // --- 從 prompts 資料夾導入腳本 ---
 const { getStoryPrompt } = require('../prompts/storyPrompt');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt');
-const { getSummaryPrompt } = 'require('../prompts/summaryPrompt');
+const { getSummaryPrompt } = require('../prompts/summaryPrompt');
+const { getPrequelPrompt } = require('../prompts/prequelPrompt'); // 【新增】導入前情提要指令
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt) {
@@ -79,7 +80,6 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
 }
 
 // 任務三：生成主要故事
-// 【已修改】增加 userProfile 參數，並將其傳遞給 getStoryPrompt
 async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile) {
     const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile);
     try {
@@ -92,9 +92,25 @@ async function getAIStory(modelName, longTermSummary, recentHistory, playerActio
     }
 }
 
+// 【新增】任務四：生成前情提要
+async function getAIPrequel(modelName, recentHistory) {
+    const prompt = getPrequelPrompt(recentHistory);
+    try {
+        // 前情提要只需要純文字，直接呼叫 callAI 即可
+        const text = await callAI(modelName, prompt);
+        return text;
+    } catch (error) {
+        console.error("[AI 任務失敗] 江湖說書人任務:", error);
+        // 如果失敗，返回一個 null，讓前端知道沒有提要可以顯示
+        return null;
+    }
+}
+
+
 // 匯出所有服務函式
 module.exports = {
     getNarrative,
     getAISummary,
-    getAIStory
+    getAIStory,
+    getAIPrequel // 【新增】匯出新函式
 };
