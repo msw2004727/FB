@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const novelContent = document.getElementById('novel-content');
-    const backendBaseUrl = 'https://md-server-main.onrender.com';
+    const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 
     try {
         const response = await fetch(`${backendBaseUrl}/get-novel`);
