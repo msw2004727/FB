@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-        // 【已修改】將 /api/get-novel 修改為 /api/game/get-novel
         const response = await fetch(`${backendBaseUrl}/api/game/get-novel`, {
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -29,15 +28,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await response.json();
 
         if (!response.ok) {
-            // 如果請求失敗 (例如令牌過期)，拋出從後端收到的錯誤訊息
             throw new Error(data.message || '無法獲取故事內容。');
         }
         
         novelContent.innerHTML = ''; // 清空載入中訊息
 
         if (data.novel && data.novel.length > 0) {
-            data.novel.forEach((paragraph, index) => {
-                if(paragraph && paragraph.trim() !== '') { // 確保段落有內容
+            // 【已修改】將 paragraph 變數改為 chapterData，並正確讀取其下的 .text 屬性
+            data.novel.forEach((chapterData, index) => {
+                if(chapterData && chapterData.text && chapterData.text.trim() !== '') {
                     const chapterDiv = document.createElement('div');
                     chapterDiv.className = 'chapter';
 
@@ -46,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const content = document.createElement('p');
                     // 將換行符 \n 轉換為 <br> 標籤，以保留段落格式
-                    content.innerHTML = paragraph.replace(/\n/g, '<br>');
+                    content.innerHTML = chapterData.text.replace(/\n/g, '<br>');
 
                     chapterDiv.appendChild(title);
                     chapterDiv.appendChild(content);
@@ -61,7 +60,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('獲取小說時出錯:', error);
         novelContent.innerHTML = `<p class="loading">錯誤：無法從世界中讀取您的傳奇。<br>(${error.message})</p>`;
         
-        // 【新增】如果因為授權問題出錯，3秒後跳轉回登入頁面
         if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
             setTimeout(() => {
                 window.location.href = 'login.html';
