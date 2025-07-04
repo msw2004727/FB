@@ -36,10 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const deceasedTitle = document.getElementById('deceased-title');
     const restartButton = document.getElementById('restart-btn');
 
-    // 【已修改】只建立一個統一的 AI 回應等待動畫元素
+    // 【已修改】建立一個統一且可變文字的 AI 回應等待動畫元素
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
+        <div class="loader-text"></div>
         <div class="loader-dots">
             <span></span>
             <span></span>
@@ -77,7 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     });
     
-    // 【已修改】修正自殺API呼叫
     suicideButton.addEventListener('click', async () => {
         if (isRequesting) return;
         const confirmation = window.confirm("你確定要了卻此生，重新輪迴嗎？");
@@ -96,7 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
             } catch (error) {
                 handleApiError(error);
-                setLoadingState(false); // 確保錯誤時也關閉動畫
+            } finally {
+                // 自殺成功後，按鈕應保持鎖定，直到玩家重啟
+                if(!deceasedOverlay.classList.contains('visible')) {
+                    setLoadingState(false);
+                }
             }
         }
     });
@@ -185,7 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initializeGame() {
-        setLoadingState(true); // 【已修改】現在只會觸發通用的載入動畫
+        // 【已修改】使用帶有特定文字的統一載入動畫
+        setLoadingState(true, '江湖說書人正在努力撰寫中...');
 
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
@@ -233,17 +238,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 輔助函式 ---
-    function setLoadingState(isLoading) {
+    // 【已修改】函式現在可以接收文字參數來改變提示語
+    function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
         playerInput.disabled = isLoading;
         submitButton.disabled = isLoading;
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
 
-        // 【已修改】現在只控制這一個統一的動畫
+        const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
+        
         if (isLoading) {
+            loaderTextElement.textContent = text;
             aiThinkingLoader.classList.add('visible');
         } else {
             aiThinkingLoader.classList.remove('visible');
+            loaderTextElement.textContent = ''; // 清空文字以便下次使用
         }
 
         if (!isLoading) playerInput.focus();
