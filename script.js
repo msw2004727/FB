@@ -1,144 +1,149 @@
-// TODO: 將這裡換成您自己的 Firebase 設定
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+// --- DOM 元素 ---
+const storyPanel = document.getElementById('story-panel');
+const roundInfoPanel = document.getElementById('round-info');
+const roundNumberDisplay = document.getElementById('round-number');
+const playerInput = document.getElementById('player-input');
+const submitButton = document.getElementById('submit-button');
 
-// 初始化 Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-// DOM 元素
-const storyDisplay = document.getElementById('story-display');
-const roundInfoDisplay = document.getElementById('round-info');
-const playerActionInput = document.getElementById('player-action');
-const submitActionButton = document.getElementById('submit-action');
-
-// --- 遊戲核心邏輯 (此處為前端模擬，實際應由後端AI處理) ---
-
-// 假設的遊戲狀態
+// --- 遊戲狀態 ---
 let currentRound = 0;
 
-// 當按下送出按鈕
-submitActionButton.addEventListener('click', async () => {
-    const action = playerActionInput.value;
-    if (!action) {
-        alert('請輸入你的行動！');
-        return;
+// --- 事件監聽 ---
+submitButton.addEventListener('click', handlePlayerAction);
+playerInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        handlePlayerAction();
     }
-
-    // 禁用輸入，防止重複提交
-    playerActionInput.disabled = true;
-    submitActionButton.disabled = true;
-    storyDisplay.innerHTML += `<p><em>> ${action}</em></p>`; // 顯示玩家行動
-
-    // --- 在這裡呼叫您的後端AI ---
-    // 為了演示，我們將使用一個模擬的AI回應函式
-    const aiResponse = await getMockAIResponse(action);
-
-    // 更新前端介面
-    updateUI(aiResponse.story, aiResponse.roundData);
-
-    // 將回合紀錄儲存到 Firestore
-    await saveRoundToFirebase(aiResponse.roundData);
-
-    // 清空輸入框並重新啟用
-    playerActionInput.value = '';
-    playerActionInput.disabled = false;
-    submitActionButton.disabled = false;
-    playerActionInput.focus();
 });
 
+// --- 函式 ---
+
 /**
- * 更新前端介面
+ * 處理玩家的行動
+ */
+async function handlePlayerAction() {
+    const actionText = playerInput.value.trim();
+    if (!actionText) return; // 如果沒輸入東西就返回
+
+    // 顯示玩家的行動
+    appendPlayerActionToStory(actionText);
+
+    // 清空輸入框並暫時禁用按鈕
+    playerInput.value = '';
+    submitButton.disabled = true;
+    submitButton.textContent = '思考中...';
+
+    // *** 核心：獲取AI的回應 (目前是假的) ***
+    const aiResponse = await getMockAIResponse(actionText);
+
+    // 模擬延遲，讓感覺更真實
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // 更新介面
+    updateUI(aiResponse.story, aiResponse.roundData);
+
+    // 重新啟用按鈕
+    submitButton.disabled = false;
+    submitButton.textContent = '送出行動';
+    playerInput.focus();
+}
+
+/**
+ * 將玩家的行動顯示在故事面板上
+ * @param {string} text - 玩家輸入的文字
+ */
+function appendPlayerActionToStory(text) {
+    const p = document.createElement('p');
+    p.className = 'player-action-log';
+    p.textContent = `> ${text}`;
+    storyPanel.appendChild(p);
+    storyPanel.scrollTop = storyPanel.scrollHeight;
+}
+
+/**
+ * 將AI生成的故事顯示在故事面板上
+ * @param {string} text - AI生成的故事文字
+ */
+function appendStoryText(text) {
+    const p = document.createElement('p');
+    p.className = 'story-text';
+    p.textContent = text;
+    storyPanel.appendChild(p);
+    storyPanel.scrollTop = storyPanel.scrollHeight;
+}
+
+/**
+ * 更新整個UI介面
  * @param {string} storyText - 新的故事文本
  * @param {object} roundData - 回合資料物件
  */
 function updateUI(storyText, roundData) {
-    // 更新故事顯示
-    storyDisplay.innerHTML += `<p>${storyText}</p>`;
-    storyDisplay.scrollTop = storyDisplay.scrollHeight; // 自動滾動到底部
+    // 1. 更新故事面板
+    appendStoryText(storyText);
 
-    // 格式化並顯示回合資訊
-    let infoText = `R${roundData.R}\n`;
-    infoText += `EVT:${roundData.EVT}\n`;
-    infoText += `LOC:${roundData.LOC}\n`;
-    if (roundData.PC) infoText += `PC:${roundData.PC}\n`;
-    if (roundData.NPC) infoText += `NPC:${roundData.NPC}\n`;
-    if (roundData.ITM) infoText += `ITM:${roundData.ITM}\n`;
-    if (roundData.QST) infoText += `QST:${roundData.QST}\n`;
-    if (roundData.WRD) infoText += `WRD:${roundData.WRD}\n`;
-    if (roundData.CLS) infoText += `CLS:${roundData.CLS}\n`;
+    // 2. 更新回合資訊
+    roundNumberDisplay.textContent = roundData.R;
+    let infoText = '';
+    // 使用我們設計的新格式來顯示
+    if(roundData.ATM) infoText += `ATM: ${roundData.ATM.join(', ')}\n`;
+    if(roundData.EVT) infoText += `EVT: ${roundData.EVT}\n`;
+    if(roundData.LOC) infoText += `LOC: ${roundData.LOC.join(', ')}\n`;
+    if(roundData.PSY) infoText += `PSY: ${roundData.PSY}\n`;
+    if(roundData.PC) infoText += `PC: ${roundData.PC}\n`;
+    if(roundData.NPC) infoText += `NPC: ${roundData.NPC}\n`;
+    if(roundData.ITM) infoText += `ITM: ${roundData.ITM}\n`;
+    if(roundData.QST) infoText += `QST: ${roundData.QST}\n`;
+    if(roundData.WRD) infoText += `WRD: ${roundData.WRD}\n`;
+    if(roundData.LOR) infoText += `LOR: ${roundData.LOR}\n`;
+    if(roundData.CLS) infoText += `CLS: ${roundData.CLS}\n`;
+    if(roundData.IMP) infoText += `IMP: ${roundData.IMP}\n`;
     
-    roundInfoDisplay.textContent = infoText;
+    roundInfoPanel.textContent = infoText;
 }
 
 /**
- * 將回合紀錄儲存到 Firebase
- * @param {object} roundData - 該回合的完整資料
- */
-async function saveRoundToFirebase(roundData) {
-    try {
-        const roundId = `R${roundData.R}`;
-        // 使用 set() 並指定文件ID為回合編號
-        await db.collection("game_saves").doc(roundId).set(roundData);
-        console.log(`回合 ${roundId} 已成功儲存至 Firebase!`);
-    } catch (error) {
-        console.error("儲存至 Firebase 失敗: ", error);
-        storyDisplay.innerHTML += `<p style="color:red;">錯誤：無法儲存遊戲進度！</p>`;
-    }
-}
-
-/**
- * 模擬 AI 回應 (在實際專案中，這部分應由後端執行)
+ * (*** 核心 ***)
+ * 模擬AI的回應 - 這部分未來將被真實的後端API取代
  * @param {string} playerAction - 玩家的行動
  * @returns {Promise<object>} - 包含故事和回合資料的物件
  */
 async function getMockAIResponse(playerAction) {
-    currentRound++; // 回合數增加
-
-    // 這是模擬的AI回應，您需要將其替換為真實的後端API呼叫
+    currentRound++;
+    
+    // 這是一個假的AI回應，用來測試介面
     const mockData = {
-        story: `你決定「${playerAction}」。一陣夜風吹過，你感覺到山寨裡的氣氛更加緊張了。一名巡邏的嘍囉似乎發現了你的蹤跡，正朝你這個方向走來！`,
+        story: `你決定「${playerAction}」。夜色更深了，一陣冷風吹過，遠處的森林裡傳來一聲狼嚎，似乎有什麼東西被你的動靜驚擾了。你感覺到一絲不安，握緊了手中的武器。`,
         roundData: {
             R: currentRound,
-            EVT: "潛入山寨被發現",
-            LOC: "山寨外圍草叢",
-            PC: "心態-5,緊張",
-            NPC: "嘍囉,友好-10,警戒",
+            ATM: ["緊張", "月黑風高, 狼嚎四起"],
+            EVT: "在黑森林邊緣探索",
+            LOC: ["黑森林外圍", "{深夜, 起霧}"],
+            PSY: "感到一絲不安，但好奇心驅使著繼續前進",
+            PC: "心境-5(環境影響)",
+            NPC: "", // 本回合無NPC互動
             ITM: "", // 本回合無物品變化
-            QST: "救人,進行中,1/4",
-            WRD: "風變大",
-            CLS: "發現巡邏路線"
+            QST: "探索森林, 進行中, 1/10",
+            WRD: "霧氣變濃",
+            LOR: "",
+            CLS: "遠處似乎有微弱的光芒",
+            IMP: "發出的聲響 -> 可能吸引了未知生物的注意"
         }
     };
     
-    // 模擬網路延遲
-    return new Promise(resolve => setTimeout(() => resolve(mockData), 1000));
+    return mockData;
 }
 
-// 遊戲開始時，可以嘗試讀取最後一筆紀錄
-window.onload = async () => {
-    const query = db.collection("game_saves").orderBy("R", "desc").limit(1);
-    const snapshot = await query.get();
+// 遊戲開始時的初始訊息
+function initializeGame() {
+    const initialInfo = `
+ATM: [未知, {萬籟俱寂}]
+EVT: 故事開始
+LOC: [未知的荒野, {黃昏}]
+PSY: [頭腦昏沉，不知身在何處]
+QST: [我是誰？, 開始]
+    `;
+    roundInfoPanel.textContent = initialInfo.trim();
+    playerInput.focus();
+}
 
-    if (!snapshot.empty) {
-        const lastRound = snapshot.docs[0].data();
-        currentRound = lastRound.R;
-        storyDisplay.innerHTML = `<p>讀取到上次的進度...</p>`;
-        updateUI(`你從 ${lastRound.LOC} 繼續你的冒險。`, lastRound);
-    } else {
-        storyDisplay.innerHTML = `<p>新的冒險開始了！你發現自己身處在一座不知名的森林裡，遠方似乎有火光。請在下方輸入你的第一個行動。</p>`;
-        // 初始回合範例
-        const initialRoundData = {
-            R: 0,
-            EVT: "遊戲開始",
-            LOC: "未知森林",
-        };
-        roundInfoDisplay.textContent = `R0\nEVT:遊戲開始\nLOC:未知森林`;
-    }
-};
+initializeGame();
