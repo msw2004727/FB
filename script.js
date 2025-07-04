@@ -89,8 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
         try {
-            // 【修改】所有 fetch 請求都加入 Authorization 標頭
-            const response = await fetch(`${backendBaseUrl}/api/interact`, {
+            // 【已修正】將 /api/interact 修改為 /api/game/interact
+            const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -120,8 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory('正在連接你的世界，讀取記憶中...', 'system-message');
 
         try {
-            // 【修改】所有 fetch 請求都加入 Authorization 標頭
-            const response = await fetch(`${backendBaseUrl}/api/latest-game`, {
+            // 【已修正】將 /api/latest-game 修改為 /api/game/latest-game
+            const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
