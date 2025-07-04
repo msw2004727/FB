@@ -3,17 +3,14 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth'); // 導入身份驗證守衛
 
-// 【已修改】導入 getAIPrequel 函式
 const { getAIStory, getAISummary, getNarrative, getAIPrequel } = require('../services/aiService');
 
 const db = admin.firestore();
 
-// 【重要】將守衛應用於此檔案中的所有路由
 router.use(authMiddleware);
 
-// API 路由: /api/game/interact
 router.post('/interact', async (req, res) => {
-    const userId = req.user.id; // 從守衛中取得使用者 ID
+    const userId = req.user.id;
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
 
@@ -53,12 +50,9 @@ router.post('/interact', async (req, res) => {
     }
 });
 
-// API 路由: /api/game/latest-game
-// 【已修改】此路由的邏輯已大幅更新，以產生前情提要
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
-        // 讀取最近的 7 筆紀錄來生成摘要
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(7).get();
         
         if (snapshot.empty) {
@@ -66,20 +60,18 @@ router.get('/latest-game', async (req, res) => {
         }
 
         const recentHistory = snapshot.docs.map(doc => doc.data());
-        const latestGameData = recentHistory[0]; // 最新的紀錄 (R最大)
+        const latestGameData = recentHistory[0];
 
         let prequel = null;
-        // 只有在有多於一筆紀錄時，生成前情提要才有意義
         if (recentHistory.length > 1) {
-            // 將歷史紀錄反轉，讓AI按照時間順序閱讀
             const historyForPrequel = [...recentHistory].reverse();
-            // 使用預設的 gemini 模型來生成摘要，以節省成本
             prequel = await getAIPrequel('gemini', historyForPrequel);
         }
 
         res.json({
-            prequel: prequel, // 新增的欄位，可能是摘要文字或 null
-            story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒E險...`,
+            prequel: prequel,
+            // 【已修改】修正 "冒E險" 的錯字
+            story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
             roundData: latestGameData
         });
 
@@ -89,7 +81,6 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
-// API 路由: /api/game/get-novel
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -98,12 +89,10 @@ router.get('/get-novel', async (req, res) => {
             return res.json({ novel: ["您的故事還未寫下第一筆..."] });
         }
         
-        // 【已修改】在生成小說時，也為每一段高亮NPC
         const narrativePromises = snapshot.docs.map(async (doc) => {
             const roundData = doc.data();
             const narrativeText = await getNarrative('gemini', roundData);
             
-            // 返回包含高亮所需資料的物件
             return {
                 text: narrativeText,
                 npcs: roundData.NPC || [] 
