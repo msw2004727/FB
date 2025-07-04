@@ -15,10 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submit-button');
     const roundTitleEl = document.getElementById('round-title');
     const statusBarEl = document.getElementById('status-bar');
-    // 【新增】獲取時間狀態元素
     const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
+    // 【新增】獲取武功數值顯示元素
+    const internalPowerEl = document.getElementById('internal-power-display');
+    const externalPowerEl = document.getElementById('external-power-display');
     const npcContent = document.getElementById('npc-content');
     const itmContent = document.getElementById('itm-content');
     const qstContent = document.getElementById('qst-content');
@@ -268,7 +270,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUI('你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。', {
             R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'],
             PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '',
-            timeOfDay: '上午' // 新玩家預設時間
+            timeOfDay: '上午',
+            internalPower: 5,
+            externalPower: 5
         });
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
@@ -304,15 +308,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const weather = data.WRD || '晴朗';
         const location = data.LOC?.[0] || '未知之地';
         
-        // 【已修改】更新狀態欄，現在包含時間
         statusBarEl.innerHTML = `
-            <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
+            <div class="status-item" id="time-status"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
             <div class="status-item"><i class="fas fa-cloud-sun"></i> 天氣: ${weather}</div>
             <div class="status-item"><i class="fas fa-theater-masks"></i> 氛圍: ${atmosphere}</div>
             <div class="status-item"><i class="fas fa-map-marked-alt"></i> 地點: ${location}</div>
         `;
 
         pcContent.textContent = data.PC || '狀態穩定';
+        // 【新增】更新武功數值顯示
+        internalPowerEl.textContent = `內功: ${data.internalPower || 0}`;
+        externalPowerEl.textContent = `外功: ${data.externalPower || 0}`;
         
         npcContent.innerHTML = '';
         if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
