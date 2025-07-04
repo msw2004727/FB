@@ -13,7 +13,13 @@ const deepseek = new OpenAI({
     baseURL: "https://api.deepseek.com/v1",
 });
 
-const { getStoryPrompt, getNarrativePrompt, getSummaryPrompt, getPrequelPrompt, getSuggestionPrompt } = require('../prompts/storyPrompt');
+// 【已修正】從各自的檔案中正確引入所需的 prompt 函式
+const { getStoryPrompt } = require('../prompts/storyPrompt');
+const { getNarrativePrompt } = require('../prompts/narrativePrompt');
+const { getSummaryPrompt } = require('../prompts/summaryPrompt');
+const { getPrequelPrompt } = require('../prompts/prequelPrompt');
+const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
+
 
 // --- 【新增】專門處理串流回應的函式 ---
 async function streamAIResponse(modelName, prompt) {
