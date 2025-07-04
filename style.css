@@ -194,32 +194,35 @@ body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); backgr
 
 .input-action-wrapper {
     display: flex;
+    align-items: stretch; /* 讓子元素填滿容器高度 */
 }
 
-/* 【已修改】重寫此處樣式以確保高度一致 */
+/* 【已修改】為輸入框和按鈕設定通用樣式以確保高度一致 */
+#player-input,
+#submit-button {
+    padding: 1.1rem 2rem; /* 統一垂直內距 */
+    font-size: 1.1rem;      /* 統一字體大小 */
+    line-height: 1.5;       /* 統一線高 */
+    border: none;           /* 統一無邊框 */
+    box-sizing: border-box; /* 統一盒模型計算方式 */
+}
+
+/* 【已修改】只保留輸入框的獨特樣式 */
 #player-input {
     flex-grow: 1;
     min-width: 100px;
-    padding: 1.25rem 2rem;
     background: transparent;
-    border: none;
-    font-family: var(--font-sans);
-    font-size: 1.1rem;
     color: var(--light-text-primary);
 }
 body.dark-theme #player-input { color: var(--dark-text-primary); }
 #player-input:focus { outline: none; }
 
-/* 【已修改】重寫此處樣式以確保高度一致 */
+/* 【已修改】只保留按鈕的獨特樣式 */
 #submit-button {
     flex-shrink: 0;
     min-width: 120px;
-    padding: 1.25rem 2rem;
     background-color: var(--light-accent);
-    border: none;
     border-left: 1px solid var(--light-border);
-    font-family: var(--font-sans);
-    font-size: 1rem;
     font-weight: bold;
     color: #fff;
     cursor: pointer;
