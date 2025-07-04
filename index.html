@@ -12,9 +12,18 @@
         <main class="story-container">
             <header class="story-header">
                 <h1>江湖一夢</h1>
-                <div>
-                    <a href="novel.html" target="_blank" class="novel-button" title="閱讀完整故事"><i class="fas fa-book"></i> 完整故事</a>
-                    <button id="theme-switcher" title="切換主題"><i class="fas fa-sun"></i></button>
+                <div class="header-controls">
+                    <select id="ai-selector" class="ai-selector" title="選擇AI模型">
+                        <option value="gemini">Gemini (Google)</option>
+                        <option value="openai">GPT-4o (OpenAI)</option>
+                        <option value="deepseek">DeepSeek</option>
+                    </select>
+                    <a href="novel.html" target="_blank" class="novel-button" title="閱讀完整故事">
+                        <i class="fas fa-book"></i> <span>完整故事</span>
+                    </a>
+                    <button id="theme-switcher" title="切換主題">
+                        <i class="fas fa-sun"></i>
+                    </button>
                 </div>
             </header>
             <div id="story-panel" class="panel">
