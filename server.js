@@ -20,7 +20,15 @@ const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 // --- Express App 設定 ---
 const app = express();
 const PORT = process.env.PORT || 3001;
-app.use(cors());
+
+// --- CORS 設定 (最終明確版) ---
+const corsOptions = {
+  origin: 'https://msw2004727.github.io', // 只允許您的GitHub Pages來源的請求
+  optionsSuccessStatus: 200 
+};
+app.use(cors(corsOptions));
+// --- CORS 設定結束 ---
+
 app.use(express.json());
 
 // *** 新增：摘要AI函式 ***
@@ -61,13 +69,12 @@ async function getAISummary(oldSummary, newRoundData) {
 
 // --- 核心：AI 互動函式 (升級版) ---
 async function getAIStory(longTermSummary, recentHistory, playerAction) {
-    // 這是我們給AI的「人設」和「指令」，是整個專案的靈魂！
     const prompt = `
     你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。
 
     ## 長期故事摘要 (世界核心記憶):
     ${longTermSummary}
-
+    
     ## 核心世界觀：
     1.  **時代背景**: 這是一個類似明朝中葉，但架空的武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節。
     2.  **主角設定**: 主角是一個從21世紀現代社會，靈魂穿越到這個世界的年輕人。他附身在一個不知名、約15歲的少年身上。這具身體骨骼清奇、經脈異於常人，是萬中無一的練武奇才，但因為不明原因，正處於重傷瀕死的狀態。
@@ -91,11 +98,12 @@ async function getAIStory(longTermSummary, recentHistory, playerAction) {
         - LOR: (字串) 獲得的背景知識
         - CLS: (字串) 關鍵線索
         - IMP: (字串) 行動造成的直接影響
-    
+    5.  **字數限制**: 「story」欄位的敘述文字，請務必控制在150個字元以內，保持文字精煉簡潔。
+
     ## 最近發生的事件 (短期記憶):
     ${recentHistory}
 
-    這是玩家的最新行動:
+    ## 這是玩家的最新行動:
     "${playerAction}"
 
     現在，請根據以上的長期摘要、世界觀、規則、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
