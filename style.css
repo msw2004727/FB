@@ -185,9 +185,42 @@ body.dark-theme .player-action-log { color: var(--dark-text-secondary); }
 .system-message { text-align: center; font-style: italic; color: var(--light-text-secondary); }
 body.dark-theme .system-message { color: var(--dark-text-secondary); }
 
+/* --- 【新增】前情提要樣式 --- */
+.prequel-summary {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+body.dark-theme .prequel-summary {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.prequel-summary h3 {
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
+    color: var(--light-accent);
+    margin: 0 0 0.75rem 0;
+    text-align: center;
+}
+body.dark-theme .prequel-summary h3 {
+    color: var(--dark-accent);
+}
+.prequel-summary p {
+    font-size: 1rem;
+    line-height: 1.8;
+    text-align: justify;
+    margin: 0;
+    font-style: normal; /* 覆蓋 .system-message 的斜體 */
+}
+
+
 /* 【已修改】為提示詞的絕對定位提供基準 */
 .story-footer {
-    position: relative;
+    position: relative; 
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
 }
