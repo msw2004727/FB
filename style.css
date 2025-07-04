@@ -32,7 +32,7 @@ body.dark-theme {
     color: var(--dark-text-primary);
 }
 
-/* --- 【新增】登入/註冊頁面專用樣式 --- */
+/* --- 登入/註冊頁面專用樣式 --- */
 body.auth-page {
     display: flex;
     justify-content: center;
@@ -164,8 +164,7 @@ body.dark-theme .auth-switch a {
 .message.error { color: #dc3545; }
 
 
-/* --- 遊戲主頁面樣式 (保持不變) --- */
-/* 以下是您原有的遊戲主頁面樣式，我將其保持原樣，確保新樣式不會影響到它 */
+/* --- 遊戲主頁面樣式 --- */
 .game-container { display: flex; height: 100vh; width: 100%; overflow: hidden; }
 .main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100%; transition: margin-right 0.4s ease; }
 .dashboard { width: 320px; flex-shrink: 0; background-color: var(--light-surface-bg); border-left: 1px solid var(--light-border); display: flex; flex-direction: column; transition: background-color 0.3s, border-color 0.3s; }
@@ -218,3 +217,107 @@ body.dark-theme #ai-model-selector { border-color: var(--dark-border); backgroun
 body.dark-theme .select-wrapper::after { color: var(--dark-text-secondary); }
 #ai-model-selector:focus { outline: none; border-color: var(--light-accent); box-shadow: 0 0 0 2px rgba(140, 111, 84, 0.2); }
 body.dark-theme #ai-model-selector:focus { border-color: var(--dark-accent); box-shadow: 0 0 0 2px rgba(195, 169, 138, 0.2); }
+
+
+/* --- 【新增】小說閱讀頁面 (Novel Page) 樣式 --- */
+.novel-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem 1.5rem;
+    box-sizing: border-box;
+}
+
+.novel-header {
+    text-align: center;
+    padding-bottom: 2rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--light-border);
+}
+body.dark-theme .novel-header {
+    border-bottom-color: var(--dark-border);
+}
+
+.novel-header h1 {
+    font-family: var(--font-serif);
+    font-size: 2.8rem;
+    font-weight: 600;
+    color: var(--light-text-primary);
+    margin: 0 0 0.5rem 0;
+}
+body.dark-theme .novel-header h1 {
+    color: var(--dark-text-primary);
+}
+
+.novel-header p {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--light-text-secondary);
+    margin: 0;
+}
+
+.back-to-game-btn {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--light-border);
+    border-radius: 20px;
+    color: var(--light-text-secondary);
+    text-decoration: none;
+    font-family: var(--font-sans);
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+body.dark-theme .back-to-game-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+.back-to-game-btn:hover {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+}
+body.dark-theme .back-to-game-btn:hover {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+    border-color: var(--dark-accent);
+}
+
+.back-to-game-btn i {
+    margin-right: 0.5rem;
+}
+
+.novel-content .chapter {
+    margin-bottom: 3rem;
+}
+
+.novel-content .chapter h2 {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--light-accent);
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--light-border);
+}
+body.dark-theme .novel-content .chapter h2 {
+    color: var(--dark-accent);
+    border-bottom-color: var(--dark-border);
+}
+
+.novel-content .chapter p {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 2.2;
+    text-align: justify;
+}
+
+.novel-content .loading {
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--light-text-secondary);
+}
+.novel-content .loading i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
