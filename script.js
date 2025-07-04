@@ -7,7 +7,7 @@ const submitButton = document.getElementById('submit-button');
 
 // --- 遊戲狀態 ---
 let currentRound = 0;
-const backendBaseUrl = 'https://md-server-main.onrender.com'; // 您的雲端後端網址
+const backendBaseUrl = 'https://ai-novel-final.onrender.com'; // 您的雲端後端網址
 
 // --- 事件監聽 ---
 submitButton.addEventListener('click', handlePlayerAction);
