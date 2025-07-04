@@ -8,7 +8,8 @@ const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://md-server-main-default-rtdb.asia-southeast1.firebasedatabase.app" // 您的 Firebase Realtime DB URL
+  // 請確保這裡的URL是您自己的
+  databaseURL: "https://md-server-main-default-rtdb.asia-southeast1.firebasedatabase.app"
 });
 const db = admin.firestore();
 
@@ -25,11 +26,12 @@ app.use(express.json());
 
 // --- 核心：AI 互動函式 ---
 async function getAIStory(history, playerAction) {
+    // 這是我們給AI的「人設」和「指令」，是整個專案的靈魂！
     const prompt = `
     你是一個名為「世界管理者（World Master）」的AI，負責一款沉浸式文字互動小說。你的任務是根據玩家的歷史和當前行動，生成富有創意、符合邏輯且引人入勝的故事發展。
 
     你必須嚴格遵守以下的規則：
-    1. 你的所有回應都必須是一個完整的JSON物件，不要在前後添加任何額外的文字或 "\\\`\\\`\\\`json" 標記。
+    1. 你的所有回應都必須是一個完整的JSON物件，不要在前後添加任何額外的文字或 "\`\`\`json" 標記。
     2. JSON物件必須包含 "story" 和 "roundData" 兩個頂層鍵。
     3. "story" 鍵的值是一個字串，用來生動地描述故事發展。
     4. "roundData" 鍵的值是一個物件，必須包含以下所有欄位，即使沒有內容也要用空字串""表示：
