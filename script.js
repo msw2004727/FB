@@ -96,7 +96,7 @@ async function getRealAIResponse(playerAction) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ action: playerAction })
+            body: JSON.stringify({ action: playerAction, round: currentRound })
         });
 
         if (!response.ok) {
