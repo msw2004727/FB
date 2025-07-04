@@ -185,8 +185,9 @@ body.dark-theme .player-action-log { color: var(--dark-text-secondary); }
 .system-message { text-align: center; font-style: italic; color: var(--light-text-secondary); }
 body.dark-theme .system-message { color: var(--dark-text-secondary); }
 
+/* 【已修改】為提示詞的絕對定位提供基準 */
 .story-footer {
-    padding-top: 0.5rem;
+    position: relative; 
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
 }
@@ -194,7 +195,7 @@ body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); backgr
 
 .input-action-wrapper {
     display: flex;
-    align-items: stretch; /* 讓子元素填滿容器高度 */
+    align-items: stretch;
 }
 
 #player-input,
@@ -459,21 +460,29 @@ body.dark-theme .prequel-loader-dots span {
     }
 }
 
-/* --- 動作提示句樣式 --- */
+/* 【已修改】動作提示句樣式，改為絕對定位 */
 .action-suggestion {
+    position: absolute;
+    bottom: 100%; /* 定位在父元素(footer)的頂部 */
+    left: 0;
     width: 100%;
+    background-color: rgba(237, 231, 222, 0.9); /* 帶有透明度的米色 */
+    backdrop-filter: blur(2px); /* 毛玻璃效果 */
+    border-bottom: 1px solid var(--light-border);
+    
     text-align: center;
     font-size: 0.85rem;
     color: var(--light-text-secondary);
-    padding: 0 1rem 0.25rem 1rem;
+    padding: 0.4rem 1rem;
     box-sizing: border-box;
     min-height: 1.2em;
-    transition: color 0.3s;
-    /* 【修改】調整淺色主題下提示詞的背景顏色 */
-    background-color: #ede7de; /* 一個稍微深一點的米色 */
+    transition: all 0.3s;
+    pointer-events: none; /* 讓滑鼠可以穿透 */
 }
 
 body.dark-theme .action-suggestion {
+    background-color: rgba(34, 34, 38, 0.85);
+    border-bottom-color: var(--dark-border);
     color: var(--dark-text-secondary);
 }
 
