@@ -20,7 +20,7 @@ const deepseek = new OpenAI({
 // --- 從 prompts 資料夾導入腳本 ---
 const { getStoryPrompt } = require('../prompts/storyPrompt');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt');
-const { getSummaryPrompt } = require('../prompts/summaryPrompt');
+const { getSummaryPrompt } = 'require('../prompts/summaryPrompt');
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt) {
@@ -79,8 +79,9 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
 }
 
 // 任務三：生成主要故事
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction);
+// 【已修改】增加 userProfile 參數，並將其傳遞給 getStoryPrompt
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile);
     try {
         const text = await callAI(modelName, prompt);
         const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
