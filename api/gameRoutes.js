@@ -24,7 +24,7 @@ router.post('/interact', async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
-        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
 
@@ -33,7 +33,7 @@ router.post('/interact', async (req, res) => {
         if (currentRound > 0) {
             const roundsToFetch = Array.from({length: memoryDepth}, (_, i) => currentRound - i).filter(r => r > 0);
             if (roundsToFetch.length > 0) {
-                const roundDocs = await db.collection('users').doc(userId).collection('game_saves').where('R', 'in', roundsToFetch).get();
+                const roundDocs = await userDocRef.collection('game_saves').where('R', 'in', roundsToFetch).get();
                 roundDocs.forEach(doc => recentHistoryRounds.push(doc.data()));
                 recentHistoryRounds.sort((a, b) => a.R - b.R);
             }
@@ -45,17 +45,27 @@ router.post('/interact', async (req, res) => {
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
         
+        // 【已修改】將小說段落生成與儲存移至此處
+        const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
+
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
             aiResponse.suggestion = "你的江湖路已到盡頭...";
+            const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
+            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
+
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+            
+            // 為新回合生成小說旁白並儲存
+            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
+            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
-        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
+        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
         res.json(aiResponse);
 
@@ -64,6 +74,7 @@ router.post('/interact', async (req, res) => {
         res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
     }
 });
+
 
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
@@ -104,29 +115,39 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
-// 【已修改】小說生成路由
+// 【已修改】小說生成路由，現在會讀取快取
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
-        const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
-        if (snapshot.empty) {
-            return res.json({ novel: ["您的故事還未寫下第一筆..."] });
-        }
-        
-        const narrativePromises = snapshot.docs.map(async (doc) => {
-            const roundData = doc.data();
-            // 【已修改】將 'gemini' 更改為 'deepseek'
-            const narrativeText = await getNarrative('deepseek', roundData);
+        const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
+        const novelCacheDoc = await novelCacheRef.get();
+
+        if (novelCacheDoc.exists && novelCacheDoc.data().paragraphs) {
+            // 如果快取存在，直接回傳
+            res.json({ novel: novelCacheDoc.data().paragraphs });
+        } else {
+            // 快取不存在 (相容舊玩家)，為其生成一次並儲存
+            const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+            if (snapshot.empty) {
+                return res.json({ novel: [] });
+            }
             
-            return {
-                text: narrativeText,
-                npcs: roundData.NPC || [] 
-            };
-        });
+            const narrativePromises = snapshot.docs.map(async (doc) => {
+                const roundData = doc.data();
+                const narrativeText = await getNarrative('deepseek', roundData);
+                return {
+                    text: narrativeText,
+                    npcs: roundData.NPC || [] 
+                };
+            });
 
-        const novelParagraphs = await Promise.all(narrativePromises);
-        res.json({ novel: novelParagraphs });
-
+            const novelParagraphs = await Promise.all(narrativePromises);
+            
+            // 寫入快取供未來使用
+            await novelCacheRef.set({ paragraphs: novelParagraphs });
+            
+            res.json({ novel: novelParagraphs });
+        }
     } catch (error) {
         console.error(`[UserID: ${userId}] /get-novel 錯誤:`, error);
         res.status(500).json({ message: "生成小說時出錯。" });
@@ -149,6 +170,9 @@ router.post('/restart', async (req, res) => {
         await userDocRef.collection('game_state').doc('summary').delete().catch(() => {});
         await userDocRef.collection('game_state').doc('suggestion').delete().catch(() => {});
         
+        // 【已修改】一併刪除小說快取
+        await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
+        
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete()
         });
@@ -160,5 +184,6 @@ router.post('/restart', async (req, res) => {
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
+
 
 module.exports = router;
