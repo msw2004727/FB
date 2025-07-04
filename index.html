@@ -7,13 +7,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="light-theme"> <div class="game-container">
+<body class="light-theme">
+    <div class="game-container">
         <button id="menu-toggle" class="menu-toggle"><i class="fas fa-bars"></i></button>
 
         <main id="main-content" class="main-content">
             <header class="story-header">
-                <div id="status-bar" class="status-bar">
-                    </div>
+                <div id="status-bar" class="status-bar"></div>
             </header>
             <div id="story-panel" class="story-panel">
                 <h2 id="round-title" class="round-title">楔子</h2>
@@ -33,6 +33,17 @@
                 <button id="theme-switcher" class="theme-switcher"><i class="fas fa-moon"></i></button>
             </div>
             <div class="dashboard-content">
+                <div class="info-card">
+                    <h4><i class="fas fa-brain-circuit"></i> AI 核心</h4>
+                    <div class="select-wrapper">
+                        <select id="ai-model-selector">
+                            <option value="gemini">Gemini (快 & 穩)</option>
+                            <option value="openai">GPT-4o (強 & 貴)</option>
+                            <option value="deepseek">DeepSeek (新 & 奇)</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="info-card">
                     <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
                     <div id="pc-content">--</div>
