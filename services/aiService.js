@@ -1,56 +1,32 @@
 // services/aiService.js
 
+// --- AI SDK 初始化 ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 
+// 1. Google Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 
+// 2. OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// 3. DeepSeek
 const deepseek = new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseURL: "https://api.deepseek.com/v1",
 });
 
-// 【已修正】從各自的檔案中正確引入所需的 prompt 函式
+// --- 從 prompts 資料夾導入腳本 ---
 const { getStoryPrompt } = require('../prompts/storyPrompt');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt');
 const { getSummaryPrompt } = require('../prompts/summaryPrompt');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 
-
-// --- 【新增】專門處理串流回應的函式 ---
-async function streamAIResponse(modelName, prompt) {
-    console.log(`[AI 調度中心] 正在使用模型 (串流模式): ${modelName}`);
-    try {
-        switch (modelName) {
-            case 'openai':
-                return await openai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [{ role: "user", content: prompt }],
-                    stream: true,
-                });
-            case 'deepseek':
-                return await deepseek.chat.completions.create({
-                    model: "deepseek-v2",
-                    messages: [{ role: "user", content: prompt }],
-                    stream: true,
-                });
-            case 'gemini':
-            default:
-                return await geminiModel.generateContentStream(prompt);
-        }
-    } catch (error) {
-        console.error(`[AI 調度中心] 使用模型 ${modelName} (串流) 時出錯:`, error);
-        throw new Error(`AI模型 ${modelName} 串流呼叫失敗，請檢查API金鑰與服務狀態。`);
-    }
-}
-
-// --- 保留的非串流呼叫函式 (給摘要、建議等任務使用) ---
+// 統一的AI調度中心
 async function callAI(modelName, prompt) {
-    console.log(`[AI 調度中心] 正在使用模型 (非串流模式): ${modelName}`);
+    console.log(`[AI 調度中心] 正在使用模型: ${modelName}`);
     try {
         let textResponse = "";
         switch (modelName) {
@@ -63,7 +39,7 @@ async function callAI(modelName, prompt) {
                 break;
             case 'deepseek':
                 const deepseekResult = await deepseek.chat.completions.create({
-                    model: "deepseek-v2",
+                    model: "deepseek-chat",
                     messages: [{ role: "user", content: prompt }],
                 });
                 textResponse = deepseekResult.choices[0].message.content;
@@ -80,8 +56,7 @@ async function callAI(modelName, prompt) {
     }
 }
 
-// --- 各項AI任務 ---
-
+// 任務一：生成小說旁白
 async function getNarrative(modelName, roundData) {
     const prompt = getNarrativePrompt(roundData);
     try {
@@ -92,6 +67,7 @@ async function getNarrative(modelName, roundData) {
     }
 }
 
+// 任務二：更新長期摘要
 async function getAISummary(modelName, oldSummary, newRoundData) {
     const prompt = getSummaryPrompt(oldSummary, newRoundData);
     try {
@@ -104,27 +80,34 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
     }
 }
 
-// 【已修改】getAIStory 現在會回傳一個資料流
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower);
+// 任務三：生成主要故事
+// 【已修改】增加 username 參數，並將其傳遞給 getStoryPrompt
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username);
     try {
-        return await streamAIResponse(modelName, prompt);
+        const text = await callAI(modelName, prompt);
+        const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
+        return JSON.parse(cleanJsonText);
     } catch (error) {
-        console.error("[AI 任務失敗] 故事大師任務 (串流):", error);
-        return null; // 如果串流建立失敗，回傳null
+        console.error("[AI 任務失敗] 故事大師任務:", error);
+        return null;
     }
 }
 
+// 任務四：生成前情提要
 async function getAIPrequel(modelName, recentHistory) {
     const prompt = getPrequelPrompt(recentHistory);
     try {
-        return await callAI(modelName, prompt);
+        const text = await callAI(modelName, prompt);
+        return text;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖說書人任務:", error);
+        // 【已修改】在任務失敗時，回傳一段友善的提示文字
         return "江湖說書人今日嗓子不適，未能道出前情提要...";
     }
 }
 
+// 任務五：生成動作建議
 async function getAISuggestion(modelName, roundData) {
     const prompt = getSuggestionPrompt(roundData);
     try {
@@ -136,6 +119,8 @@ async function getAISuggestion(modelName, roundData) {
     }
 }
 
+
+// 匯出所有服務函式
 module.exports = {
     getNarrative,
     getAISummary,
