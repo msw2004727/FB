@@ -1,24 +1,38 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>註冊 - AI武俠世界</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="auth-page">
     <div class="auth-container">
-        <h2>初入江湖</h2>
-        <form id="register-form">
-            <input type="text" id="username" placeholder="姓名" required>
-            <select id="gender" required>
-                <option value="">選擇性別</option>
-                <option value="male">男</option>
-                <option value="female">女</option>
-            </select>
-            <input type="password" id="password" placeholder="密碼" required>
-            <button type="submit">註冊</button>
+        <h2 class="auth-title">初入江湖</h2>
+        <form id="register-form" class="auth-form">
+            <div class="input-group">
+                <i class="fas fa-user"></i>
+                <input type="text" id="username" placeholder="請輸入你的名號" required>
+            </div>
+             <div class="input-group">
+                <i class="fas fa-venus-mars"></i>
+                <select id="gender" required>
+                    <option value="" disabled selected>請選擇你的性別</option>
+                    <option value="male">男</option>
+                    <option value="female">女</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="password" placeholder="請設定你的密碼" required>
+            </div>
+            <button type="submit" id="submit-btn">拜入師門</button>
         </form>
-        <p>已經有帳號？ <a href="login.html">直接登入</a></p>
         <p id="message" class="message"></p>
+        <div class="auth-switch">
+            <span>已經有帳號？</span> <a href="login.html">直接登入</a>
+        </div>
     </div>
     <script src="register.js"></script>
 </body>
