@@ -19,8 +19,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-        // 【修改】API請求現在會加上 Authorization 標頭來驗證身份
-        const response = await fetch(`${backendBaseUrl}/api/get-novel`, {
+        // 【已修改】將 /api/get-novel 修改為 /api/game/get-novel
+        const response = await fetch(`${backendBaseUrl}/api/game/get-novel`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
