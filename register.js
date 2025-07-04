@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch(`${backendBaseUrl}/api/register`, {
+            // 【已修正】將 /api/register 修改為 /api/auth/register
+            const response = await fetch(`${backendBaseUrl}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, gender, password })
