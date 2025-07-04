@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 【新增】重新開始按鈕的事件監聽
     restartButton.addEventListener('click', async () => {
         try {
-            const response = await fetch(`${backendBaseUrl}/api/restart`, {
+            const response = await fetch(`${backendBaseUrl}/api/game/restart`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
         try {
-            const response = await fetch(`${backendBaseUrl}/api/interact`, {
+            const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ action: actionText, round: currentRound, model: selectedModel })
@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         prequelLoader.classList.add('visible');
 
         try {
-            const response = await fetch(`${backendBaseUrl}/api/latest-game`, {
+            const response = await fetch(`${backendBaseUrl}/api/game/latest-game`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
