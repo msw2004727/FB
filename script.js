@@ -48,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     storyPanelWrapper.appendChild(prequelLoader);
 
-    // 【新增】建立 AI 回應等待動畫元素
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
@@ -183,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initializeGame() {
-        setLoadingState(true);
+        setLoadingState(true); // 這裡會顯示 aiThinkingLoader，但沒關係，因為 prequelLoader 會蓋在它上面
         prequelLoader.classList.add('visible');
 
         try {
@@ -227,21 +226,23 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
+            // 【已修改】確保在初始化結束時，兩個動畫都隱藏
             setLoadingState(false);
             prequelLoader.classList.remove('visible');
         }
     }
 
     // --- 輔助函式 ---
-    // 【已修改】加入動畫顯示/隱藏的控制
     function setLoadingState(isLoading) {
         isRequesting = isLoading;
         playerInput.disabled = isLoading;
         submitButton.disabled = isLoading;
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
 
+        // 【已修改】確保兩個動畫不會同時出現
         if (isLoading) {
-            aiThinkingLoader.classList.add('visible');
+            prequelLoader.classList.remove('visible'); // 先隱藏說書人
+            aiThinkingLoader.classList.add('visible'); // 再顯示互動中動畫
         } else {
             aiThinkingLoader.classList.remove('visible');
         }
