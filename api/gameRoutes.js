@@ -3,6 +3,7 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
+// 【已修改】aiService 現在提供串流功能
 const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -11,6 +12,7 @@ const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚'
 
 router.use(authMiddleware);
 
+// 【已修改】此路由現在會處理來自AI的串流資料
 router.post('/interact', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -27,7 +29,6 @@ router.post('/interact', async (req, res) => {
         }
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        // 【新增】讀取玩家武功數值
         const playerPower = {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5
@@ -48,9 +49,21 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【修改】將武功數值傳給AI
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
-        if (!aiResponse) throw new Error("主AI未能生成有效回應。");
+        const stream = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
+        if (!stream) throw new Error("AI未能生成有效回應。");
+
+        // 【新增】在後端處理串流，並拼接成完整JSON
+        let fullResponseText = '';
+        for await (const chunk of stream) {
+            // 不同的AI模型，串流的資料結構不同，這裡做相容處理
+            const chunkText = chunk.choices?.[0]?.delta?.content || chunk.text();
+            fullResponseText += chunkText;
+        }
+        
+        // 清理並解析完整的JSON
+        const cleanJsonText = fullResponseText.replace(/^```json\s*|```\s*$/g, '');
+        const aiResponse = JSON.parse(cleanJsonText);
+
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
@@ -63,16 +76,13 @@ router.post('/interact', async (req, res) => {
         }
         aiResponse.roundData.timeOfDay = nextTimeOfDay;
 
-        // 【新增】處理武功數值變化
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
-        // 將更新後的數值加入回傳資料
         aiResponse.roundData.internalPower = newInternalPower;
         aiResponse.roundData.externalPower = newExternalPower;
         
-        // 一次性更新所有玩家狀態
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -128,7 +138,6 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        // 【新增】加入武功數值
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
         latestGameData.internalPower = userData.internalPower || 5;
         latestGameData.externalPower = userData.externalPower || 5;
@@ -207,7 +216,6 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
-        // 【新增】重置武功數值
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
