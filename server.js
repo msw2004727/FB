@@ -3,14 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// Firebase Initialization
+// Firebase 初始化
 try {
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!serviceAccountString) throw new Error('Firebase 服務帳戶金鑰未設定！');
     const serviceAccount = JSON.parse(serviceAccountString);
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        databaseURL: "https://ai-novel-final.firebaseio.com" // Recommended to use .firebaseio.com domain
+        databaseURL: "https://md-server-main-default-rtdb.asia-southeast1.firebasedatabase.app"
     });
     console.log("Firebase 初始化成功！");
 } catch (error) {
@@ -18,26 +18,28 @@ try {
     process.exit(1);
 }
 
-// Express App Setup
+// Express App 設定
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: 'https://msw2004727.github.io' }));
 app.use(express.json());
 
-// --- API Routers ---
+// --- 載入 API 路由 ---
 const authRoutes = require('./api/authRoutes');
 const gameRoutes = require('./api/gameRoutes');
 
-// Use the routers with specific base paths
-app.use('/api/auth', authRoutes); // e.g., /api/auth/register
-app.use('/api/game', gameRoutes); // e.g., /api/game/interact
+// 【重要】使用路由器並指定基礎路徑
+// 所有 /api/auth 的請求，都交給 authRoutes 處理
+app.use('/api/auth', authRoutes);
+// 所有 /api/game 的請求，都交給 gameRoutes 處理
+app.use('/api/game', gameRoutes);
 
-// Root health check
+// 根目錄健康檢查
 app.get('/', (req, res) => {
     res.send('AI 武俠世界伺服器已啟動並採用最新模組化架構！');
 });
 
-// Start Server
+// 啟動伺服器
 app.listen(PORT, () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
 });
