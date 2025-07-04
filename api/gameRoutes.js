@@ -7,6 +7,9 @@ const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion } 
 
 const db = admin.firestore();
 
+// 【新增】定義時間序列
+const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
+
 router.use(authMiddleware);
 
 router.post('/interact', async (req, res) => {
@@ -24,6 +27,9 @@ router.post('/interact', async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
+        // 【新增】讀取當前時間
+        const currentTimeOfDay = userProfile.timeOfDay || '上午';
+
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
@@ -39,12 +45,25 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username);
+        // 【修改】將當前時間傳給AI
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
         
+        // 【新增】處理時間推進邏輯
+        let nextTimeOfDay = currentTimeOfDay;
+        if (aiResponse.roundData.shouldAdvanceTime) {
+            const currentIndex = timeSequence.indexOf(currentTimeOfDay);
+            const nextIndex = (currentIndex + 1) % timeSequence.length;
+            nextTimeOfDay = timeSequence[nextIndex];
+            await userDocRef.update({ timeOfDay: nextTimeOfDay });
+        }
+        // 將時間加入回傳資料
+        aiResponse.roundData.timeOfDay = nextTimeOfDay;
+
+
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
         if (aiResponse.roundData.playerState === 'dead') {
@@ -92,14 +111,15 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
+        // 【新增】將時間資訊加入回傳
+        latestGameData.timeOfDay = userData.timeOfDay || '上午';
+
         let prequel = null;
         if (recentHistory.length > 1) {
             const historyForPrequel = [...recentHistory].reverse();
-            // 【已修正】將此處寫死的 'gemini' 改為 'deepseek'
             prequel = await getAIPrequel('deepseek', historyForPrequel);
         }
-
-        // 【已修正】統一使用 'deepseek'
+        
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
         res.json({
@@ -168,8 +188,10 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
+        // 【新增】重置時間
         await userDocRef.update({
-            isDeceased: admin.firestore.FieldValue.delete()
+            isDeceased: admin.firestore.FieldValue.delete(),
+            timeOfDay: admin.firestore.FieldValue.delete()
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -185,6 +207,8 @@ router.post('/force-suicide', async (req, res) => {
     const username = req.user.username;
     try {
         const userDocRef = db.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        const userProfile = userDoc.exists ? userDoc.data() : {};
 
         await userDocRef.update({ isDeceased: true });
 
@@ -195,6 +219,7 @@ router.post('/force-suicide', async (req, res) => {
         const finalRoundData = {
             R: newRoundNumber,
             playerState: 'dead',
+            timeOfDay: userProfile.timeOfDay || '上午', // 【新增】加入時間
             ATM: ['決絕', '悲壯'],
             EVT: '英雄末路',
             LOC: ['原地', {}],
