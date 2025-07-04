@@ -27,6 +27,7 @@ router.post('/interact', async (req, res) => {
         }
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
+        // 【新增】讀取玩家武功數值
         const playerPower = {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5
@@ -47,6 +48,7 @@ router.post('/interact', async (req, res) => {
             }
         }
         
+        // 【修改】將武功數值傳給AI
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
@@ -61,13 +63,16 @@ router.post('/interact', async (req, res) => {
         }
         aiResponse.roundData.timeOfDay = nextTimeOfDay;
 
+        // 【新增】處理武功數值變化
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
+        // 將更新後的數值加入回傳資料
         aiResponse.roundData.internalPower = newInternalPower;
         aiResponse.roundData.externalPower = newExternalPower;
         
+        // 一次性更新所有玩家狀態
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -109,7 +114,7 @@ router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.exists ? userDoc.data() : {};
+        const userData = userDoc.data();
 
         if (userData && userData.isDeceased) {
             return res.json({ gameState: 'deceased' });
@@ -120,18 +125,10 @@ router.get('/latest-game', async (req, res) => {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
         
-        // 【已修改】新增了 .filter() 來過濾掉任何可能的損毀資料
-        const recentHistory = snapshot.docs
-            .map(doc => doc.data())
-            .filter(data => data != null);
-
-        // 如果過濾後沒有任何有效的歷史紀錄
-        if (recentHistory.length === 0) {
-            return res.status(404).json({ message: '找不到有效的存檔紀錄。' });
-        }
-
+        const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
+        // 【新增】加入武功數值
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
         latestGameData.internalPower = userData.internalPower || 5;
         latestGameData.externalPower = userData.externalPower || 5;
@@ -144,11 +141,9 @@ router.get('/latest-game', async (req, res) => {
         
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
-        const locationName = latestGameData?.LOC?.[0] || '一個未知的地方';
-
         res.json({
             prequel: prequel,
-            story: `[進度已讀取] 你回到了 ${locationName}，繼續你的冒險...`,
+            story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
             roundData: latestGameData,
             suggestion: suggestion
         });
@@ -212,6 +207,7 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
+        // 【新增】重置武功數值
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
