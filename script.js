@@ -31,7 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-btn');
     const actionSuggestion = document.getElementById('action-suggestion');
     
-    // 【新增】獲取死亡畫面的元素
+    // 【新增】獲取自殺與死亡畫面的元素
+    const suicideButton = document.getElementById('suicide-btn');
     const deceasedOverlay = document.getElementById('deceased-overlay');
     const deceasedTitle = document.getElementById('deceased-title');
     const restartButton = document.getElementById('restart-btn');
@@ -70,14 +71,23 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(currentTheme);
     });
     
-    // --- 登出與重新開始的邏輯 ---
+    // --- 登出、自殺、重新開始的邏輯 ---
     logoutButton.addEventListener('click', () => {
         localStorage.removeItem('jwt_token');
         localStorage.removeItem('username');
         window.location.href = 'login.html';
     });
+    
+    // 【新增】自殺按鈕的事件監聽
+    suicideButton.addEventListener('click', () => {
+        if (isRequesting) return; // 如果正在請求中，則不執行
+        const confirmation = window.confirm("你確定要了卻此生，重新輪迴嗎？");
+        if (confirmation) {
+            playerInput.value = "決定了結自己的性命"; // 設定一個明確的自殺指令
+            handlePlayerAction();
+        }
+    });
 
-    // 【新增】重新開始按鈕的事件監聽
     restartButton.addEventListener('click', async () => {
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/restart`, {
@@ -90,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 throw new Error(data.message || '開啟輪迴失敗');
             }
-            // 成功後，重新載入頁面以開始新遊戲
             window.location.reload();
         } catch (error) {
             console.error('重新開始失敗:', error);
@@ -151,7 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
             }
             
-            // 【新增】在互動後檢查死亡狀態
             if (data.roundData.playerState === 'dead') {
                 showDeceasedScreen();
             }
@@ -172,26 +180,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            // 【已修改】處理新玩家 (404) 和其他錯誤的邏輯
             if (response.status === 404) {
                 startNewGame();
-                return; // 流程結束
+                return;
             }
             
             if (!response.ok) {
-                 const errorData = await response.json(); // 嘗試解析JSON錯誤訊息
+                 const errorData = await response.json();
                  throw new Error(errorData.message || `伺服器錯誤: ${response.status}`);
             }
 
             const data = await response.json();
 
-            // 在讀取時檢查死亡狀態
             if (data.gameState === 'deceased') {
                 showDeceasedScreen();
-                return; // 中斷後續遊戲載入
+                return;
             }
             
-            // 正常載入遊戲進度
             currentRound = data.roundData.R;
             storyTextContainer.innerHTML = '';
 
@@ -225,11 +230,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isLoading) playerInput.focus();
     }
     
-    // 【新增】顯示死亡畫面的函式
     function showDeceasedScreen() {
         deceasedTitle.textContent = `${username || '你'}的江湖路已到盡頭`;
         deceasedOverlay.classList.add('visible');
-        setLoadingState(true); // 鎖定輸入框
+        setLoadingState(true);
     }
 
     function startNewGame() {
