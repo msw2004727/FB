@@ -21,7 +21,8 @@ const deepseek = new OpenAI({
 const { getStoryPrompt } = require('../prompts/storyPrompt');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt');
 const { getSummaryPrompt } = require('../prompts/summaryPrompt');
-const { getPrequelPrompt } = require('../prompts/prequelPrompt'); // 【新增】導入前情提要指令
+const { getPrequelPrompt } = require('../prompts/prequelPrompt');
+const { getSuggestionPrompt } = require('../prompts/suggestionPrompt'); // 【新增】導入動作建議指令
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt) {
@@ -92,16 +93,27 @@ async function getAIStory(modelName, longTermSummary, recentHistory, playerActio
     }
 }
 
-// 【新增】任務四：生成前情提要
+// 任務四：生成前情提要
 async function getAIPrequel(modelName, recentHistory) {
     const prompt = getPrequelPrompt(recentHistory);
     try {
-        // 前情提要只需要純文字，直接呼叫 callAI 即可
         const text = await callAI(modelName, prompt);
         return text;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖說書人任務:", error);
-        // 如果失敗，返回一個 null，讓前端知道沒有提要可以顯示
+        return null;
+    }
+}
+
+// 【新增】任務五：生成動作建議
+async function getAISuggestion(modelName, roundData) {
+    const prompt = getSuggestionPrompt(roundData);
+    try {
+        const text = await callAI(modelName, prompt);
+        // 去除可能的引號
+        return text.replace(/["“”]/g, '');
+    } catch (error) {
+        console.error("[AI 任務失敗] 機靈書僮任務:", error);
         return null;
     }
 }
@@ -112,5 +124,6 @@ module.exports = {
     getNarrative,
     getAISummary,
     getAIStory,
-    getAIPrequel // 【新增】匯出新函式
+    getAIPrequel,
+    getAISuggestion // 【新增】匯出新函式
 };
