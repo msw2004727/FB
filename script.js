@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerInput = document.getElementById('player-input');
     const submitButton = document.getElementById('submit-button');
     const storyPanel = document.getElementById('story-panel');
-    const backendBaseUrl = 'https://md-server-main.onrender.com';
+    const backendBaseUrl = 'https://ai-novel-final.onrender.com';
     let currentRound = 0;
 
     submitButton.addEventListener('click', handlePlayerAction);
