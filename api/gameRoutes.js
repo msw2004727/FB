@@ -106,7 +106,8 @@ router.post('/interact', async (req, res) => {
 
         const playerPower = {
             internal: userProfile.internalPower || 5,
-            external: userProfile.externalPower || 5
+            external: userProfile.externalPower || 5,
+            lightness: userProfile.lightness || 5 // <--- 新增：讀取輕功值，預設為5
         };
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
 
@@ -148,7 +149,7 @@ router.post('/interact', async (req, res) => {
         
         turnsSinceEvent++;
         
-        let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
+        let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 }; // <--- 新增：預設輕功變化為0
         let moralityChange = aiResponse.roundData.moralityChange || 0;
         let newPlayerStateDescription = aiResponse.roundData.PC;
         let newItemChange = aiResponse.roundData.ITM;
@@ -195,6 +196,7 @@ router.post('/interact', async (req, res) => {
                     if(eventData.effects.powerChange) {
                         powerChange.internal += (eventData.effects.powerChange.internal || 0);
                         powerChange.external += (eventData.effects.powerChange.external || 0);
+                        powerChange.lightness += (eventData.effects.powerChange.lightness || 0); // <--- 新增：處理隨機事件的輕功變化
                     }
                     if(eventData.effects.moralityChange) {
                         moralityChange += eventData.effects.moralityChange;
@@ -213,8 +215,9 @@ router.post('/interact', async (req, res) => {
             turnsSinceEvent = 0;
         }
 
-        const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
-        const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
+        const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + (powerChange.internal || 0)));
+        const newExternalPower = Math.max(0, Math.min(999, playerPower.external + (powerChange.external || 0)));
+        const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0))); // <--- 新增：計算新的輕功值
         let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
 
@@ -224,6 +227,7 @@ router.post('/interact', async (req, res) => {
         Object.assign(aiResponse.roundData, {
             internalPower: newInternalPower,
             externalPower: newExternalPower,
+            lightness: newLightness, // <--- 新增：將輕功值加入回傳資料
             morality: newMorality,
             timeOfDay: nextTimeOfDay,
             ...currentDate
@@ -233,6 +237,7 @@ router.post('/interact', async (req, res) => {
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
+            lightness: newLightness, // <--- 新增：更新輕功值到資料庫
             morality: newMorality,
             turnsSinceEvent: turnsSinceEvent,
             ...currentDate
@@ -248,7 +253,7 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
-aiResponse.suggestion = suggestion;
+            aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
             
@@ -300,6 +305,7 @@ router.post('/combat-action', async (req, res) => {
             if (changes.powerChange) {
                 finalUpdate.internalPower = playerProfile.internalPower + (changes.powerChange.internal || 0);
                 finalUpdate.externalPower = playerProfile.externalPower + (changes.powerChange.external || 0);
+                finalUpdate.lightness = playerProfile.lightness + (changes.powerChange.lightness || 0); // <--- 新增：處理戰鬥後的輕功變化
             }
             if (changes.moralityChange) {
                 finalUpdate.morality = playerProfile.morality + changes.moralityChange;
@@ -353,6 +359,7 @@ router.get('/latest-game', async (req, res) => {
             timeOfDay: latestGameData.timeOfDay || userData.timeOfDay || '上午',
             internalPower: userData.internalPower || 5,
             externalPower: userData.externalPower || 5,
+            lightness: userData.lightness || 5, // <--- 新增：讀取最新進度時加入輕功
             morality: userData.morality === undefined ? 0 : userData.morality,
             yearName: userData.yearName || '元祐',
             year: userData.year || 1,
@@ -450,6 +457,7 @@ router.post('/restart', async (req, res) => {
             timeOfDay: admin.firestore.FieldValue.delete(),
             internalPower: admin.firestore.FieldValue.delete(),
             externalPower: admin.firestore.FieldValue.delete(),
+            lightness: admin.firestore.FieldValue.delete(), // <--- 新增：重設遊戲時刪除輕功值
             morality: admin.firestore.FieldValue.delete(),
             year: admin.firestore.FieldValue.delete(),
             month: admin.firestore.FieldValue.delete(),
@@ -487,6 +495,7 @@ router.post('/force-suicide', async (req, res) => {
             timeOfDay: userProfile.timeOfDay || '上午',
             internalPower: userProfile.internalPower || 5,
             externalPower: userProfile.externalPower || 5,
+            lightness: userProfile.lightness || 5, // <--- 新增：在最終回合數據中包含輕功
             morality: userProfile.morality === undefined ? 0 : userProfile.morality,
             yearName: userProfile.yearName || '元祐',
             year: userProfile.year || 1,
