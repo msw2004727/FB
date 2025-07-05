@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const internalPowerValue = document.getElementById('internal-power-value');
     const externalPowerBar = document.getElementById('external-power-bar');
     const externalPowerValue = document.getElementById('external-power-value');
-    // 【新增】獲取輕功的DOM元素
     const lightnessPowerBar = document.getElementById('lightness-power-bar');
     const lightnessPowerValue = document.getElementById('lightness-power-value');
     
@@ -222,7 +221,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
-            setLoadingState(false);
+            if (!isInCombat) {
+                setLoadingState(false);
+            }
         }
     }
 
@@ -240,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initialState.log.forEach(line => appendToCombatLog(line));
         
         combatInput.focus();
+        setLoadingState(false); // 停止主介面的讀取動畫
     }
 
     async function handleCombatAction() {
@@ -262,40 +264,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'COMBAT_ONGOING') {
                 appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
-                endCombat(data.outcome);
+                // 將最後一幕的戰鬥日誌顯示出來
+                appendToCombatLog(data.finalLog, 'combat-summary');
+                // 呼叫新的結束戰鬥函式，並傳入包含新回合資料的 newRound 物件
+                endCombat(data.newRound);
             }
 
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
         } finally {
             setLoadingState(false);
-            combatInput.focus();
+            if (isInCombat) { // 只有還在戰鬥中才 focus
+                combatInput.focus();
+            }
         }
     }
 
-    function endCombat(outcome) {
-        let outcomeHtml = `<p class="combat-summary-title">戰鬥結束</p>`;
-        outcomeHtml += `<p>${outcome.summary}</p>`;
-        if (outcome.playerChanges.PC) {
-            outcomeHtml += `<p>狀態變化: ${outcome.playerChanges.PC}</p>`;
+    function endCombat(newRoundData) {
+        // 更新全域的回合數
+        currentRound = newRoundData.roundData.R;
+        
+        // 使用新回合的資料更新主UI
+        updateUI(newRoundData.story, newRoundData.roundData, null);
+        
+        // 更新建議
+        if (newRoundData.suggestion) {
+            actionSuggestion.textContent = `書僮小聲說：${newRoundData.suggestion}`;
         }
-        if (outcome.playerChanges.ITM) {
-            outcomeHtml += `<p>獲得物品: ${outcome.playerChanges.ITM}</p>`;
-        }
-        appendToCombatLog(outcomeHtml, 'combat-summary');
 
-        combatInput.disabled = true;
-        combatActionButton.textContent = "關閉";
-        combatActionButton.onclick = () => {
-            combatModal.classList.remove('visible');
-            isInCombat = false;
-            playerInput.disabled = false;
-            submitButton.disabled = false;
-            combatInput.disabled = false;
-            combatActionButton.textContent = "行動";
-            combatActionButton.onclick = handleCombatAction;
-            window.location.reload();
-        };
+        // 關閉戰鬥視窗
+        combatModal.classList.remove('visible');
+        isInCombat = false;
+        
+        // 恢復主介面的輸入功能
+        playerInput.disabled = false;
+        submitButton.disabled = false;
+        playerInput.focus();
     }
     
     function appendToCombatLog(text, className) {
@@ -400,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timeOfDay: '上午',
             internalPower: 5,
             externalPower: 5,
-            lightness: 5, // 【新增】新遊戲時的初始輕功值
+            lightness: 5,
             morality: 0,
             yearName: '元祐', year: 1, month: 1, day: 1
         }, null);
@@ -477,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const processedStory = highlightNpcNames(storyText, data.NPC);
             appendMessageToStory(processedStory, 'story-text');
         }
-        if (!data) return; // 如果沒有 data 就提前退出
+        if (!data) return;
 
         roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
         
@@ -498,11 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const internal = data.internalPower === undefined ? 0 : data.internalPower;
         const external = data.externalPower === undefined ? 0 : data.externalPower;
-        const lightness = data.lightness === undefined ? 0 : data.lightness; // 【新增】讀取輕功值
+        const lightness = data.lightness === undefined ? 0 : data.lightness;
 
         updatePowerBar(internalPowerBar, internalPowerValue, internal);
         updatePowerBar(externalPowerBar, externalPowerValue, external);
-        updatePowerBar(lightnessPowerBar, lightnessPowerValue, lightness); // 【新增】更新輕功的UI
+        updatePowerBar(lightnessPowerBar, lightnessPowerValue, lightness);
         
         updateMoralityBar(data.morality === undefined ? 0 : data.morality);
 
