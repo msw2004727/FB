@@ -13,9 +13,8 @@ const authMiddleware = (req, res, next) => {
     try {
         // Verify the token using the secret key
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
-        // 【已修正】將 decoded.userId 修正為 decoded.id
-        // Attach the user's info (from the token) to the request object
+
+        // 【已修正】將 decoded.userId 修正為 decoded.id，以匹配登入時簽發的 token
         req.user = { id: decoded.id, username: decoded.username };
 
         // If verification is successful, proceed to the next function (the actual API logic)
