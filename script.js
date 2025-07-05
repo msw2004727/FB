@@ -65,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <span></span>
         </div>
     `;
-    // 【修改】將 loader 附加到 mainContent
     mainContent.appendChild(aiThinkingLoader);
 
     if (welcomeMessage && username) {
@@ -267,21 +266,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
                 appendToCombatLog(data.finalLog, 'combat-summary');
-                if (data.newRound) {
-                    endCombat(data.newRound);
-                } else {
-                    console.error("戰鬥結束，但後端未提供 newRound 資料。");
-                    endCombat(null); 
-                }
+                // 即使後端回傳資料有問題，也要確保能安全退出
+                endCombat(data.newRound || null); 
             }
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
+            // 發生 fetch 錯誤時，也要確保能退出
+            endCombat(null);
         } finally {
             setLoadingState(false);
         }
     }
 
     function endCombat(newRoundData) {
+        // 【修改】增加對傳入資料的檢查
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             currentRound = newRoundData.roundData.R;
             updateUI(newRoundData.story, newRoundData.roundData, null);
@@ -289,9 +287,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionSuggestion.textContent = `書僮小聲說：${newRoundData.suggestion}`;
             }
         } else {
+            // 如果資料有問題，只顯示提示，避免程式崩潰
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
 
+        // 無論如何，都必須執行關閉彈窗和恢復UI的邏輯
         combatModal.classList.remove('visible');
         isInCombat = false;
         
