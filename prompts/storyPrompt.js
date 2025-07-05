@@ -1,7 +1,7 @@
 // prompts/storyPrompt.js
 
 // 函式現在會接收完整的日期物件
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5 }, playerMorality = 0) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -52,14 +52,15 @@ ${longTermSummary}
     * 若行動無關道德，則回傳 \`0\`。
 
 ## 武功規則 (非常重要)：
-1.  **玩家目前的武功修為是：** 內功: ${playerPower.internal} / 999, 外功: ${playerPower.external} / 999。
-2.  **內功** 代表真氣、內力，影響招式威力和持久力。**外功** 代表招式技巧、筋骨強度，影響命中和防禦。
-3.  你在判斷任何與NPC的實力對比、戰鬥、或任何需要體力/技巧的行動結果時，**必須**將這兩個數值作為**最核心的判斷依據**。
-4.  你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`powerChange\` 的物件，格式為 \`{ "internal": X, "external": Y }\`，其中X和Y代表本回合內功與外功的變化值。
+1.  **玩家目前的武功修為是：** 內功: ${playerPower.internal} / 999, 外功: ${playerPower.external} / 999, 輕功: ${playerPower.lightness} / 999。
+2.  **內功** 代表真氣、內力，影響招式威力和持久力。**外功** 代表招式技巧、筋骨強度，影響命中和防禦。**輕功** 代表身法、速度與閃避能力，影響移動和戰鬥中的靈活性。
+3.  你在判斷任何與NPC的實力對比、戰鬥、或任何需要體力/技巧/速度的行動結果時，**必須**將這三個數值作為**最核心的判斷依據**。
+4.  你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`powerChange\` 的物件，格式為 \`{ "internal": X, "external": Y, "lightness": Z }\`，其中X、Y和Z代表本回合內功、外功與輕功的變化值。
     * 如果玩家學習或練習**外功招式** (如劍法、拳法)，你應該增加 \`external\` 的值。
     * 如果玩家打坐、修練**內功心法**，你應該增加 \`internal\` 的值。
-    * 如果玩家受傷，你應該**減少**對應的數值（例如內傷減內功，外傷減外功）。
-    * 如果沒有任何變化，則回傳 \`{ "internal": 0, "external": 0 }\`。
+    * 如果玩家練習**身法、步法或進行敏捷相關的訓練**，你應該增加 \`lightness\` 的值。
+    * 如果玩家受傷，你應該**減少**對應的數值（例如內傷減內功，筋骨受損減外功，腿部受創減輕功）。
+    * 如果沒有任何變化，則回傳 \`{ "internal": 0, "external": 0, "lightness": 0 }\`。
 
 ## 你必須嚴格遵守以下的規則：
 1. 【重要】玩家的姓名是「${username}」。在你的所有 "story" 敘述中，請務必使用這個名字來稱呼玩家，絕對禁止使用「主角」這個詞。
@@ -71,7 +72,7 @@ ${longTermSummary}
     - playerState: (字串) 玩家的存活狀態。只能是 'alive' (存活) 或 'dead' (死亡)。
     - timeOfDay: (字串) 行動結束後的最終時辰，必須是 ${JSON.stringify(timeSequence)} 之一。
     - daysToAdvance: (可選的數字) 如果行動跨越多日，則提供此欄位。
-    - powerChange: (物件) 武功數值的變化，格式為 {"internal": X, "external": Y}。
+    - powerChange: (物件) 武功數值的變化，格式為 {"internal": X, "external": Y, "lightness": Z}。
     - moralityChange: (數字) 正邪值的變化，可以是正數、負數或零。
     - ATM: (陣列) [氛圍, 感官細節]
     - EVT: (字串) 事件摘要
