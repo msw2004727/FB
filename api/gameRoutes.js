@@ -3,13 +3,40 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
-const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion } = require('../services/aiService');
+// 【修改】從 aiService 導入新的 getAIEncyclopedia 函式
+const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion, getAIEncyclopedia } = require('../services/aiService');
 
 const db = admin.firestore();
 
 const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 
 router.use(authMiddleware);
+
+// 【新增】獲取江湖百科的 API 路由
+router.get('/get-encyclopedia', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    try {
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+
+        if (!summaryDoc.exists || !summaryDoc.data().text) {
+            return res.json({ encyclopediaHtml: '<p class="loading">你的江湖經歷尚淺，還沒有可供編撰的百科內容。</p>' });
+        }
+
+        const longTermSummary = summaryDoc.data().text;
+        
+        // 使用我們新建立的 AI 服務來生成百科內容
+        const encyclopediaHtml = await getAIEncyclopedia('gemini', longTermSummary, username);
+        
+        res.json({ encyclopediaHtml });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /get-encyclopedia 錯誤:`, error);
+        res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
+    }
+});
+
 
 router.post('/interact', async (req, res) => {
     const userId = req.user.id;
@@ -31,7 +58,6 @@ router.post('/interact', async (req, res) => {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5
         };
-        // 【新增】讀取玩家正邪值，若不存在則預設為 0 (中立)
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
 
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
@@ -49,7 +75,6 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【修改】將武功數值和正邪值一併傳給AI
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
@@ -68,23 +93,19 @@ router.post('/interact', async (req, res) => {
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
-        // 【新增】處理正邪值變化
         const moralityChange = aiResponse.roundData.moralityChange || 0;
         let newMorality = playerMorality + moralityChange;
-        // 確保數值被限制在 -100 到 +100 之間
         newMorality = Math.max(-100, Math.min(100, newMorality));
         
-        // 將更新後的數值加入回傳資料，供前端使用
         aiResponse.roundData.internalPower = newInternalPower;
         aiResponse.roundData.externalPower = newExternalPower;
         aiResponse.roundData.morality = newMorality;
         
-        // 一次性更新所有玩家狀態
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
-            morality: newMorality // 【新增】將新的正邪值寫回資料庫
+            morality: newMorality
         });
 
 
@@ -122,7 +143,7 @@ router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.data() || {}; // 若無用戶數據則給空物件
+        const userData = userDoc.data() || {};
 
         if (userData && userData.isDeceased) {
             return res.json({ gameState: 'deceased' });
@@ -136,7 +157,6 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        // 【新增】加入武功與正邪數值
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
         latestGameData.internalPower = userData.internalPower || 5;
         latestGameData.externalPower = userData.externalPower || 5;
@@ -216,13 +236,12 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
-        // 【修改】重置時，一併刪除武功與正邪值
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
             internalPower: admin.firestore.FieldValue.delete(),
             externalPower: admin.firestore.FieldValue.delete(),
-            morality: admin.firestore.FieldValue.delete() // 【新增】刪除正邪值
+            morality: admin.firestore.FieldValue.delete()
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -253,7 +272,7 @@ router.post('/force-suicide', async (req, res) => {
             timeOfDay: userProfile.timeOfDay || '上午',
             internalPower: userProfile.internalPower || 5,
             externalPower: userProfile.externalPower || 5,
-            morality: userProfile.morality === undefined ? 0 : userProfile.morality, // 【新增】
+            morality: userProfile.morality === undefined ? 0 : userProfile.morality,
             ATM: ['決絕', '悲壯'],
             EVT: '英雄末路',
             LOC: ['原地', {}],
