@@ -37,14 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || '發生未知錯誤');
             }
 
+            // --- 以下為本次修改重點 ---
+
             // 註冊成功
-            messageElement.textContent = data.message + ' 正在將您導向登入頁面...';
+            messageElement.textContent = data.message; // 直接使用後端傳來的訊息
             messageElement.classList.add('success');
 
-            // 2秒後自動跳轉到登入頁面
+            // 將後端回傳的 token 和 username 儲存到瀏覽器的 localStorage
+            localStorage.setItem('jwt_token', data.token);
+            localStorage.setItem('username', data.username);
+
+            // 1.5秒後自動跳轉到主遊戲頁面
             setTimeout(() => {
-                window.location.href = 'login.html';
-            }, 2000);
+                window.location.href = 'index.html';
+            }, 1500);
 
         } catch (error) {
             console.error('註冊失敗:', error);
