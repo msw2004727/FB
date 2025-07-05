@@ -18,10 +18,10 @@ const getRandomEventPrompt = (eventType, playerProfile) => {
 
 1.  **事件描述 (description)**: 必須是一段 50 字以內的生動文字，描述事件是如何發生的。
 2.  **遊戲效果 (effects)**: 必須是一個物件，用來定義此事件對遊戲數值的具體影響。可用的效果鍵如下：
-    * `PC`: (字串) 對玩家狀態的文字描述，例如 "你感到一陣暖流，精神好了許多。"
-    * `ITM`: (字串) 物品的變化，例如 "+1 金瘡藥" 或 "-1 火摺子"。
-    * `powerChange`: (物件) 內外功的變化，格式為 \`{ "internal": X, "external": Y }\`。
-    * `moralityChange`: (數字) 正邪值的變化。
+    * \`PC\`: (字串) 對玩家狀態的文字描述，例如 "你感到一陣暖流，精神好了許多。"
+    * \`ITM\`: (字串) 物品的變化，例如 "+1 金瘡藥" 或 "-1 火摺子"。
+    * \`powerChange\`: (物件) 內外功的變化，格式為 \`{ "internal": X, "external": Y }\`。
+    * \`moralityChange\`: (數字) 正邪值的變化。
 
 ## 事件指令範例:
 
