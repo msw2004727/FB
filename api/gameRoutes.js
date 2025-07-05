@@ -116,6 +116,31 @@ router.post('/interact', async (req, res) => {
                 currentDate = advanceDate(currentDate);
             }
         }
+        // --- 【新增】戰鬥模式觸發檢查 ---
+        if (aiResponse.roundData.enterCombat) {
+            console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
+            
+            // 建立初始戰鬥狀態
+            const combatState = {
+                turn: 0, // 戰鬥回合數
+                player: {
+                    username: username,
+                    // 未來可以從 userProfile 中讀取更多玩家戰鬥數值
+                },
+                enemies: aiResponse.roundData.combatants, // 使用AI提供的敵人列表
+                log: [`戰鬥開始：你遭遇了 ${aiResponse.roundData.combatants.map(c => c.name).join('、')}！`] // 戰鬥日誌
+            };
+
+            // 將初始戰鬥狀態存入資料庫
+            await userDocRef.collection('game_state').doc('current_combat').set(combatState);
+
+            // 【重要】修改回傳給前端的資料結構
+            // 我們在 aiResponse 上附加一個新的鍵 combatInfo，通知前端戰鬥開始
+            aiResponse.combatInfo = {
+                status: 'COMBAT_START',
+                initialState: combatState
+            };
+        }
         
         // 【新增】每回合後，計數器+1
         turnsSinceEvent++;
