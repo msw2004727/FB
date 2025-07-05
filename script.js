@@ -53,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const combatLog = document.getElementById('combat-log');
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
+    // 【新增】獲取戰鬥載入動畫的元素
+    const combatLoader = document.getElementById('combat-loader');
 
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
@@ -241,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initialState.log.forEach(line => appendToCombatLog(line));
         
         combatInput.focus();
-        setLoadingState(false); // 停止主介面的讀取動畫
+        setLoadingState(false);
     }
 
     async function handleCombatAction() {
@@ -249,7 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!actionText || isRequesting) return;
 
         combatInput.value = '';
-        setLoadingState(true, '運息應對中...');
+        // 【修改】直接呼叫 setLoadingState 來控制戰鬥載入動畫
+        setLoadingState(true); 
         appendToCombatLog(`> ${actionText}`);
 
         try {
@@ -264,39 +267,40 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'COMBAT_ONGOING') {
                 appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
-                // 將最後一幕的戰鬥日誌顯示出來
                 appendToCombatLog(data.finalLog, 'combat-summary');
-                // 呼叫新的結束戰鬥函式，並傳入包含新回合資料的 newRound 物件
-                endCombat(data.newRound);
+                // 【修改】增加對 newRound 物件的檢查
+                if (data.newRound) {
+                    endCombat(data.newRound);
+                } else {
+                    // 如果後端沒提供新回合資料，也確保能安全退出
+                    console.error("戰鬥結束，但後端未提供 newRound 資料。");
+                    endCombat(null); 
+                }
             }
-
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
         } finally {
+            // 【修改】無論成功或失敗，都隱藏載入動畫
             setLoadingState(false);
-            if (isInCombat) { // 只有還在戰鬥中才 focus
-                combatInput.focus();
-            }
         }
     }
 
     function endCombat(newRoundData) {
-        // 更新全域的回合數
-        currentRound = newRoundData.roundData.R;
-        
-        // 使用新回合的資料更新主UI
-        updateUI(newRoundData.story, newRoundData.roundData, null);
-        
-        // 更新建議
-        if (newRoundData.suggestion) {
-            actionSuggestion.textContent = `書僮小聲說：${newRoundData.suggestion}`;
+        // 【修改】增加對傳入資料的檢查
+        if (newRoundData && newRoundData.roundData && newRoundData.story) {
+            currentRound = newRoundData.roundData.R;
+            updateUI(newRoundData.story, newRoundData.roundData, null);
+            if (newRoundData.suggestion) {
+                actionSuggestion.textContent = `書僮小聲說：${newRoundData.suggestion}`;
+            }
+        } else {
+            // 如果資料有問題，只顯示提示，避免程式崩潰
+            appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
 
-        // 關閉戰鬥視窗
         combatModal.classList.remove('visible');
         isInCombat = false;
         
-        // 恢復主介面的輸入功能
         playerInput.disabled = false;
         submitButton.disabled = false;
         playerInput.focus();
@@ -361,23 +365,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
-        if (!isInCombat) {
+
+        // 根據是否在戰鬥中，決定要操作哪個 UI
+        if (isInCombat) {
+            combatInput.disabled = isLoading;
+            combatActionButton.disabled = isLoading;
+            if (combatLoader) {
+                combatLoader.classList.toggle('visible', isLoading);
+            }
+        } else {
             playerInput.disabled = isLoading;
             submitButton.disabled = isLoading;
             submitButton.textContent = isLoading ? '撰寫中...' : '動作';
-        } else {
-            combatInput.disabled = isLoading;
-            combatActionButton.disabled = isLoading;
-        }
-
-        const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
-        
-        if (isLoading) {
-            loaderTextElement.textContent = text;
-            aiThinkingLoader.classList.add('visible');
-        } else {
-            aiThinkingLoader.classList.remove('visible');
-            loaderTextElement.textContent = '';
+            
+            const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
+            if (isLoading) {
+                loaderTextElement.textContent = text;
+                aiThinkingLoader.classList.add('visible');
+            } else {
+                aiThinkingLoader.classList.remove('visible');
+                loaderTextElement.textContent = '';
+            }
         }
 
         if (!isLoading) {
@@ -425,6 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (npcs && Array.isArray(npcs) && npcs.length > 0) {
             const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
             sortedNpcs.forEach(npc => {
+                // 【修改】使用 npc.friendliness 來動態生成 class
                 const regex = new RegExp(npc.name, 'g');
                 const replacement = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>`;
                 highlightedText = highlightedText.replace(regex, replacement);
@@ -505,7 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const lightness = data.lightness === undefined ? 0 : data.lightness;
 
         updatePowerBar(internalPowerBar, internalPowerValue, internal);
-        updatePowerBar(externalPowerBar, externalPowerValue, external);
+        updatePowerBar(externalPowerBar, externalValue, external);
         updatePowerBar(lightnessPowerBar, lightnessPowerValue, lightness);
         
         updateMoralityBar(data.morality === undefined ? 0 : data.morality);
@@ -514,6 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
             data.NPC.forEach(npc => {
                 const npcLine = document.createElement('div');
+                // 【修改】使用 npc.friendliness 來動態生成 class
                 npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
                 npcContent.appendChild(npcLine);
             });
