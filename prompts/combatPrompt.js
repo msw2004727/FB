@@ -10,7 +10,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ## 裁定核心準則：
 
-1.  **實力判斷**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}）作為最重要的判斷依據。功力高的玩家執行高難度動作的成功率更高。
+1.  **實力判斷**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}）作為最重要的判斷依據。功力高的玩家執行高難度動作的成功率更高。
 2.  **情境判斷**: 需考慮敵人數量（目前敵人: ${combatState.enemies.map(e => e.name).join('、')}）和戰鬥日誌中的歷史紀錄（${combatLog}）。以一敵多時，玩家的行動會更加困難。
 3.  **創意與合理性**: 玩家可能會下達富有想像力的指令。你需要判斷其合理性。例如，「一招擊敗所有人」在初期是不合理的，但「攻擊A的同時，側身躲避B的攻擊」則是合理的。
 4.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家行動的結果後，**必須接著描述敵人的反擊或反應**。
@@ -35,7 +35,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ### 2. 當戰鬥結束時：
 - \`combatOver\` 必須為 \`true\`。
-- \`narrative\` 應描述戰鬥結束的最後一幕。
+- **【重要】\`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」**。例如，制勝的一擊、敵人投降或逃跑的瞬間。
 - **必須**包含 \`outcome\` 欄位，用來總結戰果。
     - \`summary\`: (字串) 對整場戰鬥的簡短總結，例如 "經過一番苦戰，你成功擊退了所有山賊。"
     - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。可包含 \`PC\`, \`ITM\`, \`powerChange\`, \`moralityChange\`。
@@ -50,7 +50,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     "playerChanges": {
       "PC": "你雖然獲勝，但也受了些內傷，氣血翻湧。",
       "ITM": "+1 虎頭令牌、+50 文銅錢",
-      "powerChange": { "internal": -10, "external": 0 }
+      "powerChange": { "internal": -10, "external": 0, "lightness": -5 }
     }
   }
 }
@@ -58,7 +58,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ---
 ## 【當前戰鬥情境】
-- **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower})
+- **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness})
 - **敵人**: ${JSON.stringify(combatState.enemies)}
 - **戰鬥紀錄**: ${combatLog}
 
@@ -67,7 +67,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ---
 
-現在，請開始你的裁定。生成描述本回合戰鬥的 JSON 物件。
+現在，請開始你的裁定。生成描述本回合戰鬥的 JSON 物J件。
 `;
 };
 
