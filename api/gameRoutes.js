@@ -154,11 +154,14 @@ router.post('/interact', async (req, res) => {
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
             
+            // 【修改】使用 AI 生成的 combatIntro 作為開場白
+            const initialLog = aiResponse.roundData.combatIntro || '戰鬥開始了！';
+
             const combatState = {
                 turn: 1,
                 player: { username: username },
                 enemies: aiResponse.roundData.combatants,
-                log: [`戰鬥開始：你遭遇了 ${aiResponse.roundData.combatants.map(c => c.name).join('、')}！`]
+                log: [initialLog]
             };
 
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
@@ -298,9 +301,6 @@ router.post('/combat-action', async (req, res) => {
             console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 的戰鬥已結束。`);
             await combatDocRef.delete();
 
-            // --- 【修改】穩健的結算流程開始 ---
-
-            // 1. 安全地獲取戰鬥結果，並設定預設值
             const outcome = combatResult.outcome || {};
             const changes = outcome.playerChanges || {};
             const powerChange = changes.powerChange || {};
@@ -311,7 +311,6 @@ router.post('/combat-action', async (req, res) => {
             const externalPowerChange = powerChange.external || 0;
             const lightnessPowerChange = powerChange.lightness || 0;
 
-            // 2. 計算更新後的玩家數值
             const updatedProfile = {
                 internalPower: (playerProfile.internalPower || 0) + internalPowerChange,
                 externalPower: (playerProfile.externalPower || 0) + externalPowerChange,
@@ -320,7 +319,6 @@ router.post('/combat-action', async (req, res) => {
             };
             playerProfile = { ...playerProfile, ...updatedProfile };
             
-            // 3. 準備生成戰後回合的材料
             const lastRoundSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
             const lastRound = lastRoundSnapshot.empty ? { R: 0 } : lastRoundSnapshot.docs[0].data();
             
@@ -331,16 +329,14 @@ router.post('/combat-action', async (req, res) => {
             const recentHistorySnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(2).get();
             const recentHistoryRounds = recentHistorySnapshot.docs.map(doc => doc.data()).reverse();
 
-            // 4. 使用更清晰的指令呼叫AI生成新回合
             const postCombatAction = `戰鬥剛剛結束。結局：${outcome.summary || '戰鬥結束'}。我的狀態變化：${pcChange || '無'}。`;
             const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), postCombatAction, playerProfile, playerProfile.username, playerProfile.timeOfDay, updatedProfile, updatedProfile.morality);
 
             if (!aiResponse) throw new Error("戰鬥後AI未能生成有效回應。");
 
-            // 5. 整合與儲存新回合數據
             const newRoundNumber = (lastRound.R || 0) + 1;
             aiResponse.roundData.R = newRoundNumber;
-            aiResponse.roundData.ITM = applyItemChanges(aiResponse.roundData.ITM, itmChange); // 合併物品變化
+            aiResponse.roundData.ITM = applyItemChanges(aiResponse.roundData.ITM, itmChange);
             
             const finalInternalPower = Math.max(0, Math.min(999, updatedProfile.internalPower + (aiResponse.roundData.powerChange?.internal || 0)));
             const finalExternalPower = Math.max(0, Math.min(999, updatedProfile.externalPower + (aiResponse.roundData.powerChange?.external || 0)));
@@ -354,7 +350,6 @@ router.post('/combat-action', async (req, res) => {
                 morality: finalMorality
             });
 
-            // 一次性更新所有資料庫欄位
             await userDocRef.update({ 
                 internalPower: finalInternalPower,
                 externalPower: finalExternalPower,
@@ -372,7 +367,6 @@ router.post('/combat-action', async (req, res) => {
             await userDocRef.collection('game_state').doc('novel_cache').set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
-            // 6. 回傳包含完整新回合資訊的物件
             res.json({
                 status: 'COMBAT_END',
                 finalLog: combatResult.narrative,
