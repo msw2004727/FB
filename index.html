@@ -68,8 +68,20 @@
                 <div class="info-card">
                     <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
                     <div id="pc-content">--</div>
-                    <div id="internal-power-display" style="margin-top: 0.5rem;">內功: --</div>
-                    <div id="external-power-display">外功: --</div>
+                    <div class="power-display">
+                        <span class="power-label">內功</span>
+                        <div class="power-bar-container">
+                            <div id="internal-power-bar" class="power-bar"></div>
+                        </div>
+                        <span id="internal-power-value" class="power-value">--/999</span>
+                    </div>
+                    <div class="power-display">
+                        <span class="power-label">外功</span>
+                        <div class="power-bar-container">
+                            <div id="external-power-bar" class="power-bar"></div>
+                        </div>
+                        <span id="external-power-value" class="power-value">--/999</span>
+                    </div>
                 </div>
 
                 <div class="info-card">
@@ -82,6 +94,7 @@
                         <span class="morality-label justice">正</span>
                     </div>
                 </div>
+
                 <div class="info-card">
                     <h4><i class="fas fa-users"></i> 人物見聞 (NPC)</h4>
                     <div id="npc-content">--</div>
