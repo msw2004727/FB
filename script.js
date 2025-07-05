@@ -15,11 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submit-button');
     const roundTitleEl = document.getElementById('round-title');
     const statusBarEl = document.getElementById('status-bar');
-    const timeStatusEl = document.getElementById('time-status');
+    // 【修改】移除舊的 timeStatusEl，因為整個 status-bar 會被動態重寫
+    // const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
     
-    // 【修改】獲取新的內功外功進度條和數值元素
     const internalPowerBar = document.getElementById('internal-power-bar');
     const internalPowerValue = document.getElementById('internal-power-value');
     const externalPowerBar = document.getElementById('external-power-bar');
@@ -279,7 +279,9 @@ document.addEventListener('DOMContentLoaded', () => {
             timeOfDay: '上午',
             internalPower: 5,
             externalPower: 5,
-            morality: 0 
+            morality: 0,
+            // 【新增】新遊戲時的預設日期
+            yearName: '元祐', year: 1, month: 1, day: 1
         });
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
@@ -332,7 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 【新增】更新內外功進度條的函式
     function updatePowerBar(barElement, valueElement, currentValue) {
         const maxPower = 999;
         if (barElement && valueElement) {
@@ -351,12 +352,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
         
+        // --- 【修改】動態生成整個狀態欄 ---
         const atmosphere = data.ATM?.[0] || '未知';
         const weather = data.WRD || '晴朗';
         const location = data.LOC?.[0] || '未知之地';
+        const dateString = `${data.yearName || '元祐'}${data.year || 1}年${data.month || 1}月${data.day || 1}日`;
         
         statusBarEl.innerHTML = `
-            <div class="status-item" id="time-status"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
+            <div class="status-item"><i class="fas fa-calendar-alt"></i> ${dateString}</div>
+            <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
             <div class="status-item"><i class="fas fa-cloud-sun"></i> 天氣: ${weather}</div>
             <div class="status-item"><i class="fas fa-theater-masks"></i> 氛圍: ${atmosphere}</div>
             <div class="status-item"><i class="fas fa-map-marked-alt"></i> 地點: ${location}</div>
@@ -364,7 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pcContent.textContent = data.PC || '狀態穩定';
 
-        // 【修改】呼叫函式更新內功和外功進度條
         const internal = data.internalPower === undefined ? 0 : data.internalPower;
         const external = data.externalPower === undefined ? 0 : data.externalPower;
         updatePowerBar(internalPowerBar, internalPowerValue, internal);
