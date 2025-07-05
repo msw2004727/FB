@@ -53,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const combatLog = document.getElementById('combat-log');
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
-    // 【新增】獲取戰鬥載入動畫的元素
     const combatLoader = document.getElementById('combat-loader');
 
     const aiThinkingLoader = document.createElement('div');
@@ -66,7 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span></span>
         </div>
     `;
-    storyPanelWrapper.appendChild(aiThinkingLoader);
+    // 【修改】將 loader 附加到 mainContent
+    mainContent.appendChild(aiThinkingLoader);
 
     if (welcomeMessage && username) {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
