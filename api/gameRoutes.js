@@ -7,6 +7,26 @@ const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion, g
 
 const db = admin.firestore();
 
+// --- 【新增】時間與日期系統設定 ---
+const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
+const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // 索引0不用
+
+// 【新增】日期推進的輔助函式
+function advanceDate(currentDate) {
+    let { year, month, day, yearName } = currentDate;
+    day++;
+    if (day > DAYS_IN_MONTH[month]) {
+        day = 1;
+        month++;
+        if (month > 12) {
+            month = 1;
+            year++;
+            // 這裡可以加入未來更新年號的邏輯
+        }
+    }
+    return { year, month, day, yearName };
+}
+
 router.use(authMiddleware);
 
 router.get('/get-encyclopedia', async (req, res) => {
@@ -22,7 +42,6 @@ router.get('/get-encyclopedia', async (req, res) => {
 
         const longTermSummary = summaryDoc.data().text;
         
-        // 【修改】將模型從 'gemini' 改為 'deepseek'
         const encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username);
         
         res.json({ encyclopediaHtml });
@@ -49,7 +68,15 @@ router.post('/interact', async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
+        // 【新增】讀取現有日期，若無則提供預設值
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
+        let currentDate = {
+            yearName: userProfile.yearName || '元祐',
+            year: userProfile.year || 1,
+            month: userProfile.month || 1,
+            day: userProfile.day || 1
+        };
+
         const playerPower = {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5
@@ -71,7 +98,8 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
+        // 【新增】將日期資訊也傳給AI
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
@@ -79,6 +107,13 @@ router.post('/interact', async (req, res) => {
         
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
 
+        // 【新增】日期推進判斷邏輯
+        const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
+        const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
+        if (newTimeIndex < oldTimeIndex) {
+            currentDate = advanceDate(currentDate); // 如果跨日，則日期+1
+        }
+        
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
@@ -87,15 +122,22 @@ router.post('/interact', async (req, res) => {
         let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
         
-        aiResponse.roundData.internalPower = newInternalPower;
-        aiResponse.roundData.externalPower = newExternalPower;
-        aiResponse.roundData.morality = newMorality;
-        
+        // 【新增】將所有更新的資料加入回傳物件
+        Object.assign(aiResponse.roundData, {
+            internalPower: newInternalPower,
+            externalPower: newExternalPower,
+            morality: newMorality,
+            timeOfDay: nextTimeOfDay,
+            ...currentDate
+        });
+
+        // 【新增】一次性更新所有玩家狀態到資料庫
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
-            morality: newMorality
+            morality: newMorality,
+            ...currentDate
         });
 
 
@@ -118,9 +160,7 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
-        aiResponse.roundData.timeOfDay = nextTimeOfDay;
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
-
         res.json(aiResponse);
 
     } catch (error) {
@@ -148,10 +188,18 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
-        latestGameData.internalPower = userData.internalPower || 5;
-        latestGameData.externalPower = userData.externalPower || 5;
-        latestGameData.morality = userData.morality === undefined ? 0 : userData.morality;
+        // 【新增】載入遊戲時，一併讀取日期
+        Object.assign(latestGameData, {
+            timeOfDay: latestGameData.timeOfDay || userData.timeOfDay || '上午',
+            internalPower: userData.internalPower || 5,
+            externalPower: userData.externalPower || 5,
+            morality: userData.morality === undefined ? 0 : userData.morality,
+            yearName: userData.yearName || '元祐',
+            year: userData.year || 1,
+            month: userData.month || 1,
+            day: userData.day || 1
+        });
+
 
         let prequel = null;
         if (recentHistory.length > 1) {
@@ -227,12 +275,17 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
+        // 【新增】重新開始時，一併刪除日期資料
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
             internalPower: admin.firestore.FieldValue.delete(),
             externalPower: admin.firestore.FieldValue.delete(),
-            morality: admin.firestore.FieldValue.delete()
+            morality: admin.firestore.FieldValue.delete(),
+            year: admin.firestore.FieldValue.delete(),
+            month: admin.firestore.FieldValue.delete(),
+            day: admin.firestore.FieldValue.delete(),
+            yearName: admin.firestore.FieldValue.delete()
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -256,7 +309,8 @@ router.post('/force-suicide', async (req, res) => {
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
         const newRoundNumber = lastRound + 1;
-
+        
+        // 【新增】在最終回合數據中也加入日期
         const finalRoundData = {
             R: newRoundNumber,
             playerState: 'dead',
@@ -264,6 +318,10 @@ router.post('/force-suicide', async (req, res) => {
             internalPower: userProfile.internalPower || 5,
             externalPower: userProfile.externalPower || 5,
             morality: userProfile.morality === undefined ? 0 : userProfile.morality,
+            yearName: userProfile.yearName || '元祐',
+            year: userProfile.year || 1,
+            month: userProfile.month || 1,
+            day: userProfile.day || 1,
             ATM: ['決絕', '悲壯'],
             EVT: '英雄末路',
             LOC: ['原地', {}],
