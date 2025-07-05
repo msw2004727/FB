@@ -190,11 +190,11 @@ body.dark-theme .menu-toggle { background: var(--dark-surface-bg); color: var(--
     padding: 0.5rem 2rem; 
     border-bottom: 1px solid var(--light-border); 
     z-index: 10;
-    transition: transform 0.4s ease-out, padding 0.4s ease-out; /* 動畫效果 */
+    transition: padding 0.4s ease-out; /* 移除 transform 動畫 */
 }
 body.dark-theme .story-header { border-bottom: 1px solid var(--dark-border); }
 
-.status-bar { display: flex; flex-wrap: wrap; gap: 1.5rem; color: var(--light-text-secondary); font-family: var(--font-sans); font-size: 0.9rem; }
+.status-bar { display: flex; flex-wrap: wrap; gap: 1.5rem; color: var(--light-text-secondary); font-family: var(--font-sans); font-size: 0.9rem;overflow: hidden;max-height: 100px;opacity: 1;transition: max-height 0.4s ease-out, opacity 0.4s ease-out, gap 0.4s ease-out, padding 0.4s ease-out; }
 body.dark-theme .status-bar { color: var(--dark-text-secondary); }
 .status-item i { margin-right: 0.5rem; }
 .story-panel { position: relative; flex-grow: 1; padding: 1rem 2rem 2rem 2rem; overflow-y: auto; }
@@ -802,11 +802,12 @@ body.dark-theme .header-toggle-btn:hover {
     background-color: rgba(255,255,255,0.1);
     color: var(--dark-text-primary);
 }
-.story-header.collapsed {
-    transform: translateY(-100%);
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-bottom: -1px; /* 避免收起時，下方的 story-panel 邊框跳動 */
+.story-header.collapsed .status-bar {
+    max-height: 0;
+    opacity: 0;
+    margin: 0; 
+    padding: 0;
+    gap: 0;
 }
 
 /* --- 【新增】針對窄視窗的收折按鈕修正 --- */
