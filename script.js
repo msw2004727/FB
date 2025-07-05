@@ -9,14 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 獲取所有需要的DOM元素 ---
+    const storyHeader = document.querySelector('.story-header'); // 【新增】獲取整個 header
+    const headerToggleButton = document.getElementById('header-toggle-btn'); // 【新增】獲取收折按鈕
     const storyPanelWrapper = document.querySelector('.story-panel');
     const storyTextContainer = document.getElementById('story-text-wrapper');
     const playerInput = document.getElementById('player-input');
     const submitButton = document.getElementById('submit-button');
     const roundTitleEl = document.getElementById('round-title');
     const statusBarEl = document.getElementById('status-bar');
-    // 【修改】移除舊的 timeStatusEl，因為整個 status-bar 會被動態重寫
-    // const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
     
@@ -60,6 +60,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (welcomeMessage && username) {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
     }
+    
+    // 【新增】資訊欄收折功能
+    if(headerToggleButton && storyHeader) {
+        headerToggleButton.addEventListener('click', () => {
+            storyHeader.classList.toggle('collapsed');
+            const icon = headerToggleButton.querySelector('i');
+            if (storyHeader.classList.contains('collapsed')) {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            } else {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            }
+        });
+    }
+
 
     // --- 漢堡選單與主題切換 ---
     menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
@@ -280,7 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
             internalPower: 5,
             externalPower: 5,
             morality: 0,
-            // 【新增】新遊戲時的預設日期
             yearName: '元祐', year: 1, month: 1, day: 1
         });
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
@@ -352,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
         
-        // --- 【修改】動態生成整個狀態欄 ---
         const atmosphere = data.ATM?.[0] || '未知';
         const weather = data.WRD || '晴朗';
         const location = data.LOC?.[0] || '未知之地';
