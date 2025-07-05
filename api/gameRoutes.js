@@ -154,7 +154,6 @@ router.post('/interact', async (req, res) => {
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
             
-            // 【修改】使用 AI 生成的 combatIntro 作為開場白
             const initialLog = aiResponse.roundData.combatIntro || '戰鬥開始了！';
 
             const combatState = {
@@ -272,8 +271,9 @@ router.post('/interact', async (req, res) => {
 
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
-    const { action } = req.body;
-    const modelName = 'deepseek';
+    // 【修改】接收 model 參數
+    const { action, model } = req.body;
+    const modelName = model || 'deepseek'; // 若前端未提供，預設為 deepseek
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -290,6 +290,7 @@ router.post('/combat-action', async (req, res) => {
         const userDoc = await userDocRef.get();
         let playerProfile = userDoc.exists ? userDoc.data() : {};
 
+        // 【修改】將 modelName 傳遞下去
         const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
