@@ -23,6 +23,9 @@ const { getNarrativePrompt } = require('../prompts/narrativePrompt');
 const { getSummaryPrompt } = require('../prompts/summaryPrompt');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
+// 【新增】導入我們新建立的百科指令稿
+const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
+
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt) {
@@ -34,6 +37,8 @@ async function callAI(modelName, prompt) {
                 const openaiResult = await openai.chat.completions.create({
                     model: "gpt-4o",
                     messages: [{ role: "user", content: prompt }],
+                    // 【新增】確保 OpenAI 回應是 JSON 格式
+                    response_format: { type: "json_object" },
                 });
                 textResponse = openaiResult.choices[0].message.content;
                 break;
@@ -41,12 +46,16 @@ async function callAI(modelName, prompt) {
                 const deepseekResult = await deepseek.chat.completions.create({
                     model: "deepseek-chat",
                     messages: [{ role: "user", content: prompt }],
+                    // 【新增】確保 DeepSeek 回應是 JSON 格式
+                    response_format: { type: "json_object" },
                 });
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
             case 'gemini':
             default:
-                const geminiResult = await geminiModel.generateContent(prompt);
+                // 【修改】告知 Gemini 我們期望得到 JSON 回應
+                const generationConfig = { response_mime_type: "application/json" };
+                const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
         }
         return textResponse;
@@ -72,8 +81,8 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
     const prompt = getSummaryPrompt(oldSummary, newRoundData);
     try {
         const text = await callAI(modelName, prompt);
-        const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
-        return JSON.parse(cleanJsonText).summary;
+        // 因為已要求 AI 回傳 JSON，所以不再需要清理 ```json 標籤
+        return JSON.parse(text).summary;
     } catch (error) {
         console.error("[AI 任務失敗] 檔案管理員任務:", error);
         return oldSummary;
@@ -81,13 +90,12 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
 }
 
 // 任務三：生成主要故事
-// 【已修改】增加 username 參數，並將其傳遞給 getStoryPrompt
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username);
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
     try {
         const text = await callAI(modelName, prompt);
-        const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
-        return JSON.parse(cleanJsonText);
+        // 因為已要求 AI 回傳 JSON，所以不再需要清理 ```json 標籤
+        return JSON.parse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 故事大師任務:", error);
         return null;
@@ -102,7 +110,6 @@ async function getAIPrequel(modelName, recentHistory) {
         return text;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖說書人任務:", error);
-        // 【已修改】在任務失敗時，回傳一段友善的提示文字
         return "江湖說書人今日嗓子不適，未能道出前情提要...";
     }
 }
@@ -119,6 +126,20 @@ async function getAISuggestion(modelName, roundData) {
     }
 }
 
+// 【新增】任務六：生成江湖百科
+async function getAIEncyclopedia(modelName, longTermSummary, username) {
+    const prompt = getEncyclopediaPrompt(longTermSummary, username);
+    try {
+        const text = await callAI(modelName, prompt);
+        const data = JSON.parse(text);
+        return data.encyclopediaHtml;
+    } catch (error) {
+        console.error("[AI 任務失敗] 江湖史官任務:", error);
+        // 如果AI失敗，回傳一段錯誤提示HTML
+        return `<div class="chapter"><h2 class="chapter-title">錯誤</h2><p class="entry-content">史官在翻閱你的記憶時遇到了困難，暫時無法完成編撰。</p></div>`;
+    }
+}
+
 
 // 匯出所有服務函式
 module.exports = {
@@ -126,5 +147,7 @@ module.exports = {
     getAISummary,
     getAIStory,
     getAIPrequel,
-    getAISuggestion
+    getAISuggestion,
+    // 【新增】匯出新的百科函式
+    getAIEncyclopedia
 };
