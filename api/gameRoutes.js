@@ -27,11 +27,12 @@ router.post('/interact', async (req, res) => {
         }
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        // 【新增】讀取玩家武功數值
         const playerPower = {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5
         };
+        // 【新增】讀取玩家正邪值，若不存在則預設為 0 (中立)
+        const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
 
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
@@ -48,8 +49,8 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【修改】將武功數值傳給AI
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
+        // 【修改】將武功數值和正邪值一併傳給AI
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
@@ -63,20 +64,27 @@ router.post('/interact', async (req, res) => {
         }
         aiResponse.roundData.timeOfDay = nextTimeOfDay;
 
-        // 【新增】處理武功數值變化
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
-        // 將更新後的數值加入回傳資料
+        // 【新增】處理正邪值變化
+        const moralityChange = aiResponse.roundData.moralityChange || 0;
+        let newMorality = playerMorality + moralityChange;
+        // 確保數值被限制在 -100 到 +100 之間
+        newMorality = Math.max(-100, Math.min(100, newMorality));
+        
+        // 將更新後的數值加入回傳資料，供前端使用
         aiResponse.roundData.internalPower = newInternalPower;
         aiResponse.roundData.externalPower = newExternalPower;
+        aiResponse.roundData.morality = newMorality;
         
         // 一次性更新所有玩家狀態
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
-            externalPower: newExternalPower
+            externalPower: newExternalPower,
+            morality: newMorality // 【新增】將新的正邪值寫回資料庫
         });
 
 
@@ -114,7 +122,7 @@ router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.data();
+        const userData = userDoc.data() || {}; // 若無用戶數據則給空物件
 
         if (userData && userData.isDeceased) {
             return res.json({ gameState: 'deceased' });
@@ -128,10 +136,11 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        // 【新增】加入武功數值
+        // 【新增】加入武功與正邪數值
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
         latestGameData.internalPower = userData.internalPower || 5;
         latestGameData.externalPower = userData.externalPower || 5;
+        latestGameData.morality = userData.morality === undefined ? 0 : userData.morality;
 
         let prequel = null;
         if (recentHistory.length > 1) {
@@ -207,12 +216,13 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
-        // 【新增】重置武功數值
+        // 【修改】重置時，一併刪除武功與正邪值
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
             internalPower: admin.firestore.FieldValue.delete(),
-            externalPower: admin.firestore.FieldValue.delete()
+            externalPower: admin.firestore.FieldValue.delete(),
+            morality: admin.firestore.FieldValue.delete() // 【新增】刪除正邪值
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -243,6 +253,7 @@ router.post('/force-suicide', async (req, res) => {
             timeOfDay: userProfile.timeOfDay || '上午',
             internalPower: userProfile.internalPower || 5,
             externalPower: userProfile.externalPower || 5,
+            morality: userProfile.morality === undefined ? 0 : userProfile.morality, // 【新增】
             ATM: ['決絕', '悲壯'],
             EVT: '英雄末路',
             LOC: ['原地', {}],
