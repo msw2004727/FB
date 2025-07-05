@@ -88,9 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 漢堡選單與主題切換 ---
     menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
-    mainContent.addEventListener('click', () => {
-        if (window.innerWidth <= 1024) gameContainer.classList.remove('sidebar-open');
+    mainContent.addEventListener('click', (e) => {
+        // 如果點擊的不是 dashboard 內部或 menuToggle，就關閉側邊欄
+        if (window.innerWidth <= 1024 && !document.getElementById('dashboard').contains(e.target) && e.target !== menuToggle && !menuToggle.contains(e.target)) {
+            gameContainer.classList.remove('sidebar-open');
+        }
     });
+
 
     function applyTheme(theme) {
         document.body.className = theme === 'dark' ? 'dark-theme' : 'light-theme';
@@ -202,13 +206,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
             
+            // 顯示主劇情
+            updateUI(data.story, data.roundData, data.randomEvent);
+            currentRound = data.roundData.R;
+            
+            // 如果需要進入戰鬥
             if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
-                startCombat(data.combatInfo.initialState);
-                appendMessageToStory(data.story, 'story-text');
-                updateUI(null, data.roundData, data.randomEvent);
+                // 等待短暫時間讓玩家閱讀前情
+                setTimeout(() => {
+                    startCombat(data.combatInfo.initialState);
+                }, 1500); // 1.5秒延遲
             } else {
-                currentRound = data.roundData.R;
-                updateUI(data.story, data.roundData, data.randomEvent);
+                 setLoadingState(false);
             }
             
             if (data.suggestion) {
@@ -221,10 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             handleApiError(error);
-        } finally {
-            if (!isInCombat) {
-                setLoadingState(false);
-            }
+            setLoadingState(false);
         }
     }
 
@@ -238,11 +244,17 @@ document.addEventListener('DOMContentLoaded', () => {
         combatTitle.textContent = `遭遇強敵`;
         combatEnemies.textContent = `對手: ${enemyNames}`;
         
-        combatLog.innerHTML = '';
-        initialState.log.forEach(line => appendToCombatLog(line));
+        // 【修改】將戰鬥介紹顯示在頂部
+        combatLog.innerHTML = ''; // 清空舊日誌
+        if (initialState.log && initialState.log.length > 0) {
+            const introText = initialState.log[0];
+            const introP = document.createElement('p');
+            introP.className = 'combat-intro-text'; // 給予特殊 class 方便未來設定樣式
+            introP.innerHTML = introText.replace(/\n/g, '<br>');
+            combatLog.appendChild(introP);
+        }
         
         combatInput.focus();
-        setLoadingState(false);
     }
 
     async function handleCombatAction() {
@@ -251,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         combatInput.value = '';
         setLoadingState(true); 
-        appendToCombatLog(`> ${actionText}`);
+        appendToCombatLog(`> ${actionText}`, 'player-action-log');
 
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/combat-action`, {
@@ -266,20 +278,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
                 appendToCombatLog(data.finalLog, 'combat-summary');
-                // 即使後端回傳資料有問題，也要確保能安全退出
-                endCombat(data.newRound || null); 
+                setTimeout(() => {
+                    endCombat(data.newRound || null);
+                }, 1500); // 給玩家一點時間看最後的結果
+                return; // 提前返回，避免 finally 過早執行
             }
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
-            // 發生 fetch 錯誤時，也要確保能退出
-            endCombat(null);
-        } finally {
-            setLoadingState(false);
-        }
+            setTimeout(() => endCombat(null), 1500); // 即使出錯，也延遲關閉
+            return; 
+        } 
+        
+        setLoadingState(false);
     }
 
     function endCombat(newRoundData) {
-        // 【修改】增加對傳入資料的檢查
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             currentRound = newRoundData.roundData.R;
             updateUI(newRoundData.story, newRoundData.roundData, null);
@@ -287,17 +300,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionSuggestion.textContent = `書僮小聲說：${newRoundData.suggestion}`;
             }
         } else {
-            // 如果資料有問題，只顯示提示，避免程式崩潰
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
 
-        // 無論如何，都必須執行關閉彈窗和恢復UI的邏輯
         combatModal.classList.remove('visible');
         isInCombat = false;
         
         playerInput.disabled = false;
         submitButton.disabled = false;
         playerInput.focus();
+        setLoadingState(false); // 確保主介面的讀取動畫被關閉
     }
     
     function appendToCombatLog(text, className) {
