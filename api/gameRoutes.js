@@ -72,6 +72,7 @@ router.post('/interact', async (req, res) => {
             month: userProfile.month || 1,
             day: userProfile.day || 1
         };
+        let turnsSinceEvent = userProfile.turnsSinceEvent || 0;
 
         const playerPower = {
             internal: userProfile.internalPower || 5,
@@ -102,22 +103,43 @@ router.post('/interact', async (req, res) => {
         
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
 
-        // --- 【修改】日期推進的最終邏輯 ---
         const daysToAdvance = aiResponse.roundData.daysToAdvance;
         if (daysToAdvance && typeof daysToAdvance === 'number' && daysToAdvance > 0) {
-            // 方案一：如果AI提供了明確天數，則按天數推進
             for (let i = 0; i < daysToAdvance; i++) {
                 currentDate = advanceDate(currentDate);
             }
         } else {
-            // 方案二：如果AI未提供天數，則使用舊的跨日判斷邏輯
             const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
             const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
             if (newTimeIndex < oldTimeIndex) {
-                currentDate = advanceDate(currentDate); // 日期+1
+                currentDate = advanceDate(currentDate);
             }
         }
         
+        turnsSinceEvent++;
+        
+        // --- 【修改】隨機事件觸發邏輯 ---
+        let randomEventData = null; // 用來存放可能發生的事件
+        if (turnsSinceEvent >= 3) {
+            // 第一層搖骰：決定是否發生事件 (例如 60% 機率發生)
+            if (Math.random() < 0.6) {
+                console.log(`[事件系統] 玩家 ${username} 觸發隨機事件！`);
+                // 第二層搖骰：決定事件規模與性質
+                // 這部分我們會在後續步驟中，交給AI來生成具體內容
+                // 現在先預留一個位置，並將事件資料存起來
+                randomEventData = {
+                    type: "placeholder",
+                    description: "一個隨機事件發生了！" // 預留描述
+                };
+                // 將事件資料附加到回傳給前端的資料中
+                aiResponse.randomEvent = randomEventData;
+            } else {
+                console.log(`[事件系統] 玩家 ${username} 本回合無事發生。`);
+            }
+            // 無論是否發生事件，都重置計數器
+            turnsSinceEvent = 0;
+        }
+
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
@@ -134,11 +156,13 @@ router.post('/interact', async (req, res) => {
             ...currentDate
         });
 
+        // 更新資料庫時，也一併更新事件計數器
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
             morality: newMorality,
+            turnsSinceEvent: turnsSinceEvent, // 【新增】
             ...currentDate
         });
 
@@ -293,7 +317,8 @@ router.post('/restart', async (req, res) => {
             year: admin.firestore.FieldValue.delete(),
             month: admin.firestore.FieldValue.delete(),
             day: admin.firestore.FieldValue.delete(),
-            yearName: admin.firestore.FieldValue.delete()
+            yearName: admin.firestore.FieldValue.delete(),
+            turnsSinceEvent: admin.firestore.FieldValue.delete() // 【新增】
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -360,7 +385,7 @@ router.post('/force-suicide', async (req, res) => {
 
     } catch (error) {
         console.error(`[UserID: ${userId}] /force-suicide 錯誤:`, error);
-        res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
+        res.status(500).json({ message: '了此殘生時發生錯誤...' });
     }
 });
 
