@@ -8,6 +8,8 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 你的風格必須客觀、寫實，類似於武俠小說中的旁白，專注於描述動作、反應和結果，而不是內心戲。
 
+**【語言鐵律】**: 你的所有敘述和總結文字都必須只包含「繁體中文」。絕對禁止使用任何簡體中文、英文或表情符號。
+
 ## 裁定核心準則：
 
 1.  **實力判斷**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}）作為最重要的判斷依據。功力高的玩家執行高難度動作的成功率更高。
@@ -67,7 +69,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ---
 
-現在，請開始你的裁定。生成描述本回合戰鬥的 JSON 物J件。
+現在，請開始你的裁定。生成描述本回合戰鬥的 JSON 物件。
 `;
 };
 
