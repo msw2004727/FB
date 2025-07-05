@@ -32,7 +32,6 @@ const { getPrequelPrompt } = require('../prompts/prequelPrompt');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
 const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
-// 【修正】補上遺漏的戰鬥指令稿導入
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 
 
@@ -178,7 +177,7 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
     }
 }
 
-// 任務八：生成戰鬥回合結果
+// 【修改】接收 modelName 參數
 async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
