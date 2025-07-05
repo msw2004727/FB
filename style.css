@@ -184,7 +184,7 @@ body.dark-theme .dashboard { background-color: var(--dark-bg); border-left: 1px 
 .menu-toggle { display: none; position: fixed; top: 15px; right: 15px; z-index: 1001; background: var(--light-surface-bg); color: var(--light-text-primary); border: 1px solid var(--light-border); border-radius: 50%; width: 45px; height: 45px; font-size: 1.2rem; cursor: pointer; }
 body.dark-theme .menu-toggle { background: var(--dark-surface-bg); color: var(--dark-text-primary); border: 1px solid var(--dark-border); }
 
-/* 【修改】為 story-header 添加相對定位和動畫效果 */
+/* 為 story-header 添加相對定位和動畫效果 */
 .story-header { 
     position: relative; /* 為了讓收折按鈕能相對於它定位 */
     padding: 0.5rem 2rem; 
@@ -447,7 +447,6 @@ body.dark-theme .npc-neutral {
     color: var(--dark-text-secondary); /* 中立灰 - 深色主題 */
 }
 
-/* 【已移除】遊戲讀取提示樣式 (prequel-loader) --- */
 /* 我們不再需要 prequel-loader，因為將統一使用 ai-thinking-loader */
 
 @keyframes prequel-bounce {
@@ -773,7 +772,7 @@ body.dark-theme .power-value {
     color: var(--dark-text-secondary);
 }
 
-/* --- 【新增】可收折資訊欄樣式 --- */
+/* --- 可收折資訊欄樣式 --- */
 .header-toggle-btn {
     position: absolute;
     top: 5px;
@@ -808,4 +807,14 @@ body.dark-theme .header-toggle-btn:hover {
     padding-top: 0;
     padding-bottom: 0;
     margin-bottom: -1px; /* 避免收起時，下方的 story-panel 邊框跳動 */
+}
+
+/* --- 【新增】針對窄視窗的收折按鈕修正 --- */
+@media (max-width: 1024px) { 
+    .header-toggle-btn {
+        top: 13px; /* 微調垂直位置，使其與漢堡選單對齊 */
+        left: 15px; /* 移動到左邊 */
+        right: auto; /* 取消右邊的定位 */
+        z-index: 1002; /* 確保層級高於漢堡選單，避免被覆蓋 */
+    }
 }
