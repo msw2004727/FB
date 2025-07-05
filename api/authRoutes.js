@@ -29,7 +29,20 @@ router.post('/register', async (req, res) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        res.status(201).json({ message: '註冊成功！請前往登入。' });
+        // 註冊成功後，直接產生 JWT
+        const token = jwt.sign(
+            { userId: newUserRef.id, username: username }, // 使用新建立的用戶 ID 和用戶名
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // 回傳 token，讓前端可以直接登入
+        res.status(201).json({ 
+            message: '註冊成功，正在進入遊戲...', 
+            token, 
+            username 
+        });
+
     } catch (error) {
         console.error("註冊失敗:", error);
         res.status(500).json({ message: '伺服器內部錯誤，註冊失敗。' });
