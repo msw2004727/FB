@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const internalPowerValue = document.getElementById('internal-power-value');
     const externalPowerBar = document.getElementById('external-power-bar');
     const externalPowerValue = document.getElementById('external-power-value');
+    // 【新增】獲取輕功的DOM元素
+    const lightnessPowerBar = document.getElementById('lightness-power-bar');
+    const lightnessPowerValue = document.getElementById('lightness-power-value');
     
     const moralityBarIndicator = document.getElementById('morality-bar-indicator');
     const npcContent = document.getElementById('npc-content');
@@ -397,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timeOfDay: '上午',
             internalPower: 5,
             externalPower: 5,
+            lightness: 5, // 【新增】新遊戲時的初始輕功值
             morality: 0,
             yearName: '元祐', year: 1, month: 1, day: 1
         }, null);
@@ -494,8 +498,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const internal = data.internalPower === undefined ? 0 : data.internalPower;
         const external = data.externalPower === undefined ? 0 : data.externalPower;
+        const lightness = data.lightness === undefined ? 0 : data.lightness; // 【新增】讀取輕功值
+
         updatePowerBar(internalPowerBar, internalPowerValue, internal);
         updatePowerBar(externalPowerBar, externalPowerValue, external);
+        updatePowerBar(lightnessPowerBar, lightnessPowerValue, lightness); // 【新增】更新輕功的UI
         
         updateMoralityBar(data.morality === undefined ? 0 : data.morality);
 
