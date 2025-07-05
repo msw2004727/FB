@@ -7,9 +7,6 @@ const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion, g
 
 const db = admin.firestore();
 
-// 【移除】不再需要後端的時間序列
-// const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
-
 router.use(authMiddleware);
 
 router.get('/get-encyclopedia', async (req, res) => {
@@ -25,7 +22,8 @@ router.get('/get-encyclopedia', async (req, res) => {
 
         const longTermSummary = summaryDoc.data().text;
         
-        const encyclopediaHtml = await getAIEncyclopedia('gemini', longTermSummary, username);
+        // 【修改】將模型從 'gemini' 改為 'deepseek'
+        const encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username);
         
         res.json({ encyclopediaHtml });
 
@@ -78,11 +76,8 @@ router.post('/interact', async (req, res) => {
 
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
-
-        // --- 【修改】時間處理邏輯 ---
-        // 直接從 AI 的回應中獲取最終時辰，不再自己計算
+        
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
-        // --------------------------
 
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
@@ -96,7 +91,6 @@ router.post('/interact', async (req, res) => {
         aiResponse.roundData.externalPower = newExternalPower;
         aiResponse.roundData.morality = newMorality;
         
-        // 更新資料庫時，也直接使用 AI 決定的時辰
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -124,7 +118,6 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
-        // 確保回傳給前端的 roundData 包含最新的時辰
         aiResponse.roundData.timeOfDay = nextTimeOfDay;
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
