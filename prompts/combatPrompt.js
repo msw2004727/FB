@@ -40,7 +40,8 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 - **【重要】\`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」**。例如，制勝的一擊、敵人投降或逃跑的瞬間。
 - **必須**包含 \`outcome\` 欄位，用來總結戰果。
     - \`summary\`: (字串) 對整場戰鬥的簡短總結，例如 "經過一番苦戰，你成功擊退了所有山賊。"
-    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。可包含 \`PC\`, \`ITM\`, \`powerChange\`, \`moralityChange\`。
+    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。
+        - **【結構鐵律】**: 這個物件**必須**包含 PC, ITM, powerChange, moralityChange 四個完整的鍵。如果沒有變化，則使用空字串 "" 或 0 作為值。powerChange 也必須包含 internal, external, lightness 三個鍵。
 
 **範例 (JSON):**
 \`\`\`json
@@ -52,7 +53,24 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     "playerChanges": {
       "PC": "你雖然獲勝，但也受了些內傷，氣血翻湧。",
       "ITM": "+1 虎頭令牌、+50 文銅錢",
-      "powerChange": { "internal": -10, "external": 0, "lightness": -5 }
+      "powerChange": { "internal": -10, "external": 0, "lightness": -5 },
+      "moralityChange": 5
+    }
+  }
+}
+\`\`\`
+**範例 (無特殊變化):**
+\`\`\`json
+{
+  "narrative": "你輕鬆地閃過林教頭試探性的一拳，並順勢點到為止地將手掌停在他的喉前。林教頭抱拳認輸，稱讚你的武藝又有精進。",
+  "combatOver": true,
+  "outcome": {
+    "summary": "一場友好的切磋結束了，你略勝一籌。",
+    "playerChanges": {
+      "PC": "",
+      "ITM": "",
+      "powerChange": { "internal": 0, "external": 1, "lightness": 1 },
+      "moralityChange": 0
     }
   }
 }
