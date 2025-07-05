@@ -15,8 +15,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = document.getElementById('username').value.trim();
         const gender = document.getElementById('gender').value;
         const password = document.getElementById('password').value.trim();
+        const worldview = document.getElementById('worldview').value; // 【新增】獲取世界觀選擇
 
-        if (!username || !gender || !password) {
+        if (!username || !gender || !password || !worldview) { // 【修改】加入對 worldview 的檢查
             messageElement.textContent = '所有欄位皆為必填。';
             messageElement.classList.add('error');
             return;
@@ -27,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${backendBaseUrl}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, gender, password })
+                body: JSON.stringify({ username, gender, password, worldview }) // 【修改】將 worldview 加入請求
             });
 
             const data = await response.json();
