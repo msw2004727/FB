@@ -17,16 +17,11 @@ const deepseek = new OpenAI({
     baseURL: "https://api.deepseek.com/v1",
 });
 
-// --- 從 prompts 資料夾導入腳本 ---
-const { getStoryPrompt } = require('../prompts/storyPrompt');
-const { getNarrativePrompt } = require('../prompts/narrativePrompt');
-const { getSummaryPrompt } = require('../prompts/summaryPrompt');
-const { getPrequelPrompt } = require('../prompts/prequelPrompt');
-const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
-const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
-const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
-// 【新增】導入我們新建立的戰鬥指令稿
-const { getCombatPrompt } = require('../prompts/combatPrompt.js');
+// 4. 【新增】Grok
+const grok = new OpenAI({
+    apiKey: process.env.GROK_API_KEY,
+    baseURL: "https://api.x.ai/v1",
+});
 
 
 // 統一的AI調度中心，增加 isJsonExpected 參數
@@ -55,6 +50,15 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 }
                 const deepseekResult = await deepseek.chat.completions.create(options);
                 textResponse = deepseekResult.choices[0].message.content;
+                break;
+            // 【新增】Grok 的處理邏輯
+            case 'grok':
+                options.model = "grok-3-mini"; // 使用 grok-3-mini 模型
+                if (isJsonExpected) {
+                    options.response_format = { type: "json_object" };
+                }
+                const grokResult = await grok.chat.completions.create(options);
+                textResponse = grokResult.choices[0].message.content;
                 break;
             case 'gemini':
             default:
