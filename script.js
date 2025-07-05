@@ -45,6 +45,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const deceasedTitle = document.getElementById('deceased-title');
     const restartButton = document.getElementById('restart-btn');
 
+    const combatModal = document.getElementById('combat-modal');
+    const combatTitle = document.getElementById('combat-title');
+    const combatEnemies = document.getElementById('combat-enemies');
+    const combatLog = document.getElementById('combat-log');
+    const combatInput = document.getElementById('combat-input');
+    const combatActionButton = document.getElementById('combat-action-btn');
+
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
@@ -131,9 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/restart`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
             if (!response.ok) {
@@ -163,23 +168,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
     let currentRound = 0;
     let isRequesting = false;
+    let isInCombat = false;
 
     submitButton.addEventListener('click', handlePlayerAction);
     playerInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handlePlayerAction();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); handlePlayerAction(); }
     });
+
+    combatActionButton.addEventListener('click', handleCombatAction);
+    combatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); handleCombatAction(); }
+    });
+
 
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
-        if (!actionText || isRequesting) return;
+        if (!actionText || isRequesting || isInCombat) return;
 
         playerInput.value = '';
         actionSuggestion.textContent = '';
-
-        const selectedModel = aiModelSelector.value;
         setLoadingState(true);
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
@@ -187,14 +194,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${backendBaseUrl}/api/game/interact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ action: actionText, round: currentRound, model: selectedModel })
+                body: JSON.stringify({ action: actionText, round: currentRound, model: aiModelSelector.value })
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
             
-            currentRound = data.roundData.R;
-            // 【修改】將隨機事件資料也傳入UI更新函式
-            updateUI(data.story, data.roundData, data.randomEvent);
+            if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
+                startCombat(data.combatInfo.initialState);
+                appendMessageToStory(data.story, 'story-text');
+                updateUI(null, data.roundData, data.randomEvent);
+            } else {
+                currentRound = data.roundData.R;
+                updateUI(data.story, data.roundData, data.randomEvent);
+            }
             
             if (data.suggestion) {
                 actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
@@ -209,6 +221,86 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             setLoadingState(false);
         }
+    }
+
+    function startCombat(initialState) {
+        isInCombat = true;
+        combatModal.classList.add('visible');
+        playerInput.disabled = true;
+        submitButton.disabled = true;
+
+        const enemyNames = initialState.enemies.map(e => e.name).join('、');
+        combatTitle.textContent = `遭遇強敵`;
+        combatEnemies.textContent = `對手: ${enemyNames}`;
+        
+        combatLog.innerHTML = '';
+        initialState.log.forEach(line => appendToCombatLog(line));
+        
+        combatInput.focus();
+    }
+
+    async function handleCombatAction() {
+        const actionText = combatInput.value.trim();
+        if (!actionText || isRequesting) return;
+
+        combatInput.value = '';
+        setLoadingState(true, '運息應對中...');
+        appendToCombatLog(`> ${actionText}`);
+
+        try {
+            const response = await fetch(`${backendBaseUrl}/api/game/combat-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ action: actionText })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || '戰鬥中發生錯誤');
+
+            if (data.status === 'COMBAT_ONGOING') {
+                appendToCombatLog(data.narrative);
+            } else if (data.status === 'COMBAT_END') {
+                endCombat(data.outcome);
+            }
+
+        } catch (error) {
+            appendToCombatLog(`[系統錯誤] ${error.message}`);
+        } finally {
+            setLoadingState(false);
+            combatInput.focus();
+        }
+    }
+
+    function endCombat(outcome) {
+        let outcomeHtml = `<p class="combat-summary-title">戰鬥結束</p>`;
+        outcomeHtml += `<p>${outcome.summary}</p>`;
+        if (outcome.playerChanges.PC) {
+            outcomeHtml += `<p>狀態變化: ${outcome.playerChanges.PC}</p>`;
+        }
+        if (outcome.playerChanges.ITM) {
+            outcomeHtml += `<p>獲得物品: ${outcome.playerChanges.ITM}</p>`;
+        }
+        appendToCombatLog(outcomeHtml, 'combat-summary');
+
+        combatInput.disabled = true;
+        combatActionButton.textContent = "關閉";
+        combatActionButton.onclick = () => {
+            combatModal.classList.remove('visible');
+            isInCombat = false;
+            playerInput.disabled = false;
+            submitButton.disabled = false;
+            combatInput.disabled = false;
+            combatActionButton.textContent = "行動";
+            combatActionButton.onclick = handleCombatAction;
+            window.location.reload();
+        };
+    }
+    
+    function appendToCombatLog(text, className) {
+        const p = document.createElement('p');
+        if (className) p.className = className;
+        p.innerHTML = text.replace(/\n/g, '<br>');
+        combatLog.appendChild(p);
+        combatLog.scrollTop = combatLog.scrollHeight;
     }
 
     async function initializeGame() {
@@ -260,12 +352,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 輔助函式 ---
     function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
-        playerInput.disabled = isLoading;
-        submitButton.disabled = isLoading;
-        submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+        if (!isInCombat) {
+            playerInput.disabled = isLoading;
+            submitButton.disabled = isLoading;
+            submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+        } else {
+            combatInput.disabled = isLoading;
+            combatActionButton.disabled = isLoading;
+        }
 
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         
@@ -277,7 +373,13 @@ document.addEventListener('DOMContentLoaded', () => {
             loaderTextElement.textContent = '';
         }
 
-        if (!isLoading) playerInput.focus();
+        if (!isLoading) {
+            if (isInCombat) {
+                combatInput.focus();
+            } else {
+                playerInput.focus();
+            }
+        }
     }
     
     function showDeceasedScreen() {
@@ -310,6 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function highlightNpcNames(text, npcs) {
+        if (!text) return '';
         let highlightedText = text;
         if (npcs && Array.isArray(npcs) && npcs.length > 0) {
             const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
@@ -342,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (moralityValue < -10) {
                     colorVar = 'var(--morality-evil-dark)';
                 } else {
-                    colorVar = 'var(--morality-neutral-dark)';
+                    colorVar = 'var(--dark-text-secondary)';
                 }
             }
             moralityBarIndicator.style.backgroundColor = colorVar;
@@ -358,10 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-    // 【修改】函式現在會接收第三個參數 randomEvent
     function updateUI(storyText, data, randomEvent) {
-        // 【新增】如果存在隨機事件，就顯示它
         if (randomEvent && randomEvent.description) {
             const eventDiv = document.createElement('div');
             eventDiv.className = 'random-event-message';
@@ -373,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const processedStory = highlightNpcNames(storyText, data.NPC);
             appendMessageToStory(processedStory, 'story-text');
         }
+        if (!data) return; // 如果沒有 data 就提前退出
 
         roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
         
