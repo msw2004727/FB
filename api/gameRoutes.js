@@ -72,6 +72,7 @@ router.post('/interact', async (req, res) => {
             month: userProfile.month || 1,
             day: userProfile.day || 1
         };
+        // 【新增】讀取隨機事件計數器
         let turnsSinceEvent = userProfile.turnsSinceEvent || 0;
 
         const playerPower = {
@@ -116,23 +117,15 @@ router.post('/interact', async (req, res) => {
             }
         }
         
+        // 【新增】每回合後，計數器+1
         turnsSinceEvent++;
         
-        // --- 【修改】隨機事件觸發邏輯 ---
-        let randomEventData = null; // 用來存放可能發生的事件
+        // 【新增】隨機事件觸發邏輯 (包含「無事發生」的機率)
         if (turnsSinceEvent >= 3) {
-            // 第一層搖骰：決定是否發生事件 (例如 60% 機率發生)
+            // 第一層搖骰：決定是否發生事件 (60% 機率發生)
             if (Math.random() < 0.6) {
                 console.log(`[事件系統] 玩家 ${username} 觸發隨機事件！`);
-                // 第二層搖骰：決定事件規模與性質
-                // 這部分我們會在後續步驟中，交給AI來生成具體內容
-                // 現在先預留一個位置，並將事件資料存起來
-                randomEventData = {
-                    type: "placeholder",
-                    description: "一個隨機事件發生了！" // 預留描述
-                };
-                // 將事件資料附加到回傳給前端的資料中
-                aiResponse.randomEvent = randomEventData;
+                // 這部分會在後續步驟中，替換成真正呼叫AI生成事件的邏輯
             } else {
                 console.log(`[事件系統] 玩家 ${username} 本回合無事發生。`);
             }
@@ -156,13 +149,13 @@ router.post('/interact', async (req, res) => {
             ...currentDate
         });
 
-        // 更新資料庫時，也一併更新事件計數器
+        // 【新增】更新資料庫時，也一併更新事件計數器
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
             morality: newMorality,
-            turnsSinceEvent: turnsSinceEvent, // 【新增】
+            turnsSinceEvent: turnsSinceEvent,
             ...currentDate
         });
 
@@ -318,7 +311,8 @@ router.post('/restart', async (req, res) => {
             month: admin.firestore.FieldValue.delete(),
             day: admin.firestore.FieldValue.delete(),
             yearName: admin.firestore.FieldValue.delete(),
-            turnsSinceEvent: admin.firestore.FieldValue.delete() // 【新增】
+            // 【新增】重置時清除事件計數器
+            turnsSinceEvent: admin.firestore.FieldValue.delete()
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -385,7 +379,7 @@ router.post('/force-suicide', async (req, res) => {
 
     } catch (error) {
         console.error(`[UserID: ${userId}] /force-suicide 錯誤:`, error);
-        res.status(500).json({ message: '了此殘生時發生錯誤...' });
+        res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
 
