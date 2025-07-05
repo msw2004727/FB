@@ -9,8 +9,8 @@ const db = admin.firestore();
 // API 路由: /api/auth/register
 router.post('/register', async (req, res) => {
     try {
-        const { username, gender, password } = req.body;
-        if (!username || !gender || !password) {
+        const { username, gender, password, worldview } = req.body; // 【修改】接收 worldview
+        if (!username || !gender || !password || !worldview) { // 【修改】加入對 worldview 的檢查
             return res.status(400).json({ message: '所有欄位皆為必填。' });
         }
 
@@ -26,6 +26,7 @@ router.post('/register', async (req, res) => {
             username,
             gender,
             passwordHash,
+            worldview: worldview, // 【新增】將世界觀存入資料庫
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
