@@ -853,7 +853,7 @@ body.dark-theme .random-event-message {
         transform: translateY(0);
     }
 }
-/* --- 【新增】戰鬥彈窗樣式 --- */
+/* --- 戰鬥彈窗樣式 --- */
 .combat-modal-overlay {
     position: fixed;
     top: 0;
@@ -877,6 +877,7 @@ body.dark-theme .random-event-message {
 }
 
 .combat-modal-content {
+    position: relative; /* 新增，為loader提供定位基準 */
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 12px;
@@ -989,4 +990,30 @@ body.dark-theme #combat-input {
 }
 body.dark-theme #combat-action-btn {
     border-left-color: var(--dark-border);
+}
+
+/* --- 戰鬥彈窗專用載入動畫 --- */
+.combat-loader-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 1011;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 12px; /* 需與 .combat-modal-content 的圓角一致 */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+.combat-loader-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.combat-loader-overlay .loader-dots span {
+    background-color: #fff;
 }
