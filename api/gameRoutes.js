@@ -107,7 +107,7 @@ router.post('/interact', async (req, res) => {
         const playerPower = {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5,
-            lightness: userProfile.lightness || 5 // <--- 新增：讀取輕功值，預設為5
+            lightness: userProfile.lightness || 5
         };
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
 
@@ -118,18 +118,15 @@ router.post('/interact', async (req, res) => {
         let recentHistoryRounds = [];
         const memoryDepth = 3;
         if (currentRound > 0) {
-            const roundsToFetch = Array.from({length: memoryDepth}, (_, i) => currentRound - i).filter(r => r > 0);
-            if (roundsToFetch.length > 0) {
-                const roundDocs = await userDocRef.collection('game_saves').where('R', 'in', roundsToFetch).get();
-                roundDocs.forEach(doc => recentHistoryRounds.push(doc.data()));
-                recentHistoryRounds.sort((a, b) => a.R - b.R);
-            }
+            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(memoryDepth).get();
+            savesSnapshot.forEach(doc => recentHistoryRounds.push(doc.data()));
+            recentHistoryRounds.sort((a, b) => a.R - b.R);
         }
         
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
-        const newRoundNumber = currentRound + 1;
+        const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
@@ -149,7 +146,7 @@ router.post('/interact', async (req, res) => {
         
         turnsSinceEvent++;
         
-        let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 }; // <--- 新增：預設輕功變化為0
+        let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 };
         let moralityChange = aiResponse.roundData.moralityChange || 0;
         let newPlayerStateDescription = aiResponse.roundData.PC;
         let newItemChange = aiResponse.roundData.ITM;
@@ -196,7 +193,7 @@ router.post('/interact', async (req, res) => {
                     if(eventData.effects.powerChange) {
                         powerChange.internal += (eventData.effects.powerChange.internal || 0);
                         powerChange.external += (eventData.effects.powerChange.external || 0);
-                        powerChange.lightness += (eventData.effects.powerChange.lightness || 0); // <--- 新增：處理隨機事件的輕功變化
+                        powerChange.lightness += (eventData.effects.powerChange.lightness || 0);
                     }
                     if(eventData.effects.moralityChange) {
                         moralityChange += eventData.effects.moralityChange;
@@ -217,7 +214,7 @@ router.post('/interact', async (req, res) => {
 
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + (powerChange.internal || 0)));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + (powerChange.external || 0)));
-        const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0))); // <--- 新增：計算新的輕功值
+        const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0)));
         let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
 
@@ -227,7 +224,7 @@ router.post('/interact', async (req, res) => {
         Object.assign(aiResponse.roundData, {
             internalPower: newInternalPower,
             externalPower: newExternalPower,
-            lightness: newLightness, // <--- 新增：將輕功值加入回傳資料
+            lightness: newLightness,
             morality: newMorality,
             timeOfDay: nextTimeOfDay,
             ...currentDate
@@ -237,7 +234,7 @@ router.post('/interact', async (req, res) => {
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
-            lightness: newLightness, // <--- 新增：更新輕功值到資料庫
+            lightness: newLightness,
             morality: newMorality,
             turnsSinceEvent: turnsSinceEvent,
             ...currentDate
@@ -253,7 +250,7 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
-            aiResponse.suggestion = suggestion;
+aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
             
@@ -273,6 +270,7 @@ router.post('/interact', async (req, res) => {
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
     const { action } = req.body;
+    const modelName = 'deepseek'; // 戰鬥相關固定使用回應較快的模型
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -287,9 +285,9 @@ router.post('/combat-action', async (req, res) => {
         combatState.log.push(`> ${action}`);
 
         const userDoc = await userDocRef.get();
-        const playerProfile = userDoc.exists ? userDoc.data() : {};
+        let playerProfile = userDoc.exists ? userDoc.data() : {};
 
-        const combatResult = await getAICombatAction('deepseek', playerProfile, combatState, action);
+        const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
@@ -298,27 +296,96 @@ router.post('/combat-action', async (req, res) => {
 
         if (combatResult.combatOver) {
             console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 的戰鬥已結束。`);
-            
-            const changes = combatResult.outcome.playerChanges;
-            let finalUpdate = {};
+            await combatDocRef.delete(); // 立即刪除戰鬥狀態
 
-            if (changes.powerChange) {
-                finalUpdate.internalPower = playerProfile.internalPower + (changes.powerChange.internal || 0);
-                finalUpdate.externalPower = playerProfile.externalPower + (changes.powerChange.external || 0);
-                finalUpdate.lightness = playerProfile.lightness + (changes.powerChange.lightness || 0); // <--- 新增：處理戰鬥後的輕功變化
+            const outcome = combatResult.outcome;
+            const changes = outcome.playerChanges || {};
+            
+            // 1. 即時更新玩家數值
+            const powerChange = changes.powerChange || {};
+            const updatedProfile = {
+                internalPower: (playerProfile.internalPower || 0) + (powerChange.internal || 0),
+                externalPower: (playerProfile.externalPower || 0) + (powerChange.external || 0),
+                lightness: (playerProfile.lightness || 0) + (powerChange.lightness || 0),
+                morality: (playerProfile.morality || 0) + (changes.moralityChange || 0)
+            };
+            await userDocRef.update(updatedProfile);
+            
+            // 將更新後的數值合併回 playerProfile 供後續AI使用
+            playerProfile = { ...playerProfile, ...updatedProfile };
+            
+            // 2. 準備生成戰鬥後的總結回合
+            const lastRoundSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRound = lastRoundSnapshot.empty ? { R: 0 } : lastRoundSnapshot.docs[0].data();
+            
+            const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+            const summaryDoc = await summaryDocRef.get();
+            const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
+
+            let recentHistoryRounds = [];
+            const memoryDepth = 2; // 少讀一回合，因為當前回合就是戰鬥
+            if (lastRound.R > 0) {
+                const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(memoryDepth).get();
+                savesSnapshot.forEach(doc => recentHistoryRounds.push(doc.data()));
+                recentHistoryRounds.sort((a, b) => a.R - b.R);
             }
-            if (changes.moralityChange) {
-                finalUpdate.morality = playerProfile.morality + changes.moralityChange;
-            }
+
+            // 3. 構造一個特殊的 "action"，告訴AI剛剛發生了什麼
+            const postCombatAction = `剛剛結束了一場戰鬥。最後一幕是：${combatResult.narrative}。戰鬥總結是：${outcome.summary}。我的狀態變化是：${changes.PC || '無'}`;
+
+            // 4. 呼叫AI生成新回合
+            const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), postCombatAction, playerProfile, playerProfile.username, playerProfile.timeOfDay, updatedProfile, updatedProfile.morality);
+
+            if (!aiResponse) throw new Error("戰鬥後AI未能生成有效回應。");
+
+            // 5. 處理並儲存新回合數據
+            const newRoundNumber = (lastRound.R || 0) + 1;
+            aiResponse.roundData.R = newRoundNumber;
             
-            await userDocRef.update(finalUpdate);
+            // 合併戰鬥結果的物品變化到AI生成的回合中
+            aiResponse.roundData.ITM = applyItemChanges(aiResponse.roundData.ITM, changes.ITM);
             
-            await combatDocRef.delete();
+            const newInternalPower = Math.max(0, Math.min(999, updatedProfile.internalPower + (aiResponse.roundData.powerChange?.internal || 0)));
+            const newExternalPower = Math.max(0, Math.min(999, updatedProfile.externalPower + (aiResponse.roundData.powerChange?.external || 0)));
+            const newLightness = Math.max(0, Math.min(999, updatedProfile.lightness + (aiResponse.roundData.powerChange?.lightness || 0)));
+            const newMorality = Math.max(-100, Math.min(100, updatedProfile.morality + (aiResponse.roundData.moralityChange || 0)));
+
+            Object.assign(aiResponse.roundData, {
+                internalPower: newInternalPower,
+                externalPower: newExternalPower,
+                lightness: newLightness,
+                morality: newMorality
+            });
+
+            await userDocRef.update({ 
+                internalPower: newInternalPower,
+                externalPower: newExternalPower,
+                lightness: newLightness,
+                morality: newMorality,
+                timeOfDay: aiResponse.roundData.timeOfDay || playerProfile.timeOfDay,
+                // 省略日期更新，讓AI決定
+            });
+
+            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
+            await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+
+            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
+            const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
+
+            const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
+            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
             
+            await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
+
+            // 6. 回傳一個包含完整新回合資訊的物件
             res.json({
                 status: 'COMBAT_END',
-                log: combatState.log,
-                outcome: combatResult.outcome
+                finalLog: combatResult.narrative, // 將最後一句日誌傳給前端顯示
+                newRound: { // 命名為 newRound 讓前端好辨識
+                    story: narrativeText,
+                    roundData: aiResponse.roundData,
+                    suggestion: suggestion
+                }
             });
 
         } 
@@ -359,7 +426,7 @@ router.get('/latest-game', async (req, res) => {
             timeOfDay: latestGameData.timeOfDay || userData.timeOfDay || '上午',
             internalPower: userData.internalPower || 5,
             externalPower: userData.externalPower || 5,
-            lightness: userData.lightness || 5, // <--- 新增：讀取最新進度時加入輕功
+            lightness: userData.lightness || 5,
             morality: userData.morality === undefined ? 0 : userData.morality,
             yearName: userData.yearName || '元祐',
             year: userData.year || 1,
@@ -457,7 +524,7 @@ router.post('/restart', async (req, res) => {
             timeOfDay: admin.firestore.FieldValue.delete(),
             internalPower: admin.firestore.FieldValue.delete(),
             externalPower: admin.firestore.FieldValue.delete(),
-            lightness: admin.firestore.FieldValue.delete(), // <--- 新增：重設遊戲時刪除輕功值
+            lightness: admin.firestore.FieldValue.delete(),
             morality: admin.firestore.FieldValue.delete(),
             year: admin.firestore.FieldValue.delete(),
             month: admin.firestore.FieldValue.delete(),
@@ -485,9 +552,9 @@ router.post('/force-suicide', async (req, res) => {
         await userDocRef.update({ isDeceased: true });
 
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-        const lastRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
+        const lastRound = savesSnapshot.empty ? { R: 0 } : savesSnapshot.docs[0].data();
         
-        const newRoundNumber = lastRound + 1;
+        const newRoundNumber = (lastRound.R || 0) + 1;
         
         const finalRoundData = {
             R: newRoundNumber,
@@ -495,7 +562,7 @@ router.post('/force-suicide', async (req, res) => {
             timeOfDay: userProfile.timeOfDay || '上午',
             internalPower: userProfile.internalPower || 5,
             externalPower: userProfile.externalPower || 5,
-            lightness: userProfile.lightness || 5, // <--- 新增：在最終回合數據中包含輕功
+            lightness: userProfile.lightness || 5,
             morality: userProfile.morality === undefined ? 0 : userProfile.morality,
             yearName: userProfile.yearName || '元祐',
             year: userProfile.year || 1,
