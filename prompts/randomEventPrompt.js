@@ -14,6 +14,8 @@ const getRandomEventPrompt = (eventType, playerProfile) => {
 
 你的回應必須是一個結構化的 JSON 物件，其中包含 "description" (事件描述) 和 "effects" (遊戲效果) 兩個鍵。
 
+**【語言鐵律】**: 你的 "description" 和 "effects.PC" 文字都必須只包含「繁體中文」。絕對禁止使用任何簡體中文、英文或表情符號。
+
 ## 核心準則:
 
 1.  **事件描述 (description)**: 必須是一段 50 字以內的生動文字，描述事件是如何發生的。
