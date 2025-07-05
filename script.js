@@ -9,8 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 獲取所有需要的DOM元素 ---
-    const storyHeader = document.querySelector('.story-header'); // 【新增】獲取整個 header
-    const headerToggleButton = document.getElementById('header-toggle-btn'); // 【新增】獲取收折按鈕
+    const storyHeader = document.querySelector('.story-header');
+    const headerToggleButton = document.getElementById('header-toggle-btn');
     const storyPanelWrapper = document.querySelector('.story-panel');
     const storyTextContainer = document.getElementById('story-text-wrapper');
     const playerInput = document.getElementById('player-input');
@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         welcomeMessage.textContent = `${username}，歡迎回來。`;
     }
     
-    // 【新增】資訊欄收折功能
     if(headerToggleButton && storyHeader) {
         headerToggleButton.addEventListener('click', () => {
             storyHeader.classList.toggle('collapsed');
@@ -115,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
 
-                updateUI(data.story, data.roundData);
+                updateUI(data.story, data.roundData, data.randomEvent);
                 showDeceasedScreen();
                 
             } catch (error) {
@@ -194,7 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
             
             currentRound = data.roundData.R;
-            updateUI(data.story, data.roundData);
+            // 【修改】將隨機事件資料也傳入UI更新函式
+            updateUI(data.story, data.roundData, data.randomEvent);
             
             if (data.suggestion) {
                 actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.gameState === 'deceased') {
                 showDeceasedScreen();
-                updateUI('', data.roundData || {});
+                updateUI('', data.roundData || {}, null);
                 return;
             }
             
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyTextContainer.appendChild(prequelDiv);
             }
             
-            updateUI(data.story, data.roundData);
+            updateUI(data.story, data.roundData, null);
             
             if (data.suggestion) {
                 actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             externalPower: 5,
             morality: 0,
             yearName: '元祐', year: 1, month: 1, day: 1
-        });
+        }, null);
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
 
@@ -359,7 +359,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function updateUI(storyText, data) {
+    // 【修改】函式現在會接收第三個參數 randomEvent
+    function updateUI(storyText, data, randomEvent) {
+        // 【新增】如果存在隨機事件，就顯示它
+        if (randomEvent && randomEvent.description) {
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'random-event-message';
+            eventDiv.innerHTML = `<strong>【奇遇】</strong> ${randomEvent.description}`;
+            storyTextContainer.appendChild(eventDiv);
+        }
+
         if (storyText) {
             const processedStory = highlightNpcNames(storyText, data.NPC);
             appendMessageToStory(processedStory, 'story-text');
