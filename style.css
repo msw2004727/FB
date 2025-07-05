@@ -417,37 +417,40 @@ body.dark-theme .novel-content .chapter h2 {
     margin-bottom: 1rem;
 }
 
-/* --- NPC 姓名高亮樣式 --- */
+/* --- NPC 姓名高亮樣式 (7級友好度) --- */
 .npc-name {
     font-weight: bold;
     transition: color 0.3s ease;
 }
 
-.npc-friendly {
-    color: #28a745; /* 友善綠 */
-}
+/* 1. 崇拜 (綠色系 - 最亮) */
+.npc-devoted { color: #198754; }
+body.dark-theme .npc-devoted { color: #28a745; }
 
-.npc-hostile {
-    color: #dc3545; /* 敵對紅 */
-}
+/* 2. 信賴 (綠色系 - 標準) */
+.npc-trusted { color: #20c997; }
+body.dark-theme .npc-trusted { color: #3ddca3; }
 
-.npc-neutral {
-    color: var(--light-text-secondary); /* 中立灰 - 淺色主題 */
-}
+/* 3. 友善 (綠色系 - 最淺) */
+.npc-friendly { color: #6fcf97; }
+body.dark-theme .npc-friendly { color: #88e3b4; }
 
-body.dark-theme .npc-friendly {
-    color: #33d45f; /* 友善綠 - 深色主題 */
-}
+/* 4. 中立 */
+.npc-neutral { color: var(--light-text-secondary); }
+body.dark-theme .npc-neutral { color: var(--dark-text-secondary); }
 
-body.dark-theme .npc-hostile {
-    color: #ff5263; /* 敵對紅 - 深色主題 */
-}
+/* 5. 警惕 (紅色/紫色系 - 最淺) */
+.npc-wary { color: #856404; }
+body.dark-theme .npc-wary { color: #ffc107; }
 
-body.dark-theme .npc-neutral {
-    color: var(--dark-text-secondary); /* 中立灰 - 深色主題 */
-}
+/* 6. 敵對 (紅色/紫色系 - 標準) */
+.npc-hostile { color: #dc3545; }
+body.dark-theme .npc-hostile { color: #ff5263; }
 
-/* 我們不再需要 prequel-loader，因為將統一使用 ai-thinking-loader */
+/* 7. 死敵 (紅色/紫色系 - 最深) */
+.npc-sworn_enemy { color: #8B0000; }
+body.dark-theme .npc-sworn_enemy { color: #ff2424; }
+
 
 @keyframes prequel-bounce {
     0%, 80%, 100% {
