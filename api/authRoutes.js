@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middleware/auth');
 
-// 【已修改】引入世界觀管理器，以便在開始新遊戲時使用
+// 【引入】從您檔案中既有的引入
 const { loadPrompts } = require('../services/worldviewManager');
 const { getAIStory } = require('../services/aiService');
 
@@ -21,27 +21,41 @@ router.post('/register', async (req, res) => {
 
         const userSnapshot = await db.collection('users').where('username', '==', username).get();
         if (!userSnapshot.empty) {
-            return res.status(400).json({ message: '此姓名已被註冊。' });
+            return res.status(400).json({ message: '此名號已被註冊。' });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
+
         const newUserRef = db.collection('users').doc();
         await newUserRef.set({
             username,
             gender,
             passwordHash,
-            worldview: worldview, // 將世界觀存入資料庫
+            worldview: worldview,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        res.status(201).json({ message: '註冊成功！請前往登入。' });
+        // --- 【新增】註冊成功後，立即簽發 Token ---
+        const token = jwt.sign(
+            { id: newUserRef.id, username: username }, // 使用新建立的使用者 ID 和名稱
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // --- 【修改】回傳的內容，現在包含 token ---
+        res.status(201).json({
+            message: '註冊成功！',
+            token: token, // 將 token 回傳給前端
+            username: username
+        });
+
     } catch (error) {
         console.error("註冊失敗:", error);
         res.status(500).json({ message: '伺服器內部錯誤，註冊失敗。' });
     }
 });
 
-// API 路由: /api/auth/login
+// API 路由: /api/auth/login (保留您檔案中的原樣)
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -60,7 +74,7 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: userDoc.id, username: userData.username }, // 使用 userDoc.id
+            { id: userDoc.id, username: userData.username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -72,31 +86,23 @@ router.post('/login', async (req, res) => {
     }
 });
 
-
-// --- 【已修正】開始新遊戲的邏輯 ---
+// 開始新遊戲的邏輯 (保留您檔案中的原樣)
 router.post('/start-new-game', authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
 
     try {
-        // 1. 從資料庫讀取使用者設定檔
         const userDocRef = db.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         if (!userDoc.exists) {
             return res.status(404).json({ message: '找不到使用者資料。' });
         }
         const userProfile = userDoc.data();
-
-        // 2. 從設定檔中取得儲存的世界觀
-        const worldview = userProfile.worldview || 'wuxia'; // 如果沒有設定，則預設為 'wuxia'
-        
-        // 3. 載入正確的世界觀 prompts
+        const worldview = userProfile.worldview || 'wuxia';
         const prompts = loadPrompts(worldview);
-
-        // 4. 使用正確的 prompt 開始遊戲
         const initialPower = worldview === 'gundam' ? { machineSync: 5, pilotSkill: 5 } : { internal: 5, external: 5 };
         const initialPlayerAction = "我這是...在哪裡？";
-        
+
         const aiResponse = await getAIStory(
             'gemini',
             "遊戲剛剛開始，一切都是未知。",
@@ -104,7 +110,7 @@ router.post('/start-new-game', authMiddleware, async (req, res) => {
             initialPlayerAction,
             userProfile,
             username,
-            '清晨', // 或 '標準時間0800'
+            '清晨',
             initialPower,
             prompts.getStoryPrompt
         );
@@ -115,11 +121,10 @@ router.post('/start-new-game', authMiddleware, async (req, res) => {
 
         const newRoundNumber = 1;
         aiResponse.roundData.R = newRoundNumber;
-        
-        // 5. 將世界觀設定存入第一筆遊戲紀錄中
+
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
         await userDocRef.collection('game_state').doc('summary').set({ text: "遊戲初始，一切皆有可能。", lastUpdated: 1 });
-        await userDocRef.update({ 
+        await userDocRef.update({
             timeOfDay: aiResponse.roundData.timeOfDay,
             internalPower: aiResponse.roundData.internalPower || 5,
             externalPower: aiResponse.roundData.externalPower || 5
@@ -132,6 +137,5 @@ router.post('/start-new-game', authMiddleware, async (req, res) => {
         res.status(500).json({ message: '建立新遊戲時發生內部伺服器錯誤。' });
     }
 });
-
 
 module.exports = router;
