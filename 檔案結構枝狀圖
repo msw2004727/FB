@@ -1,0 +1,35 @@
+.
+├── api/                             # 後端 API 路由資料夾
+│   ├── authRoutes.js                # 處理所有使用者註冊與登入的路由邏輯
+│   ├── gameRoutes.js                # 處理所有遊戲核心互動（如動作、讀檔、重啟）的路由邏輯
+│
+├── middleware/                      # 後端中介軟體資料夾
+│   └── auth.js                      # JWT 權杖驗證中介軟體，保護需要登入才能存取的 API
+│
+├── prompts/                         # AI 指令稿（Prompt）資料夾
+│   ├── narrativePrompt.js           # 指導 AI 將遊戲數據轉換為小說體裁的段落
+│   ├── prequelPrompt.js             # 指導 AI 根據歷史紀錄生成「前情提要」
+│   ├── storyPrompt.js               # 遊戲最核心的指令稿，指導 AI 生成主要劇情與遊戲數據
+│   ├── suggestionPrompt.js          # 指導 AI 扮演「書僮」，為玩家提供行動建議
+│   └── summaryPrompt.js             # 指導 AI 將新回合資訊整合進舊摘要，形成長期記憶
+│
+├── services/                        # 後端服務邏輯資料夾
+│   └── aiService.js                 # AI 調度中心，負責呼叫不同的大語言模型（Gemini, GPT, DeepSeek）
+│
+├── public/ (隱含資料夾，對應前端)
+│   ├── index.html                   # 遊戲的主頁面，玩家主要在此互動
+│   ├── login.html                   # 使用者登入頁面
+│   ├── novel.html                   # 閱讀完整小說故事的頁面
+│   ├── register.html                # 新使用者註冊頁面
+│   ├── script.js                    # `index.html` 的主要 JavaScript 檔案，處理前端遊戲邏輯
+│   ├── login.js                     # `login.html` 的 JavaScript 檔案，處理登入請求
+│   ├── register.js                  # `register.html` 的 JavaScript 檔案，處理註冊請求
+│   ├── novel.js                     # `novel.html` 的 JavaScript 檔案，負責讀取並顯示小說
+│   ├── style.css                    # 主要的 CSS 樣式檔案，定義所有頁面的外觀
+│   └── novel.css                    # (此檔案內容應已整合至 style.css) 專門為小說頁面設計的樣式
+│
+├── .env                             # (隱藏檔案) 環境變數設定檔，儲存 API 金鑰、資料庫金鑰等機密資訊
+├── package.json                     # Node.js 專案設定檔，定義專案依賴、腳本等
+├── package-lock.json                # 鎖定專案依賴的具體版本，確保開發環境一致
+├── server.js                        # 後端伺服器的進入點，負責啟動 Express 應用與初始化 Firebase
+└── README.md                        # 專案的說明檔案
