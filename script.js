@@ -205,14 +205,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
             
+            // 無論如何，先更新UI和回合數
             updateUI(data.story, data.roundData, data.randomEvent);
             currentRound = data.roundData.R;
             
+            // 如果需要進入戰鬥，則呼叫戰鬥流程
             if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
-                setTimeout(() => {
-                    startCombat(data.combatInfo.initialState);
-                }, 1500);
+                startCombat(data.combatInfo.initialState);
             } else {
+                // 如果不進入戰鬥，則直接解除鎖定
                  setLoadingState(false);
             }
             
@@ -243,12 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
         combatLog.innerHTML = '';
         if (initialState.log && initialState.log.length > 0) {
             const introText = initialState.log[0];
-            const introP = document.createElement('p');
-            introP.className = 'combat-intro-text';
-            introP.innerHTML = introText.replace(/\n/g, '<br>');
-            combatLog.appendChild(introP);
+            appendToCombatLog(introText, 'combat-intro-text');
         }
         
+        // 解除主介面的載入狀態，因為現在焦點在戰鬥視窗
+        setLoadingState(false); 
         combatInput.focus();
     }
 
@@ -271,21 +271,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.status === 'COMBAT_ONGOING') {
                 appendToCombatLog(data.narrative);
+                setLoadingState(false); // 繼續戰鬥，解除鎖定
             } else if (data.status === 'COMBAT_END') {
                 appendToCombatLog(data.finalLog, 'combat-summary');
+                // 延遲關閉，讓玩家看清最後一擊
                 setTimeout(() => {
                     endCombat(data.newRound || null);
-                }, 1500); 
+                }, 2000); 
             }
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
-            setTimeout(() => endCombat(null), 1500);
-        } finally {
-            // 【修改】將 setLoadingState(false) 移到 finally 區塊
-            // 但只在戰鬥還在進行時呼叫，避免過早啟用結束後的UI
-            if (isInCombat && !document.querySelector('.combat-summary')) {
-                 setLoadingState(false);
-            }
+            // 即使出錯，也要確保能關閉
+            setTimeout(() => endCombat(null), 2000);
         }
     }
 
@@ -303,9 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
         combatModal.classList.remove('visible');
         isInCombat = false;
         
-        playerInput.disabled = false;
-        submitButton.disabled = false;
-        setLoadingState(false); // 確保主介面和戰鬥介面的狀態都被重設
+        // 確保所有相關的UI都恢復正常
+        setLoadingState(false); 
         playerInput.focus();
     }
     
@@ -369,29 +365,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
 
-        if (isInCombat) {
-            combatInput.disabled = isLoading;
-            combatActionButton.disabled = isLoading;
-            if (combatLoader) {
-                combatLoader.classList.toggle('visible', isLoading);
-            }
-        } else {
-            playerInput.disabled = isLoading;
-            submitButton.disabled = isLoading;
-            submitButton.textContent = isLoading ? '撰寫中...' : '動作';
-            
-            const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
-            if (isLoading) {
-                loaderTextElement.textContent = text;
-                aiThinkingLoader.classList.add('visible');
-            } else {
-                aiThinkingLoader.classList.remove('visible');
-                loaderTextElement.textContent = '';
-            }
+        // 主介面UI控制
+        playerInput.disabled = isLoading || isInCombat;
+        submitButton.disabled = isLoading || isInCombat;
+        submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+        if (aiThinkingLoader) {
+             const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
+             if(loaderTextElement) loaderTextElement.textContent = text;
+             aiThinkingLoader.classList.toggle('visible', isLoading && !isInCombat);
         }
 
-        if (!isLoading && !isInCombat) {
-            playerInput.focus();
+        // 戰鬥介面UI控制
+        combatInput.disabled = isLoading;
+        combatActionButton.disabled = isLoading;
+        if(combatLoader) {
+            combatLoader.classList.toggle('visible', isLoading && isInCombat);
         }
     }
     
