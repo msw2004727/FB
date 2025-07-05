@@ -102,10 +102,20 @@ router.post('/interact', async (req, res) => {
         
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
 
-        const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
-        const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
-        if (newTimeIndex < oldTimeIndex) {
-            currentDate = advanceDate(currentDate);
+        // --- 【修改】日期推進的最終邏輯 ---
+        const daysToAdvance = aiResponse.roundData.daysToAdvance;
+        if (daysToAdvance && typeof daysToAdvance === 'number' && daysToAdvance > 0) {
+            // 方案一：如果AI提供了明確天數，則按天數推進
+            for (let i = 0; i < daysToAdvance; i++) {
+                currentDate = advanceDate(currentDate);
+            }
+        } else {
+            // 方案二：如果AI未提供天數，則使用舊的跨日判斷邏輯
+            const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
+            const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
+            if (newTimeIndex < oldTimeIndex) {
+                currentDate = advanceDate(currentDate); // 日期+1
+            }
         }
         
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
@@ -140,7 +150,6 @@ router.post('/interact', async (req, res) => {
             aiResponse.roundData.timeOfDay = currentTimeOfDay;
             const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
-
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
@@ -150,7 +159,7 @@ router.post('/interact', async (req, res) => {
             const narrativeText = await getNarrative(modelName, aiResponse.roundData);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
-
+        
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
         res.json(aiResponse);
 
@@ -226,16 +235,15 @@ router.get('/get-novel', async (req, res) => {
             return res.json({ novel: [] });
         }
         
-        let isCacheable = true; // 【新增】快取標記
+        let isCacheable = true;
         const fallbackText = "在那一刻，時間的長河似乎出現了斷層...";
 
         const narrativePromises = snapshot.docs.map(async (doc) => {
             const roundData = doc.data();
             const narrativeText = await getNarrative('deepseek', roundData);
             
-            // 【新增】檢查AI回傳的內容是否為錯誤備用文字
             if (narrativeText.includes(fallbackText)) {
-                isCacheable = false; // 如果是，將標記設為false
+                isCacheable = false;
             }
 
             return {
@@ -246,7 +254,6 @@ router.get('/get-novel', async (req, res) => {
 
         const novelParagraphs = await Promise.all(narrativePromises);
         
-        // 【修改】只有在內容完整無誤時，才寫入快取
         if (isCacheable) {
             await novelCacheRef.set({ paragraphs: novelParagraphs });
         }
