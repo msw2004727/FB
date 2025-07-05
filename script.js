@@ -89,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 漢堡選單與主題切換 ---
     menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
     mainContent.addEventListener('click', (e) => {
-        // 如果點擊的不是 dashboard 內部或 menuToggle，就關閉側邊欄
         if (window.innerWidth <= 1024 && !document.getElementById('dashboard').contains(e.target) && e.target !== menuToggle && !menuToggle.contains(e.target)) {
             gameContainer.classList.remove('sidebar-open');
         }
@@ -206,16 +205,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
             
-            // 顯示主劇情
             updateUI(data.story, data.roundData, data.randomEvent);
             currentRound = data.roundData.R;
             
-            // 如果需要進入戰鬥
             if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
-                // 等待短暫時間讓玩家閱讀前情
                 setTimeout(() => {
                     startCombat(data.combatInfo.initialState);
-                }, 1500); // 1.5秒延遲
+                }, 1500);
             } else {
                  setLoadingState(false);
             }
@@ -244,12 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
         combatTitle.textContent = `遭遇強敵`;
         combatEnemies.textContent = `對手: ${enemyNames}`;
         
-        // 【修改】將戰鬥介紹顯示在頂部
-        combatLog.innerHTML = ''; // 清空舊日誌
+        combatLog.innerHTML = '';
         if (initialState.log && initialState.log.length > 0) {
             const introText = initialState.log[0];
             const introP = document.createElement('p');
-            introP.className = 'combat-intro-text'; // 給予特殊 class 方便未來設定樣式
+            introP.className = 'combat-intro-text';
             introP.innerHTML = introText.replace(/\n/g, '<br>');
             combatLog.appendChild(introP);
         }
@@ -280,16 +275,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendToCombatLog(data.finalLog, 'combat-summary');
                 setTimeout(() => {
                     endCombat(data.newRound || null);
-                }, 1500); // 給玩家一點時間看最後的結果
-                return; // 提前返回，避免 finally 過早執行
+                }, 1500); 
             }
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
-            setTimeout(() => endCombat(null), 1500); // 即使出錯，也延遲關閉
-            return; 
-        } 
-        
-        setLoadingState(false);
+            setTimeout(() => endCombat(null), 1500);
+        } finally {
+            // 【修改】將 setLoadingState(false) 移到 finally 區塊
+            // 但只在戰鬥還在進行時呼叫，避免過早啟用結束後的UI
+            if (isInCombat && !document.querySelector('.combat-summary')) {
+                 setLoadingState(false);
+            }
+        }
     }
 
     function endCombat(newRoundData) {
@@ -308,13 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         playerInput.disabled = false;
         submitButton.disabled = false;
+        setLoadingState(false); // 確保主介面和戰鬥介面的狀態都被重設
         playerInput.focus();
-        setLoadingState(false); // 確保主介面的讀取動畫被關閉
     }
     
-    function appendToCombatLog(text, className) {
+    function appendToCombatLog(text, className = '') {
         const p = document.createElement('p');
-        if (className) p.className = className;
+        p.className = className;
         p.innerHTML = text.replace(/\n/g, '<br>');
         combatLog.appendChild(p);
         combatLog.scrollTop = combatLog.scrollHeight;
@@ -393,12 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (!isLoading) {
-            if (isInCombat) {
-                combatInput.focus();
-            } else {
-                playerInput.focus();
-            }
+        if (!isLoading && !isInCombat) {
+            playerInput.focus();
         }
     }
     
