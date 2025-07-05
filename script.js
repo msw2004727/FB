@@ -18,9 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
-    // 【新增】獲取武功數值顯示元素
     const internalPowerEl = document.getElementById('internal-power-display');
     const externalPowerEl = document.getElementById('external-power-display');
+    // 【新增】獲取立場傾向計量棒的指示器元素
+    const moralityBarIndicator = document.getElementById('morality-bar-indicator');
     const npcContent = document.getElementById('npc-content');
     const itmContent = document.getElementById('itm-content');
     const qstContent = document.getElementById('qst-content');
@@ -212,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.gameState === 'deceased') {
                 showDeceasedScreen();
+                // 【修改】死亡時也要更新一次介面，顯示最終狀態
+                updateUI('', data.roundData || {});
                 return;
             }
             
@@ -272,7 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
             PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '',
             timeOfDay: '上午',
             internalPower: 5,
-            externalPower: 5
+            externalPower: 5,
+            morality: 0 // 【新增】新遊戲時，立場為中立
         });
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
@@ -298,11 +302,44 @@ document.addEventListener('DOMContentLoaded', () => {
         return highlightedText;
     }
 
-    function updateUI(storyText, data) {
-        const processedStory = highlightNpcNames(storyText, data.NPC);
-        appendMessageToStory(processedStory, 'story-text');
+    // 【新增】更新立場傾向計量棒的函式
+    function updateMoralityBar(moralityValue) {
+        if (moralityBarIndicator) {
+            // 將 -100 到 +100 的值轉換為 0% 到 100% 的百分比
+            const percentage = (moralityValue + 100) / 200 * 100;
+            moralityBarIndicator.style.left = `${percentage}%`;
 
-        roundTitleEl.textContent = data.EVT || `第 ${data.R} 回`;
+            // 根據值的正負和大小設定顏色
+            let colorVar;
+            if (moralityValue > 10) { // 略偏正義
+                colorVar = 'var(--morality-justice-light)';
+            } else if (moralityValue < -10) { // 略偏邪惡
+                colorVar = 'var(--morality-evil-light)';
+            } else { // 中立
+                colorVar = 'var(--morality-neutral-light)';
+            }
+            
+            // 深色主題下使用不同的變數
+            if (document.body.classList.contains('dark-theme')) {
+                 if (moralityValue > 10) {
+                    colorVar = 'var(--morality-justice-dark)';
+                } else if (moralityValue < -10) {
+                    colorVar = 'var(--morality-evil-dark)';
+                } else {
+                    colorVar = 'var(--morality-neutral-dark)';
+                }
+            }
+            moralityBarIndicator.style.backgroundColor = colorVar;
+        }
+    }
+
+    function updateUI(storyText, data) {
+        if (storyText) {
+            const processedStory = highlightNpcNames(storyText, data.NPC);
+            appendMessageToStory(processedStory, 'story-text');
+        }
+
+        roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
         
         const atmosphere = data.ATM?.[0] || '未知';
         const weather = data.WRD || '晴朗';
@@ -316,10 +353,13 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         pcContent.textContent = data.PC || '狀態穩定';
-        // 【新增】更新武功數值顯示
         internalPowerEl.textContent = `內功: ${data.internalPower || 0}`;
         externalPowerEl.textContent = `外功: ${data.externalPower || 0}`;
         
+        // 【新增】呼叫函式來更新立場計量棒
+        // 若 data.morality 未定義，則預設為 0
+        updateMoralityBar(data.morality === undefined ? 0 : data.morality);
+
         npcContent.innerHTML = '';
         if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
             data.NPC.forEach(npc => {
