@@ -24,14 +24,17 @@ const { getSummaryPrompt } = require('../prompts/summaryPrompt');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
+// 【新增】導入我們新建立的隨機事件指令稿
+const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
 
-// 【修改】統一的AI調度中心，增加 isJsonExpected 參數
+
+// 統一的AI調度中心，增加 isJsonExpected 參數
 async function callAI(modelName, prompt, isJsonExpected = false) {
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
         let textResponse = "";
         let options = {
-            model: "default", // 預設值
+            model: "default",
             messages: [{ role: "user", content: prompt }],
         };
 
@@ -79,7 +82,6 @@ function parseJsonResponse(text) {
 async function getNarrative(modelName, roundData) {
     const prompt = getNarrativePrompt(roundData);
     try {
-        // 不需要JSON
         return await callAI(modelName, prompt, false);
     } catch (error) {
         console.error("[AI 任務失敗] 小說家任務:", error);
@@ -91,7 +93,6 @@ async function getNarrative(modelName, roundData) {
 async function getAISummary(modelName, oldSummary, newRoundData) {
     const prompt = getSummaryPrompt(oldSummary, newRoundData);
     try {
-        // 需要JSON
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text).summary;
     } catch (error) {
@@ -104,7 +105,6 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
 async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality) {
     const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
     try {
-        // 需要JSON
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
@@ -117,11 +117,9 @@ async function getAIStory(modelName, longTermSummary, recentHistory, playerActio
 async function getAIPrequel(modelName, recentHistory) {
     const prompt = getPrequelPrompt(recentHistory);
     try {
-        // 不需要JSON
         const text = await callAI(modelName, prompt, false);
         return text;
-    } catch (error)
-        {
+    } catch (error) {
         console.error("[AI 任務失敗] 江湖說書人任務:", error);
         return "江湖說書人今日嗓子不適，未能道出前情提要...";
     }
@@ -131,7 +129,6 @@ async function getAIPrequel(modelName, recentHistory) {
 async function getAISuggestion(modelName, roundData) {
     const prompt = getSuggestionPrompt(roundData);
     try {
-        // 不需要JSON
         const text = await callAI(modelName, prompt, false);
         return text.replace(/["“”]/g, '');
     } catch (error) {
@@ -144,13 +141,26 @@ async function getAISuggestion(modelName, roundData) {
 async function getAIEncyclopedia(modelName, longTermSummary, username) {
     const prompt = getEncyclopediaPrompt(longTermSummary, username);
     try {
-        // 需要JSON
         const text = await callAI(modelName, prompt, true);
         const data = parseJsonResponse(text);
         return data.encyclopediaHtml;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖史官任務:", error);
         return `<div class="chapter"><h2 class="chapter-title">錯誤</h2><p class="entry-content">史官在翻閱你的記憶時遇到了困難，暫時無法完成編撰。</p></div>`;
+    }
+}
+
+// 【新增】任務七：生成隨機事件
+async function getAIRandomEvent(modelName, eventType, playerProfile) {
+    const prompt = getRandomEventPrompt(eventType, playerProfile);
+    try {
+        // 需要 JSON 回應
+        const text = await callAI(modelName, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 司命星君任務:", error);
+        // 如果AI失敗，回傳 null，讓後端知道無事發生
+        return null; 
     }
 }
 
@@ -162,5 +172,7 @@ module.exports = {
     getAIStory,
     getAIPrequel,
     getAISuggestion,
-    getAIEncyclopedia
+    getAIEncyclopedia,
+    // 【新增】匯出新的隨機事件函式
+    getAIRandomEvent
 };
