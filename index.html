@@ -50,8 +50,48 @@
                     </button>
                 </div>
             </div>
-            <div id="dashboard-content-wrapper" class="dashboard-content">
+            <div class="dashboard-content">
+                <div class="info-card welcome-card">
+                    <div id="welcome-message"></div>
                 </div>
+                <div class="info-card">
+                    <h4><i class="fas fa-brain-circuit"></i> AI 核心</h4>
+                    <div class="select-wrapper">
+                        <select id="ai-model-selector">
+                            <option value="gemini">Gemini (快 & 穩)</option>
+                            <option value="openai">GPT-4o (強 & 貴)</option>
+                            <option value="deepseek" selected>DeepSeek-V2 (強 & 奇)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
+                    <div id="pc-content">--</div>
+                    <div id="internal-power-display" style="margin-top: 0.5rem;">內功: --</div>
+                    <div id="external-power-display">外功: --</div>
+                </div>
+                <div class="info-card">
+                    <h4><i class="fas fa-users"></i> 人物見聞 (NPC)</h4>
+                    <div id="npc-content">--</div>
+                </div>
+                <div class="info-card">
+                    <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
+                    <div id="itm-content">--</div>
+                </div>
+                <div class="info-card">
+                    <h4><i class="fas fa-scroll"></i> 任務日誌 (QST)</h4>
+                    <div id="qst-content">--</div>
+                </div>
+                 <div class="info-card">
+                    <h4><i class="fas fa-brain"></i> 內心獨白 (PSY)</h4>
+                    <div id="psy-content">--</div>
+                </div>
+                <div class="info-card">
+                    <h4><i class="fas fa-key"></i> 關鍵線索 (CLS)</h4>
+                    <div id="cls-content">--</div>
+                </div>
+            </div>
         </aside>
 
         <div id="deceased-overlay" class="deceased-overlay">
