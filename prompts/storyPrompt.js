@@ -1,6 +1,6 @@
 // prompts/storyPrompt.js
 
-// 【修改】函式現在會接收完整的日期物件
+// 函式現在會接收完整的日期物件
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5 }, playerMorality = 0) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
@@ -26,7 +26,11 @@ ${longTermSummary}
 3.  **你的描述必須反映時辰與季節**：你的故事敘述必須與你決定的最終時辰相符。同時，你應根據當前月份（例如：1-3月為春，4-6月為夏...）來描述相應的季節特徵（例如「春暖花開」、「酷暑難耐」、「秋高氣爽」、「寒風刺骨」），讓世界更真實。
 4.  **【關鍵】時間判斷權力**：你現在擁有完全的時間控制權。你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`timeOfDay\` 的字串欄位。這個欄位的值必須是你判斷該回合行動結束後，**最終應該到達的時辰**。
     * 如果行動只花費很短時間（如說幾句話），\`timeOfDay\` 應回傳與行動前相同的時辰。
-    * 如果行動花費大量時間（如長途跋涉、練功、休息），你必須根據行動內容，決定一個合理的未來時辰並回傳。例如，從「上午」跋涉到鄰近城鎮，最終時辰可能是「中午」或「下午」。從「黃昏」休息到天亮，最終時辰應為「清晨」。
+    * 如果行動花費大量時間（如長途跋涉、練功、休息），你必須根據行動內容，決定一個合理的未來時辰並回傳。
+5.  **【新增】天數判斷建議**：如果玩家的行動明確暗示了**跨越多日**，你**應該**在 \`roundData\` 物件中額外提供一個名為 \`daysToAdvance\` 的**數字**欄位。
+    * 例如：玩家說「閉關七日」，你應回傳 \`"daysToAdvance": 7\`。
+    * 例如：玩家說「我要睡個好覺」，這通常指一夜，你應回傳 \`"daysToAdvance": 1\`。
+    * **如果玩家的行動沒有明確指明跨越多日，則「不要」包含 \`daysToAdvance\` 這個欄位。**
 
 ## 正邪系統 (非常重要)：
 1.  **玩家目前的立場傾向是：** ${playerMorality} (範圍從 -100 極惡 到 +100 極善，0為絕對中立)。
@@ -60,6 +64,7 @@ ${longTermSummary}
     - R: (數字) 新的回合編號
     - playerState: (字串) 玩家的存活狀態。只能是 'alive' (存活) 或 'dead' (死亡)。
     - timeOfDay: (字串) 行動結束後的最終時辰，必須是 ${JSON.stringify(timeSequence)} 之一。
+    - daysToAdvance: (可選的數字) 如果行動跨越多日，則提供此欄位。
     - powerChange: (物件) 武功數值的變化，格式為 {"internal": X, "external": Y}。
     - moralityChange: (數字) 正邪值的變化，可以是正數、負數或零。
     - ATM: (陣列) [氛圍, 感官細節]
