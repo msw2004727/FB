@@ -7,11 +7,9 @@ const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion, g
 
 const db = admin.firestore();
 
-// --- 【新增】時間與日期系統設定 ---
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // 索引0不用
 
-// 【新增】日期推進的輔助函式
 function advanceDate(currentDate) {
     let { year, month, day, yearName } = currentDate;
     day++;
@@ -21,7 +19,6 @@ function advanceDate(currentDate) {
         if (month > 12) {
             month = 1;
             year++;
-            // 這裡可以加入未來更新年號的邏輯
         }
     }
     return { year, month, day, yearName };
@@ -68,7 +65,6 @@ router.post('/interact', async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
-        // 【新增】讀取現有日期，若無則提供預設值
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
         let currentDate = {
             yearName: userProfile.yearName || '元祐',
@@ -98,7 +94,6 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【新增】將日期資訊也傳給AI
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
@@ -107,11 +102,10 @@ router.post('/interact', async (req, res) => {
         
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
 
-        // 【新增】日期推進判斷邏輯
         const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
         const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
         if (newTimeIndex < oldTimeIndex) {
-            currentDate = advanceDate(currentDate); // 如果跨日，則日期+1
+            currentDate = advanceDate(currentDate);
         }
         
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
@@ -122,7 +116,6 @@ router.post('/interact', async (req, res) => {
         let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
         
-        // 【新增】將所有更新的資料加入回傳物件
         Object.assign(aiResponse.roundData, {
             internalPower: newInternalPower,
             externalPower: newExternalPower,
@@ -131,7 +124,6 @@ router.post('/interact', async (req, res) => {
             ...currentDate
         });
 
-        // 【新增】一次性更新所有玩家狀態到資料庫
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -139,7 +131,6 @@ router.post('/interact', async (req, res) => {
             morality: newMorality,
             ...currentDate
         });
-
 
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
@@ -188,7 +179,6 @@ router.get('/latest-game', async (req, res) => {
         const recentHistory = snapshot.docs.map(doc => doc.data());
         const latestGameData = recentHistory[0];
 
-        // 【新增】載入遊戲時，一併讀取日期
         Object.assign(latestGameData, {
             timeOfDay: latestGameData.timeOfDay || userData.timeOfDay || '上午',
             internalPower: userData.internalPower || 5,
@@ -199,7 +189,6 @@ router.get('/latest-game', async (req, res) => {
             month: userData.month || 1,
             day: userData.day || 1
         });
-
 
         let prequel = null;
         if (recentHistory.length > 1) {
@@ -229,28 +218,41 @@ router.get('/get-novel', async (req, res) => {
         const novelCacheDoc = await novelCacheRef.get();
 
         if (novelCacheDoc.exists && novelCacheDoc.data().paragraphs) {
-            res.json({ novel: novelCacheDoc.data().paragraphs });
-        } else {
-            const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
-            if (snapshot.empty) {
-                return res.json({ novel: [] });
-            }
-            
-            const narrativePromises = snapshot.docs.map(async (doc) => {
-                const roundData = doc.data();
-                const narrativeText = await getNarrative('deepseek', roundData);
-                return {
-                    text: narrativeText,
-                    npcs: roundData.NPC || [] 
-                };
-            });
-
-            const novelParagraphs = await Promise.all(narrativePromises);
-            
-            await novelCacheRef.set({ paragraphs: novelParagraphs });
-            
-            res.json({ novel: novelParagraphs });
+            return res.json({ novel: novelCacheDoc.data().paragraphs });
+        } 
+        
+        const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+        if (snapshot.empty) {
+            return res.json({ novel: [] });
         }
+        
+        let isCacheable = true; // 【新增】快取標記
+        const fallbackText = "在那一刻，時間的長河似乎出現了斷層...";
+
+        const narrativePromises = snapshot.docs.map(async (doc) => {
+            const roundData = doc.data();
+            const narrativeText = await getNarrative('deepseek', roundData);
+            
+            // 【新增】檢查AI回傳的內容是否為錯誤備用文字
+            if (narrativeText.includes(fallbackText)) {
+                isCacheable = false; // 如果是，將標記設為false
+            }
+
+            return {
+                text: narrativeText,
+                npcs: roundData.NPC || [] 
+            };
+        });
+
+        const novelParagraphs = await Promise.all(narrativePromises);
+        
+        // 【修改】只有在內容完整無誤時，才寫入快取
+        if (isCacheable) {
+            await novelCacheRef.set({ paragraphs: novelParagraphs });
+        }
+        
+        res.json({ novel: novelParagraphs });
+        
     } catch (error) {
         console.error(`[UserID: ${userId}] /get-novel 錯誤:`, error);
         res.status(500).json({ message: "生成小說時出錯。" });
@@ -275,7 +277,6 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
-        // 【新增】重新開始時，一併刪除日期資料
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
@@ -308,9 +309,9 @@ router.post('/force-suicide', async (req, res) => {
 
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
+        
         const newRoundNumber = lastRound + 1;
         
-        // 【新增】在最終回合數據中也加入日期
         const finalRoundData = {
             R: newRoundNumber,
             playerState: 'dead',
