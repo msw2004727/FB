@@ -24,8 +24,9 @@ const { getSummaryPrompt } = require('../prompts/summaryPrompt');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
-// 【新增】導入我們新建立的隨機事件指令稿
 const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
+// 【新增】導入我們新建立的戰鬥指令稿
+const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 
 
 // 統一的AI調度中心，增加 isJsonExpected 參數
@@ -150,17 +151,32 @@ async function getAIEncyclopedia(modelName, longTermSummary, username) {
     }
 }
 
-// 【新增】任務七：生成隨機事件
+// 任務七：生成隨機事件
 async function getAIRandomEvent(modelName, eventType, playerProfile) {
     const prompt = getRandomEventPrompt(eventType, playerProfile);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 司命星君任務:", error);
+        return null; 
+    }
+}
+
+// 【新增】任務八：生成戰鬥回合結果
+async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
+    const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
         // 需要 JSON 回應
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
-        console.error("[AI 任務失敗] 司命星君任務:", error);
-        // 如果AI失敗，回傳 null，讓後端知道無事發生
-        return null; 
+        console.error("[AI 任務失敗] 戰鬥裁判任務:", error);
+        // 如果AI失敗，回傳一個表示錯誤的物件，讓後端能提示玩家重試
+        return { 
+            narrative: "[系統] 戰鬥發生混亂，裁判一時無法看清場上局勢，請你重新下達指令。",
+            combatOver: false
+        }; 
     }
 }
 
@@ -173,6 +189,7 @@ module.exports = {
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
-    // 【新增】匯出新的隨機事件函式
-    getAIRandomEvent
+    getAIRandomEvent,
+    // 【新增】匯出新的戰鬥函式
+    getAICombatAction
 };
