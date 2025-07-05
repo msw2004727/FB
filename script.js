@@ -18,9 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeStatusEl = document.getElementById('time-status');
     const aiModelSelector = document.getElementById('ai-model-selector');
     const pcContent = document.getElementById('pc-content');
-    const internalPowerEl = document.getElementById('internal-power-display');
-    const externalPowerEl = document.getElementById('external-power-display');
-    // 【新增】獲取立場傾向計量棒的指示器元素
+    
+    // 【修改】獲取新的內功外功進度條和數值元素
+    const internalPowerBar = document.getElementById('internal-power-bar');
+    const internalPowerValue = document.getElementById('internal-power-value');
+    const externalPowerBar = document.getElementById('external-power-bar');
+    const externalPowerValue = document.getElementById('external-power-value');
+    
     const moralityBarIndicator = document.getElementById('morality-bar-indicator');
     const npcContent = document.getElementById('npc-content');
     const itmContent = document.getElementById('itm-content');
@@ -213,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.gameState === 'deceased') {
                 showDeceasedScreen();
-                // 【修改】死亡時也要更新一次介面，顯示最終狀態
                 updateUI('', data.roundData || {});
                 return;
             }
@@ -276,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timeOfDay: '上午',
             internalPower: 5,
             externalPower: 5,
-            morality: 0 // 【新增】新遊戲時，立場為中立
+            morality: 0 
         });
         actionSuggestion.textContent = `書僮小聲說：試著探索一下四周環境吧。`;
     }
@@ -302,24 +305,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return highlightedText;
     }
 
-    // 【新增】更新立場傾向計量棒的函式
     function updateMoralityBar(moralityValue) {
         if (moralityBarIndicator) {
-            // 將 -100 到 +100 的值轉換為 0% 到 100% 的百分比
             const percentage = (moralityValue + 100) / 200 * 100;
             moralityBarIndicator.style.left = `${percentage}%`;
 
-            // 根據值的正負和大小設定顏色
             let colorVar;
-            if (moralityValue > 10) { // 略偏正義
+            if (moralityValue > 10) { 
                 colorVar = 'var(--morality-justice-light)';
-            } else if (moralityValue < -10) { // 略偏邪惡
+            } else if (moralityValue < -10) { 
                 colorVar = 'var(--morality-evil-light)';
-            } else { // 中立
+            } else { 
                 colorVar = 'var(--morality-neutral-light)';
             }
             
-            // 深色主題下使用不同的變數
             if (document.body.classList.contains('dark-theme')) {
                  if (moralityValue > 10) {
                     colorVar = 'var(--morality-justice-dark)';
@@ -332,6 +331,17 @@ document.addEventListener('DOMContentLoaded', () => {
             moralityBarIndicator.style.backgroundColor = colorVar;
         }
     }
+    
+    // 【新增】更新內外功進度條的函式
+    function updatePowerBar(barElement, valueElement, currentValue) {
+        const maxPower = 999;
+        if (barElement && valueElement) {
+            const percentage = Math.min((currentValue / maxPower) * 100, 100);
+            barElement.style.width = `${percentage}%`;
+            valueElement.textContent = `${currentValue}/${maxPower}`;
+        }
+    }
+
 
     function updateUI(storyText, data) {
         if (storyText) {
@@ -353,11 +363,13 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         pcContent.textContent = data.PC || '狀態穩定';
-        internalPowerEl.textContent = `內功: ${data.internalPower || 0}`;
-        externalPowerEl.textContent = `外功: ${data.externalPower || 0}`;
+
+        // 【修改】呼叫函式更新內功和外功進度條
+        const internal = data.internalPower === undefined ? 0 : data.internalPower;
+        const external = data.externalPower === undefined ? 0 : data.externalPower;
+        updatePowerBar(internalPowerBar, internalPowerValue, internal);
+        updatePowerBar(externalPowerBar, externalPowerValue, external);
         
-        // 【新增】呼叫函式來更新立場計量棒
-        // 若 data.morality 未定義，則預設為 0
         updateMoralityBar(data.morality === undefined ? 0 : data.morality);
 
         npcContent.innerHTML = '';
