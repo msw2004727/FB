@@ -251,7 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!actionText || isRequesting) return;
 
         combatInput.value = '';
-        // 【修改】直接呼叫 setLoadingState 來控制戰鬥載入動畫
         setLoadingState(true); 
         appendToCombatLog(`> ${actionText}`);
 
@@ -268,11 +267,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
                 appendToCombatLog(data.finalLog, 'combat-summary');
-                // 【修改】增加對 newRound 物件的檢查
                 if (data.newRound) {
                     endCombat(data.newRound);
                 } else {
-                    // 如果後端沒提供新回合資料，也確保能安全退出
                     console.error("戰鬥結束，但後端未提供 newRound 資料。");
                     endCombat(null); 
                 }
@@ -280,13 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
         } finally {
-            // 【修改】無論成功或失敗，都隱藏載入動畫
             setLoadingState(false);
         }
     }
 
     function endCombat(newRoundData) {
-        // 【修改】增加對傳入資料的檢查
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             currentRound = newRoundData.roundData.R;
             updateUI(newRoundData.story, newRoundData.roundData, null);
@@ -294,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionSuggestion.textContent = `書僮小聲說：${newRoundData.suggestion}`;
             }
         } else {
-            // 如果資料有問題，只顯示提示，避免程式崩潰
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
 
@@ -366,7 +360,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
 
-        // 根據是否在戰鬥中，決定要操作哪個 UI
         if (isInCombat) {
             combatInput.disabled = isLoading;
             combatActionButton.disabled = isLoading;
@@ -433,7 +426,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (npcs && Array.isArray(npcs) && npcs.length > 0) {
             const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
             sortedNpcs.forEach(npc => {
-                // 【修改】使用 npc.friendliness 來動態生成 class
                 const regex = new RegExp(npc.name, 'g');
                 const replacement = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>`;
                 highlightedText = highlightedText.replace(regex, replacement);
@@ -514,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const lightness = data.lightness === undefined ? 0 : data.lightness;
 
         updatePowerBar(internalPowerBar, internalPowerValue, internal);
-        updatePowerBar(externalPowerBar, externalValue, external);
+        updatePowerBar(externalPowerBar, externalPowerValue, external);
         updatePowerBar(lightnessPowerBar, lightnessPowerValue, lightness);
         
         updateMoralityBar(data.morality === undefined ? 0 : data.morality);
@@ -523,7 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
             data.NPC.forEach(npc => {
                 const npcLine = document.createElement('div');
-                // 【修改】使用 npc.friendliness 來動態生成 class
                 npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
                 npcContent.appendChild(npcLine);
             });
