@@ -205,15 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '後端伺服器發生未知錯誤');
             
-            // 無論如何，先更新UI和回合數
             updateUI(data.story, data.roundData, data.randomEvent);
             currentRound = data.roundData.R;
             
-            // 如果需要進入戰鬥，則呼叫戰鬥流程
             if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
                 startCombat(data.combatInfo.initialState);
             } else {
-                // 如果不進入戰鬥，則直接解除鎖定
                  setLoadingState(false);
             }
             
@@ -247,7 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
             appendToCombatLog(introText, 'combat-intro-text');
         }
         
-        // 解除主介面的載入狀態，因為現在焦點在戰鬥視窗
         setLoadingState(false); 
         combatInput.focus();
     }
@@ -264,24 +260,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${backendBaseUrl}/api/game/combat-action`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ action: actionText })
+                // 【修改】將當前選擇的 AI 模型一起傳送給後端
+                body: JSON.stringify({ 
+                    action: actionText, 
+                    model: aiModelSelector.value 
+                })
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '戰鬥中發生錯誤');
 
             if (data.status === 'COMBAT_ONGOING') {
                 appendToCombatLog(data.narrative);
-                setLoadingState(false); // 繼續戰鬥，解除鎖定
+                setLoadingState(false);
             } else if (data.status === 'COMBAT_END') {
                 appendToCombatLog(data.finalLog, 'combat-summary');
-                // 延遲關閉，讓玩家看清最後一擊
                 setTimeout(() => {
                     endCombat(data.newRound || null);
                 }, 2000); 
             }
         } catch (error) {
             appendToCombatLog(`[系統錯誤] ${error.message}`);
-            // 即使出錯，也要確保能關閉
             setTimeout(() => endCombat(null), 2000);
         }
     }
@@ -300,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
         combatModal.classList.remove('visible');
         isInCombat = false;
         
-        // 確保所有相關的UI都恢復正常
         setLoadingState(false); 
         playerInput.focus();
     }
