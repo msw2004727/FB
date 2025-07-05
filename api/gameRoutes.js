@@ -3,7 +3,10 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
-const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion } = require('../services/aiService');
+// 【新增】引入世界觀管理器
+const { loadPrompts } = require('../services/worldviewManager');
+
+const { getAIStory, getAISummary, getAIPrequel, getNarrative, getAISuggestion } = require('../services/aiService');
 
 const db = admin.firestore();
 
@@ -25,9 +28,12 @@ router.post('/interact', async (req, res) => {
         if (userProfile.isDeceased) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
+        
+        // 【已修改】從使用者資料讀取世界觀，如果沒有則使用預設值
+        const worldview = userProfile.worldview || 'wuxia';
+        const prompts = loadPrompts(worldview); // 動態載入對應的 Prompts
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        // 【新增】讀取玩家武功數值
         const playerPower = {
             internal: userProfile.internalPower || 5,
             external: userProfile.externalPower || 5
@@ -48,8 +54,7 @@ router.post('/interact', async (req, res) => {
             }
         }
         
-        // 【修改】將武功數值傳給AI
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower);
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, userProfile, username, currentTimeOfDay, playerPower, prompts.getStoryPrompt);
         if (!aiResponse) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = currentRound + 1;
@@ -63,16 +68,13 @@ router.post('/interact', async (req, res) => {
         }
         aiResponse.roundData.timeOfDay = nextTimeOfDay;
 
-        // 【新增】處理武功數值變化
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
         
-        // 將更新後的數值加入回傳資料
         aiResponse.roundData.internalPower = newInternalPower;
         aiResponse.roundData.externalPower = newExternalPower;
         
-        // 一次性更新所有玩家狀態
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -86,16 +88,16 @@ router.post('/interact', async (req, res) => {
             await userDocRef.update({ isDeceased: true });
             aiResponse.suggestion = "你的江湖路已到盡頭...";
             aiResponse.roundData.timeOfDay = currentTimeOfDay;
-            const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
+            const deathNarrative = await getNarrative(modelName, aiResponse.roundData, prompts.getNarrativePrompt);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
 
         } else {
-            const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
+            const suggestion = await getAISuggestion(modelName, aiResponse.roundData, prompts.getSuggestionPrompt);
             aiResponse.suggestion = suggestion;
-            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
+            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData, prompts.getSummaryPrompt);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
             
-            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
+            const narrativeText = await getNarrative(modelName, aiResponse.roundData, prompts.getNarrativePrompt);
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
@@ -114,21 +116,30 @@ router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.data();
+        const userData = userDoc.exists ? userDoc.data() : {};
 
         if (userData && userData.isDeceased) {
             return res.json({ gameState: 'deceased' });
         }
         
+        const worldview = userData.worldview || 'wuxia';
+        const prompts = loadPrompts(worldview);
+
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(7).get();
         if (snapshot.empty) {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
         
-        const recentHistory = snapshot.docs.map(doc => doc.data());
+        const recentHistory = snapshot.docs
+            .map(doc => doc.data())
+            .filter(data => data != null);
+
+        if (recentHistory.length === 0) {
+            return res.status(404).json({ message: '找不到有效的存檔紀錄。' });
+        }
+
         const latestGameData = recentHistory[0];
 
-        // 【新增】加入武功數值
         latestGameData.timeOfDay = latestGameData.timeOfDay || userData.timeOfDay || '上午';
         latestGameData.internalPower = userData.internalPower || 5;
         latestGameData.externalPower = userData.externalPower || 5;
@@ -136,14 +147,16 @@ router.get('/latest-game', async (req, res) => {
         let prequel = null;
         if (recentHistory.length > 1) {
             const historyForPrequel = [...recentHistory].reverse();
-            prequel = await getAIPrequel('deepseek', historyForPrequel);
+            prequel = await getAIPrequel('deepseek', historyForPrequel, prompts.getPrequelPrompt);
         }
         
-        const suggestion = await getAISuggestion('deepseek', latestGameData);
+        const suggestion = await getAISuggestion('deepseek', latestGameData, prompts.getSuggestionPrompt);
+
+        const locationName = latestGameData?.LOC?.[0] || '一個未知的地方';
 
         res.json({
             prequel: prequel,
-            story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
+            story: `[進度已讀取] 你回到了 ${locationName}，繼續你的冒險...`,
             roundData: latestGameData,
             suggestion: suggestion
         });
@@ -157,6 +170,11 @@ router.get('/latest-game', async (req, res) => {
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const worldview = userData.worldview || 'wuxia';
+        const prompts = loadPrompts(worldview);
+
         const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
         const novelCacheDoc = await novelCacheRef.get();
 
@@ -170,7 +188,7 @@ router.get('/get-novel', async (req, res) => {
             
             const narrativePromises = snapshot.docs.map(async (doc) => {
                 const roundData = doc.data();
-                const narrativeText = await getNarrative('deepseek', roundData);
+                const narrativeText = await getNarrative('deepseek', roundData, prompts.getNarrativePrompt);
                 return {
                     text: narrativeText,
                     npcs: roundData.NPC || [] 
@@ -207,7 +225,6 @@ router.post('/restart', async (req, res) => {
         
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
-        // 【新增】重置武功數值
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
             timeOfDay: admin.firestore.FieldValue.delete(),
@@ -230,6 +247,9 @@ router.post('/force-suicide', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
+        
+        const worldview = userProfile.worldview || 'wuxia';
+        const prompts = loadPrompts(worldview);
 
         await userDocRef.update({ isDeceased: true });
 
@@ -257,7 +277,7 @@ router.post('/force-suicide', async (req, res) => {
             IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
         };
 
-        const finalNarrative = await getNarrative('deepseek', finalRoundData);
+        const finalNarrative = await getNarrative('deepseek', finalRoundData, prompts.getNarrativePrompt);
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
         await novelCacheRef.set({ 
             paragraphs: admin.firestore.FieldValue.arrayUnion({ text: finalNarrative, npcs: [] }) 
