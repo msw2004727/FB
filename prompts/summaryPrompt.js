@@ -11,6 +11,7 @@ const getSummaryPrompt = (oldSummary, newRoundData) => `
 
 1.  **人際關係 (NPC Relations):**
     * 記錄與NPC首次相遇的場景與原因。
+    * **【重要】首次遇到NPC時，必須記錄其「個性標籤」(personality)，並在後續更新中永久保留此標籤。** 例如：「王大夫 (personality: '仁厚') 是無名村的郎中...」。
     * 關係的轉變必須被記錄，例如：因為「主角救了小蓮」，所以「小蓮對主角的友好度從 neutral 變為 friendly」。
     * 記錄NPC的關鍵狀態變化，例如「王大夫身中劇毒」、「李鐵匠失蹤了」。
 
