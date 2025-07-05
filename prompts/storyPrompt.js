@@ -1,6 +1,6 @@
 // prompts/storyPrompt.js
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5 }) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5 }, playerMorality = 0) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -15,6 +15,19 @@ ${longTermSummary}
 1.  **時代背景**: 這是一個類似金庸小說世界觀的宋朝，架空的金庸武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節，各種驚險與傳說故事。
 2.  **主角設定**: 主角是一個從21世紀現代社會，靈魂穿越到這個世界的年輕人。${protagonistDescription} 這具身體骨骼清奇、經脈異於常人，是萬中無一的練武奇才，但因為不明原因，正處於重傷瀕死的狀態。
 3.  **開場地點**: 主角目前在一個名為「無名村」的偏遠小村落。這個村莊地處偏僻，但周圍的山賊、惡霸、甚至不入流的小門派等惡勢力橫行，村民長年受到脅迫，生活困苦。
+
+## 正邪系統 (非常重要)：
+1.  **玩家目前的立場傾向是：** ${playerMorality} (範圍從 -100 極惡 到 +100 極善，0為絕對中立)。
+2.  **你必須將此數值作為核心判斷依據**：當生成NPC的反應、事件的走向、甚至角色的內心獨白時，都要考慮到這個立場傾向。
+    * **高正義值 (+50 ~ +100)**：玩家會被認為是義士、大俠。NPC可能會主動尋求幫助，官府可能會視你為友，但邪派人士會對你抱有敵意。
+    * **略偏正義 (+1 ~ +49)**：玩家的行為傾向於行俠仗義，會獲得善良NPC的好感。
+    * **中立 (0)**：玩家的行為不偏不倚，NPC會根據你的具體行動來判斷你的為人。
+    * **略偏邪惡 (-1 ~ -49)**：玩家為達目的不擇手段，可能會吸引一些邪道中人，正派人士會對你抱持警惕。
+    * **高邪惡值 (-50 ~ -100)**：玩家被視為魔頭、惡霸。正派人士會追殺你，但你可能會在黑道中建立威望，或讓普通人感到恐懼。
+3.  **立場不是標籤，而是氛圍**：不要在故事中直接說「因為你是個好人」，而是要透過NPC的言行（例如「像您這樣的大俠...」）或事件的發展（例如「村民們聽聞你的義舉，紛紛送來食物」）來體現。
+4.  **立場變化判斷**：你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`moralityChange\` 的數值欄位，代表本回合玩家的行動對其立場造成的變化。
+    * 例如：拯救無辜，\`moralityChange\` 應為正值 (如 \`10\`)。偷竊或傷害無辜，應為負值 (如 \`-15\`)。
+    * 若行動無關道德，則回傳 \`0\`。
 
 ## 武功規則 (非常重要)：
 1.  **玩家目前的武功修為是：** 內功: ${playerPower.internal} / 999, 外功: ${playerPower.external} / 999。
@@ -42,6 +55,7 @@ ${longTermSummary}
     - playerState: (字串) 玩家的存活狀態。只能是 'alive' (存活) 或 'dead' (死亡)。
     - shouldAdvanceTime: (布林) 是否要推進到下一個時辰 (true/false)。
     - powerChange: (物件) 武功數值的變化，格式為 {"internal": X, "external": Y}。
+    - moralityChange: (數字) 正邪值的變化，可以是正數、負數或零。
     - ATM: (陣列) [氛圍, 感官細節]
     - EVT: (字串) 事件摘要
     - LOC: (陣列) [地點名稱, {地點狀態}]
