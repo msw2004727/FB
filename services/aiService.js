@@ -17,14 +17,26 @@ const deepseek = new OpenAI({
     baseURL: "https://api.deepseek.com/v1",
 });
 
-// 4. 【新增】Grok
+// 4. Grok
 const grok = new OpenAI({
     apiKey: process.env.GROK_API_KEY,
     baseURL: "https://api.x.ai/v1",
 });
 
 
-// 統一的AI調度中心，增加 isJsonExpected 參數
+// --- 從 prompts 資料夾導入腳本 ---
+const { getStoryPrompt } = require('../prompts/storyPrompt');
+const { getNarrativePrompt } = require('../prompts/narrativePrompt');
+const { getSummaryPrompt } = require('../prompts/summaryPrompt');
+const { getPrequelPrompt } = require('../prompts/prequelPrompt');
+const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
+const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
+const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
+// 【修正】補上遺漏的戰鬥指令稿導入
+const { getCombatPrompt } = require('../prompts/combatPrompt.js');
+
+
+// 統一的AI調度中心
 async function callAI(modelName, prompt, isJsonExpected = false) {
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
@@ -51,9 +63,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 const deepseekResult = await deepseek.chat.completions.create(options);
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
-            // 【新增】Grok 的處理邏輯
             case 'grok':
-                options.model = "grok-3-mini"; // 使用 grok-3-mini 模型
+                options.model = "grok-3-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -167,16 +178,14 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
     }
 }
 
-// 【新增】任務八：生成戰鬥回合結果
+// 任務八：生成戰鬥回合結果
 async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
-        // 需要 JSON 回應
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 戰鬥裁判任務:", error);
-        // 如果AI失敗，回傳一個表示錯誤的物件，讓後端能提示玩家重試
         return { 
             narrative: "[系統] 戰鬥發生混亂，裁判一時無法看清場上局勢，請你重新下達指令。",
             combatOver: false
@@ -194,6 +203,5 @@ module.exports = {
     getAISuggestion,
     getAIEncyclopedia,
     getAIRandomEvent,
-    // 【新增】匯出新的戰鬥函式
     getAICombatAction
 };
