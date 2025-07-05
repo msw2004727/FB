@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageElement = document.getElementById('message');
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 
-    // --- 【新增】主題切換邏輯 ---
+    // --- 主題切換邏輯 (保留您檔案中的原樣) ---
     const bodyElement = document.body;
     const worldviewSelector = document.getElementById('worldview');
     const authTitle = document.querySelector('.auth-title');
@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const themeConfig = {
         wuxia: {
-            className: '', // 武俠是預設，不需要額外的 class
+            className: '',
             title: '初入江湖',
             buttonText: '拜入師門'
         },
@@ -38,13 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.textContent = selectedTheme.buttonText;
     }
 
-    if (worldviewSelector) { // 確保只在註冊頁面執行
+    if (worldviewSelector) {
         worldviewSelector.addEventListener('change', (e) => {
             setTheme(e.target.value);
         });
         setTheme(worldviewSelector.value);
     }
-    // --- 主題切換邏輯結束 ---
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -55,11 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = document.getElementById('username').value.trim();
         const gender = document.getElementById('gender').value;
         const password = document.getElementById('password').value.trim();
+        const worldview = worldviewSelector.value;
 
-        // 在提交時再次獲取世界觀的值
-        const worldview = document.getElementById('worldview') ? document.getElementById('worldview').value : 'wuxia';
-
-        if (!username || !gender || !password) {
+        if (!username || !gender || !password || !worldview) {
             messageElement.textContent = '所有欄位皆為必填。';
             messageElement.classList.add('error');
             return;
@@ -78,12 +75,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || '發生未知錯誤');
             }
 
-            messageElement.textContent = data.message + ' 正在將您導向登入頁面...';
+            // --- 【修改】註冊成功後的流程 ---
+            // 1. 顯示成功訊息
+            messageElement.textContent = data.message + ' 正在進入遊戲世界...';
             messageElement.classList.add('success');
 
+            // 2. 將獲取到的 token 和 username 存入 localStorage
+            localStorage.setItem('jwt_token', data.token);
+            localStorage.setItem('username', data.username);
+
+            // 3. 直接跳轉到遊戲主頁面
             setTimeout(() => {
-                window.location.href = 'login.html';
-            }, 2000);
+                window.location.href = 'index.html';
+            }, 1500);
 
         } catch (error) {
             console.error('註冊失敗:', error);
