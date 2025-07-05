@@ -3,7 +3,16 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
-const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion, getAIEncyclopedia } = require('../services/aiService');
+const { 
+    getAIStory, 
+    getAISummary, 
+    getNarrative, 
+    getAIPrequel, 
+    getAISuggestion, 
+    getAIEncyclopedia, 
+    getAIRandomEvent,
+    getAICombatAction 
+} = require('../services/aiService');
 
 const db = admin.firestore();
 
@@ -22,6 +31,27 @@ function advanceDate(currentDate) {
         }
     }
     return { year, month, day, yearName };
+}
+
+function applyItemChanges(currentItems, itemChangeString) {
+    let items = currentItems ? currentItems.split('、').filter(i => i) : [];
+    if (!itemChangeString) return items.join('、');
+
+    const changes = itemChangeString.split('、');
+    changes.forEach(change => {
+        change = change.trim();
+        if (change.startsWith('+')) {
+            const newItem = change.substring(1).trim();
+            items.push(newItem);
+        } else if (change.startsWith('-')) {
+            const itemToRemove = change.substring(1).trim();
+            const index = items.indexOf(itemToRemove);
+            if (index > -1) {
+                items.splice(index, 1);
+            }
+        }
+    });
+    return items.filter(Boolean).join('、');
 }
 
 router.use(authMiddleware);
@@ -72,7 +102,6 @@ router.post('/interact', async (req, res) => {
             month: userProfile.month || 1,
             day: userProfile.day || 1
         };
-        // 【新增】讀取隨機事件計數器
         let turnsSinceEvent = userProfile.turnsSinceEvent || 0;
 
         const playerPower = {
@@ -116,55 +145,81 @@ router.post('/interact', async (req, res) => {
                 currentDate = advanceDate(currentDate);
             }
         }
-        // --- 【新增】戰鬥模式觸發檢查 ---
+        
+        turnsSinceEvent++;
+        
+        let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
+        let moralityChange = aiResponse.roundData.moralityChange || 0;
+        let newPlayerStateDescription = aiResponse.roundData.PC;
+        let newItemChange = aiResponse.roundData.ITM;
+
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
             
-            // 建立初始戰鬥狀態
             const combatState = {
-                turn: 0, // 戰鬥回合數
-                player: {
-                    username: username,
-                    // 未來可以從 userProfile 中讀取更多玩家戰鬥數值
-                },
-                enemies: aiResponse.roundData.combatants, // 使用AI提供的敵人列表
-                log: [`戰鬥開始：你遭遇了 ${aiResponse.roundData.combatants.map(c => c.name).join('、')}！`] // 戰鬥日誌
+                turn: 1,
+                player: { username: username },
+                enemies: aiResponse.roundData.combatants,
+                log: [`戰鬥開始：你遭遇了 ${aiResponse.roundData.combatants.map(c => c.name).join('、')}！`]
             };
 
-            // 將初始戰鬥狀態存入資料庫
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
 
-            // 【重要】修改回傳給前端的資料結構
-            // 我們在 aiResponse 上附加一個新的鍵 combatInfo，通知前端戰鬥開始
             aiResponse.combatInfo = {
                 status: 'COMBAT_START',
                 initialState: combatState
             };
-        }
-        
-        // 【新增】每回合後，計數器+1
-        turnsSinceEvent++;
-        
-        // 【新增】隨機事件觸發邏輯 (包含「無事發生」的機率)
-        if (turnsSinceEvent >= 3) {
-            // 第一層搖骰：決定是否發生事件 (60% 機率發生)
+            
+            turnsSinceEvent = 0; 
+        } 
+        else if (turnsSinceEvent >= 3) {
             if (Math.random() < 0.6) {
-                console.log(`[事件系統] 玩家 ${username} 觸發隨機事件！`);
-                // 這部分會在後續步驟中，替換成真正呼叫AI生成事件的邏輯
+                const r = Math.random();
+                let eventType;
+                if (r < 0.4) eventType = '一個小小的正面事件';
+                else if (r < 0.6) eventType = '一個中等的正面事件';
+                else if (r < 0.9) eventType = '一個小小的負面事件';
+                else eventType = '一個中等的負面事件';
+                
+                console.log(`[事件系統] 玩家 ${username} 觸發隨機事件: ${eventType}`);
+
+                const eventData = await getAIRandomEvent('deepseek', eventType, {
+                    username: username,
+                    location: aiResponse.roundData.LOC[0],
+                    playerState: newPlayerStateDescription,
+                    morality: playerMorality + moralityChange 
+                });
+
+                if (eventData && eventData.effects) {
+                    console.log('[事件系統] 事件效果:', eventData.effects);
+                    if(eventData.effects.powerChange) {
+                        powerChange.internal += (eventData.effects.powerChange.internal || 0);
+                        powerChange.external += (eventData.effects.powerChange.external || 0);
+                    }
+                    if(eventData.effects.moralityChange) {
+                        moralityChange += eventData.effects.moralityChange;
+                    }
+                    if(eventData.effects.PC) {
+                        newPlayerStateDescription += ` ${eventData.effects.PC}`;
+                    }
+                    if(eventData.effects.ITM) {
+                        newItemChange = applyItemChanges(newItemChange, eventData.effects.ITM);
+                    }
+                    aiResponse.randomEvent = { description: eventData.description };
+                }
             } else {
                 console.log(`[事件系統] 玩家 ${username} 本回合無事發生。`);
             }
-            // 無論是否發生事件，都重置計數器
             turnsSinceEvent = 0;
         }
 
-        const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
-        
-        const moralityChange = aiResponse.roundData.moralityChange || 0;
         let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
+
+        aiResponse.roundData.PC = newPlayerStateDescription;
+        aiResponse.roundData.ITM = newItemChange;
         
         Object.assign(aiResponse.roundData, {
             internalPower: newInternalPower,
@@ -174,7 +229,6 @@ router.post('/interact', async (req, res) => {
             ...currentDate
         });
 
-        // 【新增】更新資料庫時，也一併更新事件計數器
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -183,7 +237,7 @@ router.post('/interact', async (req, res) => {
             turnsSinceEvent: turnsSinceEvent,
             ...currentDate
         });
-
+        
         const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
 
         if (aiResponse.roundData.playerState === 'dead') {
@@ -194,7 +248,7 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
-            aiResponse.suggestion = suggestion;
+aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
             
@@ -208,6 +262,71 @@ router.post('/interact', async (req, res) => {
     } catch (error) {
         console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
         res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
+    }
+});
+
+router.post('/combat-action', async (req, res) => {
+    const userId = req.user.id;
+    const { action } = req.body;
+
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const combatDocRef = userDocRef.collection('game_state').doc('current_combat');
+        
+        const combatDoc = await combatDocRef.get();
+        if (!combatDoc.exists) {
+            return res.status(404).json({ message: "戰鬥不存在或已結束。" });
+        }
+
+        let combatState = combatDoc.data();
+        combatState.log.push(`> ${action}`);
+
+        const userDoc = await userDocRef.get();
+        const playerProfile = userDoc.exists ? userDoc.data() : {};
+
+        const combatResult = await getAICombatAction('deepseek', playerProfile, combatState, action);
+
+        if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
+
+        combatState.log.push(combatResult.narrative);
+        combatState.turn++;
+
+        if (combatResult.combatOver) {
+            console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 的戰鬥已結束。`);
+            
+            const changes = combatResult.outcome.playerChanges;
+            let finalUpdate = {};
+
+            if (changes.powerChange) {
+                finalUpdate.internalPower = playerProfile.internalPower + (changes.powerChange.internal || 0);
+                finalUpdate.externalPower = playerProfile.externalPower + (changes.powerChange.external || 0);
+            }
+            if (changes.moralityChange) {
+                finalUpdate.morality = playerProfile.morality + changes.moralityChange;
+            }
+            
+            await userDocRef.update(finalUpdate);
+            
+            await combatDocRef.delete();
+            
+            res.json({
+                status: 'COMBAT_END',
+                log: combatState.log,
+                outcome: combatResult.outcome
+            });
+
+        } 
+        else {
+            await combatDocRef.set(combatState);
+            res.json({
+                status: 'COMBAT_ONGOING',
+                narrative: combatResult.narrative
+            });
+        }
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /combat-action 錯誤:`, error);
+        res.status(500).json({ message: error.message || "戰鬥中發生未知錯誤" });
     }
 });
 
@@ -336,7 +455,6 @@ router.post('/restart', async (req, res) => {
             month: admin.firestore.FieldValue.delete(),
             day: admin.firestore.FieldValue.delete(),
             yearName: admin.firestore.FieldValue.delete(),
-            // 【新增】重置時清除事件計數器
             turnsSinceEvent: admin.firestore.FieldValue.delete()
         });
         
