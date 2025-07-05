@@ -6,6 +6,8 @@ const getEncyclopediaPrompt = (longTermSummary, username) => {
 
 你的輸出必須是一個單一的 JSON 物件，格式為 {"encyclopediaHtml": "你的HTML內容..."}。絕對不要在 JSON 物件前後添加任何額外文字或 "\`\`\`" 標記。
 
+**【語言鐵律】**: 你生成的 HTML 中，所有使用者可見的文字都必須只包含「繁體中文」。絕對禁止使用任何簡體中文、英文或表情符號。
+
 ## 百科編纂核心準則：
 
 你必須將摘要中的所有資訊，歸納到以下四大類別中。如果某個類別沒有對應的資訊，則顯示「尚無記載」。請使用 'chapter' 'chapter-title' 'entry' 'entry-title' 'entry-content' 等 class 來建構你的 HTML。
