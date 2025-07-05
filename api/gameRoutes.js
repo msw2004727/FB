@@ -3,16 +3,15 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
-// 【修改】從 aiService 導入新的 getAIEncyclopedia 函式
 const { getAIStory, getAISummary, getNarrative, getAIPrequel, getAISuggestion, getAIEncyclopedia } = require('../services/aiService');
 
 const db = admin.firestore();
 
-const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
+// 【移除】不再需要後端的時間序列
+// const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 
 router.use(authMiddleware);
 
-// 【新增】獲取江湖百科的 API 路由
 router.get('/get-encyclopedia', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -26,7 +25,6 @@ router.get('/get-encyclopedia', async (req, res) => {
 
         const longTermSummary = summaryDoc.data().text;
         
-        // 使用我們新建立的 AI 服務來生成百科內容
         const encyclopediaHtml = await getAIEncyclopedia('gemini', longTermSummary, username);
         
         res.json({ encyclopediaHtml });
@@ -81,13 +79,10 @@ router.post('/interact', async (req, res) => {
         const newRoundNumber = currentRound + 1;
         aiResponse.roundData.R = newRoundNumber;
 
-        let nextTimeOfDay = currentTimeOfDay;
-        if (aiResponse.roundData.shouldAdvanceTime) {
-            const currentIndex = timeSequence.indexOf(currentTimeOfDay);
-            const nextIndex = (currentIndex + 1) % timeSequence.length;
-            nextTimeOfDay = timeSequence[nextIndex];
-        }
-        aiResponse.roundData.timeOfDay = nextTimeOfDay;
+        // --- 【修改】時間處理邏輯 ---
+        // 直接從 AI 的回應中獲取最終時辰，不再自己計算
+        const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
+        // --------------------------
 
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0 };
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
@@ -101,6 +96,7 @@ router.post('/interact', async (req, res) => {
         aiResponse.roundData.externalPower = newExternalPower;
         aiResponse.roundData.morality = newMorality;
         
+        // 更新資料庫時，也直接使用 AI 決定的時辰
         await userDocRef.update({ 
             timeOfDay: nextTimeOfDay,
             internalPower: newInternalPower,
@@ -128,6 +124,8 @@ router.post('/interact', async (req, res) => {
             await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
 
+        // 確保回傳給前端的 roundData 包含最新的時辰
+        aiResponse.roundData.timeOfDay = nextTimeOfDay;
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
         res.json(aiResponse);
