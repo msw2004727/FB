@@ -17,7 +17,6 @@
     --dark-accent: #c3a98a;
     --dark-border: #444;
 
-    /* 【新增】定義立場顏色變數 */
     --morality-evil-light: #dc3545;
     --morality-justice-light: #007bff;
     --morality-neutral-light: #6c757d;
@@ -25,7 +24,6 @@
     --morality-justice-dark: #4dabf7;
     --morality-neutral-dark: #9e9e9e;
 
-    /* 【新增】定義內功外功顏色變數 */
     --internal-power-color-light: #0d6efd;
     --external-power-color-light: #198754;
     --internal-power-color-dark: #3b82f6;
@@ -185,8 +183,17 @@ body.dark-theme .auth-switch a {
 body.dark-theme .dashboard { background-color: var(--dark-bg); border-left: 1px solid var(--dark-border); }
 .menu-toggle { display: none; position: fixed; top: 15px; right: 15px; z-index: 1001; background: var(--light-surface-bg); color: var(--light-text-primary); border: 1px solid var(--light-border); border-radius: 50%; width: 45px; height: 45px; font-size: 1.2rem; cursor: pointer; }
 body.dark-theme .menu-toggle { background: var(--dark-surface-bg); color: var(--dark-text-primary); border: 1px solid var(--dark-border); }
-.story-header { padding: 0.5rem 2rem; border-bottom: 1px solid var(--light-border); }
+
+/* 【修改】為 story-header 添加相對定位和動畫效果 */
+.story-header { 
+    position: relative; /* 為了讓收折按鈕能相對於它定位 */
+    padding: 0.5rem 2rem; 
+    border-bottom: 1px solid var(--light-border); 
+    z-index: 10;
+    transition: transform 0.4s ease-out, padding 0.4s ease-out; /* 動畫效果 */
+}
 body.dark-theme .story-header { border-bottom: 1px solid var(--dark-border); }
+
 .status-bar { display: flex; flex-wrap: wrap; gap: 1.5rem; color: var(--light-text-secondary); font-family: var(--font-sans); font-size: 0.9rem; }
 body.dark-theme .status-bar { color: var(--dark-text-secondary); }
 .status-item i { margin-right: 0.5rem; }
@@ -232,7 +239,7 @@ body.dark-theme .prequel-summary h3 {
 }
 
 
-/* 【已修改】為提示詞的絕對定位提供基準 */
+/* 為提示詞的絕對定位提供基準 */
 .story-footer {
     position: relative; 
     border-top: 1px solid var(--light-border);
@@ -277,10 +284,9 @@ body.dark-theme #submit-button { border-left: 1px solid var(--dark-border); }
 #submit-button:hover { opacity: 0.8; }
 #submit-button:disabled { background-color: var(--light-text-secondary); cursor: not-allowed; }
 
-.dashboard-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--light-border); flex-shrink: 0; }
+.dashboard-header { display: flex; justify-content: flex-end; /* 修改對齊方式 */ align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--light-border); flex-shrink: 0; }
 body.dark-theme .dashboard-header { border-bottom: 1px solid var(--dark-border); }
-.dashboard-header h3 { margin: 0; font-family: var(--font-sans); }
-.header-buttons { display: flex; align-items: center; gap: 0.5rem; }
+.dashboard-header .header-buttons { display: flex; align-items: center; gap: 0.5rem; }
 .theme-switcher, .header-link-btn { background: none; border: none; color: var(--light-text-secondary); font-size: 1.2rem; cursor: pointer; padding: 0.5rem; display: flex; align-items: center; justify-content: center; text-decoration: none; }
 body.dark-theme .theme-switcher, body.dark-theme .header-link-btn { color: var(--dark-text-secondary); }
 .header-link-btn:hover, .theme-switcher:hover { color: var(--light-accent); }
@@ -297,12 +303,6 @@ body.dark-theme .info-card h4 { color: var(--dark-accent); border-bottom: 1px so
 @media (max-width: 1024px) { 
     .menu-toggle { display: block; } 
     .dashboard { position: fixed; top: 0; right: 0; height: 100%; transform: translateX(100%); transition: transform 0.4s ease; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.1); } .game-container.sidebar-open .dashboard { transform: translateX(0); 
-    }
-    .dashboard-header {
-        padding-right: 60px; /* 為右上角的選單鈕留出空間 */
-    }
-    .dashboard-header h3 {
-        font-size: 1.1em; /* 稍微縮小字體以避免尷尬換行 */
     }
 }
 .select-wrapper { position: relative; }
@@ -447,7 +447,7 @@ body.dark-theme .npc-neutral {
     color: var(--dark-text-secondary); /* 中立灰 - 深色主題 */
 }
 
-/* --- 【已移除】遊戲讀取提示樣式 (prequel-loader) --- */
+/* 【已移除】遊戲讀取提示樣式 (prequel-loader) --- */
 /* 我們不再需要 prequel-loader，因為將統一使用 ai-thinking-loader */
 
 @keyframes prequel-bounce {
@@ -459,7 +459,7 @@ body.dark-theme .npc-neutral {
     }
 }
 
-/* 【已修改】動作提示句樣式，改為絕對定位 */
+/* 為提示詞的絕對定位提供基準 */
 .action-suggestion {
     position: absolute;
     bottom: 100%; /* 定位在父元素(footer)的頂部 */
@@ -485,7 +485,7 @@ body.dark-theme .action-suggestion {
     color: var(--dark-text-secondary);
 }
 
-/* --- 【新增】死亡畫面樣式 --- */
+/* --- 死亡畫面樣式 --- */
 .deceased-overlay {
     position: absolute;
     top: 0;
@@ -608,7 +608,7 @@ body.dark-theme .deceased-btn.restart-btn {
     opacity: 0.85;
 }
 
-/* --- 【已修改】統一的 AI 回應等待動畫 --- */
+/* --- 統一的 AI 回應等待動畫 --- */
 .ai-thinking-loader {
     position: absolute;
     top: 0;
@@ -638,7 +638,6 @@ body.dark-theme .ai-thinking-loader {
     background: rgba(26, 26, 29, 0.7);
 }
 
-/* 【新增】載入動畫中的文字樣式 */
 .ai-thinking-loader .loader-text {
     font-family: var(--font-serif);
     font-size: 1.2rem;
@@ -671,7 +670,7 @@ body.dark-theme .ai-thinking-loader .loader-dots span {
     animation-delay: -0.16s;
 }
 
-/* --- 【新增】立場傾向計量棒樣式 --- */
+/* --- 立場傾向計量棒樣式 --- */
 .morality-display-container {
     display: flex;
     align-items: center;
@@ -721,7 +720,7 @@ body.dark-theme .morality-bar-indicator {
     background-color: var(--morality-neutral-dark);
 }
 
-/* --- 【新增】內功外功進度條樣式 --- */
+/* --- 內功外功進度條樣式 --- */
 .power-display {
     display: flex;
     align-items: center;
@@ -772,4 +771,41 @@ body.dark-theme #external-power-bar {
 }
 body.dark-theme .power-value {
     color: var(--dark-text-secondary);
+}
+
+/* --- 【新增】可收折資訊欄樣式 --- */
+.header-toggle-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 28px;
+    height: 28px;
+    background-color: rgba(0,0,0,0.05);
+    border: 1px solid var(--light-border);
+    color: var(--light-text-secondary);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s, color 0.3s;
+}
+.header-toggle-btn:hover {
+    background-color: rgba(0,0,0,0.1);
+    color: var(--light-text-primary);
+}
+body.dark-theme .header-toggle-btn {
+    background-color: rgba(255,255,255,0.05);
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+body.dark-theme .header-toggle-btn:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: var(--dark-text-primary);
+}
+.story-header.collapsed {
+    transform: translateY(-100%);
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: -1px; /* 避免收起時，下方的 story-panel 邊框跳動 */
 }
