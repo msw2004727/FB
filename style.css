@@ -178,19 +178,25 @@ body.dark-theme .auth-switch a {
 
 /* --- 遊戲主頁面樣式 --- */
 .game-container { display: flex; height: 100vh; width: 100%; overflow: hidden; }
-.main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100%; transition: margin-right 0.4s ease; }
+.main-content { 
+    position: relative; /* 【修改】新增 position: relative; */
+    flex-grow: 1; 
+    display: flex; 
+    flex-direction: column; 
+    height: 100%; 
+    transition: margin-right 0.4s ease; 
+}
 .dashboard { width: 320px; flex-shrink: 0; background-color: var(--light-surface-bg); border-left: 1px solid var(--light-border); display: flex; flex-direction: column; transition: background-color 0.3s, border-color 0.3s; }
 body.dark-theme .dashboard { background-color: var(--dark-bg); border-left: 1px solid var(--dark-border); }
 .menu-toggle { display: none; position: fixed; top: 15px; right: 15px; z-index: 1001; background: var(--light-surface-bg); color: var(--light-text-primary); border: 1px solid var(--light-border); border-radius: 50%; width: 45px; height: 45px; font-size: 1.2rem; cursor: pointer; }
 body.dark-theme .menu-toggle { background: var(--dark-surface-bg); color: var(--dark-text-primary); border: 1px solid var(--dark-border); }
 
-/* 為 story-header 添加相對定位和動畫效果 */
 .story-header { 
-    position: relative; /* 為了讓收折按鈕能相對於它定位 */
+    position: relative;
     padding: 0.5rem 2rem; 
     border-bottom: 1px solid var(--light-border); 
     z-index: 10;
-    transition: padding 0.4s ease-out; /* 移除 transform 動畫 */
+    transition: padding 0.4s ease-out;
 }
 body.dark-theme .story-header { border-bottom: 1px solid var(--dark-border); }
 
@@ -235,15 +241,15 @@ body.dark-theme .prequel-summary h3 {
     line-height: 1.8;
     text-align: justify;
     margin: 0;
-    font-style: normal; /* 覆蓋 .system-message 的斜體 */
+    font-style: normal;
 }
 
 
-/* 為提示詞的絕對定位提供基準 */
 .story-footer {
     position: relative; 
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
+    z-index: 10;
 }
 body.dark-theme .story-footer { border-top: 1px solid var(--dark-border); background: var(--dark-surface-bg); }
 
@@ -284,7 +290,7 @@ body.dark-theme #submit-button { border-left: 1px solid var(--dark-border); }
 #submit-button:hover { opacity: 0.8; }
 #submit-button:disabled { background-color: var(--light-text-secondary); cursor: not-allowed; }
 
-.dashboard-header { display: flex; justify-content: flex-end; /* 修改對齊方式 */ align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--light-border); flex-shrink: 0; }
+.dashboard-header { display: flex; justify-content: flex-end; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--light-border); flex-shrink: 0; }
 body.dark-theme .dashboard-header { border-bottom: 1px solid var(--dark-border); }
 .dashboard-header .header-buttons { display: flex; align-items: center; gap: 0.5rem; }
 .theme-switcher, .header-link-btn { background: none; border: none; color: var(--light-text-secondary); font-size: 1.2rem; cursor: pointer; padding: 0.5rem; display: flex; align-items: center; justify-content: center; text-decoration: none; }
@@ -461,16 +467,14 @@ body.dark-theme .npc-sworn_enemy { color: #ff2424; }
     }
 }
 
-/* 為提示詞的絕對定位提供基準 */
 .action-suggestion {
     position: absolute;
-    bottom: 100%; /* 定位在父元素(footer)的頂部 */
+    bottom: 100%;
     left: 0;
     width: 100%;
-    background-color: rgba(237, 231, 222, 0.9); /* 帶有透明度的米色 */
-    backdrop-filter: blur(2px); /* 毛玻璃效果 */
+    background-color: rgba(237, 231, 222, 0.9);
+    backdrop-filter: blur(2px);
     border-bottom: 1px solid var(--light-border);
-    
     text-align: center;
     font-size: 0.85rem;
     color: var(--light-text-secondary);
@@ -478,7 +482,7 @@ body.dark-theme .npc-sworn_enemy { color: #ff2424; }
     box-sizing: border-box;
     min-height: 1.2em;
     transition: all 0.3s;
-    pointer-events: none; /* 讓滑鼠可以穿透 */
+    pointer-events: none;
 }
 
 body.dark-theme .action-suggestion {
@@ -623,7 +627,7 @@ body.dark-theme .deceased-btn.restart-btn {
     align-items: center;
     gap: 1.5rem;
     background: rgba(255, 255, 255, 0.7);
-    z-index: 15;
+    z-index: 20; /* 【修改】提高層級 */
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
@@ -710,12 +714,12 @@ body.dark-theme .morality-bar-background {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%; /* 初始位置置中 */
-    width: 4px; /* 指示器寬度 */
+    left: 50%;
+    width: 4px;
     height: 100%;
-    background-color: var(--morality-neutral-light); /* 預設為中立色 */
+    background-color: var(--morality-neutral-light);
     border-radius: 2px;
-    transform: translateX(-50%); /* 水平置中 */
+    transform: translateX(-50%);
     transition: left 0.5s ease-out, background-color 0.5s ease;
 }
 body.dark-theme .morality-bar-indicator {
@@ -731,7 +735,7 @@ body.dark-theme .morality-bar-indicator {
 }
 .power-label {
     flex-shrink: 0;
-    width: 3em; /* 確保"內功"和"外功"對齊 */
+    width: 3em;
     color: var(--light-text-secondary);
 }
 body.dark-theme .power-label {
@@ -748,7 +752,7 @@ body.dark-theme .power-bar-container {
 }
 .power-bar {
     height: 100%;
-    width: 0%; /* 預設為0，由JS控制 */
+    width: 0%;
     border-radius: 5px;
     transition: width 0.5s ease-out;
 }
@@ -766,9 +770,9 @@ body.dark-theme #external-power-bar {
 }
 .power-value {
     font-size: 0.8rem;
-    font-family: monospace; /* 讓數字等寬，避免跳動 */
+    font-family: monospace;
     color: var(--light-text-secondary);
-    min-width: 50px; /* 給予一個最小寬度，避免數值長度變化時佈局跳動 */
+    min-width: 50px;
     text-align: right;
 }
 body.dark-theme .power-value {
@@ -813,16 +817,14 @@ body.dark-theme .header-toggle-btn:hover {
     gap: 0;
 }
 
-/* --- 【新增】針對窄視窗的收折按鈕修正 --- */
 @media (max-width: 1024px) { 
     .header-toggle-btn {
-        top: 13px; /* 微調垂直位置，使其與漢堡選單對齊 */
-        left: 15px; /* 移動到左邊 */
-        right: auto; /* 取消右邊的定位 */
-        z-index: 1002; /* 確保層級高於漢堡選單，避免被覆蓋 */
+        top: 13px;
+        left: 15px;
+        right: auto;
+        z-index: 1002;
     }
 }
-/* --- 【新增】隨機事件訊息樣式 --- */
 .random-event-message {
     padding: 1rem 1.5rem;
     margin: 0.5rem 0 1.5rem 0;
@@ -861,7 +863,7 @@ body.dark-theme .random-event-message {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.7);
-    z-index: 1010; /* 比其他介面層級更高 */
+    z-index: 1010;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -877,7 +879,7 @@ body.dark-theme .random-event-message {
 }
 
 .combat-modal-content {
-    position: relative; /* 新增，為loader提供定位基準 */
+    position: relative;
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 12px;
@@ -897,7 +899,7 @@ body.dark-theme .random-event-message {
 }
 
 body.dark-theme .combat-modal-content {
-    background-color: #2c2c34; /* 一個比主介面稍亮的深色 */
+    background-color: #2c2c34;
     border-color: var(--dark-border);
 }
 
@@ -1004,7 +1006,7 @@ body.dark-theme #combat-action-btn {
     display: flex;
     justify-content: center;
     align-items: center;
-    border-radius: 12px; /* 需與 .combat-modal-content 的圓角一致 */
+    border-radius: 12px;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s, visibility 0.3s;
