@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatActionBtn = document.getElementById('chat-action-btn');
     const closeChatBtn = document.getElementById('close-chat-btn');
     const endChatBtn = document.getElementById('end-chat-btn');
-    
+
     // --- 遊戲狀態變數 ---
     let gameState = {
         currentRound: 0,
@@ -77,10 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInput.disabled = isLoading;
         chatActionBtn.disabled = isLoading;
         endChatBtn.disabled = isLoading;
-        
+
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         if(loaderTextElement) loaderTextElement.textContent = text;
-        
+
         if (isLoading && !gameState.isInCombat && !gameState.isInChat) {
             rotateTip();
             tipInterval = setInterval(rotateTip, 15000);
@@ -98,8 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
         playerInput.value = '';
-        
-        // 在第一個動作送出時，清空前情提要
+
         const prequelElement = storyTextContainer.querySelector('.prequel-summary');
         if (prequelElement) {
             storyTextContainer.innerHTML = '';
@@ -109,26 +108,25 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
         try {
-            const data = await api.interact({ 
-                action: actionText, 
-                round: gameState.currentRound, 
-                model: aiModelSelector.value 
+            const data = await api.interact({
+                action: actionText,
+                round: gameState.currentRound,
+                model: aiModelSelector.value
             });
 
             if (data && data.roundData) {
-                // 將後端傳來的 suggestion 加到 roundData 中，方便 UI 更新
                 data.roundData.suggestion = data.suggestion;
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
             } else {
                 throw new Error("從伺服器收到的回應格式不正確。");
             }
-            
+
             if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
                 startCombat(data.combatInfo.initialState);
             } else if (data.roundData.playerState === 'dead') {
                 modal.showDeceasedScreen();
-                setLoadingState(true); 
+                setLoadingState(true);
             }
         } catch (error) {
             handleApiError(error);
@@ -144,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.openCombatModal(initialState);
         combatInput.focus();
     }
-    
+
     async function handleCombatAction() {
         const actionText = combatInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
@@ -157,7 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'COMBAT_ONGOING') {
                 modal.appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
-                // 將後端傳來的 suggestion 加到 roundData 中
                 data.newRound.roundData.suggestion = data.newRound.suggestion;
                 modal.appendToCombatLog(data.newRound.story, 'combat-summary');
                 setTimeout(() => endCombat(data.newRound), 2000);
@@ -230,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameState.isRequesting || !gameState.currentChatNpc) return;
         const npcNameToSummarize = gameState.currentChatNpc;
         modal.closeChatModal();
-        setLoadingState(true, '正在總結對話，更新江湖事態...');
+        setLoadingState(true, '正在總結對話，更新江湖事態...'); // 【***這就是修正的核心***】
 
         try {
             const data = await api.endChat({
@@ -255,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setLoadingState(false);
         }
     }
-    
+
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
         let currentTheme = localStorage.getItem('game_theme') || 'light';
@@ -335,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
              modal.closeChatModal();
         });
         endChatBtn.addEventListener('click', endChatSession);
-        
+
         loadInitialGame();
     }
 
@@ -348,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(data.roundData) {
                     updateUI('', data.roundData, null);
                 }
-                setLoadingState(true); 
+                setLoadingState(true);
             } else {
                 gameState.currentRound = data.roundData.R;
                 storyTextContainer.innerHTML = '';
@@ -358,19 +355,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                     storyTextContainer.appendChild(prequelDiv);
                 }
-                // 【核心修改】
-                // 將後端傳來的 suggestion 加到 roundData 中，方便 UI 更新
                 data.roundData.suggestion = data.suggestion;
-                // 呼叫 updateUI 時，第一個參數（故事主文）傳入 null
                 updateUI(null, data.roundData, null);
             }
         } catch (error) {
-            // 這個 catch 區塊現在主要用於處理極端例外或舊版無存檔用戶
             if (error.message.includes('找不到存檔')) {
                 storyTextContainer.innerHTML = '';
                 const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
                 appendMessageToStory(initialMessage, 'system-message');
-                const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, suggestion: '先檢查一下自己的身體狀況吧。' };
+                const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, suggestion: '先檢查一下自己的身體狀況吧。' };
                 updateUI(null, roundZeroData, null);
             } else {
                 handleApiError(error);
