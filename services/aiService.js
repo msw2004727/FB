@@ -21,6 +21,7 @@ const deepseek = new OpenAI({
 const grok = new OpenAI({
     apiKey: process.env.GROK_API_KEY,
     baseURL: "https://api.x.ai/v1",
+    timeout: 30 * 1000, 
 });
 
 
@@ -64,12 +65,15 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
             case 'grok':
-                // 【修改】根據您的截圖，將模型修正為您實際擁有權限的 "grok-3-mini"
-                options.model = "grok-3-mini";
+                // 【修改】根據您的權限截圖，我們嘗試使用另一個您有權限的模型 "grok-3-mini-fast"
+                // 這有助於判斷問題是否出在特定的模型上
+                options.model = "grok-3-mini-fast";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
+                console.log(`[Grok 調試] 準備向 ${options.model} 發出請求...`);
                 const grokResult = await grok.chat.completions.create(options);
+                console.log("[Grok 調試] 已收到來自 Grok 的回應。");
                 textResponse = grokResult.choices[0].message.content;
                 break;
             case 'gemini':
