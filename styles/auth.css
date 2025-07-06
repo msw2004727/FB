@@ -9,6 +9,7 @@ body.auth-page {
 }
 
 .auth-container {
+    position: relative; /* 【核心新增】為絕對定位的子元素提供基準 */
     width: 100%;
     max-width: 420px;
     padding: 2.5rem;
@@ -128,3 +129,42 @@ body.dark-theme .auth-switch a {
 }
 .message.success { color: #28a745; }
 .message.error { color: #dc3545; }
+
+
+/* --- 【核心新增】教學手冊按鈕樣式 --- */
+.help-button {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 40px;
+    height: 40px;
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 50%;
+    color: var(--light-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+body.dark-theme .help-button {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+.help-button:hover {
+    background-color: var(--light-accent);
+    border-color: var(--light-accent);
+    color: #fff;
+    transform: scale(1.1);
+}
+
+body.dark-theme .help-button:hover {
+    background-color: var(--dark-accent);
+    border-color: var(--dark-accent);
+    color: var(--dark-bg);
+}
