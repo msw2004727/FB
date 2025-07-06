@@ -263,6 +263,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleGiveItem(giveData) {
         modal.closeGiveItemModal(); // 先關閉物品選擇視窗
         modal.closeChatModal(); // 同時關閉聊天視窗
+
+        // 【核心修改】將遊戲狀態切換為「不在聊天中」，以便觸發全域加載動畫
+        gameState.isInChat = false;
+        
         setLoadingState(true, "正在更新江湖事態..."); // 顯示全域讀取動畫
 
         try {
@@ -289,8 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error); // 使用統一的錯誤處理
         } finally {
-            // 重置聊天狀態
-            gameState.isInChat = false;
+            // 重置聊天相關的狀態
             gameState.currentChatNpc = null;
             gameState.chatHistory = [];
             setLoadingState(false); // 隱藏讀取動畫
