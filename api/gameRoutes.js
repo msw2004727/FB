@@ -3,7 +3,6 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
-// 【修改】導入我們在第三步建立的兩個新 Prompt
 const { 
     getAIStory, 
     getAISummary, 
@@ -14,8 +13,8 @@ const {
     getAIRandomEvent,
     getAICombatAction,
     getAINpcProfile,
-    getAIChatResponse,   // 假設 aiService 中有此函式
-    getAIChatSummary    // 假設 aiService 中有此函式
+    getAIChatResponse,
+    getAIChatSummary
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -87,7 +86,7 @@ function applyItemChanges(currentItems, itemChangeString) {
 
 router.use(authMiddleware);
 
-// --- 【新增】路由一：獲取 NPC 公開資訊 ---
+// --- 對話系統路由 ---
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
@@ -101,11 +100,10 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         
         const npcData = npcDoc.data();
         
-        // 為了安全，只回傳前端需要的公開資訊
         const publicProfile = {
             name: npcData.name,
             appearance: npcData.appearance,
-            friendliness: npcData.friendliness || 'neutral' // 提供一個預設值
+            friendliness: npcData.friendliness || 'neutral'
         };
         
         res.json(publicProfile);
@@ -115,11 +113,8 @@ router.get('/npc-profile/:npcName', async (req, res) => {
     }
 });
 
-
-// --- 【新增】路由二：處理即時對話 ---
 router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
-    // model 讓前端可以選擇用哪個AI來聊天
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
 
     try {
@@ -129,8 +124,7 @@ router.post('/npc-chat', async (req, res) => {
             return res.status(404).json({ message: '對話目標不存在。' });
         }
         const npcProfile = npcDoc.data();
-
-        // 呼叫 AI 聊天大師
+        
         const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage);
         
         if (aiReply) {
@@ -144,56 +138,40 @@ router.post('/npc-chat', async (req, res) => {
     }
 });
 
-
-// --- 【新增】路由三：結束對話並更新主線 ---
 router.post('/end-chat', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
-    // 結束對話時，我們用一個固定的、高效的AI來做總結
     const summaryModel = 'deepseek'; 
     const { npcName, fullChatHistory } = req.body;
 
     if (!fullChatHistory || fullChatHistory.length === 0) {
-        // 如果沒有對話就結束，直接回傳成功，不觸發任何事
         return res.json({ message: '對話已結束，江湖故事繼續。' });
     }
 
     try {
-        // 步驟一：呼叫 AI 摘要師，將對話紀錄總結成一句玩家行動
         const chatSummary = await getAIChatSummary(summaryModel, username, npcName, fullChatHistory);
         if (!chatSummary) {
             throw new Error('AI未能成功總結對話內容。');
         }
         console.log(`[密談系統] 對話已結束，AI總結的玩家行動為: "${chatSummary}"`);
 
-        // 步驟二：將這句總結作為玩家行動，送入原本的主線互動邏輯中
-        // 這一段是從下面的 /interact 路由中抽取的通用邏輯
-        
         const userDocRef = db.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
-        const currentRound = (await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()).docs[0]?.data()?.R || 0;
+        const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const currentRound = savesSnapshot.docs.length > 0 ? savesSnapshot.docs[0].data().R : 0;
         
-        // 使用玩家當前選擇的主要AI模型來推進故事
         const mainModel = userProfile.preferredModel || 'gemini'; 
         
-        // 觸發主線互動，並將回傳結果直接送回前端
-        // 注意：這裡我們直接呼叫 interact 函式本體，而不是透過 HTTP 請求
-        // 因此需要將 res 物件傳遞過去，以便它能回傳最終結果
-        // (這是一個簡化作法，理想的重構會將 interact 的核心邏輯再拆分出來)
-        
-        // 模擬一個 request 物件
         const mockedReq = {
             user: { id: userId, username: username },
             body: {
-                action: chatSummary, // 使用AI總結的行動
+                action: chatSummary,
                 round: currentRound,
                 model: mainModel
             }
         };
 
-        // 直接呼叫 interact 路由的處理函式
-        // 這是一個 Express 的進階用法，將 res 傳遞下去
         interactRouteHandler(mockedReq, res);
 
     } catch (error) {
@@ -203,32 +181,8 @@ router.post('/end-chat', async (req, res) => {
 });
 
 
+// --- 主遊戲路由 ---
 
-router.get('/get-encyclopedia', async (req, res) => {
-    // ... 此路由維持原樣，不變 ...
-    const userId = req.user.id;
-    const username = req.user.username;
-    try {
-        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
-        const summaryDoc = await summaryDocRef.get();
-
-        if (!summaryDoc.exists || !summaryDoc.data().text) {
-            return res.json({ encyclopediaHtml: '<p class="loading">你的江湖經歷尚淺，還沒有可供編撰的百科內容。</p>' });
-        }
-
-        const longTermSummary = summaryDoc.data().text;
-        
-        const encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username);
-        
-        res.json({ encyclopediaHtml });
-
-    } catch (error) {
-        console.error(`[UserID: ${userId}] /get-encyclopedia 錯誤:`, error);
-        res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
-    }
-});
-
-// 【修改】將 /interact 的邏輯包裝成一個函式，以便被 /end-chat 呼叫
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -360,29 +314,30 @@ const interactRouteHandler = async (req, res) => {
             lightness: newLightness,
             morality: newMorality,
             turnsSinceEvent: turnsSinceEvent,
-            preferredModel: modelName, // 順便儲存玩家偏好的主模型
+            preferredModel: modelName,
             ...currentDate
         });
         
-        const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
-
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
             aiResponse.suggestion = "你的江湖路已到盡頭...";
-            aiResponse.roundData.timeOfDay = currentTimeOfDay;
-            const deathNarrative = await getNarrative(modelName, aiResponse.roundData);
-            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: deathNarrative, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
-            
-            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
-            await novelCacheRef.set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
         }
         
+        // 【修改】核心改動：不再於此處同步生成小說旁白
+        // 原本呼叫 getNarrative 和寫入 novel_cache 的程式碼已被移除
+        
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
+        
+        // 【修改】為了讓前端能即時顯示，我們需要一個故事文字。
+        // 我們直接使用已有的事件摘要(EVT)作為臨時的、非小說風格的文字。
+        // 這確保了前端有東西可顯示，而小說的生成被推遲了。
+        aiResponse.story = aiResponse.roundData.EVT || playerAction;
+
         res.json(aiResponse);
 
     } catch (error) {
@@ -391,6 +346,30 @@ const interactRouteHandler = async (req, res) => {
     }
 }
 router.post('/interact', interactRouteHandler);
+
+
+router.get('/get-encyclopedia', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    try {
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+
+        if (!summaryDoc.exists || !summaryDoc.data().text) {
+            return res.json({ encyclopediaHtml: '<p class="loading">你的江湖經歷尚淺，還沒有可供編撰的百科內容。</p>' });
+        }
+
+        const longTermSummary = summaryDoc.data().text;
+        
+        const encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username);
+        
+        res.json({ encyclopediaHtml });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /get-encyclopedia 錯誤:`, error);
+        res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
+    }
+});
 
 
 router.post('/combat-action', async (req, res) => {
@@ -485,17 +464,17 @@ router.post('/combat-action', async (req, res) => {
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
+            // 同樣，這裡也不再生成單獨的旁白
+            aiResponse.story = aiResponse.roundData.EVT || postCombatAction;
+
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
 
-            await userDocRef.collection('game_state').doc('novel_cache').set({ paragraphs: admin.firestore.FieldValue.arrayUnion({ text: narrativeText, npcs: aiResponse.roundData.NPC || [] }) }, { merge: true });
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
 
             res.json({
                 status: 'COMBAT_END',
-                finalLog: combatResult.narrative,
                 newRound: {
-                    story: narrativeText,
+                    story: aiResponse.story,
                     roundData: aiResponse.roundData,
                     suggestion: suggestion
                 }
@@ -517,7 +496,6 @@ router.post('/combat-action', async (req, res) => {
 
 
 router.get('/latest-game', async (req, res) => {
-    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
@@ -527,36 +505,25 @@ router.get('/latest-game', async (req, res) => {
             return res.json({ gameState: 'deceased' });
         }
         
-        const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(7).get();
+        const snapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         if (snapshot.empty) {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
         
-        const recentHistory = snapshot.docs.map(doc => doc.data());
-        const latestGameData = recentHistory[0];
+        const latestGameData = snapshot.docs[0].data();
 
         Object.assign(latestGameData, {
-            timeOfDay: latestGameData.timeOfDay || userData.timeOfDay || '上午',
             internalPower: userData.internalPower || 5,
             externalPower: userData.externalPower || 5,
             lightness: userData.lightness || 5,
             morality: userData.morality === undefined ? 0 : userData.morality,
-            yearName: userData.yearName || '元祐',
-            year: userData.year || 1,
-            month: userData.month || 1,
-            day: userData.day || 1
         });
 
-        let prequel = null;
-        if (recentHistory.length > 1) {
-            const historyForPrequel = [...recentHistory].reverse();
-            prequel = await getAIPrequel('deepseek', historyForPrequel);
-        }
-        
+        // 最新進度不需要前情提要，但需要建議
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
         res.json({
-            prequel: prequel,
+            // 讓前端顯示一個讀取成功的訊息
             story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
             roundData: latestGameData,
             suggestion: suggestion
@@ -568,44 +535,42 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
+// 【修改】 get-novel 路由現在承擔了所有的小說生成工作
 router.get('/get-novel', async (req, res) => {
-    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     try {
         const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
         const novelCacheDoc = await novelCacheRef.get();
 
+        // 如果快取存在，直接回傳快取，速度最快
         if (novelCacheDoc.exists && novelCacheDoc.data().paragraphs) {
+            console.log(`[小說系統] 從快取中讀取小說...`);
             return res.json({ novel: novelCacheDoc.data().paragraphs });
         } 
         
+        console.log(`[小說系統] 快取不存在，開始即時生成小說...`);
+        // 如果沒有快取，則開始即時生成
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (snapshot.empty) {
             return res.json({ novel: [] });
         }
         
-        let isCacheable = true;
-        const fallbackText = "在那一刻，時間的長河似乎出現了斷層...";
-
-        const narrativePromises = snapshot.docs.map(async (doc) => {
+        const narrativePromises = snapshot.docs.map(doc => {
             const roundData = doc.data();
-            const narrativeText = await getNarrative('deepseek', roundData);
-            
-            if (narrativeText.includes(fallbackText)) {
-                isCacheable = false;
-            }
-
-            return {
-                text: narrativeText,
-                npcs: roundData.NPC || [] 
-            };
+            // 為每一個回合呼叫小說家AI
+            return getNarrative('deepseek', roundData).then(narrativeText => {
+                return {
+                    text: narrativeText,
+                    npcs: roundData.NPC || [] 
+                };
+            });
         });
 
         const novelParagraphs = await Promise.all(narrativePromises);
         
-        if (isCacheable) {
-            await novelCacheRef.set({ paragraphs: novelParagraphs });
-        }
+        // 生成後，寫入快取，方便下次讀取
+        await novelCacheRef.set({ paragraphs: novelParagraphs });
+        console.log(`[小說系統] 小說生成完畢並已存入快取。`);
         
         res.json({ novel: novelParagraphs });
         
@@ -616,7 +581,6 @@ router.get('/get-novel', async (req, res) => {
 });
 
 router.post('/restart', async (req, res) => {
-    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -638,7 +602,6 @@ router.post('/restart', async (req, res) => {
 
         await userDocRef.collection('game_state').doc('summary').delete().catch(() => {});
         await userDocRef.collection('game_state').doc('suggestion').delete().catch(() => {});
-        
         await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
         
         await userDocRef.update({
@@ -652,7 +615,8 @@ router.post('/restart', async (req, res) => {
             month: admin.firestore.FieldValue.delete(),
             day: admin.firestore.FieldValue.delete(),
             yearName: admin.firestore.FieldValue.delete(),
-            turnsSinceEvent: admin.firestore.FieldValue.delete()
+            turnsSinceEvent: admin.firestore.FieldValue.delete(),
+            preferredModel: admin.firestore.FieldValue.delete()
         });
         
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -664,7 +628,6 @@ router.post('/restart', async (req, res) => {
 });
 
 router.post('/force-suicide', async (req, res) => {
-    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     const username = req.user.username;
     try {
@@ -704,17 +667,11 @@ router.post('/force-suicide', async (req, res) => {
             CLS: '',
             IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
         };
-
-        const finalNarrative = await getNarrative('deepseek', finalRoundData);
-        const novelCacheRef = userDocRef.collection('game_state').doc('novel_cache');
-        await novelCacheRef.set({ 
-            paragraphs: admin.firestore.FieldValue.arrayUnion({ text: finalNarrative, npcs: [] }) 
-        }, { merge: true });
         
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
         
         res.json({
-            story: finalNarrative,
+            story: finalRoundData.PC, // 自殺時直接用狀態描述作為故事
             roundData: finalRoundData,
             suggestion: '你的江湖路已到盡頭...'
         });
