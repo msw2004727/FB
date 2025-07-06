@@ -33,6 +33,7 @@ export const api = {
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc-profile/${npcName}`),
     npcChat: (body) => fetchApi('/api/game/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/end-chat', { method: 'POST', body: JSON.stringify(body) }),
-    // 【核心新增】新增一個 giveItemToNpc 的 API 呼叫函式
     giveItemToNpc: (body) => fetchApi('/api/game/give-item', { method: 'POST', body: JSON.stringify(body) }),
+    // 【核心新增】新增一個用來獲取詳細背包資料的函式
+    getInventory: () => fetchApi('/api/game/inventory'),
 };
