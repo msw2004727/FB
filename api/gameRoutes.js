@@ -17,7 +17,7 @@ const {
     getAIChatSummary,
     getAIGiveItemResponse,
     getAINarrativeForGive,
-    getRelationGraph // 【核心新增】引入新的AI服務函式
+    getRelationGraph
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -147,7 +147,6 @@ router.get('/inventory', async (req, res) => {
     }
 });
 
-// 【核心新增】處理關係圖的路由
 router.get('/get-relations', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -161,7 +160,6 @@ router.get('/get-relations', async (req, res) => {
 
         const longTermSummary = summaryDoc.data().text;
         
-        // 呼叫AI生成Mermaid語法
         const mermaidSyntax = await getRelationGraph('deepseek', longTermSummary, username);
         
         res.json({ mermaidSyntax });
@@ -287,20 +285,23 @@ router.post('/end-chat', async (req, res) => {
     }
 });
 
+// 【核心重構】將 /give-item 路由升級為一個標準的遊戲回合
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const { giveData, model = 'gemini' } = req.body;
-    const { type, target, amount, itemName } = giveData;
+    const { target: npcName, itemName, amount } = giveData;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const npcDocRef = userDocRef.collection('npcs').doc(target);
+        const npcDocRef = userDocRef.collection('npcs').doc(npcName);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-        const [userDoc, npcDoc, latestSaveSnapshot] = await Promise.all([
+        const [userDoc, npcDoc, latestSaveSnapshot, summaryDoc] = await Promise.all([
             userDocRef.get(),
             npcDocRef.get(),
-            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
+            summaryDocRef.get()
         ]);
 
         if (!userDoc.exists || !npcDoc.exists || latestSaveSnapshot.empty) {
@@ -310,42 +311,67 @@ router.post('/give-item', async (req, res) => {
         const playerProfile = userDoc.data();
         const npcProfile = npcDoc.data();
         let lastRoundData = latestSaveSnapshot.docs[0].data();
-        
-        const currentFriendlinessValue = npcProfile.friendlinessValue || 0;
-        
-        const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, { type, amount, itemName });
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
+
+        // 1. 獲取NPC反應和友好度變化
+        const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, giveData);
         if (!aiResponse) throw new Error('AI未能生成有效的贈予反應。');
         
         const { npc_response, friendlinessChange } = aiResponse;
-        const newFriendlinessValue = currentFriendlinessValue + friendlinessChange;
-        const newFriendlinessLevel = getFriendlinessLevel(newFriendlinessValue);
-
+        
+        // 2. 更新資料庫
+        const newFriendlinessValue = (npcProfile.friendlinessValue || 0) + friendlinessChange;
         await npcDocRef.update({ 
             friendlinessValue: newFriendlinessValue,
-            friendliness: newFriendlinessLevel
+            friendliness: getFriendlinessLevel(newFriendlinessValue)
         });
+
+        const itemChanges = [{ action: 'remove', itemName, quantity: amount || 1 }];
+        await updateInventory(userId, itemChanges);
         
-        const itemToRemove = type === 'money' ? '銀兩' : itemName;
-        const quantityToRemove = type === 'money' ? amount : 1;
-        await updateInventory(userId, [{ action: 'remove', itemName: itemToRemove, quantity: quantityToRemove }]);
-        
+        // 3. 建立新的回合資料
+        const newRoundNumber = lastRoundData.R + 1;
         const inventoryState = await getInventoryState(userId);
-        lastRoundData.ITM = inventoryState.itemsString;
-        lastRoundData.money = inventoryState.money;
         
-        const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, target, itemName || `${amount}文錢`, npc_response);
-        lastRoundData.PC = narrativeText; 
+        // 複製上一回合的狀態，並更新變化
+        const newRoundData = { ...lastRoundData };
+        newRoundData.R = newRoundNumber;
+        newRoundData.ITM = inventoryState.itemsString;
+        newRoundData.money = inventoryState.money;
+        newRoundData.PC = `${username}將${itemName}贈予了${npcName}。`; // 簡短的事件描述
+        newRoundData.EVT = `贈予${npcName}物品`;
+        // 更新NPC狀態
+        const npcIndex = newRoundData.NPC.findIndex(n => n.name === npcName);
+        if (npcIndex !== -1) {
+            newRoundData.NPC[npcIndex].friendliness = getFriendlinessLevel(newFriendlinessValue);
+            newRoundData.NPC[npcIndex].status = npc_response; // 將AI回應作為NPC的最新狀態
+        } else {
+            // 如果NPC不在上一回合的列表中，新增他
+            newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(newFriendlinessValue) });
+        }
         
+        // 4. 生成新的旁白和摘要
+        const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
+        const suggestion = await getAISuggestion(model, newRoundData);
+        const newSummary = await getAISummary(model, longTermSummary, newRoundData);
+
+        // 5. 儲存新回合和摘要
+        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+
+        // 6. 回傳標準的回合物件
         res.json({
-            npc_response: npc_response,
-            roundData: lastRoundData 
+            story: narrativeText,
+            roundData: newRoundData,
+            suggestion: suggestion
         });
 
     } catch (error) {
-        console.error(`[贈予系統] 贈予NPC(${target})物品時出錯:`, error);
+        console.error(`[贈予系統] 贈予NPC(${npcName})物品時出錯:`, error);
         res.status(500).json({ message: '贈予物品時發生內部錯誤。' });
     }
 });
+
 
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
@@ -591,7 +617,7 @@ router.post('/combat-action', async (req, res) => {
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
             const narrativeText = await getNarrative(modelName, aiResponse.roundData);
-            aiResponse.story = narrativeText;
+aiResponse.story = narrativeText;
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
             res.json({
@@ -752,7 +778,7 @@ router.post('/force-suicide', async (req, res) => {
         await userDocRef.update({ isDeceased: true });
 
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-        const lastRound = savesSnapshot.empty ? { R: 0 } : lastRoundSnapshot.docs[0].data();
+        const lastRound = savesSnapshot.empty ? { R: 0 } : savesSnapshot.docs[0].data();
 
         const newRoundNumber = (lastRound.R || 0) + 1;
 
