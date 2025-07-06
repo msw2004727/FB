@@ -67,7 +67,7 @@
                             <option value="gemini">Gemini (快 & 穩)</option>
                             <option value="openai">GPT-4o (強 & 貴)</option>
                             <option value="deepseek" selected>DeepSeek-V2 (強 & 奇)</option>
-                            <option value="grok">Grok-3-Mini (快 & 怪)</option>
+                            <option value="grok">Grok (快 & 怪)</option>
                         </select>
                     </div>
                     <small class="ai-switcher-note">注意：更換核心後，故事風格與文筆將會改變。</small>
@@ -162,6 +162,32 @@
                     <button id="combat-action-btn">行動</button>
                 </div>
                 <div id="combat-loader" class="combat-loader-overlay">
+                    <div class="loader-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-modal" class="chat-modal-overlay">
+            <div class="chat-modal-content">
+                <div class="chat-header">
+                    <h3 id="chat-npc-name">與...密談</h3>
+                    <div id="chat-npc-info" class="chat-npc-info-list"></div>
+                    <button id="close-chat-btn" class="chat-close-btn" title="關閉視窗"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="chat-log" class="chat-log-area">
+                    </div>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="你說..." autocomplete="off">
+                    <button id="chat-action-btn">發送</button>
+                </div>
+                <div class="chat-footer">
+                    <button id="end-chat-btn" class="end-chat-btn">結束交談</button>
+                </div>
+                 <div id="chat-loader" class="chat-loader-overlay">
                     <div class="loader-dots">
                         <span></span>
                         <span></span>
