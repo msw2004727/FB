@@ -202,7 +202,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.openChatModalUI(profile);
                 chatInput.focus();
             } catch (error) {
-                handleApiError(error);
+                // 【核心修改】判斷錯誤訊息類型
+                if (error.message && error.message.includes('並未見到')) {
+                    // 如果是特定錯誤，直接顯示劇情旁白
+                    appendMessageToStory(error.message, 'system-message');
+                } else {
+                    // 如果是其他錯誤，才使用通用錯誤處理
+                    handleApiError(error);
+                }
             } finally {
                 setLoadingState(false);
             }
@@ -317,27 +324,19 @@ document.addEventListener('DOMContentLoaded', () => {
         let preferredModel = localStorage.getItem('preferred_ai_model') || 'openai';
         aiModelSelector.value = preferredModel;
 
-        // --- 【核心修改】 ---
         aiModelSelector.addEventListener('change', () => {
             const selectedModel = aiModelSelector.value;
             localStorage.setItem('preferred_ai_model', selectedModel);
             
-            // 移除舊的 alert 彈窗
-            // alert(`AI 核心已切換為 ${selectedModel.toUpperCase()}。\n\n下次互動將使用新的核心。`);
-
-            // 新增提示訊息到劇情面板
             const notification = document.createElement('p');
             notification.className = 'system-message ai-switch-notification';
             notification.textContent = `系統：AI 核心已切換為 ${selectedModel.toUpperCase()}。`;
             storyTextContainer.appendChild(notification);
             
-            // 確保捲動到最下方看到提示
             storyTextContainer.parentElement.scrollTop = storyTextContainer.parentElement.scrollHeight;
 
-            // 5秒後移除提示
             setTimeout(() => {
                 notification.classList.add('fading-out');
-                // 在動畫結束後再移除DOM元素，避免突然消失
                 setTimeout(() => {
                     notification.remove();
                 }, 500);
