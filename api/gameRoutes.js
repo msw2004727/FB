@@ -35,7 +35,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
-            // 在儲存前，確保新檔案也包含當前位置
             npcProfile.currentLocation = roundData.LOC[0];
             await npcDocRef.set(npcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
@@ -47,9 +46,64 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
+// 【新增】物品帳本處理函式
+async function updateInventory(userId, itemChanges) {
+    if (!itemChanges || itemChanges.length === 0) {
+        return; // 沒有物品變化，直接返回
+    }
+
+    const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
+    const doc = await inventoryRef.get();
+    let inventory = doc.exists ? doc.data() : {};
+
+    for (const change of itemChanges) {
+        const { action, itemName, quantity = 1, itemType, rarity, description } = change;
+
+        if (action === 'add') {
+            if (inventory[itemName]) {
+                inventory[itemName].quantity += quantity;
+            } else {
+                inventory[itemName] = {
+                    quantity,
+                    itemType: itemType || '其他',
+                    rarity: rarity || '普通',
+                    description: description || '一個神秘的物品。',
+                    addedAt: admin.firestore.FieldValue.serverTimestamp()
+                };
+            }
+            console.log(`[物品系統] 新增物品: ${itemName} x${quantity}`);
+        } else if (action === 'remove') {
+            if (inventory[itemName]) {
+                inventory[itemName].quantity -= quantity;
+                if (inventory[itemName].quantity <= 0) {
+                    delete inventory[itemName];
+                }
+                console.log(`[物品系統] 移除物品: ${itemName} x${quantity}`);
+            }
+        }
+    }
+
+    await inventoryRef.set(inventory, { merge: true });
+}
+
+// 【新增】獲取物品顯示字串的函式
+async function getInventoryDisplay(userId) {
+    const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
+    const doc = await inventoryRef.get();
+    if (!doc.exists) {
+        return '行囊空空';
+    }
+    const inventory = doc.data();
+    const items = Object.entries(inventory).map(([name, data]) => {
+        return `${name} x${data.quantity}`;
+    });
+
+    return items.length > 0 ? items.join('、') : '行囊空空';
+}
+
 
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
-const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // 索引0不用
+const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 function advanceDate(currentDate) {
     let { year, month, day, yearName } = currentDate;
@@ -182,7 +236,6 @@ router.post('/end-chat', async (req, res) => {
     }
 });
 
-
 // --- 主遊戲路由 ---
 
 const interactRouteHandler = async (req, res) => {
@@ -233,17 +286,19 @@ const interactRouteHandler = async (req, res) => {
 
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
+        
+        // 【核心修改】物品系統
+        await updateInventory(userId, aiResponse.roundData.itemChanges);
+        const inventoryDisplayString = await getInventoryDisplay(userId);
+        aiResponse.roundData.ITM = inventoryDisplayString; // 將新的物品字串放入回傳資料中
 
-        // 【核心修正】將NPC處理邏輯整合，避免競爭條件
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = [];
             aiResponse.roundData.NPC.forEach(npc => {
                 if (npc.isNew === true) {
-                    // 1. 如果是新NPC，觸發背景建檔程序
                     createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                     delete npc.isNew;
                 } else if (npc.location) {
-                    // 2. 如果是舊NPC，且AI提供了新位置，則更新其位置
                     const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
                     npcUpdatePromises.push(npcDocRef.update({ currentLocation: npc.location }));
                 }
@@ -271,30 +326,23 @@ const interactRouteHandler = async (req, res) => {
         let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 };
         let moralityChange = aiResponse.roundData.moralityChange || 0;
         let newPlayerStateDescription = aiResponse.roundData.PC;
-        let newItemChange = aiResponse.roundData.ITM;
 
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
-
             const initialLog = aiResponse.roundData.combatIntro || '戰鬥開始了！';
-
             const combatState = {
                 turn: 1,
                 player: { username: username },
                 enemies: aiResponse.roundData.combatants,
                 log: [initialLog]
             };
-
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
-
             aiResponse.combatInfo = {
                 status: 'COMBAT_START',
                 initialState: combatState
             };
-
             turnsSinceEvent = 0;
-        }
-        else if (turnsSinceEvent >= 3) {
+        } else if (turnsSinceEvent >= 3) {
             console.log(`[事件系統] 隨機事件功能已關閉。`);
             turnsSinceEvent = 0;
         }
@@ -306,7 +354,6 @@ const interactRouteHandler = async (req, res) => {
         newMorality = Math.max(-100, Math.min(100, newMorality));
 
         aiResponse.roundData.PC = newPlayerStateDescription;
-        aiResponse.roundData.ITM = newItemChange;
 
         Object.assign(aiResponse.roundData, {
             internalPower: newInternalPower,
@@ -339,11 +386,8 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const narrativeText = await getNarrative(modelName, aiResponse.roundData);
-
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
-
         aiResponse.story = narrativeText;
-
         res.json(aiResponse);
 
     } catch (error) {
@@ -366,9 +410,7 @@ router.get('/get-encyclopedia', async (req, res) => {
         }
 
         const longTermSummary = summaryDoc.data().text;
-
         const encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username);
-
         res.json({ encyclopediaHtml });
 
     } catch (error) {
@@ -443,7 +485,7 @@ router.post('/combat-action', async (req, res) => {
 
             const newRoundNumber = (lastRound.R || 0) + 1;
             aiResponse.roundData.R = newRoundNumber;
-
+            
             const finalInternalPower = Math.max(0, Math.min(999, updatedProfile.internalPower + (aiResponse.roundData.powerChange?.internal || 0)));
             const finalExternalPower = Math.max(0, Math.min(999, updatedProfile.externalPower + (aiResponse.roundData.powerChange?.external || 0)));
             const finalLightness = Math.max(0, Math.min(999, updatedProfile.lightness + (aiResponse.roundData.powerChange?.lightness || 0)));
@@ -466,14 +508,10 @@ router.post('/combat-action', async (req, res) => {
 
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
-
             const narrativeText = await getNarrative(modelName, aiResponse.roundData);
             aiResponse.story = narrativeText;
-
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
-
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
-
             res.json({
                 status: 'COMBAT_END',
                 newRound: {
@@ -585,24 +623,15 @@ router.post('/restart', async (req, res) => {
     try {
         const userDocRef = db.collection('users').doc(userId);
 
-        const savesCollectionRef = userDocRef.collection('game_saves');
-        const savesSnapshot = await savesCollectionRef.get();
-        const batch = db.batch();
-        savesSnapshot.docs.forEach((doc) => {
-            batch.delete(doc.ref);
-        });
-
-        const npcsCollectionRef = userDocRef.collection('npcs');
-        const npcsSnapshot = await npcsCollectionRef.get();
-        npcsSnapshot.docs.forEach((doc) => {
-            batch.delete(doc.ref);
-        });
-
-        await batch.commit();
-
-        await userDocRef.collection('game_state').doc('summary').delete().catch(() => {});
-        await userDocRef.collection('game_state').doc('suggestion').delete().catch(() => {});
-        await userDocRef.collection('game_state').doc('novel_cache').delete().catch(() => {});
+        const collections = ['game_saves', 'npcs', 'game_state'];
+        for (const col of collections) {
+            const snapshot = await userDocRef.collection(col).get();
+            const batch = db.batch();
+            snapshot.docs.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
 
         await userDocRef.update({
             isDeceased: admin.firestore.FieldValue.delete(),
@@ -660,7 +689,7 @@ router.post('/force-suicide', async (req, res) => {
             PSY: '江湖路遠，就此終焉。',
             PC: `${username}引動內力，逆轉經脈，在一陣刺目的光芒中...化為塵土。`,
             NPC: [],
-            ITM: '隨身物品盡數焚毀。',
+            itemChanges: [],
             QST: '所有恩怨情仇，煙消雲散。',
             WRD: '一聲巨響傳遍數里，驚動了遠方的勢力。',
             LOR: '',
