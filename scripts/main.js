@@ -232,7 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameState.isRequesting || !gameState.currentChatNpc) return;
         const npcNameToSummarize = gameState.currentChatNpc;
         
-        // 【核心修改】調整函式執行順序以正確顯示動畫
         modal.closeChatModal();
         gameState.isInChat = false; 
         setLoadingState(true, '正在總結對話，更新江湖事態...');
@@ -255,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
-            // 重置聊天相關狀態
             gameState.currentChatNpc = null;
             gameState.chatHistory = [];
             setLoadingState(false);
@@ -370,12 +368,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 sendChatMessage();
             }
         });
+        
+        // --- 【核心修改】 ---
         closeChatBtn.addEventListener('click', () => {
              gameState.isInChat = false;
              gameState.currentChatNpc = null;
              gameState.chatHistory = [];
              modal.closeChatModal();
+             // 【新增】補上這一步，在關閉視窗後，立刻重新評估並解除主介面的禁用狀態
+             setLoadingState(false); 
         });
+        
         endChatBtn.addEventListener('click', endChatSession);
         
         giveItemBtn.addEventListener('click', () => {
