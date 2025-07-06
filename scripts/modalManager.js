@@ -1,5 +1,5 @@
 // scripts/modalManager.js
-import { api } from './api.js'; // 【核心新增】導入api模組
+import { api } from './api.js';
 
 // --- 獲取所有彈窗相關的 DOM 元素 ---
 const deceasedOverlay = document.getElementById('deceased-overlay');
@@ -21,6 +21,44 @@ const giveItemBtn = document.getElementById('give-item-btn');
 const giveItemModal = document.getElementById('give-item-modal');
 const giveInventoryList = document.getElementById('give-inventory-list');
 const cancelGiveBtn = document.getElementById('cancel-give-btn');
+
+
+// --- Helper Functions ---
+function displayRomanceValue(value) {
+    // 根據 romanceValue 計算愛心等級 (0-5)
+    // 0: 0-9, 1: 10-29, 2: 30-49, 3: 50-69, 4: 70-89, 5: 90+
+    let level = 0;
+    if (value >= 90) {
+        level = 5;
+    } else if (value >= 70) {
+        level = 4;
+    } else if (value >= 50) {
+        level = 3;
+    } else if (value >= 30) {
+        level = 2;
+    } else if (value >= 10) {
+        level = 1;
+    }
+
+    const heartsContainer = document.createElement('div');
+    heartsContainer.className = 'romance-hearts';
+    heartsContainer.title = `心動值: ${value}`;
+
+    for (let i = 0; i < 5; i++) {
+        const heartSpan = document.createElement('span');
+        heartSpan.className = i < level ? 'fas fa-heart' : 'far fa-heart'; // 實心或空心
+        heartsContainer.appendChild(heartSpan);
+    }
+
+    // 清除舊的愛心顯示
+    const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
+    if (existingHearts) {
+        existingHearts.remove();
+    }
+    
+    // 插入到外觀描述的前面
+    chatNpcInfo.prepend(heartsContainer);
+}
 
 
 // --- 死亡畫面 ---
@@ -63,7 +101,11 @@ export function setCombatLoading(isLoading) {
 // --- 對話彈窗 ---
 export function openChatModalUI(profile) {
     chatNpcName.textContent = `與 ${profile.name} 交談`;
-    chatNpcInfo.textContent = profile.appearance || '';
+    chatNpcInfo.innerHTML = profile.appearance || ''; // 使用innerHTML以便後續插入HTML元素
+    
+    // 【核心修改】呼叫新的函式來顯示心動值
+    displayRomanceValue(profile.romanceValue);
+
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
     chatModal.classList.add('visible');
 }
@@ -74,14 +116,12 @@ export function closeChatModal() {
 
 export function appendChatMessage(speaker, message) {
     const messageDiv = document.createElement('div');
-    // 【核心修正】修正class名稱，以符合CSS樣式
     if(speaker === 'player' || speaker === 'npc' || speaker === 'system') {
         messageDiv.className = `chat-log-area ${speaker}-message`;
     } else {
          messageDiv.className = `chat-log-area npc-message`;
     }
     
-    // 移除重複的 speaker: 標籤，讓樣式更簡潔
     messageDiv.innerHTML = message;
 
     chatLog.appendChild(messageDiv);
@@ -95,19 +135,17 @@ export function setChatLoading(isLoading) {
     }
 }
 
-// --- 【核心修改】贈予物品彈窗 ---
+// --- 贈予物品彈窗 ---
 export async function openGiveItemModal(currentNpcName, giveItemCallback) {
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
 
     try {
-        // 呼叫新的API函式來獲取詳細背包資料
         const inventory = await api.getInventory();
-        giveInventoryList.innerHTML = ''; // 清空讀取提示
+        giveInventoryList.innerHTML = ''; 
 
         let hasItems = false;
 
-        // 遍歷後端回傳的背包物件
         for (const [itemName, itemData] of Object.entries(inventory)) {
             hasItems = true;
             const itemDiv = document.createElement('div');
@@ -121,7 +159,6 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
             itemDiv.innerHTML = `<i class="fas ${iconClass}"></i> ${itemName} (數量: ${itemData.quantity})`;
             
             itemDiv.addEventListener('click', () => {
-                // 如果是銀兩，彈出輸入框
                 if (itemName === '銀兩') {
                     const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
                     if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
@@ -130,7 +167,6 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
                         alert('請輸入有效的數量。');
                     }
                 } else {
-                    // 如果是普通物品，直接贈送
                     giveItemCallback({ type: 'item', itemId: itemName, itemName: itemName });
                 }
             });
