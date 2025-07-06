@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人物關係圖</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="styles/base.css">
+    <link rel="stylesheet" href="styles/novel.css">
+    <style>
+        /* 關係圖頁面專用樣式 */
+        .relations-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            text-align: center;
+        }
+        .mermaid-chart {
+            margin-top: 2rem;
+            padding: 2rem;
+            background-color: var(--light-surface-bg);
+            border: 1px solid var(--light-border);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 50vh;
+            overflow: auto;
+        }
+        body.dark-theme .mermaid-chart {
+            background-color: var(--dark-surface-bg);
+            border-color: var(--dark-border);
+        }
+        .loading-text {
+            font-family: var(--font-serif);
+            color: var(--light-text-secondary);
+        }
+        body.dark-theme .loading-text {
+            color: var(--dark-text-secondary);
+        }
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="light-theme">
+
+    <div class="relations-container">
+        <header class="novel-header">
+            <h1 id="relations-title">人物關係圖</h1>
+            <p>記載著你與江湖中人的恩怨情仇</p>
+            <a href="index.html" class="back-to-game-btn">
+                <i class="fas fa-arrow-left"></i> 返回遊戲
+            </a>
+        </header>
+
+        <main id="relations-content" class="mermaid-chart">
+            <p class="loading-text">
+                <i class="fas fa-spinner fa-spin"></i>
+                正在梳理人物脈絡，繪製關係圖中...
+            </p>
+        </main>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: false });
+        window.mermaid = mermaid; // 將mermaid掛載到window上，方便我們的腳本呼叫
+    </script>
+    
+    <script type="module" src="scripts/relations.js"></script>
+</body>
+</html>
