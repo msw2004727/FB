@@ -96,8 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.setChatLoading(isLoading && gameState.isInChat);
     }
 
-    // --- 事件處理函式 ---
+    // --- 【核心修改】事件處理函式 ---
     async function handlePlayerAction() {
+        // 【新增】在函式開始時，記錄開始時間
+        const startTime = performance.now();
+
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
         playerInput.value = '';
@@ -138,6 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (document.getElementById('deceased-overlay').classList.contains('visible') === false) {
                  setLoadingState(false);
             }
+            // 【新增】在函式結束前，計算並印出總耗時
+            const endTime = performance.now();
+            const durationInSeconds = ((endTime - startTime) / 1000).toFixed(2);
+            console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);
         }
     }
 
@@ -369,13 +376,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // --- 【核心修改】 ---
         closeChatBtn.addEventListener('click', () => {
              gameState.isInChat = false;
              gameState.currentChatNpc = null;
              gameState.chatHistory = [];
              modal.closeChatModal();
-             // 【新增】補上這一步，在關閉視窗後，立刻重新評估並解除主介面的禁用狀態
              setLoadingState(false); 
         });
         
