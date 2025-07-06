@@ -3,13 +3,16 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const { getAIPrequel, getAISuggestion } = require('../services/aiService.js');
+const authMiddleware = require('../middleware/auth.js'); // 【新增】導入驗證中間件
 
 const router = express.Router();
 const db = admin.firestore();
 
+router.use(authMiddleware); // 【新增】在所有路由執行前，先進行身分驗證
+
 // 讀取最新進度
 router.get('/latest-game', async (req, res) => {
-    const userId = req.user.id;
+    const userId = req.user.id; // 現在 req.user 應該會存在
     const userDocRef = db.collection('users').doc(userId);
     try {
         const userDoc = await userDocRef.get();
