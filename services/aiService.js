@@ -25,15 +25,15 @@ const grok = new OpenAI({
 
 
 // --- 從 prompts 資料夾導入腳本 ---
-const { getStoryPrompt } = require('../prompts/storyPrompt');
-const { getNarrativePrompt } = require('../prompts/narrativePrompt');
-const { getSummaryPrompt } = require('../prompts/summaryPrompt');
-const { getPrequelPrompt } = require('../prompts/prequelPrompt');
-const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
-const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
-const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
+const { getStoryPrompt } = require('../prompts/storyPrompt.js');
+const { getNarrativePrompt } = require('../prompts/narrativePrompt.js');
+const { getSummaryPrompt } = require('../prompts/summaryPrompt.js');
+const { getPrequelPrompt } = require('../prompts/prequelPrompt.js');
+const { getSuggestionPrompt } = require('../prompts/suggestionPrompt.js');
+const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
+const { getRandomEventPrompt } = require('../prompts/randomEventPrompt.js');
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
-const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt');
+const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 
 
 // 統一的AI調度中心
@@ -64,8 +64,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
             case 'grok':
-                // 【修改】根據您的 curl 指令，將模型從 "grok-3-mini" 更新為 "grok-3-latest"
-                options.model = "grok-3-latest";
+                // 【修改】根據您的截圖，將模型修正為您實際擁有權限的 "grok-3-mini"
+                options.model = "grok-3-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
