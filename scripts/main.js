@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentChatNpc: null,
         chatHistory: [],
     };
+    let tipInterval = null; // 【新增】用於存放提示輪播的計時器
 
     // --- 全局讀取動畫 ---
     const aiThinkingLoader = document.createElement('div');
@@ -56,6 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     mainContent.appendChild(aiThinkingLoader);
     const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
+
+    // 【新增】輪播提示的函式
+    function rotateTip() {
+        if (gameTips.length > 0) {
+            const randomIndex = Math.floor(Math.random() * gameTips.length);
+            if (loaderTipElement) {
+                loaderTipElement.textContent = gameTips[randomIndex];
+            }
+        }
+    }
 
     // --- 通用函式 ---
     function setLoadingState(isLoading, text = '') {
@@ -72,9 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         if(loaderTextElement) loaderTextElement.textContent = text;
         
+        // 【修改】啟動/停止輪播邏輯
         if (isLoading && !gameState.isInCombat && !gameState.isInChat) {
-            const randomIndex = Math.floor(Math.random() * gameTips.length);
-            if (loaderTipElement) loaderTipElement.textContent = `小提示：${gameTips[randomIndex]}`;
+            rotateTip(); // 立即顯示第一條
+            tipInterval = setInterval(rotateTip, 15000); // 每15秒換一條
+        } else {
+            clearInterval(tipInterval); // 停止輪播
         }
 
         aiThinkingLoader.classList.toggle('visible', isLoading && !gameState.isInCombat && !gameState.isInChat);
@@ -98,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 model: aiModelSelector.value 
             });
 
-            // 處理API回應的核心邏輯
             if (data && data.roundData) {
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
@@ -110,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 startCombat(data.combatInfo.initialState);
             } else if (data.roundData.playerState === 'dead') {
                 modal.showDeceasedScreen();
-                setLoadingState(true); // 死亡後鎖定介面
+                setLoadingState(true); 
             }
         } catch (error) {
             handleApiError(error);
@@ -334,11 +347,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await api.getLatestGame();
             if (data.gameState === 'deceased') {
                 modal.showDeceasedScreen();
-                // 即使死亡，也嘗試更新一次最後的狀態
                 if(data.roundData) {
                     updateUI('', data.roundData, null);
                 }
-                setLoadingState(true); // 鎖定介面
+                setLoadingState(true); 
             } else {
                 gameState.currentRound = data.roundData.R;
                 storyTextContainer.innerHTML = '';
@@ -352,7 +364,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             if (error.message.includes('找不到存檔')) {
-                // 如果是404，則開始新遊戲
                 storyTextContainer.innerHTML = '';
                 updateUI('你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。', { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1 });
             } else {
