@@ -42,7 +42,7 @@ ${longTermSummary}
 
 ### 情況二：再次遇到已知的NPC
 -   當玩家與之前見過面的NPC重逢時，你需要在 \`NPC\` 陣列中提供一個包含該角色更新後狀態的完整物件。
--   這個物件應包含 \`"name"\`、\`"status"\`、更新後的 \`"friendliness"\`，以及該角色的 \`"personality"\`（此資訊應從舊摘要中獲取）。
+-   這個物件應包含 \`"name"\`、\`"status"\`、更新後的 \`"friendliness"\`、角色的 \`"personality"\`（此資訊應從舊摘要中獲取），以及最重要的 **\`"location"\`**。
 -   **【嚴格規則】** 在這種情況下，**絕對不能**包含 \`isNew\` 這個鍵。
 
 **再次相遇範例（JSON的\`NPC\`部分）：**
@@ -51,7 +51,8 @@ ${longTermSummary}
   "name": "王大夫",
   "status": "看到你康復了許多，露出了欣慰的笑容",
   "friendliness": "friendly",
-  "personality": "仁厚, 謹慎"
+  "personality": "仁厚, 謹慎",
+  "location": "無名村藥鋪"
 }]
 \`\`\`
 
@@ -63,6 +64,7 @@ ${longTermSummary}
   "npcId": "王大夫",
   "name": "王大夫",
   "gender": "男",
+  "currentLocation": "無名村藥鋪",
   "allegiance": "中立善良",
   "personality": ["仁厚", "謹慎", "略帶迂腐"],
   "goals": ["找出治癒女兒絕症的方法(雖然已故)", "守護無名村的安寧"],
@@ -183,7 +185,7 @@ ${longTermSummary}
     - LOC: (陣列) [地點名稱, {地點狀態}]
     - PSY: (字串) 角色內心獨白或感受
     - PC: (字串) 玩家狀態變化
-    - **NPC: (陣列) 請嚴格遵守上面最新的NPC資料結構規則。**
+    - **NPC: (陣列) 請嚴格遵守上面最新的NPC資料結構規則。在你的NPC陣列中，每一個NPC物件都**必須**要有一個 "location" 鍵，用來標示該NPC目前所在的位置。**
     - ITM: (字串) 物品變化
     - QST: (字串) 任務變化
     - WRD: (字串) 天氣狀況 (例如：晴空萬里、陰雨綿綿、狂風大作)。
