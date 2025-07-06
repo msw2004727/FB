@@ -334,3 +334,28 @@ body.dark-theme .random-event-message {
     background-color: var(--dark-surface-bg);
     color: var(--dark-text-primary);
 }
+
+
+/* --- 【核心修改】AI 核心切換提示樣式 --- */
+.ai-switch-notification {
+    color: #155724; /* 醒目的綠色 */
+    background-color: #d4edda; /* 淡綠色背景 */
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    padding: 0.75rem 1.25rem;
+    margin-top: 1rem;
+    text-align: center;
+    font-style: normal; /* 取消系統訊息的斜體 */
+    font-weight: bold;
+    transition: opacity 0.5s ease-in-out;
+}
+
+body.dark-theme .ai-switch-notification {
+    color: #a3e6b8;
+    background-color: #2e4b37;
+    border-color: #3f684e;
+}
+
+.ai-switch-notification.fading-out {
+    opacity: 0;
+}
