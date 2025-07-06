@@ -453,10 +453,38 @@ body.dark-theme .chat-header h3 {
     font-style: italic;
 }
 
-.chat-close-btn {
+/* --- 【核心修改】 --- */
+.chat-close-container {
     position: absolute;
-    top: 0.5rem;
+    top: 0.75rem;
     right: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.chat-close-tip {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: var(--light-text-secondary);
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.chat-close-container:hover .chat-close-tip {
+    opacity: 1;
+}
+
+body.dark-theme .chat-close-tip {
+    color: var(--dark-text-secondary);
+}
+
+.chat-close-btn {
+    /* 移除絕對定位，讓它在容器內流動 */
+    position: relative;
+    top: auto;
+    right: auto;
     background: none;
     border: none;
     color: var(--light-text-secondary);
@@ -471,6 +499,7 @@ body.dark-theme .chat-header h3 {
 body.dark-theme .chat-close-btn:hover {
     color: var(--dark-text-primary);
 }
+
 
 .chat-log-area {
     flex-grow: 1;
@@ -532,11 +561,10 @@ body.dark-theme #chat-input {
     color: var(--dark-text-primary);
 }
 
-/* 【核心修改】確保按鈕大小一致 */
 #chat-action-btn, .give-item-btn {
     flex-shrink: 0;
-    width: 80px; /* 設定一個固定的寬度 */
-    height: 44px; /* 設定一個固定的高度 */
+    width: 80px; 
+    height: 44px;
     padding: 0.5rem;
     border: none;
     background-color: var(--light-accent);
