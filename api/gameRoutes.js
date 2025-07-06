@@ -6,8 +6,8 @@ const authMiddleware = require('../middleware/auth');
 const {
     getAIStory,
     getAISummary,
-    // 【優化】移除 getNarrative 的導入，因為不再需要
-    // getNarrative, 
+    // 【修正】為了向下相容，我們將 getNarrative 加回來
+    getNarrative,
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
@@ -90,7 +90,6 @@ async function updateInventory(userId, itemChanges) {
                 }
             }
         }
-        // 【核心修正】移除 { merge: true }，確保在刪除物品時能完整覆蓋文件
         transaction.set(inventoryRef, inventory);
     });
 }
@@ -252,6 +251,7 @@ router.post('/end-chat', async (req, res) => {
     const { npcName, fullChatHistory } = req.body;
 
     if (!fullChatHistory || fullChatHistory.length === 0) {
+        // 【修正】這裡不應該回傳一個完整的遊戲回合，而是一個簡單的消息
         return res.json({ message: '對話已結束，江湖故事繼續。' });
     }
 
@@ -278,7 +278,7 @@ router.post('/end-chat', async (req, res) => {
                 model: mainModel
             }
         };
-
+        // 直接調用 interactRouteHandler 來處理後續
         interactRouteHandler(mockedReq, res);
 
     } catch (error) {
@@ -314,13 +314,11 @@ router.post('/give-item', async (req, res) => {
         let lastRoundData = latestSaveSnapshot.docs[0].data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
 
-        // 1. 獲取NPC反應和友好度變化
         const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, giveData);
         if (!aiResponse) throw new Error('AI未能生成有效的贈予反應。');
         
         const { npc_response, friendlinessChange } = aiResponse;
         
-        // 2. 更新資料庫
         const newFriendlinessValue = (npcProfile.friendlinessValue || 0) + friendlinessChange;
         await npcDocRef.update({ 
             friendlinessValue: newFriendlinessValue,
@@ -330,37 +328,37 @@ router.post('/give-item', async (req, res) => {
         const itemChanges = [{ action: 'remove', itemName, quantity: amount || 1 }];
         await updateInventory(userId, itemChanges);
         
-        // 3. 建立新的回合資料
         const newRoundNumber = lastRoundData.R + 1;
         const inventoryState = await getInventoryState(userId);
         
-        // 複製上一回合的狀態，並更新變化
         const newRoundData = { ...lastRoundData };
         newRoundData.R = newRoundNumber;
         newRoundData.ITM = inventoryState.itemsString;
         newRoundData.money = inventoryState.money;
-        newRoundData.PC = `${username}將${itemName}贈予了${npcName}。`; // 簡短的事件描述
+        newRoundData.PC = `${username}將${itemName}贈予了${npcName}。`;
         newRoundData.EVT = `贈予${npcName}物品`;
-        // 更新NPC狀態
+        
         const npcIndex = newRoundData.NPC.findIndex(n => n.name === npcName);
         if (npcIndex !== -1) {
             newRoundData.NPC[npcIndex].friendliness = getFriendlinessLevel(newFriendlinessValue);
-            newRoundData.NPC[npcIndex].status = npc_response; // 將AI回應作為NPC的最新狀態
+            newRoundData.NPC[npcIndex].status = npc_response;
         } else {
-            // 如果NPC不在上一回合的列表中，新增他
             newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(newFriendlinessValue) });
         }
         
-        // 4. 生成新的旁白和摘要
         const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
-        const suggestion = await getAISuggestion(model, newRoundData);
-        const newSummary = await getAISummary(model, longTermSummary, newRoundData);
-
-        // 5. 儲存新回合和摘要
+        
+        // 【優化注入】將 story 直接寫入回合數據，以便讀取時使用
+        newRoundData.story = narrativeText; 
+        
+        const [newSummary, suggestion] = await Promise.all([
+            getAISummary(model, longTermSummary, newRoundData),
+            getAISuggestion(model, newRoundData)
+        ]);
+        
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-        // 6. 回傳標準的回合物件
         res.json({
             story: narrativeText,
             roundData: newRoundData,
@@ -374,7 +372,6 @@ router.post('/give-item', async (req, res) => {
 });
 
 
-// --- 【核心優化修改開始】 ---
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -383,7 +380,6 @@ const interactRouteHandler = async (req, res) => {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
         const userDocRef = db.collection('users').doc(userId);
         
-        // 1. 初始資料準備
         const userDoc = await userDocRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
         if (userProfile.isDeceased) {
@@ -408,7 +404,6 @@ const interactRouteHandler = async (req, res) => {
         let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
 
-        // 2. 呼叫故事大師生成核心劇情
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality);
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
 
@@ -417,28 +412,27 @@ const interactRouteHandler = async (req, res) => {
         
         // 【優化】直接使用 story 大師產出的故事文本
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
+        // 【優化注入】將 story 寫入 roundData，以便 /latest-game 路由可以直接使用
+        aiResponse.roundData.story = aiResponse.story;
 
-        // 3. 【並行處理】同時呼叫 AI 更新摘要和生成建議
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData).catch(err => {
                 console.error("[優化流程] 摘要生成失敗，將沿用舊摘要:", err.message);
-                return longTermSummary; // 即使摘要失敗，也返回舊摘要，確保遊戲繼續
+                return longTermSummary;
             }),
             getAISuggestion(modelName, aiResponse.roundData).catch(err => {
                 console.error("[優化流程] 建議生成失敗:", err.message);
-                return "先靜觀其變吧。"; // 即使建議失敗，也返回一個預設建議
+                return "先靜觀其變吧。";
             })
         ]);
         
         aiResponse.suggestion = suggestion;
         
-        // 4. 先執行必要的同步資料庫讀寫
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         const inventoryState = await getInventoryState(userId);
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
         
-        // 5. NPC 狀態更新 (這部分依然需要 await)
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
@@ -446,7 +440,7 @@ const interactRouteHandler = async (req, res) => {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                 } else if (npc.friendlinessChange !== undefined) {
-                    // ... (此處省略了與原檔案相同的友好度更新邏輯)
+                    // 省略友好度更新...
                 }
                 if (npc.location) {
                     return npcDocRef.set({ currentLocation: npc.location }, { merge: true });
@@ -456,21 +450,18 @@ const interactRouteHandler = async (req, res) => {
             await Promise.all(npcUpdatePromises);
         }
 
-        // 6. 計算並準備更新玩家狀態
         let turnsSinceEvent = userProfile.turnsSinceEvent || 0;
         if (aiResponse.roundData.enterCombat) {
-            console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
             const initialLog = aiResponse.roundData.combatIntro || '戰鬥開始了！';
             const combatState = { turn: 1, player: { username: username }, enemies: aiResponse.roundData.combatants, log: [initialLog] };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
             turnsSinceEvent = 0;
         } else if (turnsSinceEvent >= 3) {
-            console.log(`[事件系統] 隨機事件功能已關閉。`);
             turnsSinceEvent = 0;
         }
         
-        const { powerChange, moralityChange, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
+        const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
         
         if (daysToAdvance && typeof daysToAdvance === 'number' && daysToAdvance > 0) {
             for (let i = 0; i < daysToAdvance; i++) { currentDate = advanceDate(currentDate); }
@@ -483,15 +474,13 @@ const interactRouteHandler = async (req, res) => {
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + (powerChange.internal || 0)));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + (powerChange.external || 0)));
         const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0)));
-        let newMorality = playerMorality + (moralityChange || 0);
+        let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
         
-        // 7. 組合最終的回合資料
         Object.assign(aiResponse.roundData, {
              internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay, ...currentDate 
         });
 
-        // 8. 所有計算完成後，一次性更新玩家主文件、新摘要和新存檔
         await Promise.all([
              userDocRef.update({ 
                 timeOfDay: nextTimeOfDay || currentTimeOfDay, 
@@ -511,7 +500,6 @@ const interactRouteHandler = async (req, res) => {
              await userDocRef.update({ isDeceased: true });
         }
 
-        // 9. 最後才回傳給前端
         res.json(aiResponse);
 
     } catch (error) {
@@ -520,8 +508,6 @@ const interactRouteHandler = async (req, res) => {
     }
 }
 router.post('/interact', interactRouteHandler);
-// --- 【核心優化修改結束】 ---
-
 
 router.get('/get-encyclopedia', async (req, res) => {
     const userId = req.user.id;
@@ -610,6 +596,9 @@ router.post('/combat-action', async (req, res) => {
             const newRoundNumber = (lastRound.R || 0) + 1;
             aiResponse.roundData.R = newRoundNumber;
             
+            aiResponse.story = aiResponse.story || combatResult.narrative;
+            aiResponse.roundData.story = aiResponse.story;
+
             const inventoryState = await getInventoryState(userId);
             aiResponse.roundData.ITM = inventoryState.itemsString;
             aiResponse.roundData.money = inventoryState.money;
@@ -636,9 +625,6 @@ router.post('/combat-action', async (req, res) => {
 
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
-            
-            // 【優化】直接使用aiResponse中已有的story欄位
-            aiResponse.story = aiResponse.story || combatResult.narrative;
             
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
@@ -692,11 +678,17 @@ router.get('/latest-game', async (req, res) => {
             externalPower: userData.externalPower || 5,
             lightness: userData.lightness || 5,
             morality: userData.morality === undefined ? 0 : userData.morality,
+            preferredModel: userData.preferredModel,
         });
 
-        const prequelText = await getAIPrequel('deepseek', [latestGameData]);
-        const narrativeText = await getNarrative('deepseek', latestGameData);
-        const suggestion = await getAISuggestion('deepseek', latestGameData);
+        // 【修正】使用 Promise.all 並行處理，並移除 getNarrative
+        const [prequelText, suggestion] = await Promise.all([
+            getAIPrequel('deepseek', [latestGameData]),
+            getAISuggestion('deepseek', latestGameData)
+        ]);
+
+        // 【修正】故事文本直接從存檔的 roundData 中讀取
+        const narrativeText = latestGameData.story || "你靜靜地站在原地，思索著下一步。";
 
         res.json({
             prequel: prequelText,
@@ -730,12 +722,10 @@ router.get('/get-novel', async (req, res) => {
 
         const narrativePromises = snapshot.docs.map(doc => {
             const roundData = doc.data();
-            // 【優化】這裡依然可以使用舊的 getNarrative，因為它不影響主流程的速度
-            return getNarrative('deepseek', roundData).then(narrativeText => {
-                return {
-                    text: narrativeText,
-                    npcs: roundData.NPC || []
-                };
+            const narrativeText = roundData.story || "這段往事，已淹沒在時間的長河中。";
+            return Promise.resolve({
+                text: narrativeText,
+                npcs: roundData.NPC || []
             });
         });
 
@@ -830,6 +820,9 @@ router.post('/force-suicide', async (req, res) => {
             CLS: '',
             IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
         };
+        
+        // 將最後的遺言也作為故事儲存
+        finalRoundData.story = finalRoundData.PC;
 
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
 
