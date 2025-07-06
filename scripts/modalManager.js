@@ -55,7 +55,7 @@ export function setCombatLoading(isLoading) {
 
 // --- 對話彈窗 ---
 export function openChatModalUI(profile) {
-    chatNpcName.textContent = `與 ${profile.name} 密談中`;
+    chatNpcName.textContent = `與 ${profile.name} 交談`;
     chatNpcInfo.textContent = profile.appearance || '';
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
     chatModal.classList.add('visible');
