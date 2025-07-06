@@ -2,6 +2,7 @@
 import { api } from './api.js';
 import { updateUI, handleApiError, appendMessageToStory } from './uiUpdater.js';
 import * as modal from './modalManager.js';
+import { gameTips } from './tips.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- 登入驗證 ---
@@ -51,8 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
     aiThinkingLoader.innerHTML = `
         <div class="loader-text"></div>
         <div class="loader-dots"><span></span><span></span><span></span></div>
+        <div class="loader-tip"></div>
     `;
     mainContent.appendChild(aiThinkingLoader);
+    const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
 
     // --- 通用函式 ---
     function setLoadingState(isLoading, text = '') {
@@ -68,6 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         if(loaderTextElement) loaderTextElement.textContent = text;
+        
+        if (isLoading && !gameState.isInCombat && !gameState.isInChat) {
+            const randomIndex = Math.floor(Math.random() * gameTips.length);
+            if (loaderTipElement) loaderTipElement.textContent = `小提示：${gameTips[randomIndex]}`;
+        }
+
         aiThinkingLoader.classList.toggle('visible', isLoading && !gameState.isInCombat && !gameState.isInChat);
 
         modal.setCombatLoading(isLoading && gameState.isInCombat);
@@ -79,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
         playerInput.value = '';
-        setLoadingState(true);
+        setLoadingState(true, '江湖百曉生正在構思...');
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
         try {
@@ -88,8 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 round: gameState.currentRound, 
                 model: aiModelSelector.value 
             });
-            updateUI(data.story, data.roundData, data.randomEvent);
-            gameState.currentRound = data.roundData.R;
+
+            // 處理API回應的核心邏輯
+            if (data && data.roundData) {
+                updateUI(data.story, data.roundData, data.randomEvent);
+                gameState.currentRound = data.roundData.R;
+            } else {
+                throw new Error("從伺服器收到的回應格式不正確。");
+            }
             
             if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
                 startCombat(data.combatInfo.initialState);
@@ -124,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'COMBAT_ONGOING') {
                 modal.appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
-                modal.appendToCombatLog(data.finalLog, 'combat-summary');
+                modal.appendToCombatLog(data.newRound.story, 'combat-summary');
                 setTimeout(() => endCombat(data.newRound), 2000);
             }
         } catch (error) {
@@ -140,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.closeCombatModal();
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             gameState.currentRound = newRoundData.roundData.R;
-            updateUI(newRoundData.story, newRoundData.roundData, newRoundData.suggestion);
+            updateUI(newRoundData.story, newRoundData.roundData, null);
         } else {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
@@ -151,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = event.target.closest('.npc-name');
         if (target && !gameState.isRequesting) {
             const npcName = target.dataset.npcName || target.textContent;
-            setLoadingState(true);
+            setLoadingState(true, '正在查找此人檔案...');
             try {
                 const profile = await api.getNpcProfile(npcName);
                 gameState.isInChat = true;
@@ -201,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await api.endChat({
                 npcName: npcNameToSummarize,
                 fullChatHistory: gameState.chatHistory,
+                model: aiModelSelector.value
             });
             if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
                 appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
@@ -256,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         suicideButton.addEventListener('click', async () => {
             if (gameState.isRequesting) return;
             if (window.confirm("你確定要了卻此生，重新輪迴嗎？")) {
-                setLoadingState(true);
+                setLoadingState(true, '英雄末路，輪迴將啟...');
                 try {
                     const data = await api.forceSuicide();
                     updateUI(data.story, data.roundData, data.randomEvent);
@@ -279,12 +295,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         submitButton.addEventListener('click', handlePlayerAction);
-        playerInput.addEventListener('keypress', (e) => e.key === 'Enter' && (e.preventDefault(), handlePlayerAction()));
+        playerInput.addEventListener('keypress', (e) => {
+             if (e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
+                handlePlayerAction();
+            }
+        });
         combatActionButton.addEventListener('click', handleCombatAction);
-        combatInput.addEventListener('keypress', (e) => e.key === 'Enter' && (e.preventDefault(), handleCombatAction()));
+        combatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
+                handleCombatAction();
+            }
+        });
         storyTextContainer.addEventListener('click', handleNpcClick);
         chatActionBtn.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && (e.preventDefault(), sendChatMessage()));
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
         closeChatBtn.addEventListener('click', () => {
              gameState.isInChat = false;
              gameState.currentChatNpc = null;
@@ -298,12 +329,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadInitialGame() {
-        setLoadingState(true, '江湖說書人正在努力撰寫中...');
+        setLoadingState(true, '正在連接你的世界，讀取記憶中...');
         try {
             const data = await api.getLatestGame();
             if (data.gameState === 'deceased') {
                 modal.showDeceasedScreen();
-                updateUI('', data.roundData || {}, null);
+                // 即使死亡，也嘗試更新一次最後的狀態
+                if(data.roundData) {
+                    updateUI('', data.roundData, null);
+                }
                 setLoadingState(true); // 鎖定介面
             } else {
                 gameState.currentRound = data.roundData.R;
@@ -311,14 +345,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.prequel) {
                     const prequelDiv = document.createElement('div');
                     prequelDiv.className = 'prequel-summary';
-                    prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel}</p>`;
+                    prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                     storyTextContainer.appendChild(prequelDiv);
                 }
-                updateUI(data.story, data.roundData, data.suggestion);
+                updateUI(data.story, data.roundData, null);
             }
         } catch (error) {
             if (error.message.includes('找不到存檔')) {
                 // 如果是404，則開始新遊戲
+                storyTextContainer.innerHTML = '';
                 updateUI('你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。', { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1 });
             } else {
                 handleApiError(error);
