@@ -3,9 +3,12 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const { getNarrative, getAIEncyclopedia } = require('../services/aiService.js');
+const authMiddleware = require('../middleware/auth.js'); // 【新增】導入驗證中間件
 
 const router = express.Router();
 const db = admin.firestore();
+
+router.use(authMiddleware); // 【新增】在所有路由執行前，先進行身分驗證
 
 // 獲取小說
 router.get('/get-novel', async (req, res) => {
