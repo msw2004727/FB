@@ -55,6 +55,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const combatActionButton = document.getElementById('combat-action-btn');
     const combatLoader = document.getElementById('combat-loader');
 
+    // --- 【新增】對話彈窗 (江湖密談) 相關的DOM元素 ---
+    const chatModal = document.getElementById('chat-modal');
+    const chatNpcName = document.getElementById('chat-npc-name');
+    const chatNpcInfo = document.getElementById('chat-npc-info');
+    const closeChatBtn = document.getElementById('close-chat-btn');
+    const chatLog = document.getElementById('chat-log');
+    const chatInput = document.getElementById('chat-input');
+    const chatActionBtn = document.getElementById('chat-action-btn');
+    const endChatBtn = document.getElementById('end-chat-btn');
+    const chatLoader = document.getElementById('chat-loader');
+
+
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
@@ -175,6 +187,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRound = 0;
     let isRequesting = false;
     let isInCombat = false;
+    
+    // --- 【新增】對話系統狀態變數 ---
+    let isInChat = false;
+    let currentChatNpc = null;
+    let chatHistory = [];
 
     submitButton.addEventListener('click', handlePlayerAction);
     playerInput.addEventListener('keypress', (e) => {
@@ -185,11 +202,22 @@ document.addEventListener('DOMContentLoaded', () => {
     combatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); handleCombatAction(); }
     });
+    
+    // --- 【新增】為對話系統綁定事件 ---
+    // 使用事件委派，監聽整個故事面板的點擊事件
+    storyTextContainer.addEventListener('click', handleNpcClick);
+    chatActionBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); }
+    });
+    closeChatBtn.addEventListener('click', closeChatModal);
+    endChatBtn.addEventListener('click', endChatSession);
 
 
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
-        if (!actionText || isRequesting || isInCombat) return;
+        // 如果正在聊天或戰鬥，主輸入框應禁用
+        if (!actionText || isRequesting || isInCombat || isInChat) return;
 
         playerInput.value = '';
         actionSuggestion.textContent = '';
@@ -227,6 +255,160 @@ document.addEventListener('DOMContentLoaded', () => {
             setLoadingState(false);
         }
     }
+    
+    // --- 【新增】點擊 NPC 名字的處理函式 ---
+    async function handleNpcClick(event) {
+        // 檢查被點擊的是否是 NPC 的名字
+        const target = event.target.closest('.npc-name');
+        if (target) {
+            const npcName = target.textContent;
+            openChatModal(npcName);
+        }
+    }
+    
+    // --- 【新增】打開對話彈窗的函式 ---
+    async function openChatModal(npcName) {
+        if (isRequesting || isInCombat) return;
+        
+        setChatLoading(true);
+        chatModal.classList.add('visible');
+
+        try {
+            const response = await fetch(`${backendBaseUrl}/api/game/npc-profile/${npcName}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || '無法取得人物檔案');
+            }
+            const profile = await response.json();
+
+            // 更新彈窗標題和資訊
+            chatNpcName.textContent = `與 ${profile.name} 密談中`;
+            chatNpcInfo.textContent = profile.appearance || '';
+            
+            // 初始化對話狀態
+            isInChat = true;
+            currentChatNpc = profile.name;
+            chatHistory = []; 
+            chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
+            chatInput.focus();
+
+        } catch (error) {
+            console.error('打開對話窗失敗:', error);
+            chatLog.innerHTML = `<p class="system-message error">無法開啟對話：${error.message}</p>`;
+        } finally {
+            setChatLoading(false);
+        }
+    }
+    
+    // --- 【新增】發送對話訊息的函式 ---
+    async function sendChatMessage() {
+        const message = chatInput.value.trim();
+        if (!message || isRequesting) return;
+
+        chatInput.value = '';
+        appendChatMessage('player', message);
+        chatHistory.push({ speaker: 'player', message: message });
+
+        setChatLoading(true);
+
+        try {
+            const response = await fetch(`${backendBaseUrl}/api/game/npc-chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    npcName: currentChatNpc,
+                    chatHistory: chatHistory,
+                    playerMessage: message,
+                    model: aiModelSelector.value // 讓聊天也使用玩家選擇的AI
+                })
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'NPC似乎不想理你...');
+            }
+
+            const data = await response.json();
+            appendChatMessage('npc', data.reply);
+            chatHistory.push({ speaker: 'npc', message: data.reply });
+
+        } catch (error) {
+            appendChatMessage('system', `[系統錯誤: ${error.message}]`);
+        } finally {
+            setChatLoading(false);
+        }
+    }
+    
+    // --- 【新增】結束對話的函式 ---
+    async function endChatSession() {
+        if (isRequesting) return;
+
+        closeChatModal(); // 先關閉視窗
+        setLoadingState(true, '正在總結對話，更新江湖事態...'); // 顯示主畫面的讀取動畫
+
+        try {
+            const response = await fetch(`${backendBaseUrl}/api/game/end-chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    npcName: currentChatNpc,
+                    fullChatHistory: chatHistory
+                })
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || '結束對話時發生錯誤。');
+            }
+            
+            // 結束對話後，後端會回傳一個完整的主線更新
+            const data = await response.json();
+            
+            // 直接用這個回傳結果來更新主畫面UI
+            appendMessageToStory(`<p class="system-message">結束了與${currentChatNpc}的交談。</p>`);
+            updateUI(data.story, data.roundData, data.randomEvent);
+            currentRound = data.roundData.R;
+            if (data.suggestion) {
+                actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+            }
+
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            setLoadingState(false);
+        }
+    }
+    
+    // --- 【新增】關閉對話彈窗 (不儲存) ---
+    function closeChatModal() {
+        chatModal.classList.remove('visible');
+        isInChat = false;
+        currentChatNpc = null;
+        chatHistory = [];
+    }
+
+    // --- 【新增】在對話紀錄中追加訊息的輔助函式 ---
+    function appendChatMessage(speaker, message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add(`${speaker}-message`);
+        messageDiv.textContent = message;
+        chatLog.appendChild(messageDiv);
+        chatLog.scrollTop = chatLog.scrollHeight; // 自動滾動到底部
+    }
+
+    // --- 【新增】控制對話彈窗讀取狀態的函式 ---
+    function setChatLoading(isLoading) {
+        isRequesting = isLoading;
+        chatInput.disabled = isLoading;
+        chatActionBtn.disabled = isLoading;
+        endChatBtn.disabled = isLoading;
+        if(chatLoader) {
+            chatLoader.classList.toggle('visible', isLoading);
+        }
+    }
+
 
     function startCombat(initialState) {
         isInCombat = true;
@@ -260,7 +442,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${backendBaseUrl}/api/game/combat-action`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                // 【修改】將當前選擇的 AI 模型一起傳送給後端
                 body: JSON.stringify({ 
                     action: actionText, 
                     model: aiModelSelector.value 
@@ -369,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (aiThinkingLoader) {
              const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
              if(loaderTextElement) loaderTextElement.textContent = text;
-             aiThinkingLoader.classList.toggle('visible', isLoading && !isInCombat);
+             aiThinkingLoader.classList.toggle('visible', isLoading && !isInCombat && !isInChat);
         }
 
         // 戰鬥介面UI控制
@@ -416,8 +597,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (npcs && Array.isArray(npcs) && npcs.length > 0) {
             const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
             sortedNpcs.forEach(npc => {
-                const regex = new RegExp(npc.name, 'g');
-                const replacement = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>`;
+                // 使用更安全的正則表達式，避免特殊字符問題
+                const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const regex = new RegExp(npcNameEscaped, 'g');
+                const replacement = `<span class="npc-name" data-npc-name="${npc.name}">${npc.name}</span>`;
                 highlightedText = highlightedText.replace(regex, replacement);
             });
         }
