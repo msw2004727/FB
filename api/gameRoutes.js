@@ -21,18 +21,16 @@ const {
 
 const db = admin.firestore();
 
-// 【核心新增】友好度數值與等級對應的轉換函式
 const getFriendlinessLevel = (value) => {
-    if (value >= 100) return 'devoted';   // 崇拜
-    if (value >= 70) return 'trusted';    // 信賴
-    if (value >= 30) return 'friendly';   // 友善
-    if (value <= -100) return 'sworn_enemy'; // 死敵
-    if (value <= -50) return 'hostile';    // 敵對
-    if (value <= -10) return 'wary';       // 警惕
-    return 'neutral';                     // 中立
+    if (value >= 100) return 'devoted';
+    if (value >= 70) return 'trusted';
+    if (value >= 30) return 'friendly';
+    if (value <= -100) return 'sworn_enemy';
+    if (value <= -50) return 'hostile';
+    if (value <= -10) return 'wary';
+    return 'neutral';
 };
 
-// --- 在背景建立 NPC 詳細檔案的非同步函式 ---
 const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
     const npcName = npcData.name;
     console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序。`);
@@ -48,11 +46,9 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
-            // 【核心修改】統一友好度系統
             npcProfile.currentLocation = roundData.LOC[0];
             npcProfile.friendlinessValue = npcData.friendlinessValue || 0;
             npcProfile.friendliness = getFriendlinessLevel(npcProfile.friendlinessValue);
-
             await npcDocRef.set(npcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
         } else {
@@ -63,32 +59,21 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// 物品帳本處理函式
 async function updateInventory(userId, itemChanges) {
     if (!itemChanges || itemChanges.length === 0) {
         return;
     }
-
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
-    
     await db.runTransaction(async (transaction) => {
         const doc = await transaction.get(inventoryRef);
         let inventory = doc.exists ? doc.data() : {};
-
         for (const change of itemChanges) {
             const { action, itemName, quantity = 1, itemType, rarity, description } = change;
-
             if (action === 'add') {
                 if (inventory[itemName]) {
                     inventory[itemName].quantity += quantity;
                 } else {
-                    inventory[itemName] = {
-                        quantity,
-                        itemType: itemType || '其他',
-                        rarity: rarity || '普通',
-                        description: description || '一個神秘的物品。',
-                        addedAt: admin.firestore.FieldValue.serverTimestamp()
-                    };
+                    inventory[itemName] = { quantity, itemType: itemType || '其他', rarity: rarity || '普通', description: description || '一個神秘的物品。', addedAt: admin.firestore.FieldValue.serverTimestamp() };
                 }
                 console.log(`[物品系統] 新增物品: ${itemName} x${quantity}`);
             } else if (action === 'remove') {
@@ -107,21 +92,31 @@ async function updateInventory(userId, itemChanges) {
     });
 }
 
-// 獲取物品顯示字串的函式
-async function getInventoryDisplay(userId) {
+// 【核心修改】將 getInventoryDisplay 升級為 getInventoryState
+async function getInventoryState(userId) {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
     if (!doc.exists) {
-        return '行囊空空';
+        return { money: 0, itemsString: '行囊空空' };
     }
+
     const inventory = doc.data();
-    const items = Object.entries(inventory).map(([name, data]) => {
-        return `${name} x${data.quantity}`;
-    });
+    let money = 0;
+    const otherItems = [];
 
-    return items.length > 0 ? items.join('、') : '行囊空空';
+    for (const [name, data] of Object.entries(inventory)) {
+        if (name === '銀兩') {
+            money = data.quantity || 0;
+        } else {
+            otherItems.push(`${name} x${data.quantity}`);
+        }
+    }
+
+    return {
+        money: money,
+        itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物'
+    };
 }
-
 
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -132,17 +127,14 @@ function advanceDate(currentDate) {
     if (day > DAYS_IN_MONTH[month]) {
         day = 1;
         month++;
-        if (month > 12) {
-            month = 1;
-            year++;
-        }
+        if (month > 12) { month = 1; year++; }
     }
     return { year, month, day, yearName };
 }
 
 router.use(authMiddleware);
 
-// --- 對話系統路由 ---
+// ... (npc-profile, npc-chat, end-chat 路由保持不變) ...
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
@@ -189,7 +181,6 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         res.status(500).json({ message: '讀取人物檔案時發生內部錯誤。' });
     }
 });
-
 router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
@@ -214,7 +205,6 @@ router.post('/npc-chat', async (req, res) => {
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
     }
 });
-
 router.post('/end-chat', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -256,12 +246,11 @@ router.post('/end-chat', async (req, res) => {
         res.status(500).json({ message: '結束對話並更新世界時發生錯誤。' });
     }
 });
-
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const { giveData, model = 'gemini' } = req.body;
-    const { type, target, amount, itemId, itemName } = giveData;
+    const { type, target, amount, itemName } = giveData;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -284,14 +273,9 @@ router.post('/give-item', async (req, res) => {
         const currentFriendlinessValue = npcProfile.friendlinessValue || 0;
         
         const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, { type, amount, itemName });
-
-        if (!aiResponse) {
-            throw new Error('AI未能生成有效的贈予反應。');
-        }
-
+        if (!aiResponse) throw new Error('AI未能生成有效的贈予反應。');
+        
         const { npc_response, friendlinessChange } = aiResponse;
-
-        // 更新NPC友好度
         const newFriendlinessValue = currentFriendlinessValue + friendlinessChange;
         const newFriendlinessLevel = getFriendlinessLevel(newFriendlinessValue);
 
@@ -300,15 +284,15 @@ router.post('/give-item', async (req, res) => {
             friendliness: newFriendlinessLevel
         });
         
-        // 從玩家背包移除物品
         const itemToRemove = type === 'money' ? '銀兩' : itemName;
         const quantityToRemove = type === 'money' ? amount : 1;
         await updateInventory(userId, [{ action: 'remove', itemName: itemToRemove, quantity: quantityToRemove }]);
         
-        // 更新ITM字串以供顯示
-        lastRoundData.ITM = await getInventoryDisplay(userId);
+        // 【核心修改】使用新的函式來更新錢袋和物品
+        const inventoryState = await getInventoryState(userId);
+        lastRoundData.ITM = inventoryState.itemsString;
+        lastRoundData.money = inventoryState.money;
         
-        // 更新敘述
         const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, target, itemName || `${amount}文錢`, npc_response);
         lastRoundData.PC = narrativeText; 
         
@@ -323,15 +307,12 @@ router.post('/give-item', async (req, res) => {
     }
 });
 
-
-// --- 主遊戲路由 ---
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
 
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
-
         const userDocRef = db.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
@@ -341,29 +322,16 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        let currentDate = {
-            yearName: userProfile.yearName || '元祐',
-            year: userProfile.year || 1,
-            month: userProfile.month || 1,
-            day: userProfile.day || 1
-        };
+        let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
         let turnsSinceEvent = userProfile.turnsSinceEvent || 0;
-
-        const playerPower = {
-            internal: userProfile.internalPower || 5,
-            external: userProfile.externalPower || 5,
-            lightness: userProfile.lightness || 5
-        };
+        const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
-
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const summaryDoc = await summaryDocRef.get();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
-
         let recentHistoryRounds = [];
-        const memoryDepth = 3;
         if (currentRound > 0) {
-            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(memoryDepth).get();
+            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get();
             savesSnapshot.forEach(doc => recentHistoryRounds.push(doc.data()));
             recentHistoryRounds.sort((a, b) => a.R - b.R);
         }
@@ -375,9 +343,13 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         
         await updateInventory(userId, aiResponse.roundData.itemChanges);
-        const inventoryDisplayString = await getInventoryDisplay(userId);
-        aiResponse.roundData.ITM = inventoryDisplayString; 
-
+        
+        // 【核心修改】使用新的函式來獲取錢袋和物品資訊
+        const inventoryState = await getInventoryState(userId);
+        aiResponse.roundData.ITM = inventoryState.itemsString;
+        aiResponse.roundData.money = inventoryState.money;
+        
+        // ... (NPC友好度更新邏輯保持不變) ...
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = [];
             for (const npc of aiResponse.roundData.NPC) {
@@ -409,23 +381,17 @@ const interactRouteHandler = async (req, res) => {
             await Promise.all(npcUpdatePromises);
         }
 
-        const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
 
+        const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
         const daysToAdvance = aiResponse.roundData.daysToAdvance;
         if (daysToAdvance && typeof daysToAdvance === 'number' && daysToAdvance > 0) {
-            for (let i = 0; i < daysToAdvance; i++) {
-                currentDate = advanceDate(currentDate);
-            }
+            for (let i = 0; i < daysToAdvance; i++) { currentDate = advanceDate(currentDate); }
         } else {
             const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
             const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
-            if (newTimeIndex < oldTimeIndex) {
-                currentDate = advanceDate(currentDate);
-            }
+            if (newTimeIndex < oldTimeIndex) { currentDate = advanceDate(currentDate); }
         }
-
         turnsSinceEvent++;
-
         let powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 };
         let moralityChange = aiResponse.roundData.moralityChange || 0;
         let newPlayerStateDescription = aiResponse.roundData.PC;
@@ -433,17 +399,9 @@ const interactRouteHandler = async (req, res) => {
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 玩家 ${username} 進入戰鬥！`);
             const initialLog = aiResponse.roundData.combatIntro || '戰鬥開始了！';
-            const combatState = {
-                turn: 1,
-                player: { username: username },
-                enemies: aiResponse.roundData.combatants,
-                log: [initialLog]
-            };
+            const combatState = { turn: 1, player: { username: username }, enemies: aiResponse.roundData.combatants, log: [initialLog] };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
-            aiResponse.combatInfo = {
-                status: 'COMBAT_START',
-                initialState: combatState
-            };
+            aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
             turnsSinceEvent = 0;
         } else if (turnsSinceEvent >= 3) {
             console.log(`[事件系統] 隨機事件功能已關閉。`);
@@ -455,28 +413,9 @@ const interactRouteHandler = async (req, res) => {
         const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0)));
         let newMorality = playerMorality + moralityChange;
         newMorality = Math.max(-100, Math.min(100, newMorality));
-
         aiResponse.roundData.PC = newPlayerStateDescription;
-
-        Object.assign(aiResponse.roundData, {
-            internalPower: newInternalPower,
-            externalPower: newExternalPower,
-            lightness: newLightness,
-            morality: newMorality,
-            timeOfDay: nextTimeOfDay,
-            ...currentDate
-        });
-
-        await userDocRef.update({
-            timeOfDay: nextTimeOfDay,
-            internalPower: newInternalPower,
-            externalPower: newExternalPower,
-            lightness: newLightness,
-            morality: newMorality,
-            turnsSinceEvent: turnsSinceEvent,
-            preferredModel: modelName,
-            ...currentDate
-        });
+        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay, ...currentDate });
+        await userDocRef.update({ timeOfDay: nextTimeOfDay, internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, turnsSinceEvent: turnsSinceEvent, preferredModel: modelName, ...currentDate });
 
         if (aiResponse.roundData.playerState === 'dead') {
             await userDocRef.update({ isDeceased: true });
@@ -501,6 +440,7 @@ const interactRouteHandler = async (req, res) => {
 router.post('/interact', interactRouteHandler);
 
 
+// ... (get-encyclopedia, combat-action, latest-game, get-novel, restart, force-suicide 路由保持不變) ...
 router.get('/get-encyclopedia', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -521,8 +461,6 @@ router.get('/get-encyclopedia', async (req, res) => {
         res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
     }
 });
-
-
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
     const { action, model } = req.body;
@@ -589,9 +527,9 @@ router.post('/combat-action', async (req, res) => {
             const newRoundNumber = (lastRound.R || 0) + 1;
             aiResponse.roundData.R = newRoundNumber;
             
-            // 【核心修正】戰鬥後也要更新物品顯示
-            const inventoryDisplayString = await getInventoryDisplay(userId);
-            aiResponse.roundData.ITM = inventoryDisplayString;
+            const inventoryState = await getInventoryState(userId);
+            aiResponse.roundData.ITM = inventoryState.itemsString;
+            aiResponse.roundData.money = inventoryState.money;
             
             const finalInternalPower = Math.max(0, Math.min(999, updatedProfile.internalPower + (aiResponse.roundData.powerChange?.internal || 0)));
             const finalExternalPower = Math.max(0, Math.min(999, updatedProfile.externalPower + (aiResponse.roundData.powerChange?.external || 0)));
@@ -641,8 +579,6 @@ router.post('/combat-action', async (req, res) => {
         res.status(500).json({ message: error.message || "戰鬥中發生未知錯誤" });
     }
 });
-
-
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -659,8 +595,13 @@ router.get('/latest-game', async (req, res) => {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
 
-        const latestGameData = snapshot.docs[0].data();
+        let latestGameData = snapshot.docs[0].data();
 
+        // 【核心修改】從新的函式獲取錢袋和物品
+        const inventoryState = await getInventoryState(userId);
+        latestGameData.ITM = inventoryState.itemsString;
+        latestGameData.money = inventoryState.money;
+        
         Object.assign(latestGameData, {
             internalPower: userData.internalPower || 5,
             externalPower: userData.externalPower || 5,
@@ -684,7 +625,6 @@ router.get('/latest-game', async (req, res) => {
         res.status(500).json({ message: "讀取最新進度失敗。" });
     }
 });
-
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -724,7 +664,6 @@ router.get('/get-novel', async (req, res) => {
         res.status(500).json({ message: "生成小說時出錯。" });
     }
 });
-
 router.post('/restart', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -762,7 +701,6 @@ router.post('/restart', async (req, res) => {
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
-
 router.post('/force-suicide', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -817,6 +755,5 @@ router.post('/force-suicide', async (req, res) => {
         res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
-
 
 module.exports = router;
