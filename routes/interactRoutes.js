@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const { getAIStory, getAISummary, getAISuggestion, getAICombatAction } = require('../services/aiService.js');
 const { createNpcProfileInBackground } = require('../services/npcService.js');
 const { advanceDate, shouldAdvanceDay, applyItemChanges } = require('../utils/gameLogic.js');
+const authMiddleware = require('../middleware/auth.js'); // 【新增】導入驗證中間件
 
 const router = express.Router();
 const db = admin.firestore();
