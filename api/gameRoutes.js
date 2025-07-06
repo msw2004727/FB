@@ -30,7 +30,7 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             return;
         }
 
-        // 【修改】根據您的要求，此處將固定使用 'deepseek' (DeepSeek-V2) 模型來生成NPC詳細檔案。
+        // 根據您的要求，此處將固定使用 'deepseek' (DeepSeek-V2) 模型來生成NPC詳細檔案。
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
@@ -211,6 +211,8 @@ router.post('/interact', async (req, res) => {
             turnsSinceEvent = 0; 
         } 
         else if (turnsSinceEvent >= 3) {
+            // 【修改】我已將整個隨機事件的觸發邏輯註解掉，以關閉此功能。
+            /*
             if (Math.random() < 0.6) {
                 const r = Math.random();
                 let eventType;
@@ -249,6 +251,8 @@ router.post('/interact', async (req, res) => {
             } else {
                 console.log(`[事件系統] 玩家 ${username} 本回合無事發生。`);
             }
+            */
+            console.log(`[事件系統] 隨機事件功能已關閉。`);
             turnsSinceEvent = 0;
         }
 
