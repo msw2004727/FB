@@ -251,7 +251,9 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         const publicProfile = {
             name: npcData.name,
             appearance: npcData.appearance,
-            friendliness: npcData.friendliness || 'neutral'
+            friendliness: npcData.friendliness || 'neutral',
+            // 【核心修改】將心動值也回傳給前端
+            romanceValue: npcData.romanceValue || 0 
         };
 
         res.json(publicProfile);
