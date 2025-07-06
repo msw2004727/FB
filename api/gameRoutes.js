@@ -287,10 +287,9 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // 【核心修改】物品系統
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         const inventoryDisplayString = await getInventoryDisplay(userId);
-        aiResponse.roundData.ITM = inventoryDisplayString; // 將新的物品字串放入回傳資料中
+        aiResponse.roundData.ITM = inventoryDisplayString; 
 
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = [];
@@ -485,6 +484,10 @@ router.post('/combat-action', async (req, res) => {
 
             const newRoundNumber = (lastRound.R || 0) + 1;
             aiResponse.roundData.R = newRoundNumber;
+            
+            // 【核心修正】戰鬥後也要更新物品顯示
+            const inventoryDisplayString = await getInventoryDisplay(userId);
+            aiResponse.roundData.ITM = inventoryDisplayString;
             
             const finalInternalPower = Math.max(0, Math.min(999, updatedProfile.internalPower + (aiResponse.roundData.powerChange?.internal || 0)));
             const finalExternalPower = Math.max(0, Math.min(999, updatedProfile.externalPower + (aiResponse.roundData.powerChange?.external || 0)));
