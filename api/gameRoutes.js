@@ -16,7 +16,8 @@ const {
     getAIChatResponse,
     getAIChatSummary,
     getAIGiveItemResponse,
-    getAINarrativeForGive
+    getAINarrativeForGive,
+    getRelationGraph // 【核心新增】引入新的AI服務函式
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -133,7 +134,6 @@ function advanceDate(currentDate) {
 
 router.use(authMiddleware);
 
-// 【核心新增】專門用來獲取詳細背包資料的路由
 router.get('/inventory', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -144,6 +144,31 @@ router.get('/inventory', async (req, res) => {
     } catch (error) {
         console.error(`[庫存系統] 獲取背包資料時出錯:`, error);
         res.status(500).json({ message: '讀取背包資料時發生內部錯誤。' });
+    }
+});
+
+// 【核心新增】處理關係圖的路由
+router.get('/get-relations', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    try {
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+
+        if (!summaryDoc.exists || !summaryDoc.data().text) {
+            return res.status(404).json({ message: '尚無足夠的故事摘要來生成關係圖。' });
+        }
+
+        const longTermSummary = summaryDoc.data().text;
+        
+        // 呼叫AI生成Mermaid語法
+        const mermaidSyntax = await getRelationGraph('deepseek', longTermSummary, username);
+        
+        res.json({ mermaidSyntax });
+
+    } catch (error) {
+        console.error(`[關係圖系統] 生成關係圖時出錯:`, error);
+        res.status(500).json({ message: '梳理人物脈絡時發生未知錯誤。' });
     }
 });
 
