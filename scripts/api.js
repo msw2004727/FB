@@ -34,6 +34,7 @@ export const api = {
     npcChat: (body) => fetchApi('/api/game/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/end-chat', { method: 'POST', body: JSON.stringify(body) }),
     giveItemToNpc: (body) => fetchApi('/api/game/give-item', { method: 'POST', body: JSON.stringify(body) }),
-    // 【核心新增】新增一個用來獲取詳細背包資料的函式
     getInventory: () => fetchApi('/api/game/inventory'),
+    // 【核心新增】新增一個用來獲取關係圖資料的函式
+    getRelations: () => fetchApi('/api/game/get-relations'),
 };
