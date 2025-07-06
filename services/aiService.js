@@ -33,7 +33,6 @@ const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
 const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
-// 【新增】導入我們為人物設定師建立的 prompt 檔案
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt');
 
 
@@ -65,7 +64,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
             case 'grok':
-                options.model = "grok-3-mini";
+                // 【修改】根據您的 curl 指令，將模型從 "grok-3-mini" 更新為 "grok-3-latest"
+                options.model = "grok-3-latest";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -179,7 +179,7 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
     }
 }
 
-// 【新增】任務八：生成 NPC 詳細檔案
+// 任務八：生成 NPC 詳細檔案
 async function getAINpcProfile(modelName, username, npcName, roundData) {
     const prompt = getNpcCreatorPrompt(username, npcName, roundData);
     try {
@@ -215,7 +215,6 @@ module.exports = {
     getAISuggestion,
     getAIEncyclopedia,
     getAIRandomEvent,
-    // 【新增】匯出新的 NPC 檔案生成服務
     getAINpcProfile,
     getAICombatAction
 };
