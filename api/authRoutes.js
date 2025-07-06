@@ -40,24 +40,30 @@ router.post('/register', async (req, res) => {
             day: 1
         });
 
-        // *** 【核心新增功能】 ***
-        // 為新玩家建立固定的開局「第0回」存檔
+        // 【核心修改】為新玩家建立一個更具體的開局「第0回」存檔
         const roundZeroData = {
             R: 0,
             playerState: 'alive',
             timeOfDay: '上午',
             powerChange: { internal: 0, external: 0, lightness: 0 },
             moralityChange: 0,
-            ATM: ['幽暗', '陳舊', '一絲血腥味'],
-            EVT: '醒來發現身處陌生茅屋',
-            LOC: ['破舊的茅屋', { description: '四壁空空，只有一張硬板床和一張破桌子。' }],
+            ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
+            EVT: '從劇痛中醒來，發現身處陌生藥鋪',
+            LOC: ['無名村藥鋪', { description: '一間樸素的藥鋪，空氣中瀰漫著草藥的氣味，光線有些昏暗。' }],
             PSY: '頭痛欲裂...這裡是哪裡？我不是應該在...？這身體不是我的！',
-            PC: '你在一陣劇痛中醒來，感覺全身筋骨欲裂，內息紊亂不堪，似乎受了極重的內傷。',
-            NPC: [],
-            ITM: '身無長物',
+            PC: '你在一陣劇痛中醒來，感覺全身筋骨欲裂，內息紊亂不堪，似乎受了極重的內傷。一位年約五旬的郎中正在為你把脈，神色凝重。',
+            // 【核心修改】直接設定開局遇到的第一個NPC為普通人
+            NPC: [{
+                name: '王大夫',
+                status: '憂心忡忡地為你把脈',
+                friendliness: 'neutral', // 使用友好度等級
+                friendlinessValue: 10,  // 給予一個基礎友好度數值
+                isNew: true
+            }],
+            ITM: { money: 0, items: {} }, // 確保初始ITM結構正確
             QST: '探查自身與周遭的處境。',
             WRD: '天色陰沉，細雨濛濛。',
-            LOR: '',
+            LOR: '你似乎被一位郎中所救。',
             CLS: '身上有多處不明的傷口，似乎經歷過一場惡鬥。',
             IMP: '你的靈魂穿越到這個陌生的武俠世界，一段新的江湖路就此展開。',
             internalPower: 5,
@@ -74,7 +80,7 @@ router.post('/register', async (req, res) => {
 
         // 註冊成功後，直接產生 JWT
         const token = jwt.sign(
-            { userId: newUserRef.id, username: username }, // 使用新建立的用戶 ID 和用戶名
+            { userId: newUserRef.id, username: username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
