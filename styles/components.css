@@ -336,7 +336,7 @@ body.dark-theme .random-event-message {
 }
 
 
-/* --- 【核心修改】AI 核心切換提示樣式 --- */
+/* --- AI 核心切換提示樣式 --- */
 .ai-switch-notification {
     color: #155724; /* 醒目的綠色 */
     background-color: #d4edda; /* 淡綠色背景 */
@@ -358,4 +358,19 @@ body.dark-theme .ai-switch-notification {
 
 .ai-switch-notification.fading-out {
     opacity: 0;
+}
+
+/* --- 【核心新增】戀愛事件特殊樣式 --- */
+.romance-event {
+    border-style: solid; /* 使用實線，更突出 */
+    border-color: #e54865; /* 使用浪漫的粉紅色作為邊框 */
+    background-color: #fff0f3; /* 淡粉色背景 */
+    color: #a6324a; /* 深粉色文字 */
+    font-weight: 600; /* 加粗字體 */
+}
+
+body.dark-theme .romance-event {
+    border-color: #ff6b81;
+    background-color: #4d2b33;
+    color: #ffb3c1;
 }
