@@ -16,6 +16,8 @@
     visibility: hidden;
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
     pointer-events: none;
+    padding: 2rem; /* 增加內邊距，避免提示文字貼邊 */
+    box-sizing: border-box;
 }
 
 .ai-thinking-loader.visible {
@@ -70,6 +72,22 @@ body.dark-theme .ai-thinking-loader .loader-dots span {
 .combat-loader-overlay .loader-dots span:nth-of-type(2),
 .chat-loader-overlay .loader-dots span:nth-of-type(2) {
     animation-delay: -0.16s;
+}
+
+/* --- 新增：載入中提示樣式 --- */
+.loader-tip {
+    margin-top: 2rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--light-text-secondary);
+    max-width: 450px;
+    text-align: center;
+    line-height: 1.6;
+    font-style: italic;
+}
+
+body.dark-theme .loader-tip {
+    color: var(--dark-text-secondary);
 }
 
 
