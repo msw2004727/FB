@@ -96,9 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.setChatLoading(isLoading && gameState.isInChat);
     }
 
-    // --- 【核心修改】事件處理函式 ---
+    // --- 事件處理函式 ---
     async function handlePlayerAction() {
-        // 【新增】在函式開始時，記錄開始時間
         const startTime = performance.now();
 
         const actionText = playerInput.value.trim();
@@ -141,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (document.getElementById('deceased-overlay').classList.contains('visible') === false) {
                  setLoadingState(false);
             }
-            // 【新增】在函式結束前，計算並印出總耗時
             const endTime = performance.now();
             const durationInSeconds = ((endTime - startTime) / 1000).toFixed(2);
             console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);
@@ -305,6 +303,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
+        
+        // --- 【核心修改】開始 ---
+        
+        // 1. 設置主題
         let currentTheme = localStorage.getItem('game_theme') || 'light';
         document.body.className = `${currentTheme}-theme`;
         themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
@@ -314,6 +316,23 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.className = `${currentTheme}-theme`;
             themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         });
+
+        // 2. 【新增】設置 AI 核心偏好
+        // 從瀏覽器暫存中讀取玩家上次的選擇，如果沒有，就預設為 'openai'
+        let preferredModel = localStorage.getItem('preferred_ai_model') || 'openai';
+        aiModelSelector.value = preferredModel;
+
+        // 【新增】為下拉選單加上事件監聽器
+        aiModelSelector.addEventListener('change', () => {
+            const selectedModel = aiModelSelector.value;
+            // 將新的選擇存入瀏覽器，這樣下次打開遊戲時會記住
+            localStorage.setItem('preferred_ai_model', selectedModel);
+            // 彈出提示，明確告知玩家切換成功
+            alert(`AI 核心已切換為 ${selectedModel.toUpperCase()}。\n\n下次互動將使用新的核心。`);
+        });
+        
+        // --- 【核心修改】結束 ---
+
         headerToggleButton.addEventListener('click', () => {
             storyHeader.classList.toggle('collapsed');
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
@@ -401,6 +420,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoadingState(true, '正在連接你的世界，讀取記憶中...');
         try {
             const data = await api.getLatestGame();
+            
+            // 【新增】在讀取到伺服器進度後，也順便設定一下上次使用的模型
+            if (data.roundData && data.roundData.preferredModel) {
+                 aiModelSelector.value = data.roundData.preferredModel;
+                 localStorage.setItem('preferred_ai_model', data.roundData.preferredModel);
+            }
+
             if (data.gameState === 'deceased') {
                 modal.showDeceasedScreen();
                 if(data.roundData) {
