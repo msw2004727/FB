@@ -498,7 +498,8 @@ router.post('/combat-action', async (req, res) => {
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
-        const userDoc = await db.collection('users').doc(userId).get();
+        const userDocRef = db.collection('users').doc(userId); // *** 這就是修正的地方 ***
+        const userDoc = await userDocRef.get();
         const userData = userDoc.data() || {};
 
         if (userData && userData.isDeceased) {
