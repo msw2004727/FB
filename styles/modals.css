@@ -16,7 +16,7 @@
     visibility: hidden;
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
     pointer-events: none;
-    padding: 2rem; /* 增加內邊距，避免提示文字貼邊 */
+    padding: 2rem;
     box-sizing: border-box;
 }
 
@@ -453,7 +453,6 @@ body.dark-theme .chat-header h3 {
     font-style: italic;
 }
 
-/* --- 【核心修改】 --- */
 .chat-close-container {
     position: absolute;
     top: 0.75rem;
@@ -481,7 +480,6 @@ body.dark-theme .chat-close-tip {
 }
 
 .chat-close-btn {
-    /* 移除絕對定位，讓它在容器內流動 */
     position: relative;
     top: auto;
     right: auto;
@@ -631,4 +629,27 @@ body.dark-theme .chat-footer {
 .chat-loader-overlay.visible {
     opacity: 1;
     visibility: visible;
+}
+
+/* 【核心新增】心動值愛心樣式 */
+.romance-hearts {
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.romance-hearts .fa-heart {
+    color: #e54865; /* 亮紅色 */
+    margin: 0 2px;
+}
+
+body.dark-theme .romance-hearts .fa-heart {
+    color: #ff6b81; /* 亮粉色 */
+}
+
+.romance-hearts .far.fa-heart {
+    color: var(--light-border); /* 空心使用邊框顏色 */
+}
+
+body.dark-theme .romance-hearts .far.fa-heart {
+    color: var(--dark-border);
 }
