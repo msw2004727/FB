@@ -48,44 +48,51 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// 【新增】物品帳本處理函式
+// 【修改】物品帳本處理函式
 async function updateInventory(userId, itemChanges) {
     if (!itemChanges || itemChanges.length === 0) {
-        return; // 沒有物品變化，直接返回
+        return;
     }
 
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
-    const doc = await inventoryRef.get();
-    let inventory = doc.exists ? doc.data() : {};
+    
+    // 使用 transaction 確保資料一致性
+    await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(inventoryRef);
+        let inventory = doc.exists ? doc.data() : {};
 
-    for (const change of itemChanges) {
-        const { action, itemName, quantity = 1, itemType, rarity, description } = change;
+        for (const change of itemChanges) {
+            const { action, itemName, quantity = 1, itemType, rarity, description } = change;
 
-        if (action === 'add') {
-            if (inventory[itemName]) {
-                inventory[itemName].quantity += quantity;
-            } else {
-                inventory[itemName] = {
-                    quantity,
-                    itemType: itemType || '其他',
-                    rarity: rarity || '普通',
-                    description: description || '一個神秘的物品。',
-                    addedAt: admin.firestore.FieldValue.serverTimestamp()
-                };
-            }
-            console.log(`[物品系統] 新增物品: ${itemName} x${quantity}`);
-        } else if (action === 'remove') {
-            if (inventory[itemName]) {
-                inventory[itemName].quantity -= quantity;
-                if (inventory[itemName].quantity <= 0) {
-                    delete inventory[itemName];
+            if (action === 'add') {
+                if (inventory[itemName]) {
+                    inventory[itemName].quantity += quantity;
+                } else {
+                    inventory[itemName] = {
+                        quantity,
+                        itemType: itemType || '其他',
+                        rarity: rarity || '普通',
+                        description: description || '一個神秘的物品。',
+                        addedAt: admin.firestore.FieldValue.serverTimestamp()
+                    };
                 }
-                console.log(`[物品系統] 移除物品: ${itemName} x${quantity}`);
+                console.log(`[物品系統] 新增物品: ${itemName} x${quantity}`);
+            } else if (action === 'remove') {
+                // 【核心增修】增加物品存在和數量檢查
+                if (inventory[itemName] && inventory[itemName].quantity >= quantity) {
+                    inventory[itemName].quantity -= quantity;
+                    if (inventory[itemName].quantity <= 0) {
+                        delete inventory[itemName];
+                    }
+                    console.log(`[物品系統] 移除物品: ${itemName} x${quantity}`);
+                } else {
+                    // 如果物品不存在或數量不足，則拋出錯誤中斷交易
+                    throw new Error(`物品移除失敗：試圖移除不存在或數量不足的物品'${itemName}'。`);
+                }
             }
         }
-    }
-
-    await inventoryRef.set(inventory, { merge: true });
+        transaction.set(inventoryRef, inventory, { merge: true });
+    });
 }
 
 // 【新增】獲取物品顯示字串的函式
@@ -447,7 +454,7 @@ const interactRouteHandler = async (req, res) => {
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
-            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
+            const newSummary = await getAISummary(modelName, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         }
 
