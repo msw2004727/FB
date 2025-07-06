@@ -75,7 +75,6 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const npcDocRef = userDocRef.collection('npcs').doc(npcName);
 
-        // 平行獲取玩家最新位置和NPC檔案
         const [latestSaveSnapshot, npcDoc] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             npcDocRef.get()
@@ -235,24 +234,21 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
 
+        // 【核心修正】將NPC處理邏輯整合，避免競爭條件
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
-                if (npc.location) {
-                    const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
-                    return npcDocRef.set({ currentLocation: npc.location }, { merge: true });
-                }
-                return Promise.resolve();
-            });
-            await Promise.all(npcUpdatePromises);
-        }
-
-        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
+            const npcUpdatePromises = [];
             aiResponse.roundData.NPC.forEach(npc => {
                 if (npc.isNew === true) {
+                    // 1. 如果是新NPC，觸發背景建檔程序
                     createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                     delete npc.isNew;
+                } else if (npc.location) {
+                    // 2. 如果是舊NPC，且AI提供了新位置，則更新其位置
+                    const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
+                    npcUpdatePromises.push(npcDocRef.update({ currentLocation: npc.location }));
                 }
             });
+            await Promise.all(npcUpdatePromises);
         }
 
         const nextTimeOfDay = aiResponse.roundData.timeOfDay || currentTimeOfDay;
@@ -675,7 +671,7 @@ router.post('/force-suicide', async (req, res) => {
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
 
         res.json({
-            story: finalRoundData.PC, // 自殺時直接用狀態描述作為故事
+            story: finalRoundData.PC,
             roundData: finalRoundData,
             suggestion: '你的江湖路已到盡頭...'
         });
