@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatActionBtn = document.getElementById('chat-action-btn');
     const closeChatBtn = document.getElementById('close-chat-btn');
     const endChatBtn = document.getElementById('end-chat-btn');
+    const giveItemBtn = document.getElementById('give-item-btn'); // 【新增】
+    const cancelGiveBtn = document.getElementById('cancel-give-btn'); // 【新增】
 
     // --- 遊戲狀態變數 ---
     let gameState = {
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isInChat: false,
         currentChatNpc: null,
         chatHistory: [],
+        roundData: null, // 【新增】
     };
     let tipInterval = null;
 
@@ -118,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.roundData.suggestion = data.suggestion;
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
+                gameState.roundData = data.roundData; // 【修改】
             } else {
                 throw new Error("從伺服器收到的回應格式不正確。");
             }
@@ -172,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.closeCombatModal();
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             gameState.currentRound = newRoundData.roundData.R;
+            gameState.roundData = newRoundData.roundData; // 【修改】
             updateUI(newRoundData.story, newRoundData.roundData, null);
         } else {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
@@ -227,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameState.isRequesting || !gameState.currentChatNpc) return;
         const npcNameToSummarize = gameState.currentChatNpc;
         modal.closeChatModal();
-        setLoadingState(true, '正在總結對話，更新江湖事態...'); // 【***這就是修正的核心***】
+        setLoadingState(true, '正在總結對話，更新江湖事態...');
 
         try {
             const data = await api.endChat({
@@ -240,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.roundData.suggestion = data.suggestion;
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
+                gameState.roundData = data.roundData; // 【修改】
             } else {
                 throw new Error('從伺服器收到的回應格式不正確。');
             }
@@ -250,6 +256,36 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.currentChatNpc = null;
             gameState.chatHistory = [];
             setLoadingState(false);
+        }
+    }
+
+    // 【新增】處理贈予物品請求的函式
+    async function handleGiveItem(giveData) {
+        modal.closeGiveItemModal();
+        modal.setChatLoading(true);
+
+        const itemName = giveData.type === 'money' ? `${giveData.amount} 文銅錢` : giveData.itemName;
+        const npcName = gameState.currentChatNpc;
+        
+        modal.appendChatMessage('system', `你將 ${itemName} 給予了 ${npcName}。`);
+
+        try {
+            // 這一步會在下一步的 api.js 中建立
+            const data = await api.giveItemToNpc(giveData);
+            
+            if (data.npc_response) {
+                modal.appendChatMessage(npcName, data.npc_response);
+            }
+            if (data.roundData) {
+                gameState.roundData = data.roundData;
+                updateUI(null, data.roundData, null);
+            }
+
+        } catch (error) {
+            console.error('贈予物品時出錯:', error);
+            modal.appendChatMessage('system', `贈予失敗: ${error.message}`);
+        } finally {
+            modal.setChatLoading(false);
         }
     }
 
@@ -332,6 +368,16 @@ document.addEventListener('DOMContentLoaded', () => {
              modal.closeChatModal();
         });
         endChatBtn.addEventListener('click', endChatSession);
+        
+        // 【新增】
+        giveItemBtn.addEventListener('click', () => {
+            if (gameState.isInChat && gameState.currentChatNpc && gameState.roundData) {
+                modal.openGiveItemModal(gameState.roundData, gameState.currentChatNpc, handleGiveItem);
+            }
+        });
+        
+        // 【新增】
+        cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
 
         loadInitialGame();
     }
@@ -348,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setLoadingState(true);
             } else {
                 gameState.currentRound = data.roundData.R;
+                gameState.roundData = data.roundData; // 【修改】
                 storyTextContainer.innerHTML = '';
                 if (data.prequel) {
                     const prequelDiv = document.createElement('div');
