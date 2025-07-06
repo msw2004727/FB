@@ -21,8 +21,6 @@ try {
 // Express App 設定
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// 【修改】為您的 GitHub Pages 域名設定更精準的 CORS
 app.use(cors({ origin: 'https://msw2004727.github.io' }));
 app.use(express.json());
 
@@ -33,7 +31,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const playerRoutes = require('./routes/playerRoutes');
 
-// --- 使用路由器並指定基礎路徑 ---
+// --- 【修改】使用新的路由器並指定基礎路徑 ---
 app.use('/api/auth', authRoutes);
 
 // 所有遊戲相關的路由都掛載在 /api/game 底下
