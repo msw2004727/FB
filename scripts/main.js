@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentChatNpc: null,
         chatHistory: [],
     };
-    let tipInterval = null; // 【新增】用於存放提示輪播的計時器
+    let tipInterval = null;
 
     // --- 全局讀取動畫 ---
     const aiThinkingLoader = document.createElement('div');
@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
     mainContent.appendChild(aiThinkingLoader);
     const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
 
-    // 【新增】輪播提示的函式
     function rotateTip() {
         if (gameTips.length > 0) {
             const randomIndex = Math.floor(Math.random() * gameTips.length);
@@ -68,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 通用函式 ---
     function setLoadingState(isLoading, text = '') {
         gameState.isRequesting = isLoading;
         playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
@@ -83,16 +81,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         if(loaderTextElement) loaderTextElement.textContent = text;
         
-        // 【修改】啟動/停止輪播邏輯
         if (isLoading && !gameState.isInCombat && !gameState.isInChat) {
-            rotateTip(); // 立即顯示第一條
-            tipInterval = setInterval(rotateTip, 15000); // 每15秒換一條
+            rotateTip();
+            tipInterval = setInterval(rotateTip, 15000);
         } else {
-            clearInterval(tipInterval); // 停止輪播
+            clearInterval(tipInterval);
         }
 
         aiThinkingLoader.classList.toggle('visible', isLoading && !gameState.isInCombat && !gameState.isInChat);
-
         modal.setCombatLoading(isLoading && gameState.isInCombat);
         modal.setChatLoading(isLoading && gameState.isInChat);
     }
@@ -102,6 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
         playerInput.value = '';
+        
+        // 在第一個動作送出時，清空前情提要
+        const prequelElement = storyTextContainer.querySelector('.prequel-summary');
+        if (prequelElement) {
+            storyTextContainer.innerHTML = '';
+        }
+
         setLoadingState(true, '江湖百曉生正在構思...');
         appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
@@ -113,6 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (data && data.roundData) {
+                // 將後端傳來的 suggestion 加到 roundData 中，方便 UI 更新
+                data.roundData.suggestion = data.suggestion;
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
             } else {
@@ -152,6 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'COMBAT_ONGOING') {
                 modal.appendToCombatLog(data.narrative);
             } else if (data.status === 'COMBAT_END') {
+                // 將後端傳來的 suggestion 加到 roundData 中
+                data.newRound.roundData.suggestion = data.newRound.suggestion;
                 modal.appendToCombatLog(data.newRound.story, 'combat-summary');
                 setTimeout(() => endCombat(data.newRound), 2000);
             }
@@ -233,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
                 appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
+                data.roundData.suggestion = data.suggestion;
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
             } else {
@@ -248,40 +256,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- 初始化與事件綁定 ---
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
-
         let currentTheme = localStorage.getItem('game_theme') || 'light';
         document.body.className = `${currentTheme}-theme`;
         themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        
         themeSwitcher.addEventListener('click', () => {
             currentTheme = (document.body.classList.contains('light-theme')) ? 'dark' : 'light';
             localStorage.setItem('game_theme', currentTheme);
             document.body.className = `${currentTheme}-theme`;
             themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         });
-
         headerToggleButton.addEventListener('click', () => {
             storyHeader.classList.toggle('collapsed');
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-down');
         });
-
         menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
         mainContent.addEventListener('click', (e) => {
             if (window.innerWidth <= 1024 && !document.getElementById('dashboard').contains(e.target) && !menuToggle.contains(e.target)) {
                 gameContainer.classList.remove('sidebar-open');
             }
         });
-
         logoutButton.addEventListener('click', () => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
             window.location.href = 'login.html';
         });
-
         suicideButton.addEventListener('click', async () => {
             if (gameState.isRequesting) return;
             if (window.confirm("你確定要了卻此生，重新輪迴嗎？")) {
@@ -296,7 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
-
         restartButton.addEventListener('click', async () => {
             try {
                 await api.startNewGame();
@@ -306,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`開啟新的輪迴時發生錯誤：${error.message}`);
             }
         });
-
         submitButton.addEventListener('click', handlePlayerAction);
         playerInput.addEventListener('keypress', (e) => {
              if (e.key === 'Enter' && !e.isComposing) {
@@ -337,7 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         endChatBtn.addEventListener('click', endChatSession);
         
-        // 載入遊戲
         loadInitialGame();
     }
 
@@ -360,12 +358,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                     storyTextContainer.appendChild(prequelDiv);
                 }
-                updateUI(data.story, data.roundData, null);
+                // 【核心修改】
+                // 將後端傳來的 suggestion 加到 roundData 中，方便 UI 更新
+                data.roundData.suggestion = data.suggestion;
+                // 呼叫 updateUI 時，第一個參數（故事主文）傳入 null
+                updateUI(null, data.roundData, null);
             }
         } catch (error) {
+            // 這個 catch 區塊現在主要用於處理極端例外或舊版無存檔用戶
             if (error.message.includes('找不到存檔')) {
                 storyTextContainer.innerHTML = '';
-                updateUI('你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。', { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1 });
+                const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
+                appendMessageToStory(initialMessage, 'system-message');
+                const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, suggestion: '先檢查一下自己的身體狀況吧。' };
+                updateUI(null, roundZeroData, null);
             } else {
                 handleApiError(error);
             }
