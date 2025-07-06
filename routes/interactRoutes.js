@@ -1,21 +1,16 @@
 // routes/interactRoutes.js
 
-import express from 'express';
-import admin from 'firebase-admin';
-import { 
-    getAIStory, 
-    getAISummary, 
-    getAISuggestion,
-    getAICombatAction 
-} from '../services/aiService.js';
-import { createNpcProfileInBackground } from '../services/npcService.js';
-import { advanceDate, shouldAdvanceDay, applyItemChanges } from '../utils/gameLogic.js';
+const express = require('express');
+const admin = require('firebase-admin');
+const { getAIStory, getAISummary, getAISuggestion, getAICombatAction } = require('../services/aiService.js');
+const { createNpcProfileInBackground } = require('../services/npcService.js');
+const { advanceDate, shouldAdvanceDay, applyItemChanges } = require('../utils/gameLogic.js');
 
 const router = express.Router();
 const db = admin.firestore();
 
-// 將主線互動邏輯從路由處理器中分離出來，方便複用
-const handleInteraction = async (req, res) => {
+// 主互動路由
+router.post('/interact', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
 
@@ -101,6 +96,11 @@ const handleInteraction = async (req, res) => {
 
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 };
         const moralityChange = aiResponse.roundData.moralityChange || 0;
+        
+        // 從資料庫讀取最新的物品狀態，而不是依賴可能過時的 userProfile
+        const latestUserDoc = await userDocRef.get();
+        const latestUserData = latestUserDoc.data() || {};
+        aiResponse.roundData.ITM = applyItemChanges(latestUserData.ITM, aiResponse.roundData.ITM);
 
         const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + powerChange.internal));
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + powerChange.external));
@@ -124,6 +124,7 @@ const handleInteraction = async (req, res) => {
             morality: newMorality,
             turnsSinceEvent,
             preferredModel: modelName,
+            ITM: aiResponse.roundData.ITM,
             ...currentDate
         });
         
@@ -147,10 +148,8 @@ const handleInteraction = async (req, res) => {
         console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
         res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
     }
-}
+});
 
-// 主互動路由
-router.post('/interact', handleInteraction);
 
 // 戰鬥行動路由
 router.post('/combat-action', async (req, res) => {
@@ -183,7 +182,8 @@ router.post('/combat-action', async (req, res) => {
             console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 的戰鬥已結束。`);
             await combatDocRef.delete();
 
-            // 省略戰鬥結束後的更新邏輯，直接回傳結果
+            // 戰鬥結束後，我們只回傳結果，讓前端來觸發一個新的主線回合
+            // 這可以簡化後端邏輯，避免在這裡重複 interact 的程式碼
             res.json({
                 status: 'COMBAT_END',
                 finalLog: combatResult.narrative,
@@ -203,6 +203,4 @@ router.post('/combat-action', async (req, res) => {
     }
 });
 
-// 導出互動處理函式，供 chatRoutes 使用
-export { handleInteraction };
-export default router;
+module.exports = router;
