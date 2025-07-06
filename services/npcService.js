@@ -1,18 +1,11 @@
 // services/npcService.js
 
-import { getAINpcProfile } from './aiService.js';
-import admin from 'firebase-admin';
+const admin = require('firebase-admin');
+const { getAINpcProfile } = require('./aiService.js');
 
 const db = admin.firestore();
 
-/**
- * 在背景為新NPC建立詳細檔案
- * @param {string} userId - 玩家ID
- * @param {string} username - 玩家姓名
- * @param {object} npcData - 從主線故事中獲得的基礎NPC資訊
- * @param {object} roundData - 該回合的完整遊戲數據，用於提供情境
- */
-export const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
+const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
     const npcName = npcData.name;
     console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序。`);
     
@@ -24,11 +17,9 @@ export const createNpcProfileInBackground = async (userId, username, npcData, ro
             return;
         }
 
-        // 使用 'deepseek' 模型來生成NPC詳細檔案
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
-            // 安全地合併友好度資訊
             const finalProfile = {
                 ...npcProfile,
                 friendliness: npcData.friendliness || 'neutral'
@@ -41,4 +32,8 @@ export const createNpcProfileInBackground = async (userId, username, npcData, ro
     } catch (error) {
         console.error(`[NPC系統] 為 "${npcName}" 進行背景建檔時發生錯誤:`, error);
     }
+};
+
+module.exports = {
+    createNpcProfileInBackground
 };
