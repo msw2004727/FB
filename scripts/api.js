@@ -33,4 +33,5 @@ export const api = {
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc-profile/${npcName}`),
     npcChat: (body) => fetchApi('/api/game/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/end-chat', { method: 'POST', body: JSON.stringify(body) }),
+    giveItemToNpc: (body) => fetchApi('/api/game/give-item', { method: 'POST', body: JSON.stringify(body) }), // 【新增】
 };
