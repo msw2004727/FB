@@ -752,7 +752,7 @@ router.post('/force-suicide', async (req, res) => {
         await userDocRef.update({ isDeceased: true });
 
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-        const lastRound = savesSnapshot.empty ? { R: 0 } : savesSnapshot.docs[0].data();
+        const lastRound = savesSnapshot.empty ? { R: 0 } : lastRoundSnapshot.docs[0].data();
 
         const newRoundNumber = (lastRound.R || 0) + 1;
 
