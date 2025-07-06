@@ -1,3 +1,5 @@
+// server.js
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -24,17 +26,25 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: 'https://msw2004727.github.io' }));
 app.use(express.json());
 
-// --- 【修改】載入拆分後的新 API 路由 ---
+// --- 載入所有路由與中間件 ---
+const authMiddleware = require('./middleware/auth.js');
 const authRoutes = require('./api/authRoutes');
 const interactRoutes = require('./routes/interactRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const playerRoutes = require('./routes/playerRoutes');
 
-// --- 【修改】使用新的路由器並指定基礎路徑 ---
+// --- 【修改】重新規劃路由掛載 ---
+
+// 1. 掛載不需要身分驗證的路由
 app.use('/api/auth', authRoutes);
 
-// 所有遊戲相關的路由都掛載在 /api/game 底下
+// 2. 在這之後，掛載身分驗證中間件
+// 這代表所有在這行程式碼之後的路由，都必須先通過 authMiddleware 的檢查
+app.use(authMiddleware);
+
+// 3. 掛載所有需要身分驗證的遊戲路由
+// 因為它們都在 authMiddleware 之後，所以 req.user 將永遠存在
 app.use('/api/game', interactRoutes);
 app.use('/api/game', chatRoutes);
 app.use('/api/game', dataRoutes);
