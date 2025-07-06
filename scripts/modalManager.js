@@ -1,4 +1,5 @@
 // scripts/modalManager.js
+import { api } from './api.js'; // 【核心新增】導入api模組
 
 // --- 獲取所有彈窗相關的 DOM 元素 ---
 const deceasedOverlay = document.getElementById('deceased-overlay');
@@ -16,7 +17,6 @@ const chatNpcInfo = document.getElementById('chat-npc-info');
 const chatLog = document.getElementById('chat-log');
 const chatLoader = document.getElementById('chat-loader');
 
-// 【新增】贈予物品彈窗相關元素
 const giveItemBtn = document.getElementById('give-item-btn');
 const giveItemModal = document.getElementById('give-item-modal');
 const giveInventoryList = document.getElementById('give-inventory-list');
@@ -74,21 +74,20 @@ export function closeChatModal() {
 
 export function appendChatMessage(speaker, message) {
     const messageDiv = document.createElement('div');
-    messageDiv.classList.add('chat-message', `${speaker}-message`);
-
-    const speakerSpan = document.createElement('span');
-    speakerSpan.classList.add('speaker');
-    speakerSpan.textContent = `${speaker}:`;
+    // 【核心修正】修正class名稱，以符合CSS樣式
+    if(speaker === 'player' || speaker === 'npc' || speaker === 'system') {
+        messageDiv.className = `chat-log-area ${speaker}-message`;
+    } else {
+         messageDiv.className = `chat-log-area npc-message`;
+    }
     
-    const messageSpan = document.createElement('span');
-    messageSpan.classList.add('message-text');
-    messageSpan.textContent = message;
+    // 移除重複的 speaker: 標籤，讓樣式更簡潔
+    messageDiv.innerHTML = message;
 
-    messageDiv.appendChild(speakerSpan);
-    messageDiv.appendChild(messageSpan);
     chatLog.appendChild(messageDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
 }
+
 
 export function setChatLoading(isLoading) {
     if (chatLoader) {
@@ -96,44 +95,56 @@ export function setChatLoading(isLoading) {
     }
 }
 
-// --- 【新增】贈予物品彈窗 ---
-export function openGiveItemModal(playerState, currentNpcId, giveItemCallback) {
-    giveInventoryList.innerHTML = ''; // 清空舊列表
-
-    // 建立金錢選項
-    if (playerState.ITM.money > 0) {
-        const moneyItem = document.createElement('div');
-        moneyItem.classList.add('give-item');
-        moneyItem.innerHTML = `<i class="fas fa-coins"></i> 銀兩: ${playerState.ITM.money}`;
-        moneyItem.addEventListener('click', () => {
-             // 彈出一個輸入框讓玩家決定給多少錢
-            const amount = prompt(`你要給予多少銀兩？ (最多 ${playerState.ITM.money})`, playerState.ITM.money);
-            if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= playerState.ITM.money) {
-                giveItemCallback({ type: 'money', amount: parseInt(amount), target: currentNpcId });
-            } else if (amount !== null) {
-                alert('請輸入有效的數量。');
-            }
-        });
-        giveInventoryList.appendChild(moneyItem);
-    }
-
-    // 建立背包物品選項
-    for (const [itemId, item] of Object.entries(playerState.ITM.items)) {
-        const itemDiv = document.createElement('div');
-        itemDiv.classList.add('give-item');
-        itemDiv.innerHTML = `<i class="fas fa-box-open"></i> ${item.name} (數量: ${item.quantity})`;
-        itemDiv.dataset.itemId = itemId;
-        itemDiv.addEventListener('click', () => {
-            giveItemCallback({ type: 'item', itemId: itemId, itemName: item.name, target: currentNpcId });
-        });
-        giveInventoryList.appendChild(itemDiv);
-    }
-
-    if (giveInventoryList.children.length === 0) {
-        giveInventoryList.innerHTML = '<p class="system-message">你身無分文，也沒有任何物品可以贈送。</p>';
-    }
-
+// --- 【核心修改】贈予物品彈窗 ---
+export async function openGiveItemModal(currentNpcName, giveItemCallback) {
+    giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
+
+    try {
+        // 呼叫新的API函式來獲取詳細背包資料
+        const inventory = await api.getInventory();
+        giveInventoryList.innerHTML = ''; // 清空讀取提示
+
+        let hasItems = false;
+
+        // 遍歷後端回傳的背包物件
+        for (const [itemName, itemData] of Object.entries(inventory)) {
+            hasItems = true;
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('give-item');
+            
+            let iconClass = 'fa-box-open';
+            if (itemName === '銀兩') {
+                iconClass = 'fa-coins';
+            }
+
+            itemDiv.innerHTML = `<i class="fas ${iconClass}"></i> ${itemName} (數量: ${itemData.quantity})`;
+            
+            itemDiv.addEventListener('click', () => {
+                // 如果是銀兩，彈出輸入框
+                if (itemName === '銀兩') {
+                    const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
+                    if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
+                        giveItemCallback({ type: 'money', amount: parseInt(amount), itemName: '銀兩' });
+                    } else if (amount !== null) {
+                        alert('請輸入有效的數量。');
+                    }
+                } else {
+                    // 如果是普通物品，直接贈送
+                    giveItemCallback({ type: 'item', itemId: itemName, itemName: itemName });
+                }
+            });
+            giveInventoryList.appendChild(itemDiv);
+        }
+
+        if (!hasItems) {
+            giveInventoryList.innerHTML = '<p class="system-message">你身無長物，行囊空空。</p>';
+        }
+
+    } catch (error) {
+        console.error("獲取背包資料失敗:", error);
+        giveInventoryList.innerHTML = `<p class="system-message">翻檢行囊時出錯: ${error.message}</p>`;
+    }
 }
 
 export function closeGiveItemModal() {
