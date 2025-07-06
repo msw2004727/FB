@@ -35,6 +35,9 @@ const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
 const { getRandomEventPrompt } = require('../prompts/randomEventPrompt.js');
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
+// 【新增】導入聊天大師和摘要師的 Prompt
+const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
+const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
 
 
 // 統一的AI調度中心
@@ -69,9 +72,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                console.log(`[Grok 調試] 準備向 ${options.model} 發出請求...`);
                 const grokResult = await grok.chat.completions.create(options);
-                console.log("[Grok 調試] 已收到來自 Grok 的回應。");
                 textResponse = grokResult.choices[0].message.content;
                 break;
             case 'gemini':
@@ -193,6 +194,33 @@ async function getAINpcProfile(modelName, username, npcName, roundData) {
     }
 }
 
+// 【新增】任務九：生成 NPC 對話回覆
+async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage) {
+    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage);
+    try {
+        // 對話回覆預期是純文字
+        const reply = await callAI(modelName, prompt, false);
+        return reply.replace(/["“”]/g, ''); // 順便移除回覆中可能出現的引號
+    } catch (error) {
+        console.error("[AI 任務失敗] 聊天大師任務:", error);
+        return "（他似乎心事重重，沒有回答你。）";
+    }
+}
+
+// 【新增】任務十：生成對話總結
+async function getAIChatSummary(modelName, username, npcName, fullChatHistory) {
+    const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory);
+    try {
+        // 總結預期是純文字
+        const summary = await callAI(modelName, prompt, false);
+        return summary.replace(/["“”]/g, '');
+    } catch (error) {
+        console.error("[AI 任務失敗] 摘要師任務:", error);
+        return `我與${npcName}進行了一番交談。`; // 提供一個通用的備用總結
+    }
+}
+
+
 async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
@@ -218,5 +246,8 @@ module.exports = {
     getAIEncyclopedia,
     getAIRandomEvent,
     getAINpcProfile,
-    getAICombatAction
+    getAICombatAction,
+    // 【新增】匯出聊天和總結的服務
+    getAIChatResponse,
+    getAIChatSummary
 };
