@@ -259,44 +259,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 【核心重構】將 handleGiveItem 的邏輯與 handlePlayerAction 對齊
     async function handleGiveItem(giveData) {
-        modal.closeGiveItemModal();
-        modal.setChatLoading(true);
-
-        const itemName = giveData.type === 'money' ? `${giveData.amount} 文錢` : giveData.itemName;
-        const npcName = gameState.currentChatNpc;
-        
-        modal.appendChatMessage('system', `你將 ${itemName} 給予了 ${npcName}。`);
+        modal.closeGiveItemModal(); // 先關閉物品選擇視窗
+        modal.closeChatModal(); // 同時關閉聊天視窗
+        setLoadingState(true, "正在更新江湖事態..."); // 顯示全域讀取動畫
 
         try {
             const body = {
                 giveData: {
-                    target: npcName,
-                    type: giveData.type,
-                    amount: giveData.amount,
-                    itemId: giveData.itemId,
-                    itemName: giveData.itemName,
+                    target: gameState.currentChatNpc,
+                    ...giveData
                 },
                 model: aiModelSelector.value
             };
 
+            // 呼叫後端，後端會回傳一個完整的、標準的回合物件
             const data = await api.giveItemToNpc(body);
-            
-            if (data.npc_response) {
-                modal.appendChatMessage('npc', data.npc_response);
-            }
-            if (data.roundData) {
-                gameState.roundData = data.roundData;
-                updateUI(null, data.roundData, null);
-            }
 
+            // 用處理標準回合的方式來更新整個UI
+            if (data && data.roundData) {
+                data.roundData.suggestion = data.suggestion;
+                updateUI(data.story, data.roundData, null); // 更新主故事面板和儀表板
+                gameState.currentRound = data.roundData.R; // 更新當前回合數
+                gameState.roundData = data.roundData; // 更新全局遊戲狀態
+            } else {
+                throw new Error("從伺服器收到的回應格式不正確。");
+            }
         } catch (error) {
-            console.error('贈予物品時出錯:', error);
-            modal.appendChatMessage('system', `贈予失敗: ${error.message}`);
+            handleApiError(error); // 使用統一的錯誤處理
         } finally {
-            modal.setChatLoading(false);
+            // 重置聊天狀態
+            gameState.isInChat = false;
+            gameState.currentChatNpc = null;
+            gameState.chatHistory = [];
+            setLoadingState(false); // 隱藏讀取動畫
         }
     }
+
 
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
@@ -378,10 +378,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         endChatBtn.addEventListener('click', endChatSession);
         
-        // 【核心修正】修正呼叫 openGiveItemModal 的方式
         giveItemBtn.addEventListener('click', () => {
             if (gameState.isInChat && gameState.currentChatNpc) {
-                // 不再傳入 roundData，因為 modalManager 會自己去API獲取
                 modal.openGiveItemModal(gameState.currentChatNpc, handleGiveItem);
             }
         });
