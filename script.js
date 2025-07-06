@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const combatActionButton = document.getElementById('combat-action-btn');
     const combatLoader = document.getElementById('combat-loader');
 
-    // --- 【新增】對話彈窗 (江湖密談) 相關的DOM元素 ---
     const chatModal = document.getElementById('chat-modal');
     const chatNpcName = document.getElementById('chat-npc-name');
     const chatNpcInfo = document.getElementById('chat-npc-info');
@@ -188,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let isRequesting = false;
     let isInCombat = false;
     
-    // --- 【新增】對話系統狀態變數 ---
     let isInChat = false;
     let currentChatNpc = null;
     let chatHistory = [];
@@ -203,8 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') { e.preventDefault(); handleCombatAction(); }
     });
     
-    // --- 【新增】為對話系統綁定事件 ---
-    // 使用事件委派，監聽整個故事面板的點擊事件
     storyTextContainer.addEventListener('click', handleNpcClick);
     chatActionBtn.addEventListener('click', sendChatMessage);
     chatInput.addEventListener('keypress', (e) => {
@@ -216,7 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handlePlayerAction() {
         const actionText = playerInput.value.trim();
-        // 如果正在聊天或戰鬥，主輸入框應禁用
         if (!actionText || isRequesting || isInCombat || isInChat) return;
 
         playerInput.value = '';
@@ -256,17 +251,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- 【新增】點擊 NPC 名字的處理函式 ---
     async function handleNpcClick(event) {
-        // 檢查被點擊的是否是 NPC 的名字
         const target = event.target.closest('.npc-name');
         if (target) {
-            const npcName = target.textContent;
+            const npcName = target.dataset.npcName || target.textContent;
             openChatModal(npcName);
         }
     }
     
-    // --- 【新增】打開對話彈窗的函式 ---
     async function openChatModal(npcName) {
         if (isRequesting || isInCombat) return;
         
@@ -283,11 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const profile = await response.json();
 
-            // 更新彈窗標題和資訊
             chatNpcName.textContent = `與 ${profile.name} 密談中`;
             chatNpcInfo.textContent = profile.appearance || '';
             
-            // 初始化對話狀態
             isInChat = true;
             currentChatNpc = profile.name;
             chatHistory = []; 
@@ -302,7 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- 【新增】發送對話訊息的函式 ---
     async function sendChatMessage() {
         const message = chatInput.value.trim();
         if (!message || isRequesting) return;
@@ -321,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     npcName: currentChatNpc,
                     chatHistory: chatHistory,
                     playerMessage: message,
-                    model: aiModelSelector.value // 讓聊天也使用玩家選擇的AI
+                    model: aiModelSelector.value
                 })
             });
             
@@ -341,19 +330,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- 【新增】結束對話的函式 ---
+    // --- 【修改】修正後的結束對話函式 ---
     async function endChatSession() {
-        if (isRequesting) return;
+        // 增加一個安全檢查，確保有對話對象
+        if (isRequesting || !currentChatNpc) return;
 
-        closeChatModal(); // 先關閉視窗
-        setLoadingState(true, '正在總結對話，更新江湖事態...'); // 顯示主畫面的讀取動畫
+        // 先用一個臨時變數記住NPC的名字
+        const npcNameToSummarize = currentChatNpc;
+
+        // 立刻隱藏對話視窗，讓玩家看到主畫面的讀取動畫
+        chatModal.classList.remove('visible');
+        setLoadingState(true, '正在總結對話，更新江湖事態...');
 
         try {
             const response = await fetch(`${backendBaseUrl}/api/game/end-chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    npcName: currentChatNpc,
+                    npcName: npcNameToSummarize, // 使用儲存好的名字
                     fullChatHistory: chatHistory
                 })
             });
@@ -363,25 +357,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(err.message || '結束對話時發生錯誤。');
             }
             
-            // 結束對話後，後端會回傳一個完整的主線更新
             const data = await response.json();
-            
-            // 直接用這個回傳結果來更新主畫面UI
-            appendMessageToStory(`<p class="system-message">結束了與${currentChatNpc}的交談。</p>`);
-            updateUI(data.story, data.roundData, data.randomEvent);
-            currentRound = data.roundData.R;
-            if (data.suggestion) {
-                actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+
+            // 在使用回傳資料前，先檢查它和它必要的屬性是否存在
+            if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
+                appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
+                updateUI(data.story, data.roundData, data.randomEvent);
+                currentRound = data.roundData.R;
+                if (data.suggestion) {
+                    actionSuggestion.textContent = `書僮小聲說：${data.suggestion}`;
+                }
+            } else {
+                // 如果後端成功回應，但格式不對，也當作錯誤來處理
+                throw new Error('從伺服器收到的回應格式不正確。');
             }
 
         } catch (error) {
             handleApiError(error);
         } finally {
+            // 在所有事情都完成後，才真正重置對話狀態
+            closeChatModal();
             setLoadingState(false);
         }
     }
     
-    // --- 【新增】關閉對話彈窗 (不儲存) ---
     function closeChatModal() {
         chatModal.classList.remove('visible');
         isInChat = false;
@@ -389,16 +388,14 @@ document.addEventListener('DOMContentLoaded', () => {
         chatHistory = [];
     }
 
-    // --- 【新增】在對話紀錄中追加訊息的輔助函式 ---
     function appendChatMessage(speaker, message) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add(`${speaker}-message`);
         messageDiv.textContent = message;
         chatLog.appendChild(messageDiv);
-        chatLog.scrollTop = chatLog.scrollHeight; // 自動滾動到底部
+        chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    // --- 【新增】控制對話彈窗讀取狀態的函式 ---
     function setChatLoading(isLoading) {
         isRequesting = isLoading;
         chatInput.disabled = isLoading;
@@ -408,7 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
             chatLoader.classList.toggle('visible', isLoading);
         }
     }
-
 
     function startCombat(initialState) {
         isInCombat = true;
@@ -543,7 +539,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function setLoadingState(isLoading, text = '') {
         isRequesting = isLoading;
 
-        // 主介面UI控制
         playerInput.disabled = isLoading || isInCombat;
         submitButton.disabled = isLoading || isInCombat;
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
@@ -553,7 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
              aiThinkingLoader.classList.toggle('visible', isLoading && !isInCombat && !isInChat);
         }
 
-        // 戰鬥介面UI控制
         combatInput.disabled = isLoading;
         combatActionButton.disabled = isLoading;
         if(combatLoader) {
@@ -597,7 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (npcs && Array.isArray(npcs) && npcs.length > 0) {
             const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
             sortedNpcs.forEach(npc => {
-                // 使用更安全的正則表達式，避免特殊字符問題
                 const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                 const regex = new RegExp(npcNameEscaped, 'g');
                 const replacement = `<span class="npc-name" data-npc-name="${npc.name}">${npc.name}</span>`;
@@ -688,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
             data.NPC.forEach(npc => {
                 const npcLine = document.createElement('div');
-                npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
+                npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
                 npcContent.appendChild(npcLine);
             });
         } else {
