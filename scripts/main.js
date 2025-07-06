@@ -304,9 +304,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
         
-        // --- 【核心修改】開始 ---
-        
-        // 1. 設置主題
         let currentTheme = localStorage.getItem('game_theme') || 'light';
         document.body.className = `${currentTheme}-theme`;
         themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
@@ -317,22 +314,36 @@ document.addEventListener('DOMContentLoaded', () => {
             themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         });
 
-        // 2. 【新增】設置 AI 核心偏好
-        // 從瀏覽器暫存中讀取玩家上次的選擇，如果沒有，就預設為 'openai'
         let preferredModel = localStorage.getItem('preferred_ai_model') || 'openai';
         aiModelSelector.value = preferredModel;
 
-        // 【新增】為下拉選單加上事件監聽器
+        // --- 【核心修改】 ---
         aiModelSelector.addEventListener('change', () => {
             const selectedModel = aiModelSelector.value;
-            // 將新的選擇存入瀏覽器，這樣下次打開遊戲時會記住
             localStorage.setItem('preferred_ai_model', selectedModel);
-            // 彈出提示，明確告知玩家切換成功
-            alert(`AI 核心已切換為 ${selectedModel.toUpperCase()}。\n\n下次互動將使用新的核心。`);
+            
+            // 移除舊的 alert 彈窗
+            // alert(`AI 核心已切換為 ${selectedModel.toUpperCase()}。\n\n下次互動將使用新的核心。`);
+
+            // 新增提示訊息到劇情面板
+            const notification = document.createElement('p');
+            notification.className = 'system-message ai-switch-notification';
+            notification.textContent = `系統：AI 核心已切換為 ${selectedModel.toUpperCase()}。`;
+            storyTextContainer.appendChild(notification);
+            
+            // 確保捲動到最下方看到提示
+            storyTextContainer.parentElement.scrollTop = storyTextContainer.parentElement.scrollHeight;
+
+            // 5秒後移除提示
+            setTimeout(() => {
+                notification.classList.add('fading-out');
+                // 在動畫結束後再移除DOM元素，避免突然消失
+                setTimeout(() => {
+                    notification.remove();
+                }, 500);
+            }, 5000);
         });
         
-        // --- 【核心修改】結束 ---
-
         headerToggleButton.addEventListener('click', () => {
             storyHeader.classList.toggle('collapsed');
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
@@ -421,7 +432,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await api.getLatestGame();
             
-            // 【新增】在讀取到伺服器進度後，也順便設定一下上次使用的模型
             if (data.roundData && data.roundData.preferredModel) {
                  aiModelSelector.value = data.roundData.preferredModel;
                  localStorage.setItem('preferred_ai_model', data.roundData.preferredModel);
