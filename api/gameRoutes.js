@@ -133,6 +133,21 @@ function advanceDate(currentDate) {
 
 router.use(authMiddleware);
 
+// 【核心新增】專門用來獲取詳細背包資料的路由
+router.get('/inventory', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
+        const doc = await inventoryRef.get();
+        const inventoryData = doc.exists ? doc.data() : {};
+        res.json(inventoryData);
+    } catch (error) {
+        console.error(`[庫存系統] 獲取背包資料時出錯:`, error);
+        res.status(500).json({ message: '讀取背包資料時發生內部錯誤。' });
+    }
+});
+
+
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
@@ -162,7 +177,6 @@ router.get('/npc-profile/:npcName', async (req, res) => {
 
             if (playerLocation !== npcLocation) {
                 console.log(`[NPC系統] 互動失敗。玩家在「${playerLocation}」，NPC ${npcName} 在「${npcLocation}」。`);
-                // 【核心修改】更新此處的錯誤提示訊息
                 return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
             }
         }
