@@ -259,18 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 【核心修改】處理贈予物品請求的函式
     async function handleGiveItem(giveData) {
         modal.closeGiveItemModal();
         modal.setChatLoading(true);
 
-        const itemName = giveData.type === 'money' ? `${giveData.amount} 文銅錢` : giveData.itemName;
+        const itemName = giveData.type === 'money' ? `${giveData.amount} 文錢` : giveData.itemName;
         const npcName = gameState.currentChatNpc;
         
         modal.appendChatMessage('system', `你將 ${itemName} 給予了 ${npcName}。`);
 
         try {
-            // 建構後端所需的請求 body
             const body = {
                 giveData: {
                     target: npcName,
@@ -285,11 +283,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await api.giveItemToNpc(body);
             
             if (data.npc_response) {
-                // 將NPC的反應附加到聊天紀錄中
                 modal.appendChatMessage('npc', data.npc_response);
             }
             if (data.roundData) {
-                // 更新全域遊戲狀態和儀表板UI（特別是物品欄）
                 gameState.roundData = data.roundData;
                 updateUI(null, data.roundData, null);
             }
@@ -382,9 +378,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         endChatBtn.addEventListener('click', endChatSession);
         
+        // 【核心修正】修正呼叫 openGiveItemModal 的方式
         giveItemBtn.addEventListener('click', () => {
-            if (gameState.isInChat && gameState.currentChatNpc && gameState.roundData) {
-                modal.openGiveItemModal(gameState.roundData, gameState.currentChatNpc, handleGiveItem);
+            if (gameState.isInChat && gameState.currentChatNpc) {
+                // 不再傳入 roundData，因為 modalManager 會自己去API獲取
+                modal.openGiveItemModal(gameState.currentChatNpc, handleGiveItem);
             }
         });
         
