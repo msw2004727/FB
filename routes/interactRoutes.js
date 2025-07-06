@@ -9,8 +9,8 @@ const { advanceDate, shouldAdvanceDay, applyItemChanges } = require('../utils/ga
 const router = express.Router();
 const db = admin.firestore();
 
-// 主互動路由
-router.post('/interact', async (req, res) => {
+// 將主線互動邏輯從路由處理器中分離出來，方便複用
+async function handleInteraction(req, res) {
     const userId = req.user.id;
     const username = req.user.username;
 
@@ -97,7 +97,6 @@ router.post('/interact', async (req, res) => {
         const powerChange = aiResponse.roundData.powerChange || { internal: 0, external: 0, lightness: 0 };
         const moralityChange = aiResponse.roundData.moralityChange || 0;
         
-        // 從資料庫讀取最新的物品狀態，而不是依賴可能過時的 userProfile
         const latestUserDoc = await userDocRef.get();
         const latestUserData = latestUserDoc.data() || {};
         aiResponse.roundData.ITM = applyItemChanges(latestUserData.ITM, aiResponse.roundData.ITM);
@@ -148,10 +147,10 @@ router.post('/interact', async (req, res) => {
         console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
         res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
     }
-});
+}
 
+router.post('/interact', handleInteraction);
 
-// 戰鬥行動路由
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
     const { action, model } = req.body;
@@ -182,13 +181,23 @@ router.post('/combat-action', async (req, res) => {
             console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 的戰鬥已結束。`);
             await combatDocRef.delete();
 
-            // 戰鬥結束後，我們只回傳結果，讓前端來觸發一個新的主線回合
-            // 這可以簡化後端邏輯，避免在這裡重複 interact 的程式碼
-            res.json({
-                status: 'COMBAT_END',
-                finalLog: combatResult.narrative,
-                outcome: combatResult.outcome
-            });
+            // 【修改】將戰鬥結果包裝成一個新的行動，並重新呼叫主互動邏輯
+            const postCombatAction = `戰鬥剛剛結束。結局：${combatResult.outcome.summary || '戰鬥結束'}。我的狀態變化：${combatResult.outcome.playerChanges.PC || '無'}。`;
+            
+            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const currentRound = savesSnapshot.docs.length > 0 ? savesSnapshot.docs[0].data().R : 0;
+            const mainModel = userProfile.preferredModel || 'gemini';
+
+            const mockedReq = {
+                user: req.user,
+                body: {
+                    action: postCombatAction,
+                    round: currentRound,
+                    model: mainModel
+                }
+            };
+            // 將請求交給主互動函式處理，以生成新回合
+            return handleInteraction(mockedReq, res);
 
         } else {
             await combatDocRef.set(combatState);
