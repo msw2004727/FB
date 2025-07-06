@@ -12,24 +12,19 @@ const {
     getAIEncyclopedia, 
     getAIRandomEvent,
     getAICombatAction,
-    // 【新增】導入新的 AI 服務，我們會在下一步建立它
+    // 【修改】現在正式從 aiService 導入
     getAINpcProfile 
 } = require('../services/aiService');
 
-// 【新增】導入我們剛剛建立的 NPC 設定師 prompt
-const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt');
-
-
 const db = admin.firestore();
 
-// --- 【新增】在背景建立 NPC 詳細檔案的非同步函式 ---
-// 這個函式被設計為"呼叫後不理"，它會在背景自己完成工作
+// --- 【修改】在背景建立 NPC 詳細檔案的非同步函式 ---
+// 現在它會呼叫從 aiService 導入的函式
 const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
     const npcName = npcData.name;
     console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序。`);
     
     try {
-        // 檢查此 NPC 的檔案是否已存在，避免重複建立
         const npcDocRef = db.collection('users').doc(userId).collection('npcs').doc(npcName);
         const npcDoc = await npcDocRef.get();
         if (npcDoc.exists) {
@@ -37,16 +32,11 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             return;
         }
 
-        // 建立一個新的 prompt，要求 AI 生成詳細 NPC 檔案
-        const prompt = getNpcCreatorPrompt(username, npcName, roundData);
-
-        // 呼叫 AI 服務來獲取 NPC 詳細資料。
-        // 這裡我們假設有一個 getAINpcProfile 的服務，它會呼叫AI並解析JSON
-        // 為了穩定，建檔任務建議使用能力較強的模型
-        const npcProfile = await getAINpcProfile('openai', prompt);
+        // 【修改】直接呼叫 aiService 中的服務
+        // 為了穩定，建檔任務建議使用能力較強的模型，例如 'openai' 或 'deepseek'
+        const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
-            // 將 AI 生成的詳細檔案存入 Firestore
             await npcDocRef.set(npcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
         } else {
@@ -54,21 +44,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
         }
     } catch (error) {
         console.error(`[NPC系統] 為 "${npcName}" 進行背景建檔時發生錯誤:`, error);
-    }
-};
-
-// 【新增】一個專門用來呼叫 AI 生成 NPC 檔案的服務函式
-// 為了保持 gameRoutes.js 的清晰，我們把它加在這裡，理想情況下它應該在 aiService.js
-// 但根據我們的約定，我們先在同一個檔案內修改
-const getAINpcProfile = async (modelName, prompt) => {
-    // 這裡只是 callAI 的一個封裝，確保它期望得到 JSON
-    const { callAI, parseJsonResponse } = require('../services/aiServiceHelper'); // 假設有一個輔助檔案
-    try {
-        const text = await callAI(modelName, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 人物設定師任務:", error);
-        return null;
     }
 };
 
@@ -186,13 +161,10 @@ router.post('/interact', async (req, res) => {
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // --- 【新增】處理新NPC的邏輯 ---
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             aiResponse.roundData.NPC.forEach(npc => {
                 if (npc.isNew === true) {
-                    // 呼叫背景函式，但**不要**用 await 等待它完成
                     createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
-                    // 在回傳給前端之前，移除 isNew 標記，前端不需要這個資訊
                     delete npc.isNew;
                 }
             });
@@ -340,9 +312,8 @@ router.post('/interact', async (req, res) => {
 
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
-    // 【修改】接收 model 參數
     const { action, model } = req.body;
-    const modelName = model || 'deepseek'; // 若前端未提供，預設為 deepseek
+    const modelName = model || 'deepseek'; 
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -359,7 +330,6 @@ router.post('/combat-action', async (req, res) => {
         const userDoc = await userDocRef.get();
         let playerProfile = userDoc.exists ? userDoc.data() : {};
 
-        // 【修改】將 modelName 傳遞下去
         const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
@@ -571,7 +541,6 @@ router.post('/restart', async (req, res) => {
             batch.delete(doc.ref);
         });
         
-        // 【新增】同時刪除所有 NPC 檔案
         const npcsCollectionRef = userDocRef.collection('npcs');
         const npcsSnapshot = await npcsCollectionRef.get();
         npcsSnapshot.docs.forEach((doc) => {
