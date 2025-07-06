@@ -17,7 +17,7 @@ const {
     getAIGiveItemResponse,
     getAINarrativeForGive,
     getRelationGraph,
-    getAIRomanceEvent // 【核心新增】
+    getAIRomanceEvent
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -129,7 +129,6 @@ async function updateRomanceValues(userId, romanceChanges) {
     await Promise.all(romanceUpdatePromises);
 }
 
-// 【核心新增功能】戀愛事件觸發器
 async function checkAndTriggerRomanceEvent(userId, username, romanceChanges, roundData, model) {
     let triggeredEventNarrative = "";
     if (!romanceChanges || romanceChanges.length === 0) {
@@ -149,11 +148,9 @@ async function checkAndTriggerRomanceEvent(userId, username, romanceChanges, rou
         const currentRomanceValue = npcProfile.romanceValue || 0;
         const triggeredEvents = npcProfile.triggeredRomanceEvents || [];
 
-        // 門檻 1: 心生情愫 (>= 50)
         if (currentRomanceValue >= 50 && !triggeredEvents.includes('level_1')) {
             console.log(`[戀愛系統] ${npcName} 的心動值 (${currentRomanceValue}) 已達到 Level 1 門檻，觸發特殊事件！`);
             
-            // 為了讓AI生成事件時有更完整的玩家資料，我們從roundData中提取
             const playerProfileForEvent = {
                 username: username,
                 location: roundData.LOC[0]
@@ -162,17 +159,14 @@ async function checkAndTriggerRomanceEvent(userId, username, romanceChanges, rou
             const eventNarrative = await getAIRomanceEvent(model, playerProfileForEvent, npcProfile, 'level_1');
             
             if (eventNarrative) {
-                // 將事件劇情用特殊樣式包裹
                 triggeredEventNarrative += `<div class="random-event-message romance-event">${eventNarrative}</div>`;
                 
-                // 更新資料庫，標記事件已觸發
                 await npcDocRef.update({
                     triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1')
                 });
                 console.log(`[戀愛系統] 已為 ${npcName} 標記 level_1 戀愛事件已觸發。`);
             }
         }
-        // 未來可以在此處添加更多的 else if (currentRomanceValue >= 100 && !triggeredEvents.includes('level_2')) ...
     }
     return triggeredEventNarrative;
 }
@@ -235,11 +229,14 @@ router.get('/inventory', async (req, res) => {
     }
 });
 
+// 【核心修改】修改此路由以獲取並傳遞NPC詳細資料
 router.get('/get-relations', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     try {
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
+        
         const summaryDoc = await summaryDocRef.get();
 
         if (!summaryDoc.exists || !summaryDoc.data().text) {
@@ -247,8 +244,16 @@ router.get('/get-relations', async (req, res) => {
         }
 
         const longTermSummary = summaryDoc.data().text;
+
+        const npcDetails = {};
+        npcsSnapshot.forEach(doc => {
+            const data = doc.data();
+            npcDetails[data.name] = {
+                romanceValue: data.romanceValue || 0
+            };
+        });
         
-        const mermaidSyntax = await getRelationGraph('deepseek', longTermSummary, username);
+        const mermaidSyntax = await getRelationGraph('deepseek', longTermSummary, username, npcDetails);
         
         res.json({ mermaidSyntax });
 
@@ -498,19 +503,15 @@ const interactRouteHandler = async (req, res) => {
         
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        // --- 【核心修改】事件觸發器邏輯 ---
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
         
-        // 在更新完數值後，檢查是否觸發事件
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
 
-        // 如果有觸發事件，將其加到主故事前面
         if (romanceEventNarrative) {
             aiResponse.story = romanceEventNarrative + aiResponse.story;
         }
         aiResponse.roundData.story = aiResponse.story;
-        // --- 核心修改結束 ---
 
 
         const [newSummary, suggestion] = await Promise.all([
@@ -611,11 +612,14 @@ const interactRouteHandler = async (req, res) => {
 router.post('/interact', interactRouteHandler);
 
 
+// 【核心修改】修改此路由以獲取並傳遞NPC詳細資料
 router.get('/get-encyclopedia', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     try {
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
+
         const summaryDoc = await summaryDocRef.get();
 
         if (!summaryDoc.exists || !summaryDoc.data().text) {
@@ -623,7 +627,27 @@ router.get('/get-encyclopedia', async (req, res) => {
         }
 
         const longTermSummary = summaryDoc.data().text;
-        const encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username);
+
+        const npcDetails = {};
+        npcsSnapshot.forEach(doc => {
+            const data = doc.data();
+            npcDetails[data.name] = {
+                romanceValue: data.romanceValue || 0
+            };
+        });
+
+        let encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username, npcDetails);
+        
+        // 注入樣式
+        const style = `
+        <style>
+            .romance-meter { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #e0d8cd; }
+            .romance-label { font-weight: bold; color: #a6324a; }
+            .romance-meter .fas.fa-heart { color: #e54865; margin: 0 1px; }
+            .romance-meter .far.fa-heart { color: #e0d8cd; margin: 0 1px; }
+        </style>`;
+        encyclopediaHtml = style + encyclopediaHtml;
+
         res.json({ encyclopediaHtml });
 
     } catch (error) {
@@ -631,6 +655,7 @@ router.get('/get-encyclopedia', async (req, res) => {
         res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
     }
 });
+
 
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
