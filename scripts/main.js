@@ -231,7 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function endChatSession() {
         if (gameState.isRequesting || !gameState.currentChatNpc) return;
         const npcNameToSummarize = gameState.currentChatNpc;
+        
+        // 【核心修改】調整函式執行順序以正確顯示動畫
         modal.closeChatModal();
+        gameState.isInChat = false; 
         setLoadingState(true, '正在總結對話，更新江湖事態...');
 
         try {
@@ -252,22 +255,20 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
-            gameState.isInChat = false;
+            // 重置聊天相關狀態
             gameState.currentChatNpc = null;
             gameState.chatHistory = [];
             setLoadingState(false);
         }
     }
 
-    // 【核心重構】將 handleGiveItem 的邏輯與 handlePlayerAction 對齊
     async function handleGiveItem(giveData) {
-        modal.closeGiveItemModal(); // 先關閉物品選擇視窗
-        modal.closeChatModal(); // 同時關閉聊天視窗
+        modal.closeGiveItemModal(); 
+        modal.closeChatModal(); 
 
-        // 【核心修改】將遊戲狀態切換為「不在聊天中」，以便觸發全域加載動畫
         gameState.isInChat = false;
         
-        setLoadingState(true, "正在更新江湖事態..."); // 顯示全域讀取動畫
+        setLoadingState(true, "正在更新江湖事態..."); 
 
         try {
             const body = {
@@ -277,26 +278,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 model: aiModelSelector.value
             };
-
-            // 呼叫後端，後端會回傳一個完整的、標準的回合物件
             const data = await api.giveItemToNpc(body);
 
-            // 用處理標準回合的方式來更新整個UI
             if (data && data.roundData) {
                 data.roundData.suggestion = data.suggestion;
-                updateUI(data.story, data.roundData, null); // 更新主故事面板和儀表板
-                gameState.currentRound = data.roundData.R; // 更新當前回合數
-                gameState.roundData = data.roundData; // 更新全局遊戲狀態
+                updateUI(data.story, data.roundData, null); 
+                gameState.currentRound = data.roundData.R; 
+                gameState.roundData = data.roundData; 
             } else {
                 throw new Error("從伺服器收到的回應格式不正確。");
             }
         } catch (error) {
-            handleApiError(error); // 使用統一的錯誤處理
+            handleApiError(error); 
         } finally {
-            // 重置聊天相關的狀態
             gameState.currentChatNpc = null;
             gameState.chatHistory = [];
-            setLoadingState(false); // 隱藏讀取動畫
+            setLoadingState(false); 
         }
     }
 
