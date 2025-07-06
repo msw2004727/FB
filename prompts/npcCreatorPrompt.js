@@ -34,6 +34,7 @@ const getNpcCreatorPrompt = (username, npcName, roundData) => {
   "npcId": "王大夫",
   "name": "王大夫",
   "gender": "男",
+  "currentLocation": "無名村藥鋪",
   "allegiance": "中立善良",
   "personality": ["仁厚", "謹慎", "略帶迂腐"],
   "goals": ["找出治癒女兒絕症的方法(雖然已故)", "守護無名村的安寧"],
@@ -76,7 +77,8 @@ ${context}
 
 ## 【本次設定目標】
 為NPC「**${npcName}**」生成詳細的JSON個人檔案。
-請注意，JSON 檔案中的 "name" 和 "npcId" 欄位值必須是「${npcName}」。
+請注意，JSON 檔案中的 "name"、"npcId" 欄位值必須是「${npcName}」。
+**同時，你必須將 "currentLocation" 欄位的值，設定為上方情境中提供的「首次相遇地點」。**
 其餘欄位請根據情境自由發揮你的創造力。
 
 現在，請開始你的設定工作。
