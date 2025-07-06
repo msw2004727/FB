@@ -12,14 +12,12 @@ const {
     getAIEncyclopedia, 
     getAIRandomEvent,
     getAICombatAction,
-    // 【修改】現在正式從 aiService 導入
     getAINpcProfile 
 } = require('../services/aiService');
 
 const db = admin.firestore();
 
-// --- 【修改】在背景建立 NPC 詳細檔案的非同步函式 ---
-// 現在它會呼叫從 aiService 導入的函式
+// --- 在背景建立 NPC 詳細檔案的非同步函式 ---
 const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
     const npcName = npcData.name;
     console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序。`);
@@ -32,8 +30,7 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             return;
         }
 
-        // 【修改】直接呼叫 aiService 中的服務
-        // 為了穩定，建檔任務建議使用能力較強的模型，例如 'openai' 或 'deepseek'
+        // 【修改】根據您的要求，此處將固定使用 'deepseek' (DeepSeek-V2) 模型來生成NPC詳細檔案。
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
