@@ -6,8 +6,7 @@ const authMiddleware = require('../middleware/auth');
 const {
     getAIStory,
     getAISummary,
-    // 【修正】為了向下相容，我們將 getNarrative 加回來
-    getNarrative,
+    getNarrative, // 保留導入以向下相容舊功能
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
@@ -251,7 +250,6 @@ router.post('/end-chat', async (req, res) => {
     const { npcName, fullChatHistory } = req.body;
 
     if (!fullChatHistory || fullChatHistory.length === 0) {
-        // 【修正】這裡不應該回傳一個完整的遊戲回合，而是一個簡單的消息
         return res.json({ message: '對話已結束，江湖故事繼續。' });
     }
 
@@ -278,7 +276,7 @@ router.post('/end-chat', async (req, res) => {
                 model: mainModel
             }
         };
-        // 直接調用 interactRouteHandler 來處理後續
+
         interactRouteHandler(mockedReq, res);
 
     } catch (error) {
@@ -348,7 +346,6 @@ router.post('/give-item', async (req, res) => {
         
         const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
         
-        // 【優化注入】將 story 直接寫入回合數據，以便讀取時使用
         newRoundData.story = narrativeText; 
         
         const [newSummary, suggestion] = await Promise.all([
@@ -410,9 +407,7 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // 【優化】直接使用 story 大師產出的故事文本
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
-        // 【優化注入】將 story 寫入 roundData，以便 /latest-game 路由可以直接使用
         aiResponse.roundData.story = aiResponse.story;
 
         const [newSummary, suggestion] = await Promise.all([
@@ -440,7 +435,7 @@ const interactRouteHandler = async (req, res) => {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                 } else if (npc.friendlinessChange !== undefined) {
-                    // 省略友好度更新...
+                    // ...
                 }
                 if (npc.location) {
                     return npcDocRef.set({ currentLocation: npc.location }, { merge: true });
@@ -457,8 +452,12 @@ const interactRouteHandler = async (req, res) => {
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
             turnsSinceEvent = 0;
-        } else if (turnsSinceEvent >= 3) {
-            turnsSinceEvent = 0;
+        } else {
+            turnsSinceEvent++;
+            if (turnsSinceEvent >= 5) {
+                // ...
+                turnsSinceEvent = 0;
+            }
         }
         
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
@@ -504,10 +503,13 @@ const interactRouteHandler = async (req, res) => {
 
     } catch (error) {
         console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
-        res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
+        if (!res.headersSent) {
+            res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
+        }
     }
 }
 router.post('/interact', interactRouteHandler);
+
 
 router.get('/get-encyclopedia', async (req, res) => {
     const userId = req.user.id;
@@ -681,13 +683,14 @@ router.get('/latest-game', async (req, res) => {
             preferredModel: userData.preferredModel,
         });
 
-        // 【修正】使用 Promise.all 並行處理，並移除 getNarrative
+        // 【修正】使用玩家偏好的模型，如果沒有，則預設為 'openai'
+        const modelToUse = userData.preferredModel || 'openai';
+
         const [prequelText, suggestion] = await Promise.all([
-            getAIPrequel('deepseek', [latestGameData]),
-            getAISuggestion('deepseek', latestGameData)
+            getAIPrequel(modelToUse, [latestGameData]),
+            getAISuggestion(modelToUse, latestGameData)
         ]);
 
-        // 【修正】故事文本直接從存檔的 roundData 中讀取
         const narrativeText = latestGameData.story || "你靜靜地站在原地，思索著下一步。";
 
         res.json({
@@ -821,7 +824,6 @@ router.post('/force-suicide', async (req, res) => {
             IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
         };
         
-        // 將最後的遺言也作為故事儲存
         finalRoundData.story = finalRoundData.PC;
 
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
