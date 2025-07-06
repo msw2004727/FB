@@ -33,6 +33,8 @@ const { getSuggestionPrompt } = require('../prompts/suggestionPrompt');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
 const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
+// 【新增】導入我們為人物設定師建立的 prompt 檔案
+const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt');
 
 
 // 統一的AI調度中心
@@ -177,7 +179,18 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
     }
 }
 
-// 【修改】接收 modelName 參數
+// 【新增】任務八：生成 NPC 詳細檔案
+async function getAINpcProfile(modelName, username, npcName, roundData) {
+    const prompt = getNpcCreatorPrompt(username, npcName, roundData);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 人物設定師任務:", error);
+        return null;
+    }
+}
+
 async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
@@ -202,5 +215,7 @@ module.exports = {
     getAISuggestion,
     getAIEncyclopedia,
     getAIRandomEvent,
+    // 【新增】匯出新的 NPC 檔案生成服務
+    getAINpcProfile,
     getAICombatAction
 };
