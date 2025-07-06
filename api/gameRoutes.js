@@ -35,6 +35,8 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
+            // 在儲存前，確保新檔案也包含當前位置
+            npcProfile.currentLocation = roundData.LOC[0];
             await npcDocRef.set(npcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
         } else {
@@ -91,15 +93,37 @@ router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
     try {
-        const npcDocRef = db.collection('users').doc(userId).collection('npcs').doc(npcName);
-        const npcDoc = await npcDocRef.get();
+        const userDocRef = db.collection('users').doc(userId);
+        const npcDocRef = userDocRef.collection('npcs').doc(npcName);
+
+        // 平行獲取玩家最新位置和NPC檔案
+        const [latestSaveSnapshot, npcDoc] = await Promise.all([
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
+            npcDocRef.get()
+        ]);
 
         if (!npcDoc.exists) {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
         const npcData = npcDoc.data();
-        
+        const npcLocation = npcData.currentLocation;
+
+        // 如果是舊版NPC，沒有位置資訊，則為了相容性先允許對話
+        if (!npcLocation) {
+             console.log(`[NPC系統] NPC ${npcName} 沒有位置資訊，為保持相容性，允許對話。`);
+        } else {
+             if (latestSaveSnapshot.empty) {
+                return res.status(404).json({ message: '找不到玩家位置資訊。' });
+            }
+            const playerLocation = latestSaveSnapshot.docs[0].data().LOC[0];
+
+            if (playerLocation !== npcLocation) {
+                console.log(`[NPC系統] 互動失敗。玩家在「${playerLocation}」，NPC ${npcName} 在「${npcLocation}」。`);
+                return res.status(403).json({ message: `你與 ${npcName} 相隔千里，無法交談。` });
+            }
+        }
+
         const publicProfile = {
             name: npcData.name,
             appearance: npcData.appearance,
@@ -107,6 +131,7 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         };
         
         res.json(publicProfile);
+
     } catch (error) {
         console.error(`[密談系統] 獲取NPC(${npcName})檔案時出錯:`, error);
         res.status(500).json({ message: '讀取人物檔案時發生內部錯誤。' });
@@ -232,6 +257,18 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
+        // 【核心修改】更新NPC位置到資料庫
+        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
+            const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
+                if (npc.location) { // 只有當AI提供新位置時才更新
+                    const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
+                    return npcDocRef.set({ currentLocation: npc.location }, { merge: true });
+                }
+                return Promise.resolve();
+            });
+            await Promise.all(npcUpdatePromises);
+        }
+
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             aiResponse.roundData.NPC.forEach(npc => {
                 if (npc.isNew === true) {
@@ -328,11 +365,11 @@ const interactRouteHandler = async (req, res) => {
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         }
         
-        const narrativeText = await getNarrative(modelName, aiResponse.roundData); // *** 這就是修正的地方 (1/2) ***
+        const narrativeText = await getNarrative(modelName, aiResponse.roundData);
         
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
         
-        aiResponse.story = narrativeText; // *** 這就是修正的地方 (1/2) ***
+        aiResponse.story = narrativeText;
 
         res.json(aiResponse);
 
@@ -460,8 +497,8 @@ router.post('/combat-action', async (req, res) => {
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-            const narrativeText = await getNarrative(modelName, aiResponse.roundData); // *** 這就是修正的地方 (2/2) ***
-            aiResponse.story = narrativeText; // *** 這就是修正的地方 (2/2) ***
+            const narrativeText = await getNarrative(modelName, aiResponse.roundData);
+            aiResponse.story = narrativeText;
 
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
 
@@ -533,21 +570,18 @@ router.get('/latest-game', async (req, res) => {
     }
 });
 
-// 【修改】 get-novel 路由現在承擔了所有的小說生成工作
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
         const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
         const novelCacheDoc = await novelCacheRef.get();
 
-        // 如果快取存在，直接回傳快取，速度最快
         if (novelCacheDoc.exists && novelCacheDoc.data().paragraphs) {
             console.log(`[小說系統] 從快取中讀取小說...`);
             return res.json({ novel: novelCacheDoc.data().paragraphs });
         } 
         
         console.log(`[小說系統] 快取不存在，開始即時生成小說...`);
-        // 如果沒有快取，則開始即時生成
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (snapshot.empty) {
             return res.json({ novel: [] });
@@ -555,7 +589,6 @@ router.get('/get-novel', async (req, res) => {
         
         const narrativePromises = snapshot.docs.map(doc => {
             const roundData = doc.data();
-            // 為每一個回合呼叫小說家AI
             return getNarrative('deepseek', roundData).then(narrativeText => {
                 return {
                     text: narrativeText,
@@ -566,7 +599,6 @@ router.get('/get-novel', async (req, res) => {
 
         const novelParagraphs = await Promise.all(narrativePromises);
         
-        // 生成後，寫入快取，方便下次讀取
         await novelCacheRef.set({ paragraphs: novelParagraphs });
         console.log(`[小說系統] 小說生成完畢並已存入快取。`);
         
