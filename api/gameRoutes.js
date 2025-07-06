@@ -14,7 +14,9 @@ const {
     getAICombatAction,
     getAINpcProfile,
     getAIChatResponse,
-    getAIChatSummary
+    getAIChatSummary,
+    getAIGiveItemResponse,
+    getAINarrativeForGive
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -235,6 +237,71 @@ router.post('/end-chat', async (req, res) => {
         res.status(500).json({ message: '結束對話並更新世界時發生錯誤。' });
     }
 });
+
+router.post('/give-item', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { giveData, model = 'gemini' } = req.body;
+    const { type, target, amount, itemId, itemName } = giveData;
+
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const npcDocRef = userDocRef.collection('npcs').doc(target);
+
+        const [userDoc, npcDoc, latestSaveSnapshot] = await Promise.all([
+            userDocRef.get(),
+            npcDocRef.get(),
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
+        ]);
+
+        if (!userDoc.exists || !npcDoc.exists || latestSaveSnapshot.empty) {
+            return res.status(404).json({ message: '找不到玩家、NPC或遊戲存檔。' });
+        }
+        
+        const playerProfile = userDoc.data();
+        const npcProfile = npcDoc.data();
+        let lastRoundData = latestSaveSnapshot.docs[0].data();
+
+        // 呼叫AI生成NPC的反應
+        const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, { type, amount, itemName });
+
+        if (!aiResponse) {
+            throw new Error('AI未能生成有效的贈予反應。');
+        }
+
+        const { npc_response, friendlinessChange } = aiResponse;
+
+        // 更新NPC友好度
+        const newFriendlinessValue = (npcProfile.friendlinessValue || 0) + friendlinessChange;
+        await npcDocRef.update({ friendlinessValue: newFriendlinessValue });
+        npcProfile.friendlinessValue = newFriendlinessValue; // 更新本地副本
+
+        // 從玩家背包移除物品
+        const itemChanges = [{
+            action: 'remove',
+            itemName: type === 'money' ? '銀兩' : itemName,
+            quantity: type === 'money' ? amount : 1
+        }];
+        await updateInventory(userId, itemChanges);
+        
+        // 更新ITM字串以供顯示
+        lastRoundData.ITM = await getInventoryDisplay(userId);
+        
+        // 更新敘述 (使用新AI函式)
+        const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, target, itemName || `${amount}文錢`, npc_response);
+        lastRoundData.PC = narrativeText; // 將贈予事件的描述放入PC欄位
+        
+        res.json({
+            npc_response: npc_response,
+            roundData: lastRoundData 
+        });
+
+    } catch (error) {
+        console.error(`[贈予系統] 贈予NPC(${target})物品時出錯:`, error);
+        res.status(500).json({ message: '贈予物品時發生內部錯誤。' });
+    }
+});
+
 
 // --- 主遊戲路由 ---
 
