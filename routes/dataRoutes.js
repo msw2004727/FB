@@ -1,8 +1,8 @@
 // routes/dataRoutes.js
 
-import express from 'express';
-import admin from 'firebase-admin';
-import { getNarrative, getAIEncyclopedia } from '../services/aiService.js';
+const express = require('express');
+const admin = require('firebase-admin');
+const { getNarrative, getAIEncyclopedia } = require('../services/aiService.js');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -72,4 +72,4 @@ router.get('/get-encyclopedia', async (req, res) => {
     }
 });
 
-export default router;
+module.exports = router;
