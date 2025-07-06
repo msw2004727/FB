@@ -21,6 +21,17 @@ const {
 
 const db = admin.firestore();
 
+// 【核心新增】友好度數值與等級對應的轉換函式
+const getFriendlinessLevel = (value) => {
+    if (value >= 100) return 'devoted';   // 崇拜
+    if (value >= 70) return 'trusted';    // 信賴
+    if (value >= 30) return 'friendly';   // 友善
+    if (value <= -100) return 'sworn_enemy'; // 死敵
+    if (value <= -50) return 'hostile';    // 敵對
+    if (value <= -10) return 'wary';       // 警惕
+    return 'neutral';                     // 中立
+};
+
 // --- 在背景建立 NPC 詳細檔案的非同步函式 ---
 const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
     const npcName = npcData.name;
@@ -37,7 +48,11 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
+            // 【核心修改】統一友好度系統
             npcProfile.currentLocation = roundData.LOC[0];
+            npcProfile.friendlinessValue = npcData.friendlinessValue || 0;
+            npcProfile.friendliness = getFriendlinessLevel(npcProfile.friendlinessValue);
+
             await npcDocRef.set(npcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
         } else {
@@ -48,7 +63,7 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// 【修改】物品帳本處理函式
+// 物品帳本處理函式
 async function updateInventory(userId, itemChanges) {
     if (!itemChanges || itemChanges.length === 0) {
         return;
@@ -56,7 +71,6 @@ async function updateInventory(userId, itemChanges) {
 
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     
-    // 使用 transaction 確保資料一致性
     await db.runTransaction(async (transaction) => {
         const doc = await transaction.get(inventoryRef);
         let inventory = doc.exists ? doc.data() : {};
@@ -78,7 +92,6 @@ async function updateInventory(userId, itemChanges) {
                 }
                 console.log(`[物品系統] 新增物品: ${itemName} x${quantity}`);
             } else if (action === 'remove') {
-                // 【核心增修】增加物品存在和數量檢查
                 if (inventory[itemName] && inventory[itemName].quantity >= quantity) {
                     inventory[itemName].quantity -= quantity;
                     if (inventory[itemName].quantity <= 0) {
@@ -86,7 +99,6 @@ async function updateInventory(userId, itemChanges) {
                     }
                     console.log(`[物品系統] 移除物品: ${itemName} x${quantity}`);
                 } else {
-                    // 如果物品不存在或數量不足，則拋出錯誤中斷交易
                     throw new Error(`物品移除失敗：試圖移除不存在或數量不足的物品'${itemName}'。`);
                 }
             }
@@ -95,7 +107,7 @@ async function updateInventory(userId, itemChanges) {
     });
 }
 
-// 【新增】獲取物品顯示字串的函式
+// 獲取物品顯示字串的函式
 async function getInventoryDisplay(userId) {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
@@ -268,8 +280,9 @@ router.post('/give-item', async (req, res) => {
         const playerProfile = userDoc.data();
         const npcProfile = npcDoc.data();
         let lastRoundData = latestSaveSnapshot.docs[0].data();
-
-        // 呼叫AI生成NPC的反應
+        
+        const currentFriendlinessValue = npcProfile.friendlinessValue || 0;
+        
         const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, { type, amount, itemName });
 
         if (!aiResponse) {
@@ -279,24 +292,25 @@ router.post('/give-item', async (req, res) => {
         const { npc_response, friendlinessChange } = aiResponse;
 
         // 更新NPC友好度
-        const newFriendlinessValue = (npcProfile.friendlinessValue || 0) + friendlinessChange;
-        await npcDocRef.update({ friendlinessValue: newFriendlinessValue });
-        npcProfile.friendlinessValue = newFriendlinessValue; // 更新本地副本
+        const newFriendlinessValue = currentFriendlinessValue + friendlinessChange;
+        const newFriendlinessLevel = getFriendlinessLevel(newFriendlinessValue);
 
+        await npcDocRef.update({ 
+            friendlinessValue: newFriendlinessValue,
+            friendliness: newFriendlinessLevel
+        });
+        
         // 從玩家背包移除物品
-        const itemChanges = [{
-            action: 'remove',
-            itemName: type === 'money' ? '銀兩' : itemName,
-            quantity: type === 'money' ? amount : 1
-        }];
-        await updateInventory(userId, itemChanges);
+        const itemToRemove = type === 'money' ? '銀兩' : itemName;
+        const quantityToRemove = type === 'money' ? amount : 1;
+        await updateInventory(userId, [{ action: 'remove', itemName: itemToRemove, quantity: quantityToRemove }]);
         
         // 更新ITM字串以供顯示
         lastRoundData.ITM = await getInventoryDisplay(userId);
         
-        // 更新敘述 (使用新AI函式)
+        // 更新敘述
         const narrativeText = await getAINarrativeForGive(model, lastRoundData, username, target, itemName || `${amount}文錢`, npc_response);
-        lastRoundData.PC = narrativeText; // 將贈予事件的描述放入PC欄位
+        lastRoundData.PC = narrativeText; 
         
         res.json({
             npc_response: npc_response,
@@ -311,7 +325,6 @@ router.post('/give-item', async (req, res) => {
 
 
 // --- 主遊戲路由 ---
-
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -367,15 +380,32 @@ const interactRouteHandler = async (req, res) => {
 
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = [];
-            aiResponse.roundData.NPC.forEach(npc => {
+            for (const npc of aiResponse.roundData.NPC) {
+                const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
+                
                 if (npc.isNew === true) {
+                    npc.friendlinessValue = 0; // 新NPC初始友好度為0
                     createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                     delete npc.isNew;
-                } else if (npc.location) {
-                    const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
-                    npcUpdatePromises.push(npcDocRef.update({ currentLocation: npc.location }));
+                } else if (npc.friendlinessChange !== undefined) {
+                    const doc = await npcDocRef.get();
+                    if (doc.exists) {
+                        const currentFriendlinessValue = doc.data().friendlinessValue || 0;
+                        const newFriendlinessValue = currentFriendlinessValue + npc.friendlinessChange;
+                        const newFriendlinessLevel = getFriendlinessLevel(newFriendlinessValue);
+                        
+                        npcUpdatePromises.push(npcDocRef.update({
+                            friendlinessValue: newFriendlinessValue,
+                            friendliness: newFriendlinessLevel
+                        }));
+                        npc.friendliness = newFriendlinessLevel; // 更新本回合顯示的等級
+                    }
                 }
-            });
+                
+                if (npc.location) {
+                    npcUpdatePromises.push(npcDocRef.update({ currentLocation: npc.location }, { merge: true }));
+                }
+            }
             await Promise.all(npcUpdatePromises);
         }
 
@@ -454,7 +484,7 @@ const interactRouteHandler = async (req, res) => {
         } else {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             aiResponse.suggestion = suggestion;
-            const newSummary = await getAISummary(modelName, aiResponse.roundData);
+            const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         }
 
