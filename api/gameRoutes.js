@@ -3,6 +3,7 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 
+// 【修改】導入我們在第三步建立的兩個新 Prompt
 const { 
     getAIStory, 
     getAISummary, 
@@ -12,7 +13,9 @@ const {
     getAIEncyclopedia, 
     getAIRandomEvent,
     getAICombatAction,
-    getAINpcProfile 
+    getAINpcProfile,
+    getAIChatResponse,   // 假設 aiService 中有此函式
+    getAIChatSummary    // 假設 aiService 中有此函式
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -30,7 +33,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             return;
         }
 
-        // 根據您的要求，此處將固定使用 'deepseek' (DeepSeek-V2) 模型來生成NPC詳細檔案。
         const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
 
         if (npcProfile) {
@@ -85,7 +87,125 @@ function applyItemChanges(currentItems, itemChangeString) {
 
 router.use(authMiddleware);
 
+// --- 【新增】路由一：獲取 NPC 公開資訊 ---
+router.get('/npc-profile/:npcName', async (req, res) => {
+    const userId = req.user.id;
+    const { npcName } = req.params;
+    try {
+        const npcDocRef = db.collection('users').doc(userId).collection('npcs').doc(npcName);
+        const npcDoc = await npcDocRef.get();
+
+        if (!npcDoc.exists) {
+            return res.status(404).json({ message: '找不到該人物的檔案。' });
+        }
+        
+        const npcData = npcDoc.data();
+        
+        // 為了安全，只回傳前端需要的公開資訊
+        const publicProfile = {
+            name: npcData.name,
+            appearance: npcData.appearance,
+            friendliness: npcData.friendliness || 'neutral' // 提供一個預設值
+        };
+        
+        res.json(publicProfile);
+    } catch (error) {
+        console.error(`[密談系統] 獲取NPC(${npcName})檔案時出錯:`, error);
+        res.status(500).json({ message: '讀取人物檔案時發生內部錯誤。' });
+    }
+});
+
+
+// --- 【新增】路由二：處理即時對話 ---
+router.post('/npc-chat', async (req, res) => {
+    const userId = req.user.id;
+    // model 讓前端可以選擇用哪個AI來聊天
+    const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
+
+    try {
+        const npcDocRef = db.collection('users').doc(userId).collection('npcs').doc(npcName);
+        const npcDoc = await npcDocRef.get();
+        if (!npcDoc.exists) {
+            return res.status(404).json({ message: '對話目標不存在。' });
+        }
+        const npcProfile = npcDoc.data();
+
+        // 呼叫 AI 聊天大師
+        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage);
+        
+        if (aiReply) {
+            res.json({ reply: aiReply });
+        } else {
+            res.status(500).json({ message: 'AI似乎在思考人生，沒有回應...' });
+        }
+    } catch (error) {
+        console.error(`[密談系統] 與NPC(${npcName})對話時出錯:`, error);
+        res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
+    }
+});
+
+
+// --- 【新增】路由三：結束對話並更新主線 ---
+router.post('/end-chat', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    // 結束對話時，我們用一個固定的、高效的AI來做總結
+    const summaryModel = 'deepseek'; 
+    const { npcName, fullChatHistory } = req.body;
+
+    if (!fullChatHistory || fullChatHistory.length === 0) {
+        // 如果沒有對話就結束，直接回傳成功，不觸發任何事
+        return res.json({ message: '對話已結束，江湖故事繼續。' });
+    }
+
+    try {
+        // 步驟一：呼叫 AI 摘要師，將對話紀錄總結成一句玩家行動
+        const chatSummary = await getAIChatSummary(summaryModel, username, npcName, fullChatHistory);
+        if (!chatSummary) {
+            throw new Error('AI未能成功總結對話內容。');
+        }
+        console.log(`[密談系統] 對話已結束，AI總結的玩家行動為: "${chatSummary}"`);
+
+        // 步驟二：將這句總結作為玩家行動，送入原本的主線互動邏輯中
+        // 這一段是從下面的 /interact 路由中抽取的通用邏輯
+        
+        const userDocRef = db.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        const userProfile = userDoc.exists ? userDoc.data() : {};
+        const currentRound = (await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()).docs[0]?.data()?.R || 0;
+        
+        // 使用玩家當前選擇的主要AI模型來推進故事
+        const mainModel = userProfile.preferredModel || 'gemini'; 
+        
+        // 觸發主線互動，並將回傳結果直接送回前端
+        // 注意：這裡我們直接呼叫 interact 函式本體，而不是透過 HTTP 請求
+        // 因此需要將 res 物件傳遞過去，以便它能回傳最終結果
+        // (這是一個簡化作法，理想的重構會將 interact 的核心邏輯再拆分出來)
+        
+        // 模擬一個 request 物件
+        const mockedReq = {
+            user: { id: userId, username: username },
+            body: {
+                action: chatSummary, // 使用AI總結的行動
+                round: currentRound,
+                model: mainModel
+            }
+        };
+
+        // 直接呼叫 interact 路由的處理函式
+        // 這是一個 Express 的進階用法，將 res 傳遞下去
+        interactRouteHandler(mockedReq, res);
+
+    } catch (error) {
+        console.error(`[密談系統] 結束與NPC(${npcName})的對話時出錯:`, error);
+        res.status(500).json({ message: '結束對話並更新世界時發生錯誤。' });
+    }
+});
+
+
+
 router.get('/get-encyclopedia', async (req, res) => {
+    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     const username = req.user.username;
     try {
@@ -108,8 +228,8 @@ router.get('/get-encyclopedia', async (req, res) => {
     }
 });
 
-
-router.post('/interact', async (req, res) => {
+// 【修改】將 /interact 的邏輯包裝成一個函式，以便被 /end-chat 呼叫
+const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
 
@@ -211,47 +331,6 @@ router.post('/interact', async (req, res) => {
             turnsSinceEvent = 0; 
         } 
         else if (turnsSinceEvent >= 3) {
-            // 【修改】我已將整個隨機事件的觸發邏輯註解掉，以關閉此功能。
-            /*
-            if (Math.random() < 0.6) {
-                const r = Math.random();
-                let eventType;
-                if (r < 0.4) eventType = '一個小小的正面事件';
-                else if (r < 0.6) eventType = '一個中等的正面事件';
-                else if (r < 0.9) eventType = '一個小小的負面事件';
-                else eventType = '一個中等的負面事件';
-                
-                console.log(`[事件系統] 玩家 ${username} 觸發隨機事件: ${eventType}`);
-
-                const eventData = await getAIRandomEvent('deepseek', eventType, {
-                    username: username,
-                    location: aiResponse.roundData.LOC[0],
-                    playerState: newPlayerStateDescription,
-                    morality: playerMorality + moralityChange 
-                });
-
-                if (eventData && eventData.effects) {
-                    console.log('[事件系統] 事件效果:', eventData.effects);
-                    if(eventData.effects.powerChange) {
-                        powerChange.internal += (eventData.effects.powerChange.internal || 0);
-                        powerChange.external += (eventData.effects.powerChange.external || 0);
-                        powerChange.lightness += (eventData.effects.powerChange.lightness || 0);
-                    }
-                    if(eventData.effects.moralityChange) {
-                        moralityChange += eventData.effects.moralityChange;
-                    }
-                    if(eventData.effects.PC) {
-                        newPlayerStateDescription += ` ${eventData.effects.PC}`;
-                    }
-                    if(eventData.effects.ITM) {
-                        newItemChange = applyItemChanges(newItemChange, eventData.effects.ITM);
-                    }
-                    aiResponse.randomEvent = { description: eventData.description };
-                }
-            } else {
-                console.log(`[事件系統] 玩家 ${username} 本回合無事發生。`);
-            }
-            */
             console.log(`[事件系統] 隨機事件功能已關閉。`);
             turnsSinceEvent = 0;
         }
@@ -281,6 +360,7 @@ router.post('/interact', async (req, res) => {
             lightness: newLightness,
             morality: newMorality,
             turnsSinceEvent: turnsSinceEvent,
+            preferredModel: modelName, // 順便儲存玩家偏好的主模型
             ...currentDate
         });
         
@@ -309,9 +389,12 @@ router.post('/interact', async (req, res) => {
         console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
         res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
     }
-});
+}
+router.post('/interact', interactRouteHandler);
+
 
 router.post('/combat-action', async (req, res) => {
+    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     const { action, model } = req.body;
     const modelName = model || 'deepseek'; 
@@ -434,6 +517,7 @@ router.post('/combat-action', async (req, res) => {
 
 
 router.get('/latest-game', async (req, res) => {
+    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
@@ -485,6 +569,7 @@ router.get('/latest-game', async (req, res) => {
 });
 
 router.get('/get-novel', async (req, res) => {
+    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     try {
         const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
@@ -531,6 +616,7 @@ router.get('/get-novel', async (req, res) => {
 });
 
 router.post('/restart', async (req, res) => {
+    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -578,6 +664,7 @@ router.post('/restart', async (req, res) => {
 });
 
 router.post('/force-suicide', async (req, res) => {
+    // ... 此路由維持原樣，不變 ...
     const userId = req.user.id;
     const username = req.user.username;
     try {
