@@ -20,6 +20,9 @@ const qstContent = document.getElementById('qst-content');
 const psyContent = document.getElementById('psy-content');
 const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
+// 【核心新增】獲取錢袋的顯示元素
+const moneyContent = document.getElementById('money-content');
+
 
 // --- UI 更新函式 ---
 
@@ -39,7 +42,7 @@ function highlightNpcNames(text, npcs) {
         sortedNpcs.forEach(npc => {
             const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(npcNameEscaped, 'g');
-            const replacement = `<span class="npc-name" data-npc-name="${npc.name}">${npc.name}</span>`;
+            const replacement = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
         });
     }
@@ -128,8 +131,13 @@ export function updateUI(storyText, data, randomEvent) {
     } else {
         npcContent.textContent = '未見人煙';
     }
+    
+    // 【核心修改】更新錢袋和物品欄位
+    if (moneyContent) {
+        moneyContent.textContent = `${data.money || 0} 文錢`;
+    }
+    itmContent.textContent = data.ITM || '身無長物';
 
-    itmContent.textContent = data.ITM || '行囊空空';
     qstContent.textContent = data.QST || '暫無要事';
     psyContent.textContent = data.PSY || '心如止水';
     clsContent.textContent = data.CLS || '尚無線索';
