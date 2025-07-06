@@ -9,6 +9,7 @@ const getNpcCreatorPrompt = (username, npcName, roundData) => {
 - 當時氛圍: ${roundData.ATM.join('、')}
 - 遭遇事件: ${roundData.EVT}
 - NPC當時的狀態: ${roundData.NPC.find(npc => npc.name === npcName)?.status || '狀態不明'}
+- 玩家當時的狀態: ${roundData.PC}
 - 玩家當時的行動: ${roundData.IMP}
     `;
 
@@ -23,6 +24,7 @@ const getNpcCreatorPrompt = (username, npcName, roundData) => {
 
 1.  **邏輯性與情境感知**：
     * 你必須將「首次相遇情境」作為最重要的創作依據。所有設定都必須與該情境保持高度的邏輯一致性。
+    * **【情境整合鐵律】你創造的檔案，其 "background" (背景) 故事 **必須** 包含並解釋「首次相遇情境」中發生的核心事件。例如，如果情境是NPC救了重傷的玩家，那麼NPC的背景故事裡必須要有一段關於他為何以及如何在那個時間點救了玩家的描述。**
     * **【新手村限制】如果「首次相遇地點」是在「無名村」或其周邊地區，你創造的人物必須是平凡的。** 其 "skills" (技能) 欄位只能包含生活技能（如：打鐵、採藥、烹飪）或完全不包含此欄位。其 "background" (背景) 必須是普通人的背景，**絕對禁止**設定任何與武林門派、皇室貴族、或絕世武功相關的隱藏身份。
     * 只有當相遇地點是在大城市（如：開封、臨安）或特定的門派地點時，你才可以設定其為真正的江湖人士。
 
