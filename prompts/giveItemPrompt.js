@@ -4,6 +4,7 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     const { type, amount, itemName } = itemInfo;
     const itemGiven = type === 'money' ? `${amount}文錢` : itemName;
 
+    // 【核心修正】將整個 return 的字串用反引號 (`) 包裹
     return `
 你是一位精通人情世故的「江湖交際大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和友好度變化的JSON物件。
 
@@ -27,8 +28,8 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
 
 你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。這個物件必須包含以下兩個鍵：
 
-1.  **`npc_response`** (字串): NPC對收到禮物後的口頭反應。這段話必須完全符合NPC的個性和語氣。
-2.  **`friendlinessChange`** (數字): 本次贈予行為對NPC友好度造成的「變化數值」。
+1.  **\`npc_response\`** (字串): NPC對收到禮物後的口頭反應。這段話必須完全符合NPC的個性和語氣。
+2.  **\`friendlinessChange\`** (數字): 本次贈予行為對NPC友好度造成的「變化數值」。
     * 正面反應應為正數。普通禮物可能 +5，送到心坎裡的禮物可能 +20 或更高。
     * 負面反應應為負數。送了對方討厭的東西可能 -10。
     * 中性或拒絕接受，可以是 0。
