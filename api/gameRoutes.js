@@ -92,7 +92,6 @@ async function updateInventory(userId, itemChanges) {
     });
 }
 
-// 【核心修改】將 getInventoryDisplay 升級為 getInventoryState
 async function getInventoryState(userId) {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
@@ -134,7 +133,6 @@ function advanceDate(currentDate) {
 
 router.use(authMiddleware);
 
-// ... (npc-profile, npc-chat, end-chat 路由保持不變) ...
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
@@ -164,7 +162,8 @@ router.get('/npc-profile/:npcName', async (req, res) => {
 
             if (playerLocation !== npcLocation) {
                 console.log(`[NPC系統] 互動失敗。玩家在「${playerLocation}」，NPC ${npcName} 在「${npcLocation}」。`);
-                return res.status(403).json({ message: `你與 ${npcName} 相隔千里，無法交談。` });
+                // 【核心修改】更新此處的錯誤提示訊息
+                return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
             }
         }
 
@@ -181,6 +180,7 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         res.status(500).json({ message: '讀取人物檔案時發生內部錯誤。' });
     }
 });
+
 router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
@@ -205,6 +205,7 @@ router.post('/npc-chat', async (req, res) => {
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
     }
 });
+
 router.post('/end-chat', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -246,6 +247,7 @@ router.post('/end-chat', async (req, res) => {
         res.status(500).json({ message: '結束對話並更新世界時發生錯誤。' });
     }
 });
+
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -288,7 +290,6 @@ router.post('/give-item', async (req, res) => {
         const quantityToRemove = type === 'money' ? amount : 1;
         await updateInventory(userId, [{ action: 'remove', itemName: itemToRemove, quantity: quantityToRemove }]);
         
-        // 【核心修改】使用新的函式來更新錢袋和物品
         const inventoryState = await getInventoryState(userId);
         lastRoundData.ITM = inventoryState.itemsString;
         lastRoundData.money = inventoryState.money;
@@ -344,19 +345,17 @@ const interactRouteHandler = async (req, res) => {
         
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         
-        // 【核心修改】使用新的函式來獲取錢袋和物品資訊
         const inventoryState = await getInventoryState(userId);
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
         
-        // ... (NPC友好度更新邏輯保持不變) ...
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = [];
             for (const npc of aiResponse.roundData.NPC) {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
                 
                 if (npc.isNew === true) {
-                    npc.friendlinessValue = 0; // 新NPC初始友好度為0
+                    npc.friendlinessValue = 0;
                     createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                     delete npc.isNew;
                 } else if (npc.friendlinessChange !== undefined) {
@@ -370,7 +369,7 @@ const interactRouteHandler = async (req, res) => {
                             friendlinessValue: newFriendlinessValue,
                             friendliness: newFriendlinessLevel
                         }));
-                        npc.friendliness = newFriendlinessLevel; // 更新本回合顯示的等級
+                        npc.friendliness = newFriendlinessLevel;
                     }
                 }
                 
@@ -439,8 +438,6 @@ const interactRouteHandler = async (req, res) => {
 }
 router.post('/interact', interactRouteHandler);
 
-
-// ... (get-encyclopedia, combat-action, latest-game, get-novel, restart, force-suicide 路由保持不變) ...
 router.get('/get-encyclopedia', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -461,6 +458,7 @@ router.get('/get-encyclopedia', async (req, res) => {
         res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
     }
 });
+
 router.post('/combat-action', async (req, res) => {
     const userId = req.user.id;
     const { action, model } = req.body;
@@ -579,6 +577,7 @@ router.post('/combat-action', async (req, res) => {
         res.status(500).json({ message: error.message || "戰鬥中發生未知錯誤" });
     }
 });
+
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -597,7 +596,6 @@ router.get('/latest-game', async (req, res) => {
 
         let latestGameData = snapshot.docs[0].data();
 
-        // 【核心修改】從新的函式獲取錢袋和物品
         const inventoryState = await getInventoryState(userId);
         latestGameData.ITM = inventoryState.itemsString;
         latestGameData.money = inventoryState.money;
@@ -625,6 +623,7 @@ router.get('/latest-game', async (req, res) => {
         res.status(500).json({ message: "讀取最新進度失敗。" });
     }
 });
+
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -664,6 +663,7 @@ router.get('/get-novel', async (req, res) => {
         res.status(500).json({ message: "生成小說時出錯。" });
     }
 });
+
 router.post('/restart', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -701,6 +701,7 @@ router.post('/restart', async (req, res) => {
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
+
 router.post('/force-suicide', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -755,5 +756,6 @@ router.post('/force-suicide', async (req, res) => {
         res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
+
 
 module.exports = router;
