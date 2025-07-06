@@ -6,7 +6,6 @@ const authMiddleware = require('../middleware/auth');
 const {
     getAIStory,
     getAISummary,
-    getNarrative, // 保留導入以向下相容舊功能
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
@@ -21,6 +20,8 @@ const {
 } = require('../services/aiService');
 
 const db = admin.firestore();
+
+// --- Helper Functions ---
 
 const getFriendlinessLevel = (value) => {
     if (value >= 100) return 'devoted';
@@ -93,6 +94,46 @@ async function updateInventory(userId, itemChanges) {
     });
 }
 
+// 【核心新增功能】處理心動值變化的獨立函式
+async function updateRomanceValues(userId, romanceChanges) {
+    if (!romanceChanges || romanceChanges.length === 0) {
+        return;
+    }
+
+    console.log(`[戀愛系統] 偵測到心動值變化，開始更新...`, romanceChanges);
+    const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+
+    const romanceUpdatePromises = romanceChanges.map(async (change) => {
+        const { npcName, valueChange } = change;
+        if (!npcName || typeof valueChange !== 'number' || valueChange === 0) {
+            // 如果變化值為0，也直接略過，減少不必要的資料庫寫入
+            return;
+        }
+
+        const npcDocRef = userNpcsRef.doc(npcName);
+        try {
+            // 使用 increment 安全地增減數值
+            await npcDocRef.update({
+                romanceValue: admin.firestore.FieldValue.increment(valueChange)
+            });
+            console.log(`[戀愛系統] 成功更新NPC "${npcName}" 的心動值，變化: ${valueChange > 0 ? '+' : ''}${valueChange}`);
+        } catch (error) {
+            // 如果文檔或 romanceValue 欄位不存在，update會失敗。
+            // 我們使用 set with merge:true 來創建它，確保系統的穩健性。
+            if (error.code === 5) { // 'NOT_FOUND' error code in Firestore
+                console.warn(`[戀愛系統] NPC "${npcName}" 的檔案或 romanceValue 欄位不存在。將嘗試創建欄位...`);
+                await npcDocRef.set({ romanceValue: valueChange }, { merge: true });
+                 console.log(`[戀愛系統] 成功為NPC "${npcName}" 創建並設定心動值: ${valueChange}`);
+            } else {
+                console.error(`[戀愛系統] 更新NPC "${npcName}" 心動值時出錯:`, error);
+            }
+        }
+    });
+
+    await Promise.all(romanceUpdatePromises);
+}
+
+
 async function getInventoryState(userId) {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
@@ -132,7 +173,10 @@ function advanceDate(currentDate) {
     return { year, month, day, yearName };
 }
 
+// --- Middleware ---
 router.use(authMiddleware);
+
+// --- Routes ---
 
 router.get('/inventory', async (req, res) => {
     const userId = req.user.id;
@@ -423,7 +467,10 @@ const interactRouteHandler = async (req, res) => {
         
         aiResponse.suggestion = suggestion;
         
+        // 處理物品與心動值變化
         await updateInventory(userId, aiResponse.roundData.itemChanges);
+        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
+
         const inventoryState = await getInventoryState(userId);
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
@@ -434,8 +481,6 @@ const interactRouteHandler = async (req, res) => {
                 if (npc.isNew === true) {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
-                } else if (npc.friendlinessChange !== undefined) {
-                    // ...
                 }
                 if (npc.location) {
                     return npcDocRef.set({ currentLocation: npc.location }, { merge: true });
@@ -683,7 +728,6 @@ router.get('/latest-game', async (req, res) => {
             preferredModel: userData.preferredModel,
         });
 
-        // 【修正】使用玩家偏好的模型，如果沒有，則預設為 'openai'
         const modelToUse = userData.preferredModel || 'openai';
 
         const [prequelText, suggestion] = await Promise.all([
