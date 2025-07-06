@@ -35,9 +35,11 @@ const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
 const { getRandomEventPrompt } = require('../prompts/randomEventPrompt.js');
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
-// 【新增】導入聊天大師和摘要師的 Prompt
 const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
 const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
+// 【核心新增】導入贈予相關的 Prompt
+const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
+const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
 
 
 // 統一的AI調度中心
@@ -194,33 +196,31 @@ async function getAINpcProfile(modelName, username, npcName, roundData) {
     }
 }
 
-// 【新增】任務九：生成 NPC 對話回覆
+// 任務九：生成 NPC 對話回覆
 async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage) {
     const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage);
     try {
-        // 對話回覆預期是純文字
         const reply = await callAI(modelName, prompt, false);
-        return reply.replace(/["“”]/g, ''); // 順便移除回覆中可能出現的引號
+        return reply.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 聊天大師任務:", error);
         return "（他似乎心事重重，沒有回答你。）";
     }
 }
 
-// 【新增】任務十：生成對話總結
+// 任務十：生成對話總結
 async function getAIChatSummary(modelName, username, npcName, fullChatHistory) {
     const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory);
     try {
-        // 總結預期是純文字
         const summary = await callAI(modelName, prompt, false);
         return summary.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 摘要師任務:", error);
-        return `我與${npcName}進行了一番交談。`; // 提供一個通用的備用總結
+        return `我與${npcName}進行了一番交談。`;
     }
 }
 
-
+// 任務十一：戰鬥裁定
 async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
@@ -232,6 +232,32 @@ async function getAICombatAction(modelName, playerProfile, combatState, playerAc
             narrative: "[系統] 戰鬥發生混亂，裁判一時無法看清場上局勢，請你重新下達指令。",
             combatOver: false
         }; 
+    }
+}
+
+// 【核心新增】任務十二：生成贈予物品的NPC反應
+async function getAIGiveItemResponse(modelName, playerProfile, npcProfile, itemInfo) {
+    const prompt = getGiveItemPrompt(playerProfile, npcProfile, itemInfo);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 江湖交際大師任務:", error);
+        return {
+            npc_response: "（他看著你送出的東西，一時語塞，不知該如何是好。）",
+            friendlinessChange: 0
+        };
+    }
+}
+
+// 【核心新增】任務十三：生成贈予事件的小說旁白
+async function getAINarrativeForGive(modelName, lastRoundData, playerName, npcName, itemName, npcResponse) {
+    const prompt = getGiveNarrativePrompt(lastRoundData, playerName, npcName, itemName, npcResponse);
+    try {
+        return await callAI(modelName, prompt, false);
+    } catch (error) {
+        console.error("[AI 任務失敗] 贈予事件小說家任務:", error);
+        return `你將${itemName}給了${npcName}。`; // 提供一個簡短的備用敘述
     }
 }
 
@@ -247,7 +273,9 @@ module.exports = {
     getAIRandomEvent,
     getAINpcProfile,
     getAICombatAction,
-    // 【新增】匯出聊天和總結的服務
     getAIChatResponse,
-    getAIChatSummary
+    getAIChatSummary,
+    // 【核心新增】匯出贈予相關的服務
+    getAIGiveItemResponse,
+    getAINarrativeForGive
 };
