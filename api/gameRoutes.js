@@ -16,7 +16,8 @@ const {
     getAIChatSummary,
     getAIGiveItemResponse,
     getAINarrativeForGive,
-    getRelationGraph
+    getRelationGraph,
+    getAIRomanceEvent // 【核心新增】
 } = require('../services/aiService');
 
 const db = admin.firestore();
@@ -94,7 +95,6 @@ async function updateInventory(userId, itemChanges) {
     });
 }
 
-// 【核心新增功能】處理心動值變化的獨立函式
 async function updateRomanceValues(userId, romanceChanges) {
     if (!romanceChanges || romanceChanges.length === 0) {
         return;
@@ -106,21 +106,17 @@ async function updateRomanceValues(userId, romanceChanges) {
     const romanceUpdatePromises = romanceChanges.map(async (change) => {
         const { npcName, valueChange } = change;
         if (!npcName || typeof valueChange !== 'number' || valueChange === 0) {
-            // 如果變化值為0，也直接略過，減少不必要的資料庫寫入
             return;
         }
 
         const npcDocRef = userNpcsRef.doc(npcName);
         try {
-            // 使用 increment 安全地增減數值
             await npcDocRef.update({
                 romanceValue: admin.firestore.FieldValue.increment(valueChange)
             });
             console.log(`[戀愛系統] 成功更新NPC "${npcName}" 的心動值，變化: ${valueChange > 0 ? '+' : ''}${valueChange}`);
         } catch (error) {
-            // 如果文檔或 romanceValue 欄位不存在，update會失敗。
-            // 我們使用 set with merge:true 來創建它，確保系統的穩健性。
-            if (error.code === 5) { // 'NOT_FOUND' error code in Firestore
+            if (error.code === 5) {
                 console.warn(`[戀愛系統] NPC "${npcName}" 的檔案或 romanceValue 欄位不存在。將嘗試創建欄位...`);
                 await npcDocRef.set({ romanceValue: valueChange }, { merge: true });
                  console.log(`[戀愛系統] 成功為NPC "${npcName}" 創建並設定心動值: ${valueChange}`);
@@ -131,6 +127,54 @@ async function updateRomanceValues(userId, romanceChanges) {
     });
 
     await Promise.all(romanceUpdatePromises);
+}
+
+// 【核心新增功能】戀愛事件觸發器
+async function checkAndTriggerRomanceEvent(userId, username, romanceChanges, roundData, model) {
+    let triggeredEventNarrative = "";
+    if (!romanceChanges || romanceChanges.length === 0) {
+        return triggeredEventNarrative;
+    }
+    
+    const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+
+    for (const change of romanceChanges) {
+        const { npcName } = change;
+        const npcDocRef = userNpcsRef.doc(npcName);
+        const npcDoc = await npcDocRef.get();
+
+        if (!npcDoc.exists) continue;
+
+        const npcProfile = npcDoc.data();
+        const currentRomanceValue = npcProfile.romanceValue || 0;
+        const triggeredEvents = npcProfile.triggeredRomanceEvents || [];
+
+        // 門檻 1: 心生情愫 (>= 50)
+        if (currentRomanceValue >= 50 && !triggeredEvents.includes('level_1')) {
+            console.log(`[戀愛系統] ${npcName} 的心動值 (${currentRomanceValue}) 已達到 Level 1 門檻，觸發特殊事件！`);
+            
+            // 為了讓AI生成事件時有更完整的玩家資料，我們從roundData中提取
+            const playerProfileForEvent = {
+                username: username,
+                location: roundData.LOC[0]
+            };
+            
+            const eventNarrative = await getAIRomanceEvent(model, playerProfileForEvent, npcProfile, 'level_1');
+            
+            if (eventNarrative) {
+                // 將事件劇情用特殊樣式包裹
+                triggeredEventNarrative += `<div class="random-event-message romance-event">${eventNarrative}</div>`;
+                
+                // 更新資料庫，標記事件已觸發
+                await npcDocRef.update({
+                    triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1')
+                });
+                console.log(`[戀愛系統] 已為 ${npcName} 標記 level_1 戀愛事件已觸發。`);
+            }
+        }
+        // 未來可以在此處添加更多的 else if (currentRomanceValue >= 100 && !triggeredEvents.includes('level_2')) ...
+    }
+    return triggeredEventNarrative;
 }
 
 
@@ -252,7 +296,6 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             name: npcData.name,
             appearance: npcData.appearance,
             friendliness: npcData.friendliness || 'neutral',
-            // 【核心修改】將心動值也回傳給前端
             romanceValue: npcData.romanceValue || 0 
         };
 
@@ -454,7 +497,21 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
+        
+        // --- 【核心修改】事件觸發器邏輯 ---
+        await updateInventory(userId, aiResponse.roundData.itemChanges);
+        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
+        
+        // 在更新完數值後，檢查是否觸發事件
+        const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
+
+        // 如果有觸發事件，將其加到主故事前面
+        if (romanceEventNarrative) {
+            aiResponse.story = romanceEventNarrative + aiResponse.story;
+        }
         aiResponse.roundData.story = aiResponse.story;
+        // --- 核心修改結束 ---
+
 
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData).catch(err => {
@@ -469,10 +526,6 @@ const interactRouteHandler = async (req, res) => {
         
         aiResponse.suggestion = suggestion;
         
-        // 處理物品與心動值變化
-        await updateInventory(userId, aiResponse.roundData.itemChanges);
-        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
-
         const inventoryState = await getInventoryState(userId);
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
