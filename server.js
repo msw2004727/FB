@@ -21,22 +21,31 @@ try {
 // Express App 設定
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// 【修改】為您的 GitHub Pages 域名設定更精準的 CORS
 app.use(cors({ origin: 'https://msw2004727.github.io' }));
 app.use(express.json());
 
-// --- 載入 API 路由 ---
+// --- 【修改】載入拆分後的新 API 路由 ---
 const authRoutes = require('./api/authRoutes');
-const gameRoutes = require('./api/gameRoutes');
+const interactRoutes = require('./routes/interactRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const dataRoutes = require('./routes/dataRoutes');
+const playerRoutes = require('./routes/playerRoutes');
 
-// 【重要】使用路由器並指定基礎路徑
-// 所有 /api/auth 的請求，都交給 authRoutes 處理
+// --- 使用路由器並指定基礎路徑 ---
 app.use('/api/auth', authRoutes);
-// 所有 /api/game 的請求，都交給 gameRoutes 處理
-app.use('/api/game', gameRoutes);
+
+// 所有遊戲相關的路由都掛載在 /api/game 底下
+app.use('/api/game', interactRoutes);
+app.use('/api/game', chatRoutes);
+app.use('/api/game', dataRoutes);
+app.use('/api/game', playerRoutes);
+
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
-    res.send('AI 武俠世界伺服器已啟動並採用最新模組化架構！');
+    res.send('AI 武俠世界伺服器已啟動並採用最新的模組化架構！');
 });
 
 // 啟動伺服器
