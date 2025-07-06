@@ -37,9 +37,10 @@ const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
 const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
-// 【核心新增】導入贈予相關的 Prompt
 const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
 const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
+// 【核心新增】導入關係圖的Prompt
+const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
 
 
 // 統一的AI調度中心
@@ -235,7 +236,7 @@ async function getAICombatAction(modelName, playerProfile, combatState, playerAc
     }
 }
 
-// 【核心新增】任務十二：生成贈予物品的NPC反應
+// 任務十二：生成贈予物品的NPC反應
 async function getAIGiveItemResponse(modelName, playerProfile, npcProfile, itemInfo) {
     const prompt = getGiveItemPrompt(playerProfile, npcProfile, itemInfo);
     try {
@@ -250,14 +251,28 @@ async function getAIGiveItemResponse(modelName, playerProfile, npcProfile, itemI
     }
 }
 
-// 【核心新增】任務十三：生成贈予事件的小說旁白
+// 任務十三：生成贈予事件的小說旁白
 async function getAINarrativeForGive(modelName, lastRoundData, playerName, npcName, itemName, npcResponse) {
     const prompt = getGiveNarrativePrompt(lastRoundData, playerName, npcName, itemName, npcResponse);
     try {
         return await callAI(modelName, prompt, false);
     } catch (error) {
         console.error("[AI 任務失敗] 贈予事件小說家任務:", error);
-        return `你將${itemName}給了${npcName}。`; // 提供一個簡短的備用敘述
+        return `你將${itemName}給了${npcName}。`;
+    }
+}
+
+// 【核心新增】任務十四：生成關係圖的Mermaid語法
+async function getRelationGraph(modelName, longTermSummary, username) {
+    const prompt = getRelationGraphPrompt(longTermSummary, username);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        // 直接從解析後的JSON物件中取出mermaidSyntax
+        return parseJsonResponse(text).mermaidSyntax;
+    } catch (error) {
+        console.error("[AI 任務失敗] 關係圖百曉生任務:", error);
+        // 如果失敗，回傳一個提示性的語法
+        return "graph TD;\nA[錯誤]; A-->B[無法生成關係圖];";
     }
 }
 
@@ -275,7 +290,8 @@ module.exports = {
     getAICombatAction,
     getAIChatResponse,
     getAIChatSummary,
-    // 【核心新增】匯出贈予相關的服務
     getAIGiveItemResponse,
-    getAINarrativeForGive
+    getAINarrativeForGive,
+    // 【核心新增】匯出關係圖的服務函式
+    getRelationGraph
 };
