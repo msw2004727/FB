@@ -328,15 +328,11 @@ const interactRouteHandler = async (req, res) => {
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         }
         
-        // 【修改】核心改動：不再於此處同步生成小說旁白
-        // 原本呼叫 getNarrative 和寫入 novel_cache 的程式碼已被移除
+        const narrativeText = await getNarrative(modelName, aiResponse.roundData); // *** 這就是修正的地方 (1/2) ***
         
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
         
-        // 【修改】為了讓前端能即時顯示，我們需要一個故事文字。
-        // 我們直接使用已有的事件摘要(EVT)作為臨時的、非小說風格的文字。
-        // 這確保了前端有東西可顯示，而小說的生成被推遲了。
-        aiResponse.story = aiResponse.roundData.EVT || playerAction;
+        aiResponse.story = narrativeText; // *** 這就是修正的地方 (1/2) ***
 
         res.json(aiResponse);
 
@@ -464,8 +460,8 @@ router.post('/combat-action', async (req, res) => {
             const newSummary = await getAISummary(modelName, longTermSummary, aiResponse.roundData);
             await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-            // 同樣，這裡也不再生成單獨的旁白
-            aiResponse.story = aiResponse.roundData.EVT || postCombatAction;
+            const narrativeText = await getNarrative(modelName, aiResponse.roundData); // *** 這就是修正的地方 (2/2) ***
+            aiResponse.story = narrativeText; // *** 這就是修正的地方 (2/2) ***
 
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
 
@@ -498,7 +494,7 @@ router.post('/combat-action', async (req, res) => {
 router.get('/latest-game', async (req, res) => {
     const userId = req.user.id;
     try {
-        const userDocRef = db.collection('users').doc(userId); // *** 這就是修正的地方 ***
+        const userDocRef = db.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         const userData = userDoc.data() || {};
 
@@ -520,12 +516,13 @@ router.get('/latest-game', async (req, res) => {
             morality: userData.morality === undefined ? 0 : userData.morality,
         });
 
-        // 最新進度不需要前情提要，但需要建議
+        const prequelText = await getAIPrequel('deepseek', [latestGameData]);
+        const narrativeText = await getNarrative('deepseek', latestGameData);
         const suggestion = await getAISuggestion('deepseek', latestGameData);
 
         res.json({
-            // 讓前端顯示一個讀取成功的訊息
-            story: `[進度已讀取] 你回到了 ${latestGameData.LOC[0]}，繼續你的冒險...`,
+            prequel: prequelText,
+            story: narrativeText,
             roundData: latestGameData,
             suggestion: suggestion
         });
