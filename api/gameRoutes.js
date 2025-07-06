@@ -89,7 +89,8 @@ async function updateInventory(userId, itemChanges) {
                 }
             }
         }
-        transaction.set(inventoryRef, inventory, { merge: true });
+        // 【核心修正】移除 { merge: true }，確保在刪除物品時能完整覆蓋文件
+        transaction.set(inventoryRef, inventory);
     });
 }
 
