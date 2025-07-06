@@ -39,7 +39,6 @@ const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
 const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
 const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
 const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
-// 【核心新增】導入關係圖的Prompt
 const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
 
 
@@ -55,7 +54,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                options.model = "gpt-4o";
+                // 【核心修改】將模型從 gpt-4o 更新為 gpt-4.1-mini
+                options.model = "gpt-4.1-mini"; 
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -101,7 +101,7 @@ function parseJsonResponse(text) {
 }
 
 
-// 任務一：生成小說旁白
+// ... (檔案中其餘的 get... 函式都沒有變動，保持原樣) ...
 async function getNarrative(modelName, roundData) {
     const prompt = getNarrativePrompt(roundData);
     try {
@@ -112,7 +112,6 @@ async function getNarrative(modelName, roundData) {
     }
 }
 
-// 任務二：更新長期摘要
 async function getAISummary(modelName, oldSummary, newRoundData) {
     const prompt = getSummaryPrompt(oldSummary, newRoundData);
     try {
@@ -124,7 +123,6 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
     }
 }
 
-// 任務三：生成主要故事
 async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality) {
     const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
     try {
@@ -136,7 +134,6 @@ async function getAIStory(modelName, longTermSummary, recentHistory, playerActio
     }
 }
 
-// 任務四：生成前情提要
 async function getAIPrequel(modelName, recentHistory) {
     const prompt = getPrequelPrompt(recentHistory);
     try {
@@ -148,7 +145,6 @@ async function getAIPrequel(modelName, recentHistory) {
     }
 }
 
-// 任務五：生成動作建議
 async function getAISuggestion(modelName, roundData) {
     const prompt = getSuggestionPrompt(roundData);
     try {
@@ -160,7 +156,6 @@ async function getAISuggestion(modelName, roundData) {
     }
 }
 
-// 任務六：生成江湖百科
 async function getAIEncyclopedia(modelName, longTermSummary, username) {
     const prompt = getEncyclopediaPrompt(longTermSummary, username);
     try {
@@ -173,7 +168,6 @@ async function getAIEncyclopedia(modelName, longTermSummary, username) {
     }
 }
 
-// 任務七：生成隨機事件
 async function getAIRandomEvent(modelName, eventType, playerProfile) {
     const prompt = getRandomEventPrompt(eventType, playerProfile);
     try {
@@ -185,7 +179,6 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
     }
 }
 
-// 任務八：生成 NPC 詳細檔案
 async function getAINpcProfile(modelName, username, npcName, roundData) {
     const prompt = getNpcCreatorPrompt(username, npcName, roundData);
     try {
@@ -197,7 +190,6 @@ async function getAINpcProfile(modelName, username, npcName, roundData) {
     }
 }
 
-// 任務九：生成 NPC 對話回覆
 async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage) {
     const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage);
     try {
@@ -209,7 +201,6 @@ async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessa
     }
 }
 
-// 任務十：生成對話總結
 async function getAIChatSummary(modelName, username, npcName, fullChatHistory) {
     const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory);
     try {
@@ -221,7 +212,6 @@ async function getAIChatSummary(modelName, username, npcName, fullChatHistory) {
     }
 }
 
-// 任務十一：戰鬥裁定
 async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
@@ -236,7 +226,6 @@ async function getAICombatAction(modelName, playerProfile, combatState, playerAc
     }
 }
 
-// 任務十二：生成贈予物品的NPC反應
 async function getAIGiveItemResponse(modelName, playerProfile, npcProfile, itemInfo) {
     const prompt = getGiveItemPrompt(playerProfile, npcProfile, itemInfo);
     try {
@@ -251,7 +240,6 @@ async function getAIGiveItemResponse(modelName, playerProfile, npcProfile, itemI
     }
 }
 
-// 任務十三：生成贈予事件的小說旁白
 async function getAINarrativeForGive(modelName, lastRoundData, playerName, npcName, itemName, npcResponse) {
     const prompt = getGiveNarrativePrompt(lastRoundData, playerName, npcName, itemName, npcResponse);
     try {
@@ -262,16 +250,13 @@ async function getAINarrativeForGive(modelName, lastRoundData, playerName, npcNa
     }
 }
 
-// 【核心新增】任務十四：生成關係圖的Mermaid語法
 async function getRelationGraph(modelName, longTermSummary, username) {
     const prompt = getRelationGraphPrompt(longTermSummary, username);
     try {
         const text = await callAI(modelName, prompt, true);
-        // 直接從解析後的JSON物件中取出mermaidSyntax
         return parseJsonResponse(text).mermaidSyntax;
     } catch (error) {
         console.error("[AI 任務失敗] 關係圖百曉生任務:", error);
-        // 如果失敗，回傳一個提示性的語法
         return "graph TD;\nA[錯誤]; A-->B[無法生成關係圖];";
     }
 }
@@ -292,6 +277,5 @@ module.exports = {
     getAIChatSummary,
     getAIGiveItemResponse,
     getAINarrativeForGive,
-    // 【核心新增】匯出關係圖的服務函式
     getRelationGraph
 };
