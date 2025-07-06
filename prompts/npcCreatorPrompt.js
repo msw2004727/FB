@@ -45,6 +45,9 @@ const getNpcCreatorPrompt = (username, npcName, roundData) => {
   "allegiance": "中立善良",
   "friendliness": "neutral",
   "friendlinessValue": 10,
+  "isRomanceable": true,
+  "romanceOrientation": "異性戀",
+  "romanceValue": 0,
   "personality": ["仁厚", "謹慎", "略帶迂腐"],
   "goals": ["找出治癒女兒絕症的方法(雖然已故)", "守護無名村的安寧"],
   "secrets": "年輕時曾是江湖組織「藥王谷」的弟子，因故叛逃。",
@@ -89,6 +92,12 @@ ${context}
 請注意，JSON 檔案中的 "name"、"npcId" 欄位值必須是「${npcName}」。
 **同時，你必須將 "currentLocation" 欄位的值，設定為上方情境中提供的「首次相遇地點」。**
 其餘欄位請根據情境和你對「新手村限制」規則的理解，自由發揮你的創造力。
+
+**【新增規則：戀愛系統屬性】**
+你現在**必須**在生成的 JSON 檔案中，額外加入以下三個與戀愛相關的欄位：
+1.  **`isRomanceable`**: (布林值) 這個角色是否為可攻略的戀愛對象。請基於角色的年齡、背景、個性等因素，合理設定為 `true` 或 `false`。例如，年事已高的長者或心有所屬的角色，應設為 `false`。
+2.  **`romanceOrientation`**: (字串) 角色的戀愛傾向。可選值為 "異性戀", "同性戀", "雙性戀", "無性戀"。請根據角色的個性和背景故事，設定一個最符合其人設的傾向。
+3.  **`romanceValue`**: (數字) 初始心動值。這個值**必須永遠**設定為 `0`。
 
 現在，請開始你的設定工作。
 `;
