@@ -65,9 +65,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
             case 'grok':
-                // 【修改】根據您的權限截圖，我們嘗試使用另一個您有權限的模型 "grok-3-mini-fast"
-                // 這有助於判斷問題是否出在特定的模型上
-                options.model = "grok-3-mini-fast";
+                // 【修改】根據您的要求，使用 RPS 最高的 "grok-2-1212" 模型以追求最快速度
+                options.model = "grok-2-1212";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
