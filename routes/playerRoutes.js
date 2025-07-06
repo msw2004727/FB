@@ -16,7 +16,6 @@ router.get('/latest-game', async (req, res) => {
         const userData = userDoc.data() || {};
 
         if (userData.isDeceased) {
-            // 如果玩家已身故，回傳一個特殊狀態和最新的存檔資料供回顧
             const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
             const roundData = lastSaveSnapshot.empty ? null : lastSaveSnapshot.docs[0].data();
             return res.json({ gameState: 'deceased', roundData });
@@ -69,9 +68,11 @@ router.post('/restart', async (req, res) => {
         for (const collectionName of collectionsToDelete) {
             const collectionRef = userDocRef.collection(collectionName);
             const snapshot = await collectionRef.get();
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
+            if (!snapshot.empty) {
+                const batch = db.batch();
+                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
         }
         
         const fieldsToDelete = {
@@ -104,9 +105,6 @@ router.post('/force-suicide', async (req, res) => {
     const username = req.user.username;
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const userDoc = await userDocRef.get();
-        const userProfile = userDoc.exists ? userDoc.data() : {};
-
         await userDocRef.update({ isDeceased: true });
 
         const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
@@ -117,27 +115,7 @@ router.post('/force-suicide', async (req, res) => {
         const finalRoundData = {
             R: newRoundNumber,
             playerState: 'dead',
-            timeOfDay: userProfile.timeOfDay || '上午',
-            internalPower: userProfile.internalPower || 5,
-            externalPower: userProfile.externalPower || 5,
-            lightness: userProfile.lightness || 5,
-            morality: userProfile.morality === undefined ? 0 : userProfile.morality,
-            yearName: userProfile.yearName || '元祐',
-            year: userProfile.year || 1,
-            month: userProfile.month || 1,
-            day: userProfile.day || 1,
-            ATM: ['決絕', '悲壯'],
-            EVT: '英雄末路',
-            LOC: ['原地', {}],
-            PSY: '江湖路遠，就此終焉。',
             PC: `${username}引動內力，逆轉經脈，在一陣刺目的光芒中...化為塵土。`,
-            NPC: [],
-            ITM: '隨身物品盡數焚毀。',
-            QST: '所有恩怨情仇，煙消雲散。',
-            WRD: '一聲巨響傳遍數里，驚動了遠方的勢力。',
-            LOR: '',
-            CLS: '',
-            IMP: '你選擇了以最壯烈的方式結束這段江湖行。'
         };
         
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
