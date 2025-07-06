@@ -40,6 +40,7 @@ const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
 const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
 const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
 const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
+const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -54,7 +55,6 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                // 【核心修改】將模型從 gpt-4o 更新為 gpt-4.1-mini
                 options.model = "gpt-4.1-mini"; 
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
@@ -101,7 +101,6 @@ function parseJsonResponse(text) {
 }
 
 
-// ... (檔案中其餘的 get... 函式都沒有變動，保持原樣) ...
 async function getNarrative(modelName, roundData) {
     const prompt = getNarrativePrompt(roundData);
     try {
@@ -261,6 +260,18 @@ async function getRelationGraph(modelName, longTermSummary, username) {
     }
 }
 
+// 【核心新增】
+async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType) {
+    const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
+    try {
+        return await callAI(modelName, prompt, false);
+    } catch (error) {
+        console.error("[AI 任務失敗] 言情小說家任務:", error);
+        // 返回一個通用的、符合情境的預設文本
+        return `\n你與${npcProfile.name}的緣分，似乎在悄然間發生了些許變化，但具體是何種變化，卻又難以言說。`;
+    }
+}
+
 
 // 匯出所有服務函式
 module.exports = {
@@ -277,5 +288,6 @@ module.exports = {
     getAIChatSummary,
     getAIGiveItemResponse,
     getAINarrativeForGive,
-    getRelationGraph
+    getRelationGraph,
+    getAIRomanceEvent, // 【核心新增】
 };
