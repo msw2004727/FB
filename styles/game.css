@@ -212,7 +212,7 @@ body.dark-theme #submit-button {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    padding: 1rem 1.5rem;
+    padding: 1rem 2rem 1rem 1.5rem; /* 【***核心修改***】調整右側內邊距，將按鈕組稍微向左移動 */
     border-bottom: 1px solid var(--light-border);
     flex-shrink: 0;
 }
@@ -220,14 +220,38 @@ body.dark-theme .dashboard-header {
     border-bottom: 1px solid var(--dark-border);
 }
 
-/* 【核心修改】讓按鈕容器可以換行 */
 .dashboard-header .header-buttons {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap; /* 允許換行 */
-    justify-content: flex-end; /* 靠右對齊 */
+    gap: 0.75rem; /* 【***核心修改***】增加按鈕間距 */
+    justify-content: flex-end;
+    /* 移除了 flex-wrap: wrap; 確保按鈕始終在一行顯示，解決對齊問題 */
 }
+
+/* 【***核心新增***】統一儀表板頭部按鈕的大小與樣式 */
+.dashboard-header .header-buttons .header-link-btn,
+.dashboard-header .header-buttons .theme-switcher {
+    width: 36px;
+    height: 36px;
+    padding: 0; /* 移除內邊距，讓圖示完美置中 */
+    border-radius: 50%; /* 改為圓形按鈕 */
+    border: 1px solid transparent; /* 預留邊框位置 */
+    transition: background-color 0.2s ease-in-out;
+}
+
+.dashboard-header .header-buttons .header-link-btn:hover,
+.dashboard-header .header-buttons .theme-switcher:hover {
+    background-color: var(--light-bg); /* 新增懸停背景色 */
+    border-color: var(--light-border);
+}
+
+body.dark-theme .dashboard-header .header-buttons .header-link-btn:hover,
+body.dark-theme .dashboard-header .header-buttons .theme-switcher:hover {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+}
+
+
 .dashboard-content {
     padding: 1.5rem;
     overflow-y: auto;
