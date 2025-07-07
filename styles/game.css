@@ -1,12 +1,17 @@
 /* --- 遊戲主頁面樣式 --- */
-.game-container { display: flex; height: 100vh; width: 100%; overflow: hidden; }
+.game-container { 
+    /* height: 100vh; */ /* 移除：改由 JS 控制 */
+    width: 100%; 
+    overflow: hidden; 
+    display: flex; /* 新增：讓 .main-content 和 .dashboard 可以並排 */
+}
 .main-content {
-    position: relative;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
     height: 100%;
-    transition: margin-right 0.4s ease;
+    /* 新增：為了解決 iOS 上的滾動問題 */
+    position: relative; 
 }
 .dashboard {
     width: 320px;
@@ -43,17 +48,18 @@ body.dark-theme .menu-toggle {
 }
 
 .story-header {
-    position: sticky;
+    /* 【***核心修改***】 */
+    position: sticky; /* 維持 sticky 讓它可以固定 */
     top: 0;
-    background-color: var(--light-bg);
+    background-color: var(--light-surface-bg);
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
-    transition: padding 0.4s ease-out, background-color 0.3s;
+    flex-shrink: 0; /* 新增：不讓它被壓縮 */
 }
 body.dark-theme .story-header {
     border-bottom: 1px solid var(--dark-border);
-    background-color: var(--dark-bg);
+    background-color: var(--dark-surface-bg);
 }
 
 .status-bar {
@@ -64,9 +70,9 @@ body.dark-theme .story-header {
     font-family: var(--font-sans);
     font-size: 0.9rem;
     overflow: hidden;
-    max-height: 140px;
+    max-height: 200px;
     opacity: 1;
-    transition: max-height 0.4s ease-out, opacity 0.4s ease-out, gap 0.4s ease-out, padding 0.4s ease-out;
+    transition: max-height 0.4s ease-out, opacity 0.4s ease-out;
 }
 body.dark-theme .status-bar {
     color: var(--dark-text-secondary);
@@ -82,23 +88,14 @@ body.dark-theme .status-bar {
 .story-header.collapsed .status-bar {
     max-height: 0;
     opacity: 0;
-    gap: 0;
 }
-
 
 .story-panel {
-    position: relative;
-    flex-grow: 1;
-    padding: 1rem 2rem 2rem 2rem;
-    overflow-y: auto;
-    /* 【***核心修改***】明確設定內文區塊的背景色 */
-    background-color: var(--light-surface-bg);
+    /* 【***核心修改***】 */
+    flex-grow: 1; /* 新增：讓它填滿中間所有剩餘空間 */
+    overflow-y: auto; /* 新增：只有這個區塊可以滾動 */
+    padding: 1rem 2rem;
 }
-body.dark-theme .story-panel {
-    background-color: var(--dark-surface-bg);
-}
-
-
 .round-title {
     font-family: var(--font-serif);
     font-weight: 600;
@@ -134,10 +131,13 @@ body.dark-theme .system-message {
 }
 
 .story-footer {
-    position: relative;
+    /* 【***核心修改***】 */
+    position: sticky; /* 新增：讓它也固定住 */
+    bottom: 0;
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
     z-index: 10;
+    flex-shrink: 0; /* 新增：不讓它被壓縮 */
 }
 body.dark-theme .story-footer {
     border-top: 1px solid var(--dark-border);
