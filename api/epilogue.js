@@ -88,7 +88,8 @@ router.get('/', async (req, res) => {
             finalRelationships: finalRelationships,
             finalInventory: finalInventory,
             deathInfo: {
-                cause: lastSaveData.PC || '江湖險惡，不幸殞命。',
+                // 【核心修改】優先使用 causeOfDeath，如果沒有，再使用PC，最後才是通用描述
+                cause: lastSaveData.causeOfDeath || lastSaveData.PC || '江湖險惡，不幸殞命。',
                 time: `${lastSaveData.yearName}${lastSaveData.year}年${lastSaveData.month}月${lastSaveData.day}日`,
                 location: lastSaveData.LOC[0]
             }
