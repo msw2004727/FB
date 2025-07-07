@@ -653,6 +653,7 @@ body.dark-theme .romance-hearts .far.fa-heart {
 }
 
 
+/* 【***核心新增***】 */
 /* --- 友好度計量棒 --- */
 .friendliness-bar-container {
     width: 100%;
@@ -670,41 +671,29 @@ body.dark-theme .friendliness-bar-container {
     font-size: 0.8rem;
     color: var(--light-text-secondary);
     margin-bottom: 0.5rem;
-    padding: 0 5px;
+    padding: 0 5px; /* 微調使文字與計量棒邊緣對齊 */
 }
 
 .friendliness-bar-background {
     position: relative;
     height: 12px;
     border-radius: 6px;
-    background-color: var(--light-border); /* 【***核心修改***】改為中性背景色 */
-    overflow: hidden; /* 【***核心新增***】確保填充條不會超出圓角 */
+    border: 1px solid var(--light-border);
+    background: linear-gradient(to right, #dc3545, #868e96 50%, #198754); /* 預設漸層 */
 }
 body.dark-theme .friendliness-bar-background {
-    background-color: var(--dark-border);
+    border-color: var(--dark-border);
 }
-
-/* 【***核心新增***】新的填充條樣式 */
-.friendliness-bar-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    border-radius: 6px;
-    background: linear-gradient(to right, #dc3545, #f8c0c6 25%, #fff0b3 50%, #b3e0c5 75%, #28a745);
-    transition: width 0.5s ease-out;
-}
-
 
 .friendliness-bar-indicator {
     position: absolute;
-    top: -4px;
+    top: -4px; /* 讓指標上下超出一些，更好看 */
     width: 6px;
     height: 20px;
     background-color: var(--light-surface-bg);
     border: 2px solid var(--light-text-primary);
     border-radius: 3px;
-    transform: translateX(-50%);
+    transform: translateX(-50%); /* 讓指標中心對準 left 的百分比位置 */
     transition: left 0.5s ease-out;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
@@ -713,7 +702,7 @@ body.dark-theme .friendliness-bar-indicator {
     border-color: var(--dark-text-primary);
 }
 
-/* --- 結局彈窗樣式 --- */
+/* --- 【核心新增】結局彈窗樣式 --- */
 .epilogue-modal-overlay {
     position: fixed;
     top: 0;
