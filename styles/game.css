@@ -64,6 +64,7 @@ body.dark-theme .story-header {
     font-family: var(--font-sans);
     font-size: 0.9rem;
     overflow: hidden;
+    max-height: 140px;
     opacity: 1;
     transition: max-height 0.4s ease-out, opacity 0.4s ease-out, gap 0.4s ease-out, padding 0.4s ease-out;
 }
