@@ -13,8 +13,8 @@ const {
     createNpcProfileInBackground,
     invalidateNovelCache,
     updateLibraryNovel,
-    updateSkills,      // 【核心新增】
-    getPlayerSkills    // 【核心新增】
+    updateSkills,
+    getPlayerSkills
 } = require('./gameHelpers');
 
 const db = admin.firestore();
@@ -59,10 +59,9 @@ const interactRouteHandler = async (req, res) => {
 
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
 
-        // 處理物品、戀愛、武學的變化
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
-        await updateSkills(userId, aiResponse.roundData.skillChanges); // 【核心新增】
+        await updateSkills(userId, aiResponse.roundData.skillChanges);
 
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
 
@@ -71,18 +70,18 @@ const interactRouteHandler = async (req, res) => {
         }
         aiResponse.roundData.story = aiResponse.story;
 
-        // 並行獲取更新後的狀態
+
         const [newSummary, suggestion, inventoryState, skills] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion(modelName, aiResponse.roundData),
             getInventoryState(userId),
-            getPlayerSkills(userId) // 【核心新增】
+            getPlayerSkills(userId)
         ]);
 
         aiResponse.suggestion = suggestion;
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
-        aiResponse.roundData.skills = skills; // 【核心新增】
+        aiResponse.roundData.skills = skills;
 
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
@@ -178,8 +177,13 @@ const combatActionRouteHandler = async (req, res) => {
         let combatState = combatDoc.data();
         combatState.log.push(`> ${action}`);
 
-        const userDoc = await userDocRef.get();
+        // 【核心修改】將玩家資料和武學資料合併傳給AI
+        const [userDoc, skills] = await Promise.all([
+            userDocRef.get(),
+            getPlayerSkills(userId)
+        ]);
         let playerProfile = userDoc.exists ? userDoc.data() : {};
+        playerProfile.skills = skills; // 將武學列表附加到玩家檔案中
 
         const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
