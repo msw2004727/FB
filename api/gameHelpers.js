@@ -171,7 +171,6 @@ const checkAndTriggerRomanceEvent = async (userId, username, romanceChanges, rou
     return triggeredEventNarrative;
 };
 
-// 此函式維持原樣，用於生成顯示在儀表板上的摘要字串
 const getInventoryState = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
@@ -192,16 +191,38 @@ const getInventoryState = async (userId) => {
     return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
 };
 
-// 【核心新增】此函式用於提供給「贈予」彈窗，回傳的是完整的物品物件
 const getRawInventory = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
     if (!doc.exists) {
-        return {}; // 如果沒有背包資料，回傳一個空物件
+        return {}; 
     }
-    return doc.data(); // 直接回傳從資料庫讀取的原始資料
+    return doc.data(); 
 };
 
+// 【核心新增】處理武學更新的函式
+const updateSkills = async (userId, skillChanges) => {
+    if (!skillChanges || skillChanges.length === 0) return;
+
+    // 武學是獨立的集合，每個武學都是一個文件
+    const skillsCollectionRef = db.collection('users').doc(userId).collection('skills');
+
+    for (const skill of skillChanges) {
+        if (skill.isNewlyAcquired) {
+            const skillDocRef = skillsCollectionRef.doc(skill.skillName);
+            // 使用 set 和 merge: true，如果玩家已學會該武學，則更新；如果未學會，則新增。
+            await skillDocRef.set({
+                name: skill.skillName,
+                type: skill.skillType,
+                level: skill.level,
+                exp: skill.exp,
+                description: skill.description,
+                acquiredAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            console.log(`[武學系統] 已為玩家 ${userId} 新增/更新武學: ${skill.skillName}`);
+        }
+    }
+};
 
 module.exports = {
     TIME_SEQUENCE,
@@ -214,5 +235,6 @@ module.exports = {
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
     getInventoryState,
-    getRawInventory // 【核心新增】
+    getRawInventory,
+    updateSkills // 【核心新增】
 };
