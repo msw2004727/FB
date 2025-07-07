@@ -40,7 +40,8 @@ const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
 const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
 const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
 const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
-const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js'); // 【核心新增】
+const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
+const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -260,7 +261,6 @@ async function getRelationGraph(modelName, longTermSummary, username) {
     }
 }
 
-// 【核心新增】
 async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType) {
     const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
     try {
@@ -269,6 +269,19 @@ async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType
         console.error("[AI 任務失敗] 言情小說家任務:", error);
         // 返回一個通用的、符合情境的預設文本
         return `\n你與${npcProfile.name}的緣分，似乎在悄然間發生了些許變化，但具體是何種變化，卻又難以言說。`;
+    }
+}
+
+// 【核心新增】
+async function getAIEpilogue(modelName, playerData) {
+    const prompt = getEpiloguePrompt(playerData);
+    try {
+        const story = await callAI(modelName, prompt, false);
+        return story;
+    } catch (error) {
+        console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
+        // 提供一個優雅的備用結局
+        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${genderPronoun}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
     }
 }
 
@@ -289,5 +302,6 @@ module.exports = {
     getAIGiveItemResponse,
     getAINarrativeForGive,
     getRelationGraph,
-    getAIRomanceEvent, // 【核心新增】
+    getAIRomanceEvent,
+    getAIEpilogue, // 【核心新增】
 };
