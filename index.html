@@ -62,22 +62,6 @@
                 </div>
             </div>
             <div class="dashboard-content">
-                <div class="info-card welcome-card">
-                    <div id="welcome-message"></div>
-                </div>
-                <div class="info-card">
-                    <h4><i class="fas fa-brain-circuit"></i> AI 核心</h4>
-                    <div class="select-wrapper">
-                        <select id="ai-model-selector">
-                            <option value="gemini">Gemini (快 & 穩)</option>
-                            <option value="openai" selected>GPT (強 & 貴)</option>
-                            <option value="deepseek">DeepSeek (強 & 奇)</option>
-                            <option value="grok">Grok (快 & 怪)</option>
-                        </select>
-                    </div>
-                    <small class="ai-switcher-note">注意：更換核心後，故事風格與文筆將會改變。</small>
-                </div>
-
                 <div class="info-card">
                     <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
                     <div id="pc-content">--</div>
@@ -105,11 +89,6 @@
                 </div>
 
                 <div class="info-card">
-                    <h4><i class="fas fa-sack-dollar"></i> 錢袋</h4>
-                    <div id="money-content" class="money-display">-- 文錢</div>
-                </div>
-
-                <div class="info-card">
                     <h4><i class="fa-solid fa-scale-unbalanced"></i> 立場傾向</h4>
                     <div id="morality-display" class="morality-display-container">
                         <span class="morality-label evil">邪</span>
@@ -119,26 +98,48 @@
                         <span class="morality-label justice">正</span>
                     </div>
                 </div>
+                
+                <div class="info-card">
+                    <h4><i class="fas fa-sack-dollar"></i> 錢袋</h4>
+                    <div id="money-content" class="money-display">-- 文錢</div>
+                </div>
+
+                <div class="info-card">
+                    <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
+                    <div id="itm-content">--</div>
+                </div>
 
                 <div class="info-card">
                     <h4><i class="fas fa-users"></i> 人物見聞 (NPC)</h4>
                     <div id="npc-content">--</div>
                 </div>
-                <div class="info-card">
-                    <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
-                    <div id="itm-content">--</div>
-                </div>
+
                 <div class="info-card">
                     <h4><i class="fas fa-scroll"></i> 任務日誌 (QST)</h4>
                     <div id="qst-content">--</div>
                 </div>
+
                  <div class="info-card">
                     <h4><i class="fas fa-brain"></i> 內心獨白 (PSY)</h4>
                     <div id="psy-content">--</div>
                 </div>
+                
                 <div class="info-card">
                     <h4><i class="fas fa-key"></i> 關鍵線索 (CLS)</h4>
                     <div id="cls-content">--</div>
+                </div>
+                
+                <div class="info-card">
+                    <h4><i class="fas fa-brain-circuit"></i> AI 核心</h4>
+                    <div class="select-wrapper">
+                        <select id="ai-model-selector">
+                            <option value="gemini">Gemini (快 & 穩)</option>
+                            <option value="openai" selected>GPT (強 & 貴)</option>
+                            <option value="deepseek">DeepSeek (強 & 奇)</option>
+                            <option value="grok">Grok (快 & 怪)</option>
+                        </select>
+                    </div>
+                    <small class="ai-switcher-note">注意：更換核心後，故事風格與文筆將會改變。</small>
                 </div>
             </div>
         </aside>
