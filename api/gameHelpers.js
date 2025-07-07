@@ -204,7 +204,7 @@ const updateSkills = async (userId, skillChanges) => {
     if (!skillChanges || skillChanges.length === 0) return [];
     
     const skillsCollectionRef = db.collection('users').doc(userId).collection('skills');
-    const levelUpNotifications = [];
+    const levelUpEvents = [];
 
     for (const skillChange of skillChanges) {
         const skillDocRef = skillsCollectionRef.doc(skillChange.skillName);
@@ -217,6 +217,8 @@ const updateSkills = async (userId, skillChanges) => {
                     const newSkillData = {
                         name: skillChange.skillName,
                         type: skillChange.skillType,
+                        power_type: skillChange.power_type || 'none',
+                        max_level: skillChange.max_level || 10,
                         level: skillChange.level || 0,
                         exp: skillChange.exp || 0,
                         description: skillChange.description,
@@ -234,10 +236,10 @@ const updateSkills = async (userId, skillChanges) => {
                     let currentData = skillDoc.data();
                     let currentLevel = currentData.level || 0;
                     let currentExp = currentData.exp || 0;
+                    const maxLevel = currentData.max_level || 10;
                     
-                    if (currentLevel >= 10) {
-                         console.log(`[武學系統] 武學 ${skillChange.skillName} 已達最高等級(十成)。`);
-                         levelUpNotifications.push(`你的「${skillChange.skillName}」已至臻化境，返璞歸真，再無提升空間。`);
+                    if (currentLevel >= maxLevel) {
+                         console.log(`[武學系統] 武學 ${skillChange.skillName} 已達最高等級(${maxLevel})。`);
                          return;
                     }
 
@@ -245,17 +247,15 @@ const updateSkills = async (userId, skillChanges) => {
                     
                     let requiredExp = (currentLevel === 0) ? 100 : currentLevel * 100;
 
-                    while (currentExp >= requiredExp && currentLevel < 10) {
+                    while (currentExp >= requiredExp && currentLevel < maxLevel) {
                         currentLevel++;
                         currentExp -= requiredExp;
+                        levelUpEvents.push({ skillName: skillChange.skillName, levelUpTo: currentLevel });
                         
-                        const levelDescription = ['初窺門徑', '一成', '二成', '三成', '四成', '五成', '六成', '七成', '八成', '九成', '十成'][currentLevel] || `${currentLevel}成`;
-                        levelUpNotifications.push(`你對「${skillChange.skillName}」的領悟又深了一層，已達【${levelDescription}】境界！`);
-                        
-                        if(currentLevel < 10) {
+                        if(currentLevel < maxLevel) {
                             requiredExp = currentLevel * 100;
                         } else {
-                            currentExp = 0; // 達到滿級後經驗值清零
+                            currentExp = 0;
                         }
                     }
 
@@ -267,7 +267,7 @@ const updateSkills = async (userId, skillChanges) => {
             console.error(`[武學系統] 更新武學 ${skillChange.skillName} 時發生錯誤:`, error);
         }
     }
-    return levelUpNotifications;
+    return levelUpEvents;
 };
 
 const getPlayerSkills = async (userId) => {
