@@ -38,11 +38,11 @@ body.dark-theme .auth-title {
     color: var(--dark-accent);
 }
 
-/* 【核心新增】Logo圖片樣式 */
+/* 【核心修改】Logo圖片樣式 - 尺寸放大 */
 .auth-logo {
     display: block;
-    width: 120px;
-    height: 120px;
+    width: 240px; /* 從 120px 放大 */
+    height: 240px; /* 從 120px 放大 */
     object-fit: contain;
     margin: 0 auto 2rem auto; /* 上0, 左右自動, 下2rem */
 }
