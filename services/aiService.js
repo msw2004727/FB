@@ -14,13 +14,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // 3. DeepSeek
 const deepseek = new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: "https://api.deepseek.com/v1",
+    baseURL: "[https://api.deepseek.com/v1](https://api.deepseek.com/v1)",
 });
 
 // 4. Grok
 const grok = new OpenAI({
     apiKey: process.env.GROK_API_KEY,
-    baseURL: "https://api.x.ai/v1",
+    baseURL: "[https://api.x.ai/v1](https://api.x.ai/v1)",
     timeout: 30 * 1000,
 });
 
@@ -162,8 +162,7 @@ async function getAIEncyclopedia(modelName, longTermSummary, username, npcDetail
     const prompt = getEncyclopediaPrompt(longTermSummary, username, npcDetails);
     try {
         const text = await callAI(modelName, prompt, true);
-        const data = parseJsonResponse(text);
-        return data.encyclopediaHtml;
+        return parseJsonResponse(text).encyclopediaHtml;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖史官任務:", error);
         return `<div class="chapter"><h2 class="chapter-title">錯誤</h2><p class="entry-content">史官在翻閱你的記憶時遇到了困難，暫時無法完成編撰。</p></div>`;
@@ -299,7 +298,8 @@ async function getAIActionClassification(modelName, playerAction, context) {
     const prompt = getActionClassifierPrompt(playerAction, context);
     try {
         const text = await callAI(modelName, prompt, true);
-        return JSON.parse(text);
+        // 【***核心修改***】在這裡使用 parseJsonResponse 輔助函式
+        return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 總導演AI任務:", error);
         return { actionType: 'GENERAL_STORY', details: {} };
