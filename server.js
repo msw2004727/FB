@@ -4,25 +4,30 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// Firebase 初始化
+// --- 變數定義 ---
+const requiredEnvVars = [
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_PRIVATE_KEY_ID',
+    'FIREBASE_PRIVATE_KEY',
+    'FIREBASE_CLIENT_EMAIL',
+    'FIREBASE_CLIENT_ID',
+    'FIREBASE_CLIENT_X509_CERT_URL',
+    'JWT_SECRET'
+];
+
+// --- Firebase 初始化 ---
 try {
-    // 【核心修改】在讀取金鑰前，先進行安全檢查
-    if (!process.env.FIREBASE_PRIVATE_KEY) {
-        throw new Error("環境變數 'FIREBASE_PRIVATE_KEY' 未設定或為空。");
-    }
-    if (!process.env.FIREBASE_PROJECT_ID) {
-        throw new Error("環境變數 'FIREBASE_PROJECT_ID' 未設定或為空。");
-    }
-    if (!process.env.FIREBASE_CLIENT_EMAIL) {
-        throw new Error("環境變數 'FIREBASE_CLIENT_EMAIL' 未設定或為空。");
+    // 檢查所有必要的環境變數是否都已設定
+    const unsetVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    if (unsetVars.length > 0) {
+        throw new Error(`環境變數未設定或為空: ${unsetVars.join(', ')}。請在Render後台設定這些變數。`);
     }
 
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
-    // 【核心修改】另一種初始化方式，直接從各個環境變數讀取，避免 FIREBASE_SERVICE_ACCOUNT 的複雜性
     const serviceAccount = {
         type: "service_account",
         project_id: process.env.FIREBASE_PROJECT_ID,
         private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+        // 將 Render 環境變數中的 \n 轉換為真實的換行符
         private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
         client_email: process.env.FIREBASE_CLIENT_EMAIL,
         client_id: process.env.FIREBASE_CLIENT_ID,
@@ -38,15 +43,23 @@ try {
     });
 
     console.log("Firebase 初始化成功！");
+
 } catch (error) {
     console.error("Firebase 初始化失敗:", error.message);
-    process.exit(1); // 初始化失敗時，終止應用程式
+    // 在啟動失敗時終止應用程式，以防止 Render 繼續運行有問題的服務
+    process.exit(1); 
 }
 
 // Express App 設定
 const app = express();
 const PORT = process.env.PORT || 3001;
-app.use(cors({ origin: 'https://msw2004727.github.io' }));
+
+// 設定 CORS，只允許您的前端網域存取
+const corsOptions = {
+    origin: 'https://msw2004727.github.io',
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // --- 載入 API 路由 ---
