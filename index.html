@@ -108,10 +108,12 @@
                     <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
                     <div id="itm-content">--</div>
                 </div>
-
+                
                 <div class="info-card">
-                    <h4><i class="fas fa-book-fist"></i> 已習武學</h4>
-                    <div id="skills-content">--</div>
+                     <button id="skills-btn" class="dashboard-action-btn">
+                        <i class="fas fa-book-fist"></i>
+                        <span>查看武學</span>
+                    </button>
                 </div>
 
                 <div class="info-card">
@@ -249,6 +251,19 @@
                 <div class="chat-footer">
                     <p>選擇一項物品來贈予。</p>
                 </div>
+            </div>
+        </div>
+
+        <div id="skills-modal" class="skills-modal-overlay">
+            <div class="skills-modal-content">
+                <div class="skills-modal-header">
+                    <h3>武學總覽</h3>
+                    <button id="close-skills-btn" class="skills-modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="skills-modal-tabs" id="skills-tabs-container">
+                    </div>
+                <div class="skills-modal-body" id="skills-body-container">
+                    </div>
             </div>
         </div>
 
