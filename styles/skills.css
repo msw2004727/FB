@@ -27,8 +27,9 @@
     background-color: var(--light-surface-bg);
     border-radius: 12px;
     width: 90%;
-    max-width: 800px;
-    height: 85%;
+    max-width: 700px; /* 修改：寬度與交談窗接近 */
+    height: 80%; /* 修改：高度與交談窗一致 */
+    max-height: 700px; /* 新增：最大高度限制 */
     display: flex;
     flex-direction: column;
     box-shadow: 0 10px 40px rgba(0,0,0,0.3);
@@ -96,6 +97,7 @@ body.dark-theme .skills-modal-close:hover {
     border-bottom: 1px solid var(--light-border);
     gap: 1rem;
     background-color: var(--light-bg);
+    overflow-x: auto; /* 新增：當武學種類過多時可以橫向滾動 */
 }
 
 body.dark-theme .skills-modal-tabs {
@@ -114,6 +116,7 @@ body.dark-theme .skills-modal-tabs {
     color: var(--light-text-secondary);
     border-bottom: 3px solid transparent;
     transition: color 0.3s, border-color 0.3s;
+    flex-shrink: 0; /* 新增：防止頁籤被壓縮 */
 }
 
 .skill-tab.active {
