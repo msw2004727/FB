@@ -82,6 +82,14 @@ const interactRouteHandler = async (req, res) => {
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
+
+                // 【核心修改】檢查並標記NPC死亡
+                if (npc.isDeceased) {
+                    console.log(`[生死簿系統] 偵測到NPC ${npc.name} 已死亡，正在更新其檔案...`);
+                    // 在背景更新該NPC的檔案，將其標記為已故
+                    return npcDocRef.set({ isDeceased: true }, { merge: true });
+                }
+
                 if (npc.isNew) {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
@@ -120,9 +128,7 @@ const interactRouteHandler = async (req, res) => {
 
         Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay, ...currentDate });
 
-        // 【核心修改】處理死亡判斷
         if (aiResponse.roundData.playerState === 'dead') {
-             // 如果AI提供了具體的死因，就用它；否則，使用一個通用的描述
              aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你在這次事件中不幸殞命。';
              await userDocRef.update({ isDeceased: true });
         }
