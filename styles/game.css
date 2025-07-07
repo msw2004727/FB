@@ -26,12 +26,10 @@ body.dark-theme .dashboard {
     background-color: var(--dark-bg);
     border-left: 1px solid var(--dark-border);
 }
+
+/* 【核心修改】調整 menu-toggle 按鈕的樣式，使其在儀表板內外都能正常顯示 */
 .menu-toggle {
-    display: none;
-    position: fixed;
-    top: 15px;
-    right: 15px;
-    z-index: 1001;
+    display: none; /* 大螢幕時預設隱藏 */
     background: var(--light-surface-bg);
     color: var(--light-text-primary);
     border: 1px solid var(--light-border);
@@ -40,22 +38,42 @@ body.dark-theme .dashboard {
     height: 45px;
     font-size: 1.2rem;
     cursor: pointer;
+    z-index: 1001; /* 確保它在最上層 */
 }
 body.dark-theme .menu-toggle {
     background: var(--dark-surface-bg);
     color: var(--dark-text-primary);
     border: 1px solid var(--dark-border);
 }
+/* 當它被放在 header-buttons 內部時的樣式微調 */
+.header-buttons .menu-toggle {
+    display: inline-flex; /* 讓它顯示出來 */
+    align-items: center;
+    justify-content: center;
+    position: static; /* 移除 fixed 定位，使其能正常排列 */
+    width: 32px; /* 尺寸與其他按鈕統一 */
+    height: 32px;
+    font-size: 1.2rem;
+    color: var(--light-text-secondary);
+    background: none;
+    padding: 0;
+}
+.header-buttons .menu-toggle:hover {
+    color: var(--light-accent);
+}
+body.dark-theme .header-buttons .menu-toggle:hover {
+     color: var(--dark-accent);
+}
+
 
 .story-header {
-    /* 【***核心修改***】 */
-    position: sticky; /* 維持 sticky 讓它可以固定 */
+    position: sticky;
     top: 0;
     background-color: var(--light-surface-bg);
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
-    flex-shrink: 0; /* 新增：不讓它被壓縮 */
+    flex-shrink: 0;
 }
 body.dark-theme .story-header {
     border-bottom: 1px solid var(--dark-border);
@@ -91,9 +109,8 @@ body.dark-theme .status-bar {
 }
 
 .story-panel {
-    /* 【***核心修改***】 */
-    flex-grow: 1; /* 新增：讓它填滿中間所有剩餘空間 */
-    overflow-y: auto; /* 新增：只有這個區塊可以滾動 */
+    flex-grow: 1;
+    overflow-y: auto;
     padding: 1rem 2rem;
 }
 .round-title {
@@ -131,13 +148,12 @@ body.dark-theme .system-message {
 }
 
 .story-footer {
-    /* 【***核心修改***】 */
-    position: sticky; /* 新增：讓它也固定住 */
+    position: sticky;
     bottom: 0;
     border-top: 1px solid var(--light-border);
     background: var(--light-surface-bg);
     z-index: 10;
-    flex-shrink: 0; /* 新增：不讓它被壓縮 */
+    flex-shrink: 0;
 }
 body.dark-theme .story-footer {
     border-top: 1px solid var(--dark-border);
@@ -203,12 +219,14 @@ body.dark-theme #submit-button {
 body.dark-theme .dashboard-header {
     border-bottom: 1px solid var(--dark-border);
 }
+
+/* 【核心修改】讓按鈕容器可以換行 */
 .dashboard-header .header-buttons {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-wrap: wrap; /* 【核心修改】允許按鈕換行 */
-    justify-content: flex-end; /* 【核心修改】確保換行後依然靠右對齊 */
+    flex-wrap: wrap; /* 允許換行 */
+    justify-content: flex-end; /* 靠右對齊 */
 }
 .dashboard-content {
     padding: 1.5rem;
@@ -219,8 +237,12 @@ body.dark-theme .dashboard-header {
 }
 
 @media (max-width: 1024px) {
-    .menu-toggle {
+    /* 在小螢幕上，讓主遊戲區的 menu-toggle 按鈕顯示出來 */
+    .game-container > .menu-toggle {
         display: block;
+        position: fixed;
+        top: 15px;
+        right: 15px;
     }
     .dashboard {
         position: fixed;
