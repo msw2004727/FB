@@ -29,7 +29,7 @@ router.post('/register', async (req, res) => {
             gender,
             passwordHash,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            // 初始玩家數值 (註：不再需要 reincarnationCount)
+            // 初始玩家數值
             internalPower: 5,
             externalPower: 5,
             lightness: 5,
@@ -42,7 +42,7 @@ router.post('/register', async (req, res) => {
             isDeceased: false // 初始狀態為存活
         });
         
-        // 【核心新增】為新玩家直接賦予 "現代搏擊" 武學
+        // 為新玩家直接賦予 "現代搏擊" 武學
         const skillsCollectionRef = db.collection('users').doc(newUserRef.id).collection('skills');
         await skillsCollectionRef.doc('現代搏擊').set({
             name: '現代搏擊',
@@ -53,6 +53,7 @@ router.post('/register', async (req, res) => {
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
+        // 【核心修改】將新的前情提要寫入初始存檔中
         const roundZeroData = {
             R: 0,
             playerState: 'alive',
@@ -60,10 +61,11 @@ router.post('/register', async (req, res) => {
             powerChange: { internal: 0, external: 0, lightness: 0 },
             moralityChange: 0,
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
-            EVT: '從劇痛中醒來，發現身處陌生藥鋪',
+            EVT: '從天旋地轉中醒來，靈魂墜入陌生的武俠世界',
             LOC: ['無名村藥鋪', { description: '一間樸素的藥鋪，空氣中瀰漫著草藥的氣味，光線有些昏暗。' }],
-            PSY: '頭痛欲裂...這裡是哪裡？我不是應該在...？這身體不是我的！',
-            PC: '你在一陣劇痛中醒來，感覺全身筋骨欲裂，內息紊亂不堪，似乎受了極重的內傷。一位年約五旬的郎中正在為你把脈，神色凝重。',
+            PSY: '頭痛欲裂...我不是在滑手機嗎？這身體不是我的！這裡是哪裡？',
+            PC: '最後的印象，是指尖在冰冷螢幕上的飛速滑動，社交軟體的資訊流在眼前如瀑布般刷過。下一瞬，難以言喻的暈眩感猛然來襲，世界在你眼前扭曲、碎裂，一陣劇烈的天旋地轉後，意識如風中殘燭般徹底陷入黑暗。\n\n你在一股濃重刺鼻的藥草味中勉強睜開雙眼，映入眼簾的，不再是熟悉的螢幕光，而是一盞昏黃的油燈，照著四周斑駁的牆面與層層疊疊、標示著陌生藥名的木櫃。你正躺在一張簡陋的木板床上，每一次呼吸都牽動著撕心裂肺的劇痛，四肢百骸彷彿不屬於自己，體內一股微弱的氣流橫衝直撞，混亂不堪。\n\n「我不是在滑手機嗎？」這個念頭在你腦中一閃而過，卻顯得如此荒謬。關於這個世界的記憶一片空白，你是誰？為何在此？無從得知。你只清楚記得自己來自一個沒有內力、沒有江湖的現代世界。\n\n身旁，一位年逾五旬、留著山羊鬍的郎中正為你沉聲診脈，他眉頭緊鎖，那雙深邃的眼眸中，除了對你傷勢的憂慮，似乎還隱藏著一絲驚疑與不為人知的秘密。\n\n環顧這間陌生的藥鋪，遠方隱約傳來雞鳴犬吠，你意識到自己被困在了這個名為「無名村」的未知之地。過去已然斷裂，前路一片迷茫，你的江湖路，就從這副重傷的軀體與滿腹的疑問中，被迫展開了……',
+            story: '你在一股濃重刺鼻的藥草味中勉強睜開雙眼，映入眼簾的，不再是熟悉的螢幕光，而是一盞昏黃的油燈，照著四周斑駁的牆面與層層疊疊、標示著陌生藥名的木櫃。你正躺在一張簡陋的木板床上，每一次呼吸都牽動著撕心裂肺的劇痛，四肢百骸彷彿不屬於自己，體內一股微弱的氣流橫衝直撞，混亂不堪。身旁，一位年逾五旬、留著山羊鬍的郎中正為你沉聲診脈，他眉頭緊鎖，那雙深邃的眼眸中，除了對你傷勢的憂慮，似乎還隱藏著一絲驚疑與不為人知的秘密。',
             NPC: [{
                 name: '王大夫',
                 status: '憂心忡忡地為你把脈',
@@ -119,7 +121,6 @@ router.post('/login', async (req, res) => {
         const userDoc = userSnapshot.docs[0];
         const userData = userDoc.data();
 
-        // 【***核心修改***】 檢查玩家是否已死亡
         if (userData.isDeceased === true) {
             return res.status(403).json({ message: '此名號的主人已身故，其傳奇已載入史冊。請另創名號再戰江湖。' });
         }
