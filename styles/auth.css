@@ -32,10 +32,19 @@ body.dark-theme .auth-container {
     font-size: 2.5rem;
     font-weight: 600;
     margin-top: 0;
-    margin-bottom: 2.5rem;
+    margin-bottom: 1rem; /* 修改：調整下方間距以容納Logo */
 }
 body.dark-theme .auth-title {
     color: var(--dark-accent);
+}
+
+/* 【核心新增】Logo圖片樣式 */
+.auth-logo {
+    display: block;
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    margin: 0 auto 2rem auto; /* 上0, 左右自動, 下2rem */
 }
 
 .input-group {
