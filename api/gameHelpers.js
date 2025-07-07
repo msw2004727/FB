@@ -195,22 +195,17 @@ const getRawInventory = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
     if (!doc.exists) {
-        return {}; 
+        return {};
     }
-    return doc.data(); 
+    return doc.data();
 };
 
-// 【核心新增】處理武學更新的函式
 const updateSkills = async (userId, skillChanges) => {
     if (!skillChanges || skillChanges.length === 0) return;
-
-    // 武學是獨立的集合，每個武學都是一個文件
     const skillsCollectionRef = db.collection('users').doc(userId).collection('skills');
-
     for (const skill of skillChanges) {
         if (skill.isNewlyAcquired) {
             const skillDocRef = skillsCollectionRef.doc(skill.skillName);
-            // 使用 set 和 merge: true，如果玩家已學會該武學，則更新；如果未學會，則新增。
             await skillDocRef.set({
                 name: skill.skillName,
                 type: skill.skillType,
@@ -222,6 +217,19 @@ const updateSkills = async (userId, skillChanges) => {
             console.log(`[武學系統] 已為玩家 ${userId} 新增/更新武學: ${skill.skillName}`);
         }
     }
+};
+
+// 【核心新增】獲取玩家所有武學的函式
+const getPlayerSkills = async (userId) => {
+    const skillsSnapshot = await db.collection('users').doc(userId).collection('skills').get();
+    if (skillsSnapshot.empty) {
+        return [];
+    }
+    const skills = [];
+    skillsSnapshot.forEach(doc => {
+        skills.push(doc.data());
+    });
+    return skills;
 };
 
 module.exports = {
@@ -236,5 +244,6 @@ module.exports = {
     checkAndTriggerRomanceEvent,
     getInventoryState,
     getRawInventory,
-    updateSkills // 【核心新增】
+    updateSkills,
+    getPlayerSkills // 【核心新增】
 };
