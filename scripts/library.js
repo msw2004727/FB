@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 獲取頁面上的主要元素
     const novelListContainer = document.getElementById('novel-list');
     const novelModal = document.getElementById('novel-modal');
     const closeModalBtn = document.getElementById('close-modal-btn');
@@ -8,31 +7,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalAuthorInfo = document.getElementById('modal-author-info');
     const modalStoryContent = document.getElementById('modal-story-content');
 
-    // API 的基本路徑
-    const API_BASE_URL = 'https://ai-novel-final.onrender.com';
+    // 【***核心修改***】明確指定後端伺服器的完整網址
+    const API_BASE_URL = 'https://ai-novel-final.onrender.com/api/library';
 
-    /**
-     * 格式化日期，使其更易讀
-     * @param {string} dateString - ISO 格式的日期字串
-     * @returns {string} 格式化後的日期
-     */
     function formatLastUpdated(dateString) {
         const date = new Date(dateString);
         return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
     }
 
-    /**
-     * 從後端獲取並顯示所有小說的列表
-     */
     async function fetchAndDisplayNovels() {
         try {
+            // 現在會向正確的後端伺服器發送請求
             const response = await fetch(`${API_BASE_URL}/novels`);
             if (!response.ok) {
                 throw new Error('無法從書庫取書，請稍後再試。');
             }
             const novels = await response.json();
 
-            // 清空載入中的提示
             novelListContainer.innerHTML = '';
 
             if (novels.length === 0) {
@@ -40,11 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 遍歷每一本小說，創建對應的卡片並顯示
             novels.forEach(novel => {
                 const novelCard = document.createElement('article');
                 novelCard.className = 'novel-card';
-                novelCard.dataset.novelId = novel.id; // 將小說ID(作者ID)存在卡片上
+                novelCard.dataset.novelId = novel.id; 
 
                 const statusText = novel.isDeceased ? '已完結' : '連載中';
                 const statusClass = novel.isDeceased ? 'status-deceased' : 'status-ongoing';
@@ -71,15 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * 打開彈出視窗並載入指定的小說內容
-     * @param {string} novelId - 要載入的小說ID (作者ID)
-     */
     async function openNovelModal(novelId) {
         novelModal.classList.add('visible');
-        document.body.style.overflow = 'hidden'; // 防止背景滾動
+        document.body.style.overflow = 'hidden'; 
 
-        // 先顯示載入中...
         modalTitle.textContent = '讀取中...';
         modalAuthorInfo.textContent = '';
         modalStoryContent.innerHTML = '<div class="loader-dots"><span></span><span></span><span></span></div>';
@@ -91,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const novel = await response.json();
 
-            // 填充彈窗內容
             modalTitle.textContent = novel.novelTitle;
             const statusText = novel.isDeceased ? '已完結' : '連載中';
             modalAuthorInfo.textContent = `作者：${novel.playerName}  |  狀態：${statusText}`;
@@ -103,20 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * 關閉小說閱讀彈窗
-     */
     function closeModal() {
         novelModal.classList.remove('visible');
-        document.body.style.overflow = ''; // 恢復背景滾動
+        document.body.style.overflow = ''; 
     }
 
     // --- 事件監聽 ---
 
-    // 頁面載入後，立即獲取小說列表
     fetchAndDisplayNovels();
 
-    // 監聽整個列表容器的點擊事件（事件委派）
     novelListContainer.addEventListener('click', (event) => {
         const card = event.target.closest('.novel-card');
         if (card && card.dataset.novelId) {
@@ -124,10 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 監聽關閉按鈕的點擊
     closeModalBtn.addEventListener('click', closeModal);
 
-    // 監聽點擊彈窗背景的事件（點擊背景也可關閉）
     novelModal.addEventListener('click', (event) => {
         if (event.target === novelModal) {
             closeModal();
