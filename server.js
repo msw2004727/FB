@@ -4,38 +4,29 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// --- 變數定義 ---
-const requiredEnvVars = [
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_PRIVATE_KEY_ID',
-    'FIREBASE_PRIVATE_KEY',
-    'FIREBASE_CLIENT_EMAIL',
-    'FIREBASE_CLIENT_ID',
-    'FIREBASE_CLIENT_X509_CERT_URL',
-    'JWT_SECRET'
-];
-
 // --- Firebase 初始化 ---
 try {
-    // 檢查所有必要的環境變數是否都已設定
-    const unsetVars = requiredEnvVars.filter(varName => !process.env[varName]);
-    if (unsetVars.length > 0) {
-        throw new Error(`環境變數未設定或為空: ${unsetVars.join(', ')}。請在Render後台設定這些變數。`);
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
+    
+    // 檢查 FIREBASE_SERVICE_ACCOUNT 是否已設定
+    if (!serviceAccountString) {
+        throw new Error("環境變數 'FIREBASE_SERVICE_ACCOUNT' 未設定或為空。請在Render後台設定此變數。");
     }
 
-    const serviceAccount = {
-        type: "service_account",
-        project_id: process.env.FIREBASE_PROJECT_ID,
-        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-        // 將 Render 環境變數中的 \n 轉換為真實的換行符
-        private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        client_email: process.env.FIREBASE_CLIENT_EMAIL,
-        client_id: process.env.FIREBASE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
-    };
+    let serviceAccount;
+    try {
+        // 嘗試解析 JSON 字串
+        serviceAccount = JSON.parse(serviceAccountString);
+    } catch (parseError) {
+        // 如果解析失敗，拋出一個更具體的錯誤
+        console.error("解析 FIREBASE_SERVICE_ACCOUNT 時發生錯誤:", parseError.message);
+        throw new Error("FIREBASE_SERVICE_ACCOUNT 的值不是一個有效的 JSON 格式。請檢查您是否完整複製了 .json 金鑰檔案的全部內容，且格式沒有錯誤。");
+    }
+
+    // 檢查解析後的物件是否包含必要的金鑰
+    if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+         throw new Error("解析後的 serviceAccount 物件缺少必要的屬性（如 project_id, private_key, client_email）。");
+    }
 
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
@@ -46,15 +37,13 @@ try {
 
 } catch (error) {
     console.error("Firebase 初始化失敗:", error.message);
-    // 在啟動失敗時終止應用程式，以防止 Render 繼續運行有問題的服務
-    process.exit(1); 
+    process.exit(1); // 初始化失敗時，終止應用程式
 }
 
 // Express App 設定
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// 設定 CORS，只允許您的前端網域存取
 const corsOptions = {
     origin: 'https://msw2004727.github.io',
     optionsSuccessStatus: 200
