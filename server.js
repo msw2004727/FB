@@ -27,12 +27,16 @@ app.use(express.json());
 // --- 載入 API 路由 ---
 const authRoutes = require('./api/authRoutes');
 const gameRoutes = require('./api/gameRoutes');
+const libraryRoutes = require('./api/libraryRoutes'); // 【***核心修改***】 1. 引入新的圖書館路由
 
 // 【重要】使用路由器並指定基礎路徑
 // 所有 /api/auth 的請求，都交給 authRoutes 處理
 app.use('/api/auth', authRoutes);
 // 所有 /api/game 的請求，都交給 gameRoutes 處理
 app.use('/api/game', gameRoutes);
+// 所有 /api/library 的請求，都交給 libraryRoutes 處理
+app.use('/api/library', libraryRoutes); // 【***核心修改***】 2. 啟用新的圖書館路由
+
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
