@@ -4,7 +4,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const combatLog = combatState.log.join('\n');
     // 將玩家的武學列表轉換為易讀的字串
     const skillsString = playerProfile.skills && playerProfile.skills.length > 0
-        ? playerProfile.skills.map(s => `${s.name} (${s.level}級 / 十成)`).join('、')
+        ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
 
     return `
@@ -16,13 +16,13 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ## 裁定核心準則：
 
-1.  **實力判斷**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}）作為最重要的判斷依據。功力高的玩家執行高難度動作的成功率更高。
+1.  **基礎實力**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}）作為所有判斷的基礎。
 
-2.  **【武學等級核心規則】**: 這是你最重要的判斷依據之一。你必須將玩家使用的武學的「等級」視為威力的倍增器。
-    * **等級與威力**: 等級越高的武學，造成的傷害、產生的效果、以及命中率都應該越強大。一成功力的招式可能只是劃破皮肉，但十成功力的同一招可能開碑裂石。
-    * **敘述體現**: 你必須在敘述中體現出等級的差距。例如，你可以使用「你運起三成功力的『羅漢拳』...」或「...他使出的劍法已有七八成的火候...」等詞彙來增加真實感。
-    * **指令關聯**: 如果玩家的指令中明確提到了他已學會的招式（例如指令是「我使用羅漢拳攻擊」且玩家確實會「羅漢拳」），你必須在敘述中體現出招式的效果，並根據其等級給予相應的威力加成。
-    * **等級為0的武學**: 如果一個武學的等級為0，代表玩家只是剛剛自創或領悟，尚未融會貫通。在戰鬥中使用等級為0的武學，效果應該非常微弱，甚至可能失敗或反噬自身。
+2.  **【武學等級與功體核心規則】**: 這是你最重要的判斷依據。
+    * **等級威力**: 玩家使用的武學，其「等級（成數）」是威力的主要倍增器。一成功力的招式可能只是劃破皮肉，但十成功力的同一招可能開碑裂石。
+    * **功體加成**: 你必須判斷武學的「功體屬性(power_type)」。一門「內功」加成的武學，其威力會被玩家的「內功」值放大；「外功」加成的武學則看玩家的「外功」值。如果玩家的對應功體很低，即使武學等級高，威力也應受到限制。
+    * **敘述體現**: 你必須在敘述中體現出等級和功體的差距。例如，你可以使用「你運起三成功力的『羅漢拳』...」或「...他深厚的內力催動掌風，威力更增三分...」等詞彙。
+    * **等級為0的武學**: 在戰鬥中使用等級為0的武學，效果應該非常微弱，甚至可能失敗。
 
 3.  **情境判斷**: 需考慮敵人數量（目前敵人: ${combatState.enemies.map(e => e.name).join('、')}）和戰鬥日誌中的歷史紀錄（${combatLog}）。以一敵多時，玩家的行動會更加困難。
 
