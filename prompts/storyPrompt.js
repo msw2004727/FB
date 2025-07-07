@@ -78,10 +78,10 @@ ${longTermSummary}
 
 ## 【核心新增】武學系統 (Martial Arts System)
 
-當玩家透過奇遇、閱讀秘笈、高人指點或自行頓悟等方式，學會一門新的武學時，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 **\`skillChanges\`** 的**陣列**。如果本回合沒有學會任何新武學，請回傳一個**空陣列 \`[]\`**。
+### 情況一：初學乍練
+當玩家透過奇遇、閱讀秘笈、高人指點或自行頓悟等方式，**首次學會**一門新的武學時，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 **\`skillChanges\`** 的**陣列**。
 
-陣列中的每一個物件，都代表一門新習得的武學，其結構必須如下：
-
+陣列中的物件結構必須如下：
 \`\`\`json
 {
   "skillName": "武學的準確名稱",
@@ -92,29 +92,21 @@ ${longTermSummary}
   "isNewlyAcquired": true
 }
 \`\`\`
+**範例：** \`"skillChanges": [{"skillName": "羅漢拳", "skillType": "拳腳", "level": 1, "exp": 0, "description": "...", "isNewlyAcquired": true}]\`
 
-**【範例一：玩家讀了秘笈】**
+### 情況二：勤學苦練
+當玩家對一門**已經學會**的武學進行修練時（例如「我練習羅漢拳」），你的 \`skillChanges\` 陣列中的物件結構應改為如下，用來回報修練成果：
+-   \`isNewlyAcquired\` **必須**為 \`false\`。
+-   **必須**包含一個 \`expChange\` 欄位，代表本次修練增加的熟練度（數值由你根據修練方式和時長決定）。
+
 \`\`\`json
-"skillChanges": [{
-  "skillName": "羅漢拳",
-  "skillType": "拳腳",
-  "level": 1,
-  "exp": 0,
-  "description": "源自少林寺的基礎拳法，招式大開大闔，講究穩紮穩打。",
-  "isNewlyAcquired": true
-}]
+{
+  "skillName": "要修練的武學的準確名稱",
+  "isNewlyAcquired": false,
+  "expChange": 25
+}
 \`\`\`
-**【範例二：玩家自創武功】**
-\`\`\`json
-"skillChanges": [{
-  "skillName": "驚鴻掠影步",
-  "skillType": "輕功",
-  "level": 0,
-  "exp": 50,
-  "description": "你融合自身所學，創造出的獨門步法，身法飄忽不定，難以捉摸。",
-  "isNewlyAcquired": true
-}]
-\`\`\`
+**範例：** \`"skillChanges": [{"skillName": "羅漢拳", "isNewlyAcquired": false, "expChange": 15}]\`
 
 ---
 
