@@ -22,8 +22,7 @@ const {
 
 const db = admin.firestore();
 
-// --- 【***核心新增函式***】 ---
-// 用於將玩家的最新小說進度，備份到公開的圖書館資料庫
+// --- Helper Functions ---
 async function updateLibraryNovel(userId, username) {
     try {
         console.log(`[圖書館系統] 開始為玩家 ${username} (ID: ${userId}) 更新連載小說...`);
@@ -35,21 +34,17 @@ async function updateLibraryNovel(userId, username) {
             return;
         }
 
-        // 串接所有故事章節
         const storyChapters = snapshot.docs.map(doc => {
             const roundData = doc.data();
             const title = roundData.EVT || `第 ${roundData.R} 回`;
             const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
-            // 組合成簡單的HTML章節
             return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
         });
         const fullStoryHTML = storyChapters.join('');
 
-        // 獲取玩家最新的狀態
         const lastRoundData = snapshot.docs[snapshot.docs.length - 1].data();
         const isDeceased = lastRoundData.playerState === 'dead';
 
-        // 準備要寫入圖書館的資料
         const libraryDocRef = db.collection('library_novels').doc(userId);
         const libraryData = {
             playerName: username,
@@ -60,18 +55,13 @@ async function updateLibraryNovel(userId, username) {
             lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`
         };
 
-        // 使用 set 搭配 merge:true，無論文件是否存在，都會更新或創建
         await libraryDocRef.set(libraryData, { merge: true });
         console.log(`[圖書館系統] 成功更新 ${username} 的小說至圖書館！`);
 
     } catch (error) {
         console.error(`[圖書館系統] 為玩家 ${username} (ID: ${userId}) 更新小說時發生嚴重錯誤:`, error);
-        // 這是一個背景任務，即使失敗也不應阻礙主遊戲流程，所以只記錄錯誤
     }
 }
-
-
-// --- Helper Functions ---
 
 const getFriendlinessLevel = (value) => {
     if (value >= 100) return 'devoted';
@@ -345,11 +335,13 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             }
         }
 
+        // 【***核心修改***】
         const publicProfile = {
             name: npcData.name,
             appearance: npcData.appearance,
             friendliness: npcData.friendliness || 'neutral',
-            romanceValue: npcData.romanceValue || 0 
+            romanceValue: npcData.romanceValue || 0,
+            friendlinessValue: npcData.friendlinessValue || 0 // 新增這一行
         };
 
         res.json(publicProfile);
@@ -498,10 +490,7 @@ router.post('/give-item', async (req, res) => {
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-        // 【***核心修改***】
-        // 在贈予物品後，也觸發一次圖書館更新
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
-
 
         res.json({
             story: narrativeText,
@@ -653,11 +642,7 @@ const interactRouteHandler = async (req, res) => {
              await userDocRef.update({ isDeceased: true });
         }
         
-        // 【***核心修改***】
-        // 在所有資料都儲存完畢後，才觸發圖書館更新的背景任務
-        // 我們使用 .catch() 來確保即使圖書館更新失敗，也不會影響玩家的遊戲體驗
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
-
 
         res.json(aiResponse);
 
@@ -813,8 +798,6 @@ router.post('/combat-action', async (req, res) => {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
             
-            // 【***核心修改***】
-            // 在戰鬥結束後，也觸發一次圖書館更新
             updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
 
             res.json({
@@ -933,9 +916,13 @@ router.get('/get-novel', async (req, res) => {
 
 router.post('/restart', async (req, res) => {
     const userId = req.user.id;
+    const username = req.user.username;
     try {
         const userDocRef = db.collection('users').doc(userId);
 
+        // 在刪除舊資料前，先觸發一次圖書館更新，確保最終狀態被記錄
+        await updateLibraryNovel(userId, username).catch(err => console.error("輪迴前更新圖書館失敗:", err));
+        
         const collections = ['game_saves', 'npcs', 'game_state'];
         for (const col of collections) {
             const snapshot = await userDocRef.collection(col).get();
@@ -960,12 +947,6 @@ router.post('/restart', async (req, res) => {
             turnsSinceEvent: admin.firestore.FieldValue.delete(),
             preferredModel: admin.firestore.FieldValue.delete()
         });
-        
-        // 【***核心修改***】
-        // 在開啟新輪迴（刪除舊資料）前，也觸發一次圖書館更新，確保最終狀態被記錄
-        const username = req.user.username;
-        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
-
 
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
 
@@ -1020,8 +1001,6 @@ router.post('/force-suicide', async (req, res) => {
 
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
         
-        // 【***核心修改***】
-        // 在玩家死亡後，也觸發一次圖書館更新，確保最終結局被記錄
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
         res.json({
