@@ -24,7 +24,6 @@ async function fetchApi(endpoint, options = {}) {
     return data;
 }
 
-// 【***核心修改***】 更新所有API路徑以匹配新的後端路由結構
 export const api = {
     // Gameplay Routes
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
@@ -39,12 +38,13 @@ export const api = {
     // State Routes
     getLatestGame: () => fetchApi('/api/game/state/latest-game'),
     startNewGame: () => fetchApi('/api/game/state/restart', { method: 'POST' }),
-    forceSuicide: () => fetchApi('/api/game/state/force-suicide', { method: 'POST' }),
+    forceSuicide: (body) => fetchApi('/api/game/state/force-suicide', { method: 'POST', body: JSON.stringify(body) }),
     getInventory: () => fetchApi('/api/game/state/inventory'),
     getRelations: () => fetchApi('/api/game/state/get-relations'),
     getNovel: () => fetchApi('/api/game/state/get-novel'),
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
-    
-    // Epilogue Route 【核心新增】
+    getSkills: () => fetchApi('/api/game/state/skills'), // 【核心新增】
+
+    // Epilogue Route
     getEpilogue: () => fetchApi('/api/epilogue'),
 };
