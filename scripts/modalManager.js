@@ -25,8 +25,6 @@ const cancelGiveBtn = document.getElementById('cancel-give-btn');
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
-    // 根據 romanceValue 計算愛心等級 (0-5)
-    // 0: 0-9, 1: 10-29, 2: 30-49, 3: 50-69, 4: 70-89, 5: 90+
     let level = 0;
     if (value >= 90) {
         level = 5;
@@ -46,18 +44,56 @@ function displayRomanceValue(value) {
 
     for (let i = 0; i < 5; i++) {
         const heartSpan = document.createElement('span');
-        heartSpan.className = i < level ? 'fas fa-heart' : 'far fa-heart'; // 實心或空心
+        heartSpan.className = i < level ? 'fas fa-heart' : 'far fa-heart';
         heartsContainer.appendChild(heartSpan);
     }
 
-    // 清除舊的愛心顯示
     const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
     if (existingHearts) {
         existingHearts.remove();
     }
     
-    // 插入到外觀描述的前面
     chatNpcInfo.prepend(heartsContainer);
+}
+
+
+// 【***核心新增函式***】
+// 根據友好度數值，創建並顯示計量棒
+function displayFriendlinessBar(value) {
+    // 將友好度數值從 -100 到 100 的範圍，轉換為 0% 到 100% 的百分比
+    const percentage = ((value || 0) + 100) / 200 * 100;
+
+    const barContainer = document.createElement('div');
+    barContainer.className = 'friendliness-bar-container';
+
+    // 根據百分比決定漸層色的起點
+    // 例如，50% 時是灰色，100% 時是綠色，0% 時是紅色
+    const gradientColor = `linear-gradient(to right, #dc3545, #868e96 ${percentage}%, #198754)`;
+
+    barContainer.innerHTML = `
+        <div class="friendliness-bar-labels">
+            <span>死敵</span>
+            <span>崇拜</span>
+        </div>
+        <div class="friendliness-bar-background">
+            <div class="friendliness-bar-indicator" style="left: ${percentage}%;"></div>
+        </div>
+    `;
+
+    // 為了讓漸層效果更好，我們直接將背景設定在 bar-background 上
+    const barBackground = barContainer.querySelector('.friendliness-bar-background');
+    if(barBackground) {
+        barBackground.style.background = gradientColor;
+    }
+
+    // 清除舊的計量棒（如果有的話）
+    const existingBar = chatNpcInfo.querySelector('.friendliness-bar-container');
+    if (existingBar) {
+        existingBar.remove();
+    }
+
+    // 將新的計量棒插入到 NPC 資訊區塊的最下方
+    chatNpcInfo.appendChild(barContainer);
 }
 
 
@@ -101,10 +137,12 @@ export function setCombatLoading(isLoading) {
 // --- 對話彈窗 ---
 export function openChatModalUI(profile) {
     chatNpcName.textContent = `與 ${profile.name} 交談`;
-    chatNpcInfo.innerHTML = profile.appearance || ''; // 使用innerHTML以便後續插入HTML元素
+    chatNpcInfo.innerHTML = profile.appearance || '';
     
-    // 【核心修改】呼叫新的函式來顯示心動值
+    // 【***核心修改***】
+    // 呼叫函式來顯示心動值和新的友好度計量棒
     displayRomanceValue(profile.romanceValue);
+    displayFriendlinessBar(profile.friendlinessValue); // 新增呼叫
 
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
     chatModal.classList.add('visible');
