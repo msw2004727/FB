@@ -4,46 +4,62 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// Firebase 初始化
-try {
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!serviceAccountString) throw new Error('Firebase 服務帳戶金鑰未設定！');
-    const serviceAccount = JSON.parse(serviceAccountString);
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: "https://md-server-main-default-rtdb.asia-southeast1.firebasedatabase.app"
-    });
-    console.log("Firebase 初始化成功！");
-} catch (error) {
-    console.error("Firebase 初始化失敗:", error.message);
-    process.exit(1);
-}
+// --- Firebase Admin SDK 初始化 ---
+const serviceAccount = {
+  type: process.env.FIREBASE_TYPE,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
+};
 
-// Express App 設定
-const app = express();
-const PORT = process.env.PORT || 3001;
-app.use(cors({ origin: 'https://msw2004727.github.io' }));
-app.use(express.json());
-
-// --- 載入 API 路由 ---
-const authMiddleware = require('./middleware/auth'); // 【核心新增】
-const authRoutes = require('./api/authRoutes');
-const gameRoutes = require('./api/gameRoutes'); // 主遊戲路由器
-const libraryRoutes = require('./api/libraryRoutes');
-const epilogueRoutes = require('./api/epilogue.js'); // 【核心新增】
-
-// --- 使用路由 ---
-app.use('/api/auth', authRoutes);
-app.use('/api/game', gameRoutes); // 所有跟遊戲相關的請求都走這裡
-app.use('/api/library', libraryRoutes);
-app.use('/api/epilogue', authMiddleware, epilogueRoutes); // 【核心新增】
-
-// 根目錄健康檢查
-app.get('/', (req, res) => {
-    res.send('AI 武俠世界伺服器已啟動並採用最新模組化架構！');
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
 });
 
-// 啟動伺服器
+
+// --- Express App 設定 ---
+const app = express();
+
+// 設置 CORS
+const allowedOrigins = ['http://127.0.0.1:5500', 'https://msw2004727.github.io'];
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.static('public'));
+
+
+// --- API 路由 ---
+const authRoutes = require('./api/authRoutes');
+const gameRoutes = require('./api/gameRoutes');
+const gameplayRoutes = require('./api/gameplayRoutes');
+const npcRoutes = require('./api/npcRoutes');
+const bountyRoutes = require('./api/bountyRoutes'); // 【核心新增】
+
+app.use('/api/auth', authRoutes);
+app.use('/api/game', gameRoutes);
+app.use('/api/gameplay', gameplayRoutes);
+app.use('/api/npcs', npcRoutes);
+app.use('/api/bounties', bountyRoutes); // 【核心新增】
+
+
+// --- 伺服器啟動 ---
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
+    console.log(`江湖伺服器已在 ${PORT} 端口啟動...`);
 });
