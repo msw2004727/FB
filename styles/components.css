@@ -62,6 +62,20 @@ body.dark-theme .info-card h4 {
     line-height: 1.7; 
 }
 
+/* --- 【核心新增】卡片標題 Flex 容器 --- */
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem; /* 與原 h4 的 margin-bottom 保持一致 */
+}
+/* 讓 h4 不再有底線和 margin-bottom，因為被轉移到 flex 容器上了 */
+.card-header-flex h4 {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
 /* --- 按鈕 --- */
 .theme-switcher, .header-link-btn { 
     background: none; 
@@ -113,6 +127,42 @@ body.dark-theme .header-toggle-btn:hover {
     background-color: rgba(255,255,255,0.1);
     color: var(--dark-text-primary);
 }
+
+/* --- 【核心新增】圓形圖示按鈕樣式 (for 查看武學) --- */
+.header-icon-btn {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--light-border);
+    border-radius: 50%;
+    color: var(--light-text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0; /* 防止按鈕被壓縮 */
+}
+.header-icon-btn:hover {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+    transform: scale(1.1);
+}
+body.dark-theme .header-icon-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+body.dark-theme .header-icon-btn:hover {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+    border-color: var(--dark-accent);
+}
+.header-icon-btn .fas {
+    margin: 0; /* 覆蓋掉 .info-card i 的 margin-right */
+}
+
 
 /* --- AI 模型選擇器 --- */
 .select-wrapper { 
