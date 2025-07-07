@@ -33,7 +33,7 @@ body.dark-theme .novel-header {
     font-weight: 600;
     color: var(--light-text-primary);
     margin: 0; /* 移除 h1 的預設 margin */
-    text-align: left; /* 讓標題文字靠左對齊 */
+    text-align: center; /* 讓標題文字靠左對齊 */
 }
 body.dark-theme .novel-header h1 {
     color: var(--dark-text-primary);
