@@ -43,7 +43,9 @@ body.dark-theme .menu-toggle {
 }
 
 .story-header {
-    position: relative;
+    position: sticky; /* 新增：讓標頭固定 */
+    top: 0;           /* 新增：定位在最頂部 */
+    background-color: var(--light-surface-bg); /* 新增：增加背景色避免滾動時內容穿透 */
     padding: 0.5rem 2rem;
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
@@ -51,12 +53,13 @@ body.dark-theme .menu-toggle {
 }
 body.dark-theme .story-header {
     border-bottom: 1px solid var(--dark-border);
+    background-color: var(--dark-surface-bg); /* 新增：暗色主題的背景色 */
 }
 
 .status-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
+    gap: 0.5rem 1.2rem; /* 修改：減少了狀態文字的間距，使其更緊湊 */
     color: var(--light-text-secondary);
     font-family: var(--font-sans);
     font-size: 0.9rem;
@@ -93,9 +96,9 @@ body.dark-theme .status-bar {
 .round-title {
     font-family: var(--font-serif);
     font-weight: 600;
-    font-size: 2rem;
+    font-size: 1.3rem; /* 修改：縮小了標題字體大小 */
     text-align: center;
-    margin: 1rem 0 2rem 0;
+    margin: 1.5rem 0; /* 修改：調整了標題的上下間距 */
     color: var(--light-accent);
 }
 body.dark-theme .round-title {
