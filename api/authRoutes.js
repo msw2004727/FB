@@ -41,6 +41,17 @@ router.post('/register', async (req, res) => {
             day: 1,
             isDeceased: false // 初始狀態為存活
         });
+        
+        // 【核心新增】為新玩家直接賦予 "現代搏擊" 武學
+        const skillsCollectionRef = db.collection('users').doc(newUserRef.id).collection('skills');
+        await skillsCollectionRef.doc('現代搏擊').set({
+            name: '現代搏擊',
+            type: '拳腳',
+            level: 1,
+            exp: 0,
+            description: '來自另一個世界的格鬥技巧，招式直接有效，講求一擊制敵，但似乎缺少內力運轉的法門。',
+            acquiredAt: admin.firestore.FieldValue.serverTimestamp()
+        });
 
         const roundZeroData = {
             R: 0,
