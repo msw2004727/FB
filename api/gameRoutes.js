@@ -23,6 +23,23 @@ const {
 const db = admin.firestore();
 
 // --- Helper Functions ---
+
+/**
+ * 【***核心新增***】
+ * 清除指定使用者的小說快取，強制下次讀取時重新生成。
+ * @param {string} userId - 使用者的ID
+ */
+async function invalidateNovelCache(userId) {
+    try {
+        const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
+        await novelCacheRef.delete();
+        console.log(`[小說快取系統] 已成功清除玩家 ${userId} 的小說快取。`);
+    } catch (error) {
+        console.error(`[小說快取系統] 清除玩家 ${userId} 的小說快取時發生錯誤:`, error);
+    }
+}
+
+
 async function updateLibraryNovel(userId, username) {
     try {
         console.log(`[圖書館系統] 開始為玩家 ${username} (ID: ${userId}) 更新連載小說...`);
@@ -37,6 +54,7 @@ async function updateLibraryNovel(userId, username) {
         const storyChapters = snapshot.docs.map(doc => {
             const roundData = doc.data();
             const title = roundData.EVT || `第 ${roundData.R} 回`;
+            // 修正：直接使用儲存的 story 欄位
             const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
             return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
         });
@@ -187,6 +205,7 @@ async function checkAndTriggerRomanceEvent(userId, username, romanceChanges, rou
         const currentRomanceValue = npcProfile.romanceValue || 0;
         const triggeredEvents = npcProfile.triggeredRomanceEvents || [];
 
+        // 檢查心動值門檻並觸發事件
         if (currentRomanceValue >= 50 && !triggeredEvents.includes('level_1')) {
             console.log(`[戀愛系統] ${npcName} 的心動值 (${currentRomanceValue}) 已達到 Level 1 門檻，觸發特殊事件！`);
             
@@ -200,6 +219,7 @@ async function checkAndTriggerRomanceEvent(userId, username, romanceChanges, rou
             if (eventNarrative) {
                 triggeredEventNarrative += `<div class="random-event-message romance-event">${eventNarrative}</div>`;
                 
+                // 標記事件已觸發
                 await npcDocRef.update({
                     triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1')
                 });
@@ -489,6 +509,8 @@ router.post('/give-item', async (req, res) => {
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
+        // 【***核心修改***】 呼叫快取清除函式
+        await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
         res.json({
@@ -579,9 +601,6 @@ const interactRouteHandler = async (req, res) => {
                     delete npc.isNew; // isNew is a temporary flag, not to be saved in the NPC object itself.
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
                 } else {
-                    // 【***核心修改***】
-                    // For any existing NPC present in the scene, update their location.
-                    // This ensures NPCs who follow the player have their location updated correctly.
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
                         return npcDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
@@ -646,6 +665,8 @@ const interactRouteHandler = async (req, res) => {
              await userDocRef.update({ isDeceased: true });
         }
         
+        // 【***核心修改***】 呼叫快取清除函式
+        await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
         res.json(aiResponse);
@@ -685,6 +706,7 @@ router.get('/get-encyclopedia', async (req, res) => {
 
         let encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username, npcDetails);
         
+        // Add styles for the romance meter
         const style = `
         <style>
             .romance-meter { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #e0d8cd; }
@@ -802,6 +824,8 @@ router.post('/combat-action', async (req, res) => {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
             
+            // 【***核心修改***】 呼叫快取清除函式
+            await invalidateNovelCache(userId);
             updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
 
             res.json({
@@ -835,7 +859,9 @@ router.get('/latest-game', async (req, res) => {
         const userData = userDoc.data() || {};
 
         if (userData && userData.isDeceased) {
-            return res.json({ gameState: 'deceased' });
+            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRoundData = savesSnapshot.empty ? null : savesSnapshot.docs[0].data();
+            return res.json({ gameState: 'deceased', roundData: lastRoundData });
         }
 
         const snapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
@@ -885,32 +911,29 @@ router.get('/get-novel', async (req, res) => {
         const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
         const novelCacheDoc = await novelCacheRef.get();
 
-        if (novelCacheDoc.exists && novelCacheDoc.data().paragraphs) {
+        if (novelCacheDoc.exists && novelCacheDoc.data().storyHTML) {
             console.log(`[小說系統] 從快取中讀取小說...`);
-            return res.json({ novel: novelCacheDoc.data().paragraphs });
+            return res.json({ novelHTML: novelCacheDoc.data().storyHTML });
         }
 
         console.log(`[小說系統] 快取不存在，開始即時生成小說...`);
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (snapshot.empty) {
-            return res.json({ novel: [] });
+            return res.json({ novelHTML: "" });
         }
 
-        const narrativePromises = snapshot.docs.map(doc => {
+        const storyChapters = snapshot.docs.map(doc => {
             const roundData = doc.data();
-            const narrativeText = roundData.story || "這段往事，已淹沒在時間的長河中。";
-            return Promise.resolve({
-                text: narrativeText,
-                npcs: roundData.NPC || []
-            });
+            const title = roundData.EVT || `第 ${roundData.R} 回`;
+            const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
+            return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
         });
+        const fullStoryHTML = storyChapters.join('');
 
-        const novelParagraphs = await Promise.all(narrativePromises);
-
-        await novelCacheRef.set({ paragraphs: novelParagraphs });
+        await novelCacheRef.set({ storyHTML: fullStoryHTML });
         console.log(`[小說系統] 小說生成完畢並已存入快取。`);
 
-        res.json({ novel: novelParagraphs });
+        res.json({ novelHTML: fullStoryHTML });
 
     } catch (error) {
         console.error(`[UserID: ${userId}] /get-novel 錯誤:`, error);
@@ -950,6 +973,9 @@ router.post('/restart', async (req, res) => {
             turnsSinceEvent: admin.firestore.FieldValue.delete(),
             preferredModel: admin.firestore.FieldValue.delete()
         });
+        
+        // 【***核心修改***】 呼叫快取清除函式
+        await invalidateNovelCache(userId);
 
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
 
@@ -1004,6 +1030,8 @@ router.post('/force-suicide', async (req, res) => {
 
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
         
+        // 【***核心修改***】 呼叫快取清除函式
+        await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
         res.json({
