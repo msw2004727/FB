@@ -1,8 +1,8 @@
 // /api/gameplayRoutes.js
 const express = require('express');
 const router = express.Router();
-const admin = require('firebase-admin'); // 【核心修正】將錯誤的字串改為正確的 require 引用
-const { getAIStory, getAISummary, getAISuggestion, getAICombatAction } = require('../services/aiService');
+const admin = require('firebase-admin');
+const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -28,73 +28,112 @@ const interactRouteHandler = async (req, res) => {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
         const userDocRef = db.collection('users').doc(userId);
 
-        const userDoc = await userDocRef.get();
+        // --- 1. 並行獲取所有需要的資料 ---
+        const [userDoc, summaryDoc, savesSnapshot, skills] = await Promise.all([
+            userDocRef.get(),
+            userDocRef.collection('game_state').doc('summary').get(),
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get(),
+            getPlayerSkills(userId)
+        ]);
+        
         const userProfile = userDoc.exists ? userDoc.data() : {};
         if (userProfile.isDeceased) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
-
-        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
-        const [summaryDoc, savesSnapshot] = await Promise.all([
-            summaryDocRef.get(),
-            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get()
-        ]);
-
+        
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
-        let recentHistoryRounds = [];
-        if (currentRound > 0) {
-            savesSnapshot.forEach(doc => recentHistoryRounds.push(doc.data()));
-            recentHistoryRounds.sort((a, b) => a.R - b.R);
+        const lastSave = savesSnapshot.docs[0]?.data() || {};
+
+        // --- 2. 【新流程】呼叫「總導演AI」進行意圖分類 ---
+        const contextForClassifier = {
+            location: lastSave.LOC?.[0] || '未知之地',
+            npcs: lastSave.NPC?.map(n => n.name) || [],
+            skills: skills?.map(s => s.name) || []
+        };
+        const classification = await getAIActionClassification('gemini', playerAction, contextForClassifier);
+        
+        let aiResponse;
+
+        // --- 3. 【新流程】根據分類結果，執行不同的處理邏輯 ---
+        switch (classification.actionType) {
+            case 'COMBAT_ATTACK':
+                // 如果是戰鬥，直接構造一個觸發戰鬥的aiResponse，不經過故事AI
+                const combatIntroText = `你對 ${classification.details.target || '對手'} 發起了攻擊，一場惡鬥一觸即發！`;
+                aiResponse = {
+                    story: combatIntroText,
+                    roundData: {
+                        ...lastSave, // 繼承大部分狀態
+                        EVT: `遭遇戰：對決${classification.details.target}`,
+                        PC: `你決定與${classification.details.target}一決高下。`,
+                        IMP: `觸發了與${classification.details.target}的戰鬥`,
+                        powerChange: { internal: 0, external: 0, lightness: 0 },
+                        moralityChange: 0,
+                        itemChanges: [],
+                        romanceChanges: [],
+                        skillChanges: [],
+                        enterCombat: true, // <--- 關鍵：觸發戰鬥
+                        combatants: [{ name: classification.details.target, status: '準備應戰' }],
+                        combatIntro: combatIntroText,
+                    }
+                };
+                break;
+            
+            // 未來可以新增 SKILL_PRACTICE 等其他專職處理路徑
+            // case 'SKILL_PRACTICE':
+            //     ...
+            //     break;
+
+            case 'GENERAL_STORY':
+            default:
+                // 對於通用故事，呼叫原本的核心故事AI
+                const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
+                const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
+                const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
+                let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
+                const currentTimeOfDay = userProfile.timeOfDay || '上午';
+                
+                const preActionSkillChanges = req.body.skillChanges || [];
+                const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
+
+                aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
+                if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
+                break;
         }
 
-        const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
-        const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
-        let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
-        const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        
-        const preActionSkillChanges = req.body.skillChanges || [];
-        const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
-
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
-        if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
-
+        // --- 4. 統一處理AI回應後的遊戲狀態更新 ---
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
-
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
-
-        await updateInventory(userId, aiResponse.roundData.itemChanges);
-        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
         
-        await updateSkills(userId, aiResponse.roundData.skillChanges);
-
+        // 觸發戀愛事件 (如果有的話)
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
-
         if (romanceEventNarrative) {
             aiResponse.story = romanceEventNarrative + aiResponse.story;
         }
         aiResponse.roundData.story = aiResponse.story;
 
+        // 並行處理各種狀態更新
+        await updateInventory(userId, aiResponse.roundData.itemChanges);
+        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
+        await updateSkills(userId, aiResponse.roundData.skillChanges);
 
-        const [newSummary, suggestion, inventoryState, skills] = await Promise.all([
+        const [newSummary, suggestion, inventoryState, updatedSkills] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion('deepseek', aiResponse.roundData),
             getInventoryState(userId),
-            getPlayerSkills(userId)
+            getPlayerSkills(userId), // 重新獲取一次確保最新
         ]);
-
+        
         aiResponse.suggestion = suggestion;
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
-        aiResponse.roundData.skills = skills;
+        aiResponse.roundData.skills = updatedSkills;
 
+        // 更新NPC狀態
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
-                if (npc.isDeceased) {
-                    console.log(`[生死簿系統] 偵測到NPC ${npc.name} 已死亡，正在更新其檔案...`);
-                    return npcDocRef.set({ isDeceased: true }, { merge: true });
-                }
+                if (npc.isDeceased) return npcDocRef.set({ isDeceased: true }, { merge: true });
                 if (npc.isNew) {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
@@ -109,44 +148,43 @@ const interactRouteHandler = async (req, res) => {
             await Promise.all(npcUpdatePromises);
         }
 
+        // 如果戰鬥已觸發，填充戰鬥狀態
         if (aiResponse.roundData.enterCombat) {
-            const initialLog = aiResponse.roundData.combatIntro || '戰鬥開始了！';
-            const combatState = { turn: 1, player: { username: username }, enemies: aiResponse.roundData.combatants, log: [initialLog] };
+            const combatState = { turn: 1, player: { username: username }, enemies: aiResponse.roundData.combatants, log: [aiResponse.roundData.combatIntro] };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
 
+        // 更新玩家核心數值和時間
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
-
+        let currentDate = { yearName: userProfile.yearName, year: userProfile.year, month: userProfile.month, day: userProfile.day };
         if (daysToAdvance > 0) {
             for (let i = 0; i < daysToAdvance; i++) { currentDate = advanceDate(currentDate); }
-        } else {
-            const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
-            const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay || currentTimeOfDay);
+        } else if (nextTimeOfDay) {
+            const oldTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
+            const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
             if (newTimeIndex < oldTimeIndex) { currentDate = advanceDate(currentDate); }
         }
 
-        const newInternalPower = Math.max(0, Math.min(999, playerPower.internal + (powerChange.internal || 0)));
-        const newExternalPower = Math.max(0, Math.min(999, playerPower.external + (powerChange.external || 0)));
-        const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0)));
-        let newMorality = Math.max(-100, Math.min(100, playerMorality + moralityChange));
+        const newInternalPower = Math.max(0, Math.min(999, (userProfile.internalPower || 0) + (powerChange.internal || 0)));
+        const newExternalPower = Math.max(0, Math.min(999, (userProfile.externalPower || 0) + (powerChange.external || 0)));
+        const newLightness = Math.max(0, Math.min(999, (userProfile.lightness || 0) + (powerChange.lightness || 0)));
+        let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
 
-        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay, ...currentDate });
-
+        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...currentDate });
+        
+        // 死亡處理
         if (aiResponse.roundData.playerState === 'dead') {
              aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你在這次事件中不幸殞命。';
              await userDocRef.update({ isDeceased: true });
         }
 
+        // --- 5. 儲存本回合所有結果 ---
         await Promise.all([
              userDocRef.update({
-                timeOfDay: nextTimeOfDay || currentTimeOfDay,
-                internalPower: newInternalPower,
-                externalPower: newExternalPower,
-                lightness: newLightness,
-                morality: newMorality,
-                preferredModel: modelName,
-                ...currentDate
+                timeOfDay: aiResponse.roundData.timeOfDay,
+                internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness,
+                morality: newMorality, preferredModel: modelName, ...currentDate
             }),
             summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
             userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData)
@@ -155,6 +193,7 @@ const interactRouteHandler = async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
+        // 隨機觸發懸賞生成
         if (newRoundNumber > 5 && Math.random() < 0.2) { 
             triggerBountyGeneration(userId, newSummary).catch(err => console.error("背景生成懸賞失敗:", err));
         }
@@ -196,26 +235,60 @@ const combatActionRouteHandler = async (req, res) => {
         const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
-        combatState.log.push(combatResult.narrative);
         combatState.turn++;
+        
+        if (combatResult.enemies) {
+            combatState.enemies = combatResult.enemies;
+        }
+        if(combatResult.player) {
+            combatState.player = { ...combatState.player, ...combatResult.player };
+        }
+        combatState.log.push(combatResult.narrative);
+
 
         if (combatResult.combatOver) {
             await combatDocRef.delete();
+            
+            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRoundData = lastSaveSnapshot.docs[0].data();
 
-            const postCombatAction = `戰鬥剛剛結束。結局：${combatResult.outcome?.summary || '戰鬥結束'}。`;
-            const mockedReq = {
-                user: { id: userId, username: playerProfile.username },
-                body: { action: postCombatAction, round: combatState.R, model: modelName }
+            const postCombatSummary = combatResult.outcome.summary || '戰鬥結束';
+            const playerChanges = combatResult.outcome.playerChanges || {};
+            
+            // 更新玩家主檔案的數值
+            const powerChange = playerChanges.powerChange || {};
+            const finalPowerUpdate = {
+                internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
+                externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
+                lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
+                morality: admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0)
             };
-             const lastRoundSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-             const lastRoundData = lastRoundSnapshot.docs[0].data();
-             const newRoundData = {
+            await userDocRef.update(finalPowerUpdate);
+            
+            // 處理物品變化
+            if (combatResult.outcome.itemChanges) {
+                await updateInventory(userId, combatResult.outcome.itemChanges);
+            }
+
+            // 重新取得更新後的玩家資料，以建立準確的存檔
+            const updatedUserDoc = await userDocRef.get();
+            const updatedUserProfile = updatedUserDoc.data();
+            const inventoryState = await getInventoryState(userId);
+
+            const newRoundData = {
                  ...lastRoundData,
                  R: lastRoundData.R + 1,
                  story: combatResult.narrative,
-                 PC: combatResult.outcome.playerChanges.PC || lastRoundData.PC,
-                 EVT: "戰鬥結束"
-             }
+                 PC: playerChanges.PC || postCombatSummary,
+                 EVT: postCombatSummary,
+                 internalPower: updatedUserProfile.internalPower,
+                 externalPower: updatedUserProfile.externalPower,
+                 lightness: updatedUserProfile.lightness,
+                 morality: updatedUserProfile.morality,
+                 ITM: inventoryState.itemsString,
+                 money: inventoryState.money,
+            };
+            
              await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
              await invalidateNovelCache(userId);
              updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
@@ -261,9 +334,11 @@ router.post('/end-chat', async (req, res) => {
         const savesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const currentRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
 
+        // 將總結作為新的玩家行動，重新進入互動路由
         req.body.action = chatSummary;
         req.body.round = currentRound;
-
+        
+        // 直接呼叫 interactRouteHandler 來處理後續流程
         interactRouteHandler(req, res);
 
     } catch (error) {
