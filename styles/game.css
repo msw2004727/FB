@@ -72,7 +72,6 @@ body.dark-theme .status-bar {
     margin-right: 0.5rem;
 }
 
-/* 【***這就是修正的核心***】 */
 .story-header.collapsed {
     padding-top: 0;
     padding-bottom: 0;
@@ -100,6 +99,174 @@ body.dark-theme .status-bar {
 }
 body.dark-theme .round-title {
     color: var(--dark-accent);
+}
+#story-text-wrapper p {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 2;
+    margin-bottom: 1.5rem;
+}
+.player-action-log {
+    text-align: right;
+    font-style: italic;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .player-action-log {
+    color: var(--dark-text-secondary);
+}
+.system-message {
+    text-align: center;
+    font-style: italic;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .system-message {
+    color: var(--dark-text-secondary);
+}
+
+.story-footer {
+    position: relative;
+    border-top: 1px solid var(--light-border);
+    background: var(--light-surface-bg);
+    z-index: 10;
+}
+body.dark-theme .story-footer {
+    border-top: 1px solid var(--dark-border);
+    background: var(--dark-surface-bg);
+}
+
+.input-action-wrapper {
+    display: flex;
+    align-items: stretch;
+}
+
+#player-input,
+#submit-button {
+    padding: 1.1rem 2rem;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    border: none;
+    box-sizing: border-box;
+}
+
+#player-input {
+    flex-grow: 1;
+    min-width: 100px;
+    background: transparent;
+    color: var(--light-text-primary);
+}
+body.dark-theme #player-input {
+    color: var(--dark-text-primary);
+}
+#player-input:focus {
+    outline: none;
+}
+
+#submit-button {
+    flex-shrink: 0;
+    min-width: 120px;
+    background-color: var(--light-accent);
+    border-left: 1px solid var(--light-border);
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+body.dark-theme #submit-button {
+    border-left: 1px solid var(--dark-border);
+}
+#submit-button:hover {
+    opacity: 0.8;
+}
+#submit-button:disabled {
+    background-color: var(--light-text-secondary);
+    cursor: not-allowed;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+    flex-shrink: 0;
+}
+body.dark-theme .dashboard-header {
+    border-bottom: 1px solid var(--dark-border);
+}
+.dashboard-header .header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.dashboard-content {
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .menu-toggle {
+        display: block;
+    }
+    .dashboard {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        transform: translateX(100%);
+        transition: transform 0.4s ease;
+        z-index: 1000;
+        box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    }
+    .game-container.sidebar-open .dashboard {
+        transform: translateX(0);
+    }
+    .header-toggle-btn {
+        top: 13px;
+        left: 15px;
+        right: auto;
+        z-index: 1002;
+    }
+
+    /* --- 以下為本次修改 --- */
+    
+    /* 1. 將包含標題和故事的 .story-panel 設為滾動區域 */
+    .story-panel {
+        padding-top: 0; /* 移除頂部內邊距，讓標題可以貼齊頂部 */
+    }
+
+    /* 2. 針對標題 .round-title 進行修改 */
+    .round-title {
+        /* 這會讓標題在自己的滾動容器(.story-panel)內，滾到頂部時就固定住 */
+        position: sticky;
+        top: 0;
+        
+        /* 設定背景色，避免底下文字透出來 */
+        background-color: var(--light-bg); 
+        
+        /* 確保標題在最上層 */
+        z-index: 1; 
+
+        /* 設定字體大小與劇情文字(1.1rem)一致 */
+        font-size: 1.1rem;
+        font-weight: bold; /* 保持粗體以作區分 */
+        text-align: left;  /* 改為左對齊，更易讀 */
+        
+        /* 增加上下內邊距，讓它看起來不會太擠 */
+        padding: 0.75rem 0;
+        margin: 0 0 1rem 0; /* 調整外邊距 */
+        
+        /* 加上底部邊線，與故事內容做區隔 */
+        border-bottom: 1px solid var(--light-border);
+    }
+
+    /* 3. 為黑暗模式設定對應的背景色和邊線顏色 */
+    body.dark-theme .round-title {
+        background-color: var(--dark-bg);
+        border-bottom-color: var(--dark-border);
+    }
 }
 #story-text-wrapper p {
     font-family: var(--font-serif);
