@@ -158,26 +158,40 @@ ${levelUpText}
 
 ---
 
-## NPC資料結構新規則 (最重要)：
-當你生成與NPC的互動時，你**必須**在 \`NPC\` 陣列中的每個NPC物件裡，同時提供**質化**與**量化**的友好度變化。
+## 【***最終版***】NPC資料結構新規則 (最重要)：
+當你生成與NPC的互動時，你**必須**為 \`NPC\` 陣列中的每個NPC物件，提供以下所有欄位：
 
-1.  **\`friendliness\` (字串)**: 描述NPC**當下**的態度。必須是以下7個層級之一：\`devoted\`, \`trusted\`, \`friendly\`, \`neutral\`, \`wary\`, \`hostile\`, \`sworn_enemy\`。
-2.  **\`friendlinessChange\` (數字)**: 本回合玩家的行動對該NPC友好度造成的**具體數值變化**。
-    -   一個善意的舉動可能回傳 \`"friendlinessChange": 5\`。
-    -   完成一個重要任務可能回傳 \`"friendlinessChange": 20\`。
-    -   一個冒犯的行為可能回傳 \`"friendlinessChange": -10\`。
-    -   如果沒有任何影響關係的互動，**必須**回傳 \`"friendlinessChange": 0\`。
+1.  **\`name\` (字串)**: NPC的真實姓名。
+2.  **\`status\` (字串)**: 描述NPC當下的外觀或行為。
+3.  **\`friendliness\` (字串)**: 描述NPC**當下**的態度。必須是以下7個層級之一：\`devoted\`, \`trusted\`, \`friendly\`, \`neutral\`, \`wary\`, \`hostile\`, \`sworn_enemy\`。
+4.  **\`friendlinessChange\` (數字)**: 本回合玩家的行動對該NPC友好度造成的**具體數值變化**。一個善意的舉動可能回傳 \`10\`，一個冒犯的行為可能回傳 \`-15\`。如果沒有任何影響關係的互動，**必須**回傳 \`0\`。
+5.  **\`isNew\` (布林值, 可選)**: **只有在**玩家**首次**遭遇這位NPC時，才**必須**包含此欄位且設為 \`true\`。再次遇到時，**絕對不能**包含此欄位。
+6.  **\`isDeceased\` (布林值, 可選)**: **只有在**這位NPC在本回合死亡時，才**必須**包含此欄位且設為 \`true\`。
 
-**範例**：玩家幫助了王大夫。
+**範例一：玩家首次遇到王大夫並得到幫助**
 \`\`\`json
 "NPC": [
   {
     "name": "王大夫",
-    "status": "對你露出了讚許的微笑。",
-    "friendliness": "friendly",
-    "friendlinessChange": 10
+    "status": "他仔細為你診脈，神情專注。",
+    "friendliness": "neutral",
+    "friendlinessChange": 5,
+    "isNew": true
   }
 ]
+\`\`\`
+**範例二：玩家再次遇到王大夫，並激怒了他**
+\`\`\`json
+"NPC": [
+  {
+    "name": "王大夫",
+    "status": "他皺起了眉頭，看起來有些不悅。",
+    "friendliness": "wary",
+    "friendlinessChange": -10
+  }
+]
+\`\`\`
+---
 
 當你生成與NPC的互動時，必須區分以下兩種情況：
 
