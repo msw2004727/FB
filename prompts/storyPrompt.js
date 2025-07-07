@@ -1,7 +1,7 @@
 // prompts/storyPrompt.js
 
 // 函式現在會接收完整的日期物件
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = []) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -10,11 +10,17 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const currentDateString = `${userProfile.yearName || '元祐'}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`;
     const playerGender = userProfile.gender || 'male';
 
+    // 【核心新增】將升級事件轉換為給AI的文字提示
+    const levelUpText = levelUpEvents.length > 0
+        ? `\n## 【武學突破】\n在本回合中，玩家的武學境界發生了突破！你必須在你的故事敘述中，為以下事件生成一段充滿意境的描述，來體現玩家的成長，而不是簡單地告知。事件如下：\n${levelUpEvents.map(e => `- 「${e.skillName}」已突破至【${e.levelUpTo}成】境界。`).join('\n')}`
+        : '';
+
     return `
 你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。
 
 ## 長期故事摘要 (世界核心記憶):
 ${longTermSummary}
+${levelUpText}
 
 ## 核心世界觀：
 1.  **時代背景**: 這是一個類似金庸小說世界觀的宋朝，架空的金庸武俠世界。朝廷腐敗，江湖動盪，各大門派與地方勢力盤根錯節，各種驚險與傳說故事。
@@ -94,13 +100,15 @@ ${longTermSummary}
   "isNewlyAcquired": true,
   "skillName": "武學的準確名稱",
   "skillType": "內功 | 外功 | 輕功 | 拳腳 | 兵器 | 暗器 | 醫術 | 毒術 | 雜學",
+  "power_type": "internal | external | lightness | none",
+  "max_level": <這門武學的潛力上限等級，例如 5 或 10>,
   "level": <你判斷出的初始等級>,
   "exp": 0,
   "description": "一段關於此武學的簡短描述文字，說明其來歷或效果。"
 }
 \`\`\`
 **範例：**
-\`"skillChanges": [{"isNewlyAcquired": true, "skillName": "羅漢拳", "skillType": "拳腳", "level": 1, "exp": 0, "description": "少林寺入門拳法，招式大開大闔。"}]\`
+\`"skillChanges": [{"isNewlyAcquired": true, "skillName": "羅漢拳", "skillType": "拳腳", "power_type": "external", "max_level": 10, "level": 1, "exp": 0, "description": "少林寺入門拳法，招式大開大闔。"}]\`
 
 ### 情況二：勤學苦練 (Practice)
 當玩家對一門**已經學會**的武學進行修練時（例如「我閉關打坐」、「在瀑布下苦練劍法」），你的 \`skillChanges\` 陣列中的物件結構應改為如下：
