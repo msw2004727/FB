@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive } = require('../services/aiService');
+const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
 const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
 
 const db = admin.firestore();
@@ -70,16 +70,19 @@ router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const { giveData, model = 'gemini' } = req.body;
-    const { target: npcName, itemName, amount } = giveData;
+    const { target: npcName, itemName, amount, type } = giveData;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
         const npcDocRef = userDocRef.collection('npcs').doc(npcName);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-        const [userDoc, npcDoc, latestSaveSnapshot] = await Promise.all([
+
+        const [userDoc, npcDoc, latestSaveSnapshot, summaryDoc] = await Promise.all([
             userDocRef.get(),
             npcDocRef.get(),
-            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
+            summaryDocRef.get()
         ]);
 
         if (!userDoc.exists || !npcDoc.exists || latestSaveSnapshot.empty) {
@@ -89,6 +92,8 @@ router.post('/give-item', async (req, res) => {
         const playerProfile = userDoc.data();
         const npcProfile = npcDoc.data();
         let lastRoundData = latestSaveSnapshot.docs[0].data();
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
+
 
         const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, giveData);
         if (!aiResponse) throw new Error('AI未能生成有效的贈予反應。');
@@ -101,7 +106,10 @@ router.post('/give-item', async (req, res) => {
             friendliness: getFriendlinessLevel(newFriendlinessValue)
         });
 
-        await updateInventory(userId, [{ action: 'remove', itemName, quantity: amount || 1 }]);
+        // 【***核心修改***】 根據贈予類型，決定要移除的物品名稱和數量
+        const itemNameToRemove = type === 'money' ? '銀兩' : itemName;
+        const quantityToRemove = type === 'money' ? amount : (amount || 1);
+        await updateInventory(userId, [{ action: 'remove', itemName: itemNameToRemove, quantity: quantityToRemove }]);
         
         const newRoundNumber = lastRoundData.R + 1;
         const inventoryState = await getInventoryState(userId);
@@ -123,14 +131,23 @@ router.post('/give-item', async (req, res) => {
         
         newRoundData.story = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
         
+        const [newSummary, suggestion] = await Promise.all([
+            getAISummary(model, longTermSummary, newRoundData),
+            getAISuggestion(model, newRoundData)
+        ]);
+
+        newRoundData.suggestion = suggestion;
+        
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
         res.json({
             story: newRoundData.story,
             roundData: newRoundData,
-            suggestion: `你和${npcName}的關係似乎發生了些許變化。`
+            suggestion: newRoundData.suggestion
         });
 
     } catch (error) {
