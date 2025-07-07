@@ -22,6 +22,11 @@ const giveItemModal = document.getElementById('give-item-modal');
 const giveInventoryList = document.getElementById('give-inventory-list');
 const cancelGiveBtn = document.getElementById('cancel-give-btn');
 
+// 【核心新增】結局彈窗相關元素
+const epilogueModal = document.getElementById('epilogue-modal');
+const epilogueStory = document.getElementById('epilogue-story');
+const closeEpilogueBtn = document.getElementById('close-epilogue-btn');
+
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
@@ -218,4 +223,29 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
 
 export function closeGiveItemModal() {
     giveItemModal.classList.remove('visible');
+}
+
+// --- 【核心新增】結局彈窗 ---
+export function showEpilogueModal(storyHtml, onEpilogueEnd) {
+    if (epilogueModal && epilogueStory && closeEpilogueBtn) {
+        epilogueStory.innerHTML = storyHtml;
+        epilogueModal.classList.add('visible');
+
+        const handleClick = () => {
+            closeEpilogueModal();
+            if (typeof onEpilogueEnd === 'function') {
+                onEpilogueEnd();
+            }
+            // 移除監聽器，避免重複觸發
+            closeEpilogueBtn.removeEventListener('click', handleClick);
+        };
+
+        closeEpilogueBtn.addEventListener('click', handleClick);
+    }
+}
+
+export function closeEpilogueModal() {
+    if (epilogueModal) {
+        epilogueModal.classList.remove('visible');
+    }
 }
