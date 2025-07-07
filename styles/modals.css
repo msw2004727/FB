@@ -10,7 +10,7 @@
     justify-content: center;
     align-items: center;
     gap: 1.5rem;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.85); 
     z-index: 20;
     opacity: 0;
     visibility: hidden;
@@ -631,25 +631,73 @@ body.dark-theme .chat-footer {
     visibility: visible;
 }
 
-/* 【核心新增】心動值愛心樣式 */
 .romance-hearts {
     margin-bottom: 0.5rem;
     font-size: 1.2rem;
 }
 
 .romance-hearts .fa-heart {
-    color: #e54865; /* 亮紅色 */
-    margin: 0 2px;
+    color: #e54865;
 }
 
 body.dark-theme .romance-hearts .fa-heart {
-    color: #ff6b81; /* 亮粉色 */
+    color: #ff6b81;
 }
 
 .romance-hearts .far.fa-heart {
-    color: var(--light-border); /* 空心使用邊框顏色 */
+    color: var(--light-border);
 }
 
 body.dark-theme .romance-hearts .far.fa-heart {
     color: var(--dark-border);
+}
+
+
+/* 【***核心新增***】 */
+/* --- 友好度計量棒 --- */
+.friendliness-bar-container {
+    width: 100%;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--light-border);
+}
+body.dark-theme .friendliness-bar-container {
+    border-top-color: var(--dark-border);
+}
+
+.friendliness-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--light-text-secondary);
+    margin-bottom: 0.5rem;
+    padding: 0 5px; /* 微調使文字與計量棒邊緣對齊 */
+}
+
+.friendliness-bar-background {
+    position: relative;
+    height: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--light-border);
+    background: linear-gradient(to right, #dc3545, #868e96 50%, #198754); /* 預設漸層 */
+}
+body.dark-theme .friendliness-bar-background {
+    border-color: var(--dark-border);
+}
+
+.friendliness-bar-indicator {
+    position: absolute;
+    top: -4px; /* 讓指標上下超出一些，更好看 */
+    width: 6px;
+    height: 20px;
+    background-color: var(--light-surface-bg);
+    border: 2px solid var(--light-text-primary);
+    border-radius: 3px;
+    transform: translateX(-50%); /* 讓指標中心對準 left 的百分比位置 */
+    transition: left 0.5s ease-out;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+body.dark-theme .friendliness-bar-indicator {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-text-primary);
 }
