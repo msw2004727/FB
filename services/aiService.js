@@ -21,7 +21,7 @@ const deepseek = new OpenAI({
 const grok = new OpenAI({
     apiKey: process.env.GROK_API_KEY,
     baseURL: "https://api.x.ai/v1",
-    timeout: 30 * 1000, 
+    timeout: 30 * 1000,
 });
 
 
@@ -41,7 +41,8 @@ const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
 const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
 const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
 const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
-const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js'); // 【核心新增】
+const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
+const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -56,7 +57,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                options.model = "gpt-4.1-mini"; 
+                options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -175,7 +176,7 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 司命星君任務:", error);
-        return null; 
+        return null;
     }
 }
 
@@ -219,10 +220,10 @@ async function getAICombatAction(modelName, playerProfile, combatState, playerAc
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 戰鬥裁判任務:", error);
-        return { 
+        return {
             narrative: "[系統] 戰鬥發生混亂，裁判一時無法看清場上局勢，請你重新下達指令。",
             combatOver: false
-        }; 
+        };
     }
 }
 
@@ -272,7 +273,6 @@ async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType
     }
 }
 
-// 【核心新增】
 async function getAIEpilogue(modelName, playerData) {
     const prompt = getEpiloguePrompt(playerData);
     try {
@@ -281,7 +281,20 @@ async function getAIEpilogue(modelName, playerData) {
     } catch (error) {
         console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
         // 提供一個優雅的備用結局
-        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${genderPronoun}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
+        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
+    }
+}
+
+// 【核心新增】
+async function getAIDeathCause(modelName, username, lastRoundData) {
+    const prompt = getDeathCausePrompt(username, lastRoundData);
+    try {
+        const cause = await callAI(modelName, prompt, false);
+        return cause.replace(/["“”]/g, '');
+    } catch (error) {
+        console.error(`[AI 任務失敗] 司命星君任務 for ${username}:`, error);
+        // 提供一個通用的備用死因
+        return "似乎是積勞成疾，舊傷復發，在睡夢中安然離世。";
     }
 }
 
@@ -303,5 +316,6 @@ module.exports = {
     getAINarrativeForGive,
     getRelationGraph,
     getAIRomanceEvent,
-    getAIEpilogue, // 【核心新增】
+    getAIEpilogue,
+    getAIDeathCause, // 【核心新增】
 };
