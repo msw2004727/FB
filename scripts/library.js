@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalStoryContent = document.getElementById('modal-story-content');
 
     // API 的基本路徑
-    const API_BASE_URL = '/api/library';
+    const API_BASE_URL = 'https://ai-novel-final.onrender.com';
 
     /**
      * 格式化日期，使其更易讀
