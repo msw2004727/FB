@@ -141,7 +141,7 @@ export function updateUI(storyText, data, randomEvent) {
         moneyContent.textContent = `${data.money || 0} 文錢`;
     }
     itmContent.textContent = data.ITM || '身無長物';
-    
+
     // 【核心新增】更新武學列表
     if (skillsContent) {
         skillsContent.innerHTML = ''; // 先清空
