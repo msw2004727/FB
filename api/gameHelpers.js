@@ -201,36 +201,73 @@ const getRawInventory = async (userId) => {
 };
 
 const updateSkills = async (userId, skillChanges) => {
-    if (!skillChanges || skillChanges.length === 0) return;
-
+    if (!skillChanges || skillChanges.length === 0) return [];
+    
     const skillsCollectionRef = db.collection('users').doc(userId).collection('skills');
+    const levelUpNotifications = [];
 
-    for (const skill of skillChanges) {
-        const skillDocRef = skillsCollectionRef.doc(skill.skillName);
-        
-        // 【核心修改】區分「新學會」和「修練」
-        if (skill.isNewlyAcquired) {
-            // 如果是新學會的武學，使用 set 建立或覆蓋資料
-            await skillDocRef.set({
-                name: skill.skillName,
-                type: skill.skillType,
-                level: skill.level,
-                exp: skill.exp,
-                description: skill.description,
-                acquiredAt: admin.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            console.log(`[武學系統] 已為玩家 ${userId} 新增武學: ${skill.skillName}`);
-        } else if (skill.expChange > 0) {
-            // 如果是修練已有的武學，使用 update 和 increment 來增加熟練度
-            // 未來可以在這裡加入升級判斷邏輯
-            // const doc = await skillDocRef.get();
-            // if (doc.exists) { const currentExp = doc.data().exp; ... }
-            await skillDocRef.update({
-                exp: admin.firestore.FieldValue.increment(skill.expChange)
+    for (const skillChange of skillChanges) {
+        const skillDocRef = skillsCollectionRef.doc(skillChange.skillName);
+
+        try {
+            await db.runTransaction(async (transaction) => {
+                const skillDoc = await transaction.get(skillDocRef);
+
+                if (skillChange.isNewlyAcquired) {
+                    const newSkillData = {
+                        name: skillChange.skillName,
+                        type: skillChange.skillType,
+                        level: skillChange.level || 0,
+                        exp: skillChange.exp || 0,
+                        description: skillChange.description,
+                        acquiredAt: admin.firestore.FieldValue.serverTimestamp()
+                    };
+                    transaction.set(skillDocRef, newSkillData);
+                    console.log(`[武學系統] 已為玩家 ${userId} 新增武學: ${skillChange.skillName}，初始等級: ${newSkillData.level}`);
+
+                } else if (skillChange.expChange > 0) {
+                    if (!skillDoc.exists) {
+                        console.warn(`[武學系統] 玩家 ${userId} 試圖修練不存在的武學: ${skillChange.skillName}`);
+                        return;
+                    }
+                    
+                    let currentData = skillDoc.data();
+                    let currentLevel = currentData.level || 0;
+                    let currentExp = currentData.exp || 0;
+                    
+                    if (currentLevel >= 10) {
+                         console.log(`[武學系統] 武學 ${skillChange.skillName} 已達最高等級(十成)。`);
+                         levelUpNotifications.push(`你的「${skillChange.skillName}」已至臻化境，返璞歸真，再無提升空間。`);
+                         return;
+                    }
+
+                    currentExp += skillChange.expChange;
+                    
+                    let requiredExp = (currentLevel === 0) ? 100 : currentLevel * 100;
+
+                    while (currentExp >= requiredExp && currentLevel < 10) {
+                        currentLevel++;
+                        currentExp -= requiredExp;
+                        
+                        const levelDescription = ['初窺門徑', '一成', '二成', '三成', '四成', '五成', '六成', '七成', '八成', '九成', '十成'][currentLevel] || `${currentLevel}成`;
+                        levelUpNotifications.push(`你對「${skillChange.skillName}」的領悟又深了一層，已達【${levelDescription}】境界！`);
+                        
+                        if(currentLevel < 10) {
+                            requiredExp = currentLevel * 100;
+                        } else {
+                            currentExp = 0; // 達到滿級後經驗值清零
+                        }
+                    }
+
+                    transaction.update(skillDocRef, { level: currentLevel, exp: currentExp });
+                    console.log(`[武學系統] 玩家 ${userId} 修練 ${skillChange.skillName}，熟練度增加 ${skillChange.expChange}。現有等級: ${currentLevel}, 熟練度: ${currentExp}`);
+                }
             });
-            console.log(`[武學系統] 玩家 ${userId} 修練了 ${skill.skillName}，熟練度增加了 ${skill.expChange}`);
+        } catch (error) {
+            console.error(`[武學系統] 更新武學 ${skillChange.skillName} 時發生錯誤:`, error);
         }
     }
+    return levelUpNotifications;
 };
 
 const getPlayerSkills = async (userId) => {
