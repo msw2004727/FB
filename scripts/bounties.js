@@ -1,4 +1,5 @@
 // scripts/bounties.js
+import { api } from './api.js'; // 【核心修改】引入統一的API模組
 
 document.addEventListener('DOMContentLoaded', async () => {
     // --- 登入守衛 ---
@@ -9,20 +10,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const bountyListContainer = document.getElementById('bounty-list');
-    const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 
     try {
-        const response = await fetch(`${backendBaseUrl}/api/bounties`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const bounties = await response.json();
-
-        if (!response.ok) {
-            throw new Error(bounties.message || '無法獲取懸賞列表。');
-        }
+        // 【核心修改】使用 api.js 中的 getBounties 函式發起請求
+        const bounties = await api.getBounties();
 
         renderBounties(bounties);
 
