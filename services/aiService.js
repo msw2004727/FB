@@ -191,8 +191,8 @@ async function getAINpcProfile(modelName, username, npcName, roundData) {
     }
 }
 
-async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage) {
-    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage);
+async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage, longTermSummary) {
+    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary);
     try {
         const reply = await callAI(modelName, prompt, false);
         return reply.replace(/["“”]/g, '');
