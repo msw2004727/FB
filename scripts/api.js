@@ -24,17 +24,24 @@ async function fetchApi(endpoint, options = {}) {
     return data;
 }
 
+// 【***核心修改***】 更新所有API路徑以匹配新的後端路由結構
 export const api = {
-    getLatestGame: () => fetchApi('/api/game/latest-game'),
-    startNewGame: () => fetchApi('/api/game/restart', { method: 'POST' }),
-    forceSuicide: () => fetchApi('/api/game/force-suicide', { method: 'POST' }),
-    interact: (body) => fetchApi('/api/game/interact', { method: 'POST', body: JSON.stringify(body) }),
-    combatAction: (body) => fetchApi('/api/game/combat-action', { method: 'POST', body: JSON.stringify(body) }),
-    getNpcProfile: (npcName) => fetchApi(`/api/game/npc-profile/${npcName}`),
-    npcChat: (body) => fetchApi('/api/game/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
-    endChat: (body) => fetchApi('/api/game/end-chat', { method: 'POST', body: JSON.stringify(body) }),
-    giveItemToNpc: (body) => fetchApi('/api/game/give-item', { method: 'POST', body: JSON.stringify(body) }),
-    getInventory: () => fetchApi('/api/game/inventory'),
-    // 【核心新增】新增一個用來獲取關係圖資料的函式
-    getRelations: () => fetchApi('/api/game/get-relations'),
+    // Gameplay Routes
+    interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
+    combatAction: (body) => fetchApi('/api/game/play/combat-action', { method: 'POST', body: JSON.stringify(body) }),
+    endChat: (body) => fetchApi('/api/game/play/end-chat', { method: 'POST', body: JSON.stringify(body) }),
+    
+    // NPC Routes
+    getNpcProfile: (npcName) => fetchApi(`/api/game/npc/npc-profile/${npcName}`),
+    npcChat: (body) => fetchApi('/api/game/npc/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
+    giveItemToNpc: (body) => fetchApi('/api/game/npc/give-item', { method: 'POST', body: JSON.stringify(body) }),
+
+    // State Routes
+    getLatestGame: () => fetchApi('/api/game/state/latest-game'),
+    startNewGame: () => fetchApi('/api/game/state/restart', { method: 'POST' }),
+    forceSuicide: () => fetchApi('/api/game/state/force-suicide', { method: 'POST' }),
+    getInventory: () => fetchApi('/api/game/state/inventory'),
+    getRelations: () => fetchApi('/api/game/state/get-relations'),
+    getNovel: () => fetchApi('/api/game/state/get-novel'),
+    getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
 };
