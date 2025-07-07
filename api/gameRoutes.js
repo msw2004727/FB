@@ -335,13 +335,12 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             }
         }
 
-        // 【***核心修改***】
         const publicProfile = {
             name: npcData.name,
             appearance: npcData.appearance,
             friendliness: npcData.friendliness || 'neutral',
             romanceValue: npcData.romanceValue || 0,
-            friendlinessValue: npcData.friendlinessValue || 0 // 新增這一行
+            friendlinessValue: npcData.friendlinessValue || 0
         };
 
         res.json(publicProfile);
@@ -576,12 +575,17 @@ const interactRouteHandler = async (req, res) => {
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
-                if (npc.isNew === true) {
-                    delete npc.isNew;
+                if (npc.isNew) {
+                    delete npc.isNew; // isNew is a temporary flag, not to be saved in the NPC object itself.
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
-                }
-                if (npc.location) {
-                    return npcDocRef.set({ currentLocation: npc.location }, { merge: true });
+                } else {
+                    // 【***核心修改***】
+                    // For any existing NPC present in the scene, update their location.
+                    // This ensures NPCs who follow the player have their location updated correctly.
+                    const newSceneLocation = aiResponse.roundData.LOC[0];
+                    if (newSceneLocation) {
+                        return npcDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
+                    }
                 }
                 return Promise.resolve();
             });
@@ -920,7 +924,6 @@ router.post('/restart', async (req, res) => {
     try {
         const userDocRef = db.collection('users').doc(userId);
 
-        // 在刪除舊資料前，先觸發一次圖書館更新，確保最終狀態被記錄
         await updateLibraryNovel(userId, username).catch(err => console.error("輪迴前更新圖書館失敗:", err));
         
         const collections = ['game_saves', 'npcs', 'game_state'];
