@@ -1,3 +1,6 @@
+// scripts/library.js
+import { backendBaseUrl } from './config.js'; // 【***核心修改***】
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // 獲取頁面上的主要元素
@@ -8,8 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalAuthorInfo = document.getElementById('modal-author-info');
     const modalStoryContent = document.getElementById('modal-story-content');
 
-    // API 的基本路徑
-    const API_BASE_URL = '/api/library';
+    // 【***核心修改***】 API 的基礎路徑現在從設定檔讀取
+    const API_BASE_URL = `${backendBaseUrl}/api/library`;
 
     /**
      * 格式化日期，使其更易讀
@@ -17,8 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {string} 格式化後的日期
      */
     function formatLastUpdated(dateString) {
+        if (!dateString) return '未知時間';
         const date = new Date(dateString);
-        return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        if (isNaN(date)) return '無效日期';
+        return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     }
 
     /**
@@ -26,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function fetchAndDisplayNovels() {
         try {
+            // 【***核心修改***】 使用完整的 API 路徑
             const response = await fetch(`${API_BASE_URL}/novels`);
             if (!response.ok) {
                 throw new Error('無法從書庫取書，請稍後再試。');
@@ -51,15 +57,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 novelCard.innerHTML = `
                     <div class="card-header">
-                        <h3 class="card-title">${novel.novelTitle}</h3>
+                        <h3 class="card-title">${novel.novelTitle || '未命名傳奇'}</h3>
                         <span class="card-status ${statusClass}">${statusText}</span>
                     </div>
                     <div class="card-body">
-                        <p class="card-author"><i class="fas fa-user-edit"></i> 作者：${novel.playerName}</p>
-                        <p class="card-last-chapter"><i class="fas fa-scroll"></i> 最新章節：${novel.lastChapterTitle}</p>
+                        <p><i class="fas fa-user-edit"></i> 作者：${novel.playerName || '無名氏'}</p>
+                        <p><i class="fas fa-scroll"></i> 最新章節：${novel.lastChapterTitle || '開篇'}</p>
                     </div>
                     <footer class="card-footer">
-                        <p class="card-last-updated"><i class="fas fa-clock"></i> 最後更新：${formatLastUpdated(novel.lastUpdated)}</p>
+                        <p><i class="fas fa-clock"></i> 最後更新：${formatLastUpdated(novel.lastUpdated)}</p>
                     </footer>
                 `;
                 novelListContainer.appendChild(novelCard);
@@ -85,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalStoryContent.innerHTML = '<div class="loader-dots"><span></span><span></span><span></span></div>';
         
         try {
+            // 【***核心修改***】 使用完整的 API 路徑
             const response = await fetch(`${API_BASE_URL}/novel/${novelId}`);
             if (!response.ok) {
                 throw new Error('無法開啟這本傳奇。');
@@ -134,4 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 監聽鍵盤 "Esc" 按鍵
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && novelModal.classList.contains('visible')) {
+            closeModal();
+        }
+    });
 });
