@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
-        /* --- 基礎設定與色彩變數 (源自遊戲檔案) --- */
         :root {
             --font-serif: 'Noto Serif TC', serif;
             --font-sans: 'Noto Sans TC', sans-serif;
@@ -30,7 +30,6 @@
             line-height: 1.8;
         }
 
-        /* --- 主體容器與佈局 --- */
         .manual-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -43,7 +42,6 @@
             }
         }
 
-        /* --- 頂部標題 --- */
         .manual-header {
             text-align: center;
             padding-bottom: 2rem;
@@ -66,7 +64,6 @@
             font-style: italic;
         }
 
-        /* --- 內容網格佈局 --- */
         .manual-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -92,7 +89,6 @@
             gap: 2rem;
         }
 
-        /* --- 內容卡片樣式 --- */
         .manual-card {
             background-color: var(--light-surface-bg);
             border: 1px solid var(--light-border);
@@ -117,11 +113,10 @@
             border-bottom: 1px solid var(--light-border);
             display: flex;
             align-items: center;
+            gap: 0.75rem;
         }
         
-        .manual-card h2::before {
-            content: '📜';
-            margin-right: 0.75rem;
+        .manual-card h2 .fa-solid {
             font-size: 1.5rem;
         }
 
@@ -151,9 +146,6 @@
             font-family: monospace;
             font-size: 0.9em;
         }
-
-        /* --- Q&A Accordion --- */
-        #qa-section h2::before { content: '❓'; }
         
         .accordion-item {
             border-bottom: 1px solid var(--light-border);
@@ -161,9 +153,8 @@
         .accordion-item:last-child {
             border-bottom: none;
         }
-
         .accordion-header {
-            padding: 1rem 0;
+            padding: 1rem 0.5rem;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
@@ -196,7 +187,6 @@
             color: var(--light-text-secondary);
         }
         
-        /* --- 特色功能卡片 (Sidebar) --- */
         .feature-card {
             background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
         }
@@ -204,8 +194,6 @@
             font-size: 1.5rem;
             color: #3a2d21;
         }
-        #features-section h2::before { content: '🌟'; }
-        #core-concepts-section h2::before { content: '📖'; }
         
         .feature-item {
             margin-bottom: 1.5rem;
@@ -219,6 +207,7 @@
             margin: 0 0 0.5rem 0;
             display: flex;
             align-items: center;
+            gap: 0.5rem;
         }
         
         .feature-item p {
@@ -227,7 +216,6 @@
             margin: 0;
         }
 
-        /* --- 頁腳 --- */
         .manual-footer {
             text-align: center;
             margin-top: 4rem;
@@ -250,144 +238,116 @@
         <div class="manual-grid">
             <main class="main-content">
                 <section id="core-concepts-section" class="manual-card">
-                    <h2>核心概念</h2>
+                    <h2><i class="fa-solid fa-book-sparkles"></i>核心概念</h2>
                     <p>歡迎來到《AI文字江湖》。這不僅是一款遊戲，更是一個由你親手書寫、由AI動態演繹的武俠世界。你的每一個決定，都將化為故事的篇章。</p>
-                    
                     <h3>靈魂穿越的開局</h3>
-                    <p>你是一位來自現代的靈魂，意外穿越到這具年輕的軀體中。這具身體骨骼清奇，是萬中無一的練武奇才，卻因不明原因身受重傷。你的故事，將從「無名村」的一間藥鋪中，從零開始。</p>
-                    
-                    <h3>無盡的江湖路</h3>
-                    <p>本遊戲沒有固定的終點。你的目標，由你自己定義。你可以成為一代宗師，開宗立派；可以成為富甲一方的商賈，掌控經濟命脈；也可以成為獨行的俠客，專管世間不平事。一切皆有可能。</p>
-
+                    <p>你是一位來自現代的靈魂，最後的印象是在滑手機，卻在一陣天旋地轉後，意外穿越到這具年輕的軀體中。這具身體骨骼清奇，是萬中無一的練武奇才，卻因不明原因身受重傷。你的故事，將從「無名村」的一間藥鋪中，從零開始。</p>
                     <h3>AI江湖百曉生</h3>
                     <p>你的所有行動都將交由遊戲的AI核心——「江湖百曉生」進行推演。它將以金庸式的沉穩文筆，為你描繪出一個真實、富有邏輯的武俠世界。你輸入的指令越清晰、越富有想像力，AI生成的故事就越精彩。</p>
                 </section>
-                
-                <section id="systems-section" class="manual-card">
-                    <h2>遊戲核心系統詳解</h2>
-                    
-                    <h3>角色屬性系統 (武功 & 立場)</h3>
-                    <ul>
-                        <li><strong>三項武功：</strong>
-                            <ul>
-                                <li><code>內功</code>: 你的真氣修為，影響招式威力、續航力和對內傷的抵抗力。</li>
-                                <li><code>外功</code>: 你的招式技巧與筋骨強度，影響命中率、防禦力與外傷恢復。</li>
-                                <li><code>輕功</code>: 你的身法與速度，影響閃避能力、移動速度和執行特定動作的成功率。</li>
-                            </ul>
-                            你可以透過<code>打坐</code>、<code>練劍</code>、<code>吐納</code>等指令來提升對應修為。
-                        </li>
-                        <li><strong>立場傾向：</strong>這個世界會記錄你的所作所為。範圍從 <code>-100</code> (極惡) 到 <code>+100</code> (極善)。行俠仗義會增加正義值，殺人越貨則會墮入邪道。立場會直接影響NPC對你的初始態度和劇情走向。</li>
-                        <li><strong>新手保護機制：</strong>在你武功總和低於100時，你遇到的只會是凡人與地痞流氓，地點也將限制在新手村周邊。隨著你的實力增長，更廣闊、更危險的江湖才會逐漸對你開放。</li>
-                    </ul>
 
-                    <h3>NPC與關係系統</h3>
+                <section id="martial-arts-section" class="manual-card">
+                    <h2><i class="fa-solid fa-khanda"></i>武學系統詳解</h2>
+                    <p>武學是立身之本。本遊戲的武學系統圍繞著「修練」與「實戰」打造，你的每一分投入，都將在戰鬥中得到回報。</p>
+                    <h3>武學的獲取與成長</h3>
                     <ul>
-                        <li><strong>動態NPC：</strong>你遇到的每一位NPC都有AI在背後生成的詳細檔案，包括他們的個性、目標、秘密和人際關係。</li>
-                        <li><strong>七級友好度：</strong>你與NPC的關係分為七個等級：<code>崇拜 (devoted)</code>, <code>信賴 (trusted)</code>, <code>友善 (friendly)</code>, <code>中立 (neutral)</code>, <code>警惕 (wary)</code>, <code>敵對 (hostile)</code>, <code>死敵 (sworn_enemy)</code>。友好度越高，越容易觸發正面劇情。</li>
-                        <li><strong>密談模式：</strong>在故事中點擊NPC的姓名，即可進入「密談」模式，與其進行一對一的深入交流，打探情報或培養感情。</li>
-                        <li><strong>贈予系統：</strong>在密談中，你可以選擇贈予NPC物品或金錢。送對禮物能大幅提升友好度，反之亦然。</li>
+                        <li><strong>獲取方式</strong>: 你可以透過<code>閱讀秘笈</code>、<code>高人傳授</code>、<code>觀摩壁畫</code>、<code>頓悟</code>甚至<code>自創</code>等多種方式學會新武學。</li>
+                        <li><strong>初始等級</strong>: 不同的獲取方式會帶來不同的初始等級。自創的武學從零開始，而獲得奇遇傳承則可能讓你一步登天！</li>
+                        <li><strong>修練升級</strong>: 透過<code>打坐</code>、<code>練劍</code>、<code>閉關</code>等修練指令來獲取「熟練度(EXP)」。AI會根據你修練的用心程度，給予不同的熟練度回報。</li>
+                        <li><strong>十成境界</strong>: 武學分為十個等級（一成至十成）。熟練度達標後會自動升級，大部分武學的潛力上限為十成，但某些神功可能更高。</li>
                     </ul>
-                    
-                    <h3>戰鬥系統 (遭遇戰)</h3>
+                     <h3>屬性與戰鬥</h3>
                     <ul>
-                        <li><strong>觸發機制：</strong>當你或NPC明確表達攻擊意圖時，便會進入「遭遇戰」彈窗。</li>
-                        <li><strong>回合制裁定：</strong>戰鬥由「戰鬥裁判AI」進行裁定。你輸入行動指令，AI會根據雙方實力、狀態和戰鬥紀錄，描述一整個攻防回合的結果。</li>
-                        <li><strong>策略至上：</strong>硬碰硬並非唯一選擇。嘗試<code>格檔</code>、<code>閃避</code>、<code>虛晃一招</code>、<code>攻擊下盤</code>等更具策略性的指令，往往能以弱勝強。</li>
-                    </ul>
-
-                    <h3>時間與世界系統</h3>
-                    <ul>
-                        <li><strong>時間流逝：</strong>遊戲中的時間會根據你的行動（如長途跋涉、練功）而自動推移。時辰順序為：<code>清晨 -> 上午 -> 中午 -> 下午 -> 黃昏 -> 夜晚 -> 深夜</code>。</li>
-                        <li><strong>日夜與天氣：</strong>不同的時辰和天氣（如晴、雨、雪）會影響事件的觸發和行動的成功率。</li>
-                        <li><strong>奇遇事件：</strong>在旅途中，你可能會觸發AI生成的隨機奇遇事件，帶來意外的獎勵或懲罰。</li>
+                        <li><strong>三大功體</strong>: <code>內功</code>、<code>外功</code>、<code>輕功</code>是你最基礎的屬性，會直接影響所有行動的成敗。</li>
+                        <li><strong>武學加成</strong>: 每門武學都有其核心的「功體屬性」(power_type)。例如，外功強的人使用外功加成的招式，威力會倍增；而內功高的人催動內功型武學，則能移山填海。</li>
+                         <li><strong>等級壓制</strong>: 在戰鬥中，武學的「成數」是決定性的。一成火候的招式可能無關痛癢，但十成圓滿的同一招，則可能是你的致勝王牌。</li>
                     </ul>
                 </section>
                 
-                <section id="qa-section" class="manual-card">
-                    <h2>常見問題 (Q&A)</h2>
+                <section id="romance-section" class="manual-card">
+                    <h2><i class="fa-solid fa-heart"></i>戀愛系統詳解</h2>
+                    <p>江湖不只有打打殺殺，更有兒女情長。你可以與遊戲中的任何NPC發展出一段超脫友誼的特殊關係，但過程充滿挑戰。</p>
+                     <ul>
+                        <li><strong>雙軌制好感</strong>: 除了代表一般人際關係的「友好度」，還有獨立的「心動值(Romance Value)」。心動值是觸發特殊戀愛事件的唯一鑰匙。</li>
+                        <li><strong>攻略自由</strong>: 理論上，所有NPC皆可攻略。遊戲鼓勵你探索各種複雜甚至禁忌的關係，但其難度和後果也截然不同。</li>
+                        <li><strong>密談與贈予</strong>: 提升心動值的最主要方式，是在「密談」模式中，透過觸動人心的對話和贈送深得其意的禮物來實現。</li>
+                        <li><strong>情之所鍾</strong>: 許多NPC都有自己的情感狀況，例如暗戀對象或已故的伴侶。想打動他們，你需要付出更多努力，甚至扮演第三者的角色。</li>
+                        <li><strong>特殊事件</strong>: 當心動值累積到一定程度，便會觸發由AI生成的專屬戀愛事件，將你們的關係推向新的階段。</li>
+                    </ul>
+                </section>
+                
+                 <section id="other-systems-section" class="manual-card">
+                    <h2><i class="fa-solid fa-book-journal-whills"></i>其他核心系統</h2>
+                    <h3><i class="fa-solid fa-swords"></i> 遭遇戰系統</h3>
+                    <p>當衝突無可避免時，會進入回合制的「遭遇戰」。你需下達戰術指令，由「戰鬥裁判AI」根據雙方實力、狀態、武學等級和你的指令創意，來裁定一整個攻防回合的結果。記住，<code>虛晃一招</code>有時比猛攻更有效。</p>
                     
+                    <h3><i class="fa-solid fa-users"></i> NPC與關係</h3>
+                    <p>你遇到的每位NPC都有AI生成的詳細背景與動機。你與他們的「友好度」分為七個等級，從死敵到崇拜，直接影響他們的行為。點擊NPC姓名進入「密談」是了解他們、改變關係的關鍵。</p>
+
+                    <h3><i class="fa-solid fa-tombstone"></i> 死亡與輪迴</h3>
+                    <p>江湖險惡，死亡在所難免。但這並非終點。當你的角色身故後，你可以選擇「回顧生平」，將本次人生所有經歷匯集成一本完整的小說。之後，你可以選擇「開啟新的輪迴」，註冊一個全新的名號，再次踏入江湖。</p>
+
+                    <h3><i class="fa-solid fa-landmark"></i> 圖書館與百科</h3>
+                    <p>所有玩家完結的人生傳奇，都會被收錄在公共的「江湖圖書館」中，供後人瞻仰。而你個人的「江湖百科」則由AI為你動態整理你遇到的人、事、物，是你梳理線索、回顧冒險的好幫手。</p>
+                </section>
+
+                <section id="qa-section" class="manual-card">
+                    <h2><i class="fa-solid fa-circle-question"></i>常見問題 (Q&A)</h2>
                     <div class="accordion">
                         <div class="accordion-item">
-                            <div class="accordion-header">【基礎操作】</div>
+                            <div class="accordion-header">武學相關</div>
                             <div class="accordion-content">
-                                <p><strong>Q: 如何開始遊戲？</strong><br>A: 註冊登入後，在主介面的輸入框內輸入你的第一個動作，如「睜開眼睛，環顧四周」，然後點擊「動作」按鈕即可。</p>
-                                <p><strong>Q: 如何移動到其他地方？</strong><br>A: 使用描述性的指令，例如「前往村口的酒館」、「離開村子，往東邊的大路走」、「進入森林深處」。</p>
-                                <p><strong>Q: 如何與人物互動？</strong><br>A: 直接下達指令，如「向王大夫詢問我的傷勢」、「和李鐵匠聊天」。更深入的交流，請點擊故事中的NPC姓名進入密談模式。</p>
-                                <p><strong>Q: 如何查看我的狀態？</strong><br>A: 遊戲介面右側的「儀表板」會即時顯示你的角色狀態(PC)、武功修為(內功/外功/輕功)、立場傾向、金錢、物品等所有資訊。</p>
-                                <p><strong>Q: 我不知道該做什麼怎麼辦？</strong><br>A: 可以參考輸入框上方，你的「書僮」為你提供的行動建議。或者查看「任務日誌(QST)」和「關鍵線索(CLS)」。</p>
+                                <p><strong>Q: 如何提升武功？</strong><br>A: 透過修練指令，如<code>盤腿打坐</code>提升內功，<code>練習劍法</code>提升外功。你的描述越詳細，獲得的熟練度(EXP)就越多。</p>
+                                <p><strong>Q: 為什麼我的「現代搏擊」練不上去？</strong><br>A: 「現代搏擊」是一門特殊的初始武學，它的潛力上限可能只有1級，代表著它缺少了這個世界的內力運轉法門，無法再精進。</p>
+                                <p><strong>Q: 如何查看武學的詳細屬性？</strong><br>A: 在儀表板點擊武學圖示打開「武學總覽」，將滑鼠懸停在經驗條上，即可看到該武學的「功體屬性」和「潛力上限」。</p>
                             </div>
                         </div>
                         <div class="accordion-item">
-                            <div class="accordion-header">【遊戲玩法】</div>
+                            <div class="accordion-header">戀愛相關</div>
                             <div class="accordion-content">
-                                <p><strong>Q: 如何提升武功？</strong><br>A: 嘗試執行與修煉相關的指令，如「盤腿打坐，調息內力」可以提升內功；「在院子裡練習基礎劍法」可以提升外功；「練習梅花步法」可以提升輕功。</p>
-                                <p><strong>Q: 如何獲得物品和金錢？</strong><br>A: 完成NPC的任務、探索未知區域、搜查敵人屍體，或是...採取一些不那麼光彩的手段，例如「偷竊」。</p>
-                                <p><strong>Q: NPC名字的顏色代表什麼？</strong><br>A: 代表他對你的友好度。從綠色系(友善)到灰色(中立)再到紅色系(敵對)，讓你一目了然。</p>
-                                <p><strong>Q: 為什麼故事風格有時候會變？</strong><br>A: 你可能在儀表板切換了「AI核心」。不同的AI模型文筆和想像力各不相同，你可以選擇最喜歡的一款進行遊戲。</p>
-                                <p><strong>Q: 我可以同時和多個敵人戰鬥嗎？</strong><br>A: 可以，但AI會根據敵人數量增加你行動的難度。以一敵多時，請謹慎思考你的戰術。</p>
-                                <p><strong>Q: 如何給NPC送禮？</strong><br>A: 首先點擊NPC姓名進入密談模式，然後點擊輸入框旁邊的「禮物」圖示，選擇你想贈送的物品或金錢即可。</p>
-                                <p><strong>Q: 遊戲會自動存檔嗎？</strong><br>A: 是的，你的每一個回合都會被記錄在雲端。你可以隨時關閉遊戲，下次登入時會從最新的進度繼續。</p>
-                                <p><strong>Q: 我死了怎麼辦？</strong><br>A: 死亡是江湖常事。你可以選擇「回顧生平事蹟」將本次人生轉為小說閱讀，然後「開啟新的輪迴」，以全新的身份再次開始。</p>
-                                <p><strong>Q: 我可以中途放棄，重新開始嗎？</strong><br>A: 可以。在儀表板點擊「骷髏頭」圖示，即可「了卻此生」，然後開啟新的輪迴。</p>
-                             </div>
+                                <p><strong>Q: 如何提升NPC的心動值？</strong><br>A: 在「密談」模式中投其所好、完成NPC的個人任務、贈送其喜愛的禮物，或是在關鍵時刻保護他們，都是有效的方式。</p>
+                                <p><strong>Q: NPC對我的友好度很高，為什麼心動值還是0？</strong><br>A: 友好度不等於心動值。一個NPC可能視你為恩人或摯友，但未必對你有戀愛的情感。你需要採取更具針對性的行動來打動他們。</p>
+                            </div>
                         </div>
                          <div class="accordion-item">
-                            <div class="accordion-header">【系統機制】</div>
+                            <div class="accordion-header">系統機制</div>
                             <div class="accordion-content">
-                               <p><strong>Q: 為什麼我初期遇不到絕世高手？</strong><br>A: 遊戲內建了「新手保護機制」。在你武功尚低時，AI會被限制，只生成平凡人和低級威脅，確保你能循序漸進地成長。</p>
-                               <p><strong>Q: AI是如何決定故事走向的？</strong><br>A: AI會綜合考慮五大因素：你的「長期故事摘要」、最近幾回合的「短期記憶」、你下達的「玩家指令」、你的「角色屬性」以及內建的「世界觀規則」。</p>
-                               <p><strong>Q: 我的背包有容量限制嗎？</strong><br>A: 遊戲目前沒有嚴格的容量限制，但AI在生成故事時，會考量你攜帶過多物品的合理性。</p>
-                               <p><strong>Q: 立場值會影響什麼？</strong><br>A: 影響極大。高正義值可能讓正派人士主動結交你，邪派則視你為眼中釘；高邪惡值反之。它還會影響特定任務的觸發和NPC的反應。</p>
-                               <p><strong>Q: 遊戲的後端是如何運作的？</strong><br>A: 遊戲後端部署在Render平台上，使用Node.js和Express構建，並以Firebase Firestore作為數據庫，確保你的江湖傳奇被安全地儲存。</p>
-                               <p><strong>Q: 我可以為這個遊戲做出貢獻嗎？</strong><br>A: 當然！這是一款開源遊戲，你可以在GitHub上找到所有源代碼。歡迎提交你的程式碼或建議。</p>
+                                <p><strong>Q: 遊戲會自動存檔嗎？</strong><br>A: 是的，你的每一個回合都會被記錄在雲端。你可以隨時關閉遊戲，下次登入時會從最新的進度繼續。</p>
+                                <p><strong>Q: 為什麼我初期遇不到絕世高手？</strong><br>A: 遊戲內建了「新手保護機制」。在你武功總和尚低時，AI會被限制，只生成平凡人和低級威脅，確保你能循序漸進地成長。</p>
+                                <p><strong>Q: 我可以中途放棄，重新開始嗎？</strong><br>A: 可以。在儀表板點擊「骷髏頭」圖示，即可「了卻此生」，然後開啟新的輪迴。</p>
+                                <p><strong>Q: 我死了之後，以前的角色還能玩嗎？</strong><br>A: 不能。一旦角色死亡，該名號的江湖故事便已完結，並被永久封存進圖書館。你需要註冊新名號才能重新開始。</p>
+                                <p><strong>Q: 為什麼故事風格有時候會變？</strong><br>A: 你可能在儀表板切換了「AI核心」。不同的AI模型文筆和想像力各不相同，你可以選擇最喜歡的一款進行遊戲。</p>
                              </div>
                         </div>
-                        <div class="accordion-item">
-                            <div class="accordion-header">【進階技巧 & 其他】</div>
-                            <div class="accordion-content">
-                                <p><strong>Q: 如何輸入更有效的指令？</strong><br>A: 試著更具體、更富畫面感。與其輸入「攻擊」，不如嘗試「運起輕功，繞到敵人背後，刺向他的後心」。</p>
-                                <p><strong>Q: 我可以自創武功嗎？</strong><br>A: 你可以嘗試描述自創的招式名稱和效果，AI會根據合理性進行判定。如果你的外功修為夠高，成功的機率會更大。</p>
-                                <p><strong>Q: 如何查看完整的個人傳奇？</strong><br>A: 點擊儀表板的「書本」圖示，即可進入「我的江湖路」頁面，AI會將你所有的經歷匯集成一本完整的小說。</p>
-                                <p><strong>Q: 「江湖百科」有什麼用？</strong><br>A: 它由AI自動整理你遇到的人物、獲得的物品和經歷的事件，是你梳理劇情、回顧線索的好幫手。</p>
-                                <p><strong>Q: 「人物關係圖」是什麼？</strong><br>A: 這是一張由AI根據你的故事摘要，使用Mermaid.js語法自動繪製的圖表，能讓你清晰地看到你與所有NPC之間的恩怨情仇。</p>
-                                <p><strong>Q: 遊戲支持黑暗模式嗎？</strong><br>A: 支持。點擊儀表板的「月亮/太陽」圖示即可在明暗主題間切換。</p>
-                                <p><strong>Q: 有沒有快捷鍵？</strong><br>A: 在輸入框中按「Enter」鍵可以直接提交動作。未來可能會加入更多快捷操作。</p>
-                                 <p><strong>Q: 遊戲中的貨幣體系是怎樣的？</strong><br>A: 主要貨幣是「文錢」。你可以透過交易、任務獎勵或探索獲得。錢可以用於購買物品、賄賂NPC或觸發特定事件。</p>
-                                 <p><strong>Q: 遊戲的背景設定在哪個朝代？</strong><br>A: 一個類似北宋，名為「元祐」的架空年代。這是一個朝廷腐敗、江湖動盪的時代，充滿了機會與危險。</p>
-                                 <p><strong>Q: 為什麼NPC有時候不在我以為的地方？</strong><br>A: NPC是「活」的。AI會根據故事發展更新他們的位置。如果你想與某人互動，需要確保你們在同一地點。</p>
-                                 <p><strong>Q: 我可以結婚或與NPC建立戀愛關係嗎？</strong><br>A: 可以。只要你與特定NPC的友好度足夠高，並透過對話和行動表達你的意圖，AI完全可能生成此類劇情。這也是遊戲的魅力之一。</p>
-                            </div>
-                        </div>
                     </div>
-
                 </section>
             </main>
 
             <aside class="sidebar">
                 <section id="features-section" class="manual-card feature-card">
-                    <h2>特色功能一覽</h2>
+                    <h2><i class="fa-solid fa-star"></i>特色功能一覽</h2>
                     <div class="feature-item">
-                        <h3>📖 我的江湖路</h3>
+                        <h3><i class="fa-solid fa-book-open-reader"></i> 我的江湖路</h3>
                         <p>將你的所有經歷自動匯集成一本可供閱讀的個人武俠小說。</p>
                     </div>
                     <div class="feature-item">
-                        <h3>🗺️ 江湖百科</h3>
+                        <h3><i class="fa-solid fa-atlas"></i> 江湖百科</h3>
                         <p>AI為你動態整理的人物誌、神兵錄、武功譜與江湖軼事。</p>
                     </div>
                     <div class="feature-item">
-                        <h3>🕸️ 人物關係圖</h3>
+                        <h3><i class="fa-solid fa-diagram-project"></i> 人物關係圖</h3>
                         <p>自動繪製你與江湖中人的關係網絡，恩怨情仇一目了然。</p>
                     </div>
                     <div class="feature-item">
-                        <h3>🧠 多核AI驅動</h3>
+                        <h3><i class="fa-solid fa-brain"></i> 多核AI驅動</h3>
                         <p>可在Gemini、GPT、DeepSeek等多種AI模型間自由切換，體驗不同文筆風格。</p>
                     </div>
                     <div class="feature-item">
-                        <h3>💬 深度密談系統</h3>
+                        <h3><i class="fa-solid fa-comments"></i> 深度密談系統</h3>
                         <p>與NPC進行一對一的私密對話，挖掘他們背後的故事與秘密。</p>
                     </div>
                      <div class="feature-item">
-                        <h3>⚔️ 策略性戰鬥</h3>
+                        <h3><i class="fa-solid fa-swords"></i> 策略性戰鬥</h3>
                         <p>拒絕單調的數值比拼，鼓勵富有想像力的戰術指令。</p>
                     </div>
                 </section>
