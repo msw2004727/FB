@@ -1,8 +1,8 @@
 /* --- 遊戲主頁面樣式 --- */
-.game-container { 
+.game-container {
     /* height: 100vh; */ /* 移除：改由 JS 控制 */
-    width: 100%; 
-    overflow: hidden; 
+    width: 100%;
+    overflow: hidden;
     display: flex; /* 新增：讓 .main-content 和 .dashboard 可以並排 */
 }
 .main-content {
@@ -11,7 +11,7 @@
     flex-direction: column;
     height: 100%;
     /* 新增：為了解決 iOS 上的滾動問題 */
-    position: relative; 
+    position: relative;
 }
 .dashboard {
     width: 320px;
@@ -207,6 +207,8 @@ body.dark-theme .dashboard-header {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap; /* 【核心修改】允許按鈕換行 */
+    justify-content: flex-end; /* 【核心修改】確保換行後依然靠右對齊 */
 }
 .dashboard-content {
     padding: 1.5rem;
