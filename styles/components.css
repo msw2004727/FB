@@ -450,3 +450,19 @@ body.dark-theme .dashboard-header {
     align-items: center;
     gap: 0.5rem;
 }
+
+/* --- 【核心新增】武學總覽提示文字 --- */
+.header-action-group {
+    display: flex;
+    align-items: center;
+}
+
+.header-prompt-text {
+    font-size: 0.75rem; /* XS 大小 */
+    color: var(--light-text-secondary);
+    margin-right: 0.5rem; /* 與按鈕的間距 */
+}
+
+body.dark-theme .header-prompt-text {
+    color: var(--dark-text-secondary);
+}
