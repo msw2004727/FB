@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>懸賞告示板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="styles/base.css">
+    <link rel="stylesheet" href="styles/bounties.css"> 
+</head>
+<body class="light-theme">
+    <div class="bounty-container">
+        <header class="bounty-header">
+            <h1><i class="fas fa-scroll"></i> 懸賞告示板</h1>
+            <p>此處張貼著江湖四處的懸賞與委託，或許隱藏著機遇...</p>
+            <a href="index.html" class="back-to-game-btn"><i class="fas fa-arrow-left"></i> 返回遊戲</a>
+        </header>
+
+        <main id="bounty-list" class="bounty-list-container">
+            <div class="loading-placeholder">
+                <p>正在同步來自官府和各路英雄的最新懸賞...</p>
+                <div class="loader-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="scripts/bounties.js"></script> 
+</body>
+</html>
