@@ -3,11 +3,10 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory } = require('./gameHelpers'); // 【核心修改】
+const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills } = require('./gameHelpers'); // 【核心修改】
 
 const db = admin.firestore();
 
-// 【核心修改】這個API現在會回傳原始、詳細的背包物件
 router.get('/inventory', async (req, res) => {
     try {
         const inventoryData = await getRawInventory(req.user.id);
@@ -87,8 +86,14 @@ router.get('/latest-game', async (req, res) => {
         }
 
         let latestGameData = snapshot.docs[0].data();
-        const inventoryState = await getInventoryState(userId);
-        Object.assign(latestGameData, { ...inventoryState, ...userData });
+        
+        // 【核心修改】並行獲取背包和武學資料
+        const [inventoryState, skills] = await Promise.all([
+            getInventoryState(userId),
+            getPlayerSkills(userId)
+        ]);
+        
+        Object.assign(latestGameData, { ...inventoryState, ...userData, skills: skills });
 
         const [prequelText, suggestion] = await Promise.all([
             getAIPrequel(userData.preferredModel || 'openai', [latestGameData]),
@@ -141,7 +146,7 @@ router.post('/restart', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
         
-        const collections = ['game_saves', 'npcs', 'game_state'];
+        const collections = ['game_saves', 'npcs', 'game_state', 'skills']; // 新增 skills
         for (const col of collections) {
             const snapshot = await userDocRef.collection(col).get();
             const batch = db.batch();
@@ -167,7 +172,7 @@ router.post('/force-suicide', async (req, res) => {
     const username = req.user.username;
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const modelName = req.body.model || 'gemini'; // 從請求中獲取模型名稱
+        const modelName = req.body.model || 'gemini'; 
 
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         if (lastSaveSnapshot.empty) {
@@ -180,11 +185,11 @@ router.post('/force-suicide', async (req, res) => {
         await userDocRef.update({ isDeceased: true });
 
         const finalRoundData = {
-            ...lastRoundData, 
+            ...lastRoundData,
             R: lastRoundData.R + 1,
             playerState: 'dead',
-            story: deathCause, 
-            PC: deathCause, 
+            story: deathCause,
+            PC: deathCause,
             EVT: '天命已至',
         };
         await userDocRef.collection('game_saves').doc(`R${finalRoundData.R}`).set(finalRoundData);
