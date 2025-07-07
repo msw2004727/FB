@@ -16,12 +16,24 @@ body.dark-theme .novel-header {
     border-bottom-color: var(--dark-border);
 }
 
+/* 【***核心新增***】為標題和連結的容器新增 Flexbox 排版 */
+.title-with-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* 在窄螢幕上允許換行 */
+    gap: 1rem; /* 標題和按鈕之間的間距 */
+    margin-bottom: 0.5rem; /* 與下方的 <p> 標籤保留一些距離 */
+}
+
+
 .novel-header h1 {
     font-family: var(--font-serif);
     font-size: 2.8rem;
     font-weight: 600;
     color: var(--light-text-primary);
-    margin: 0 0 0.5rem 0;
+    margin: 0; /* 移除 h1 的預設 margin */
+    text-align: left; /* 讓標題文字靠左對齊 */
 }
 body.dark-theme .novel-header h1 {
     color: var(--dark-text-primary);
@@ -32,7 +44,48 @@ body.dark-theme .novel-header h1 {
     font-size: 1rem;
     color: var(--light-text-secondary);
     margin: 0;
+    text-align: center; /* 讓描述文字維持置中 */
 }
+
+/* 【***核心新增***】圖書館連結按鈕的完整樣式 */
+.library-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    background-color: var(--light-bg);
+    padding: 0.4rem 1rem 0.4rem 0.4rem;
+    border-radius: 30px;
+    text-decoration: none;
+    color: var(--light-text-secondary);
+    border: 1px solid var(--light-border);
+    transition: all 0.3s ease;
+    flex-shrink: 0; /* 防止按鈕在空間不足時被過度壓縮 */
+}
+
+.library-link:hover {
+    background-color: var(--light-surface-bg);
+    color: var(--light-text-primary);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.07);
+    transform: translateY(-2px);
+}
+
+.library-link .icon-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--light-accent);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.library-link span {
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
 
 .back-to-game-btn {
     display: inline-block;
