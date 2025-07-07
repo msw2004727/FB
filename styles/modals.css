@@ -10,7 +10,7 @@
     justify-content: center;
     align-items: center;
     gap: 1.5rem;
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.85);
     z-index: 20;
     opacity: 0;
     visibility: hidden;
@@ -27,7 +27,7 @@
 }
 
 body.dark-theme .ai-thinking-loader {
-    background: rgba(26, 26, 29, 0.7);
+    background: rgba(26, 26, 29, 0.85);
 }
 
 .ai-thinking-loader .loader-text {
