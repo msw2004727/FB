@@ -149,7 +149,9 @@ export function updateUI(storyText, data, randomEvent) {
             data.skills.forEach(skill => {
                 const skillLine = document.createElement('div');
                 skillLine.className = 'skill-item';
+                // 顯示武學名稱和等級
                 skillLine.innerHTML = `<strong>${skill.name}</strong> <span class="skill-level">(Lv.${skill.level || 0})</span>`;
+                // 將詳細描述放在滑鼠懸停提示中
                 skillLine.title = `類型: ${skill.type}\n描述: ${skill.description}`;
                 skillsContent.appendChild(skillLine);
             });
