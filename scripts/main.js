@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeIcon = themeSwitcher.querySelector('i');
     const logoutButton = document.getElementById('logout-btn');
     const suicideButton = document.getElementById('suicide-btn');
+    const skillsBtn = document.getElementById('skills-btn'); // 【核心新增】
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
     const storyTextContainer = document.getElementById('story-text-wrapper');
@@ -36,8 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const endChatBtn = document.getElementById('end-chat-btn');
     const giveItemBtn = document.getElementById('give-item-btn');
     const cancelGiveBtn = document.getElementById('cancel-give-btn');
+    const closeSkillsBtn = document.getElementById('close-skills-btn'); // 【核心新增】
 
-    // 動態設定遊戲容器高度，以避免行動裝置上 100vh 的問題
+    // 動態設定遊戲容器高度
     function setGameContainerHeight() {
         if (gameContainer) {
             gameContainer.style.height = `${window.innerHeight}px`;
@@ -90,8 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         if(loaderTextElement) loaderTextElement.textContent = text;
-
-        // 只有在非戰鬥、非聊天時才顯示全局加載動畫
+        
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
@@ -106,21 +107,15 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.setChatLoading(isLoading && gameState.isInChat);
     }
     
-    // 【核心新增】處理玩家死亡的函式
     async function handlePlayerDeath() {
-        // 1. 顯示結局彈窗，並在裡面顯示載入中
         modal.showEpilogueModal('<div class="loading-placeholder"><p>史官正在為您的人生撰寫終章...</p><div class="loader-dots"><span></span><span></span><span></span></div></div>', () => {
-            // 5. 當結局彈窗被關閉後，才顯示最終的死亡畫面
             modal.showDeceasedScreen();
         });
 
         try {
-            // 2. 呼叫後端 API 獲取結局故事
             const data = await api.getEpilogue();
             if (data && data.epilogue) {
-                // 3. 將 AI 生成的故事填入彈窗
                 const formattedEpilogue = data.epilogue.replace(/\n/g, '<br><br>');
-                // 4. 再次呼叫 showEpilogueModal 來更新內容 (此刻彈窗已可見)
                 modal.showEpilogueModal(formattedEpilogue, () => {
                     modal.showDeceasedScreen();
                 });
@@ -128,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("未能獲取有效的結局故事。");
             }
         } catch (error) {
-            // 如果獲取失敗，也顯示一個錯誤訊息，並允許玩家繼續
             modal.showEpilogueModal(`<p class="system-message">史官的筆墨耗盡，未能為您寫下終章...<br>(${error.message})</p>`, () => {
                 modal.showDeceasedScreen();
             });
@@ -169,11 +163,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
 
-                // 【核心修改】檢查玩家是否死亡
                 if (data.roundData.playerState === 'dead') {
-                    setLoadingState(false); // 先關閉一般讀取
-                    handlePlayerDeath(); // 呼叫新的死亡處理函式
-                    return; // 中斷後續執行
+                    setLoadingState(false);
+                    handlePlayerDeath();
+                    return;
                 }
 
             } else {
@@ -186,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
-            // 如果玩家還活著，就關閉讀取動畫
             if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
                  setLoadingState(false);
             }
@@ -415,9 +407,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) { 
                 setLoadingState(true, '英雄末路，傳奇落幕...');
                 try {
-                    const data = await api.forceSuicide();
+                    const data = await api.forceSuicide({ model: aiModelSelector.value });
                     updateUI(data.story, data.roundData, null);
-                    // 觸發自殺也走新的死亡流程
                     handlePlayerDeath();
                 } catch (error) {
                     handleApiError(error);
@@ -426,30 +417,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // 【核心新增】為武學按鈕綁定事件
+        if (skillsBtn) {
+            skillsBtn.addEventListener('click', async () => {
+                if (gameState.isRequesting) return;
+                setLoadingState(true, '獲取武學資料...');
+                try {
+                    const skills = await api.getSkills();
+                    modal.openSkillsModal(skills);
+                } catch (error) {
+                    handleApiError(error);
+                } finally {
+                    setLoadingState(false);
+                }
+            });
+        }
+        
+        // 【核心新增】為武學彈窗的關閉按鈕綁定事件
+        if (closeSkillsBtn) {
+            closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
+        }
 
         submitButton.addEventListener('click', handlePlayerAction);
-        playerInput.addEventListener('keypress', (e) => {
-             if (e.key === 'Enter' && !e.isComposing) {
-                e.preventDefault();
-                handlePlayerAction();
-            }
-        });
+        playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
         combatActionButton.addEventListener('click', handleCombatAction);
-        combatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.isComposing) {
-                e.preventDefault();
-                handleCombatAction();
-            }
-        });
+        combatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handleCombatAction(); } });
         storyTextContainer.addEventListener('click', handleNpcClick);
         chatActionBtn.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.isComposing) {
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
-        
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendChatMessage(); } });
         closeChatBtn.addEventListener('click', () => {
              gameState.isInChat = false;
              gameState.currentChatNpc = null;
@@ -457,15 +452,12 @@ document.addEventListener('DOMContentLoaded', () => {
              modal.closeChatModal();
              setLoadingState(false); 
         });
-        
         endChatBtn.addEventListener('click', endChatSession);
-        
         giveItemBtn.addEventListener('click', () => {
             if (gameState.isInChat && gameState.currentChatNpc) {
                 modal.openGiveItemModal(gameState.currentChatNpc, handleGiveItem);
             }
         });
-        
         cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
 
         setGameContainerHeight();
@@ -487,7 +479,6 @@ document.addEventListener('DOMContentLoaded', () => {
             storyTextContainer.innerHTML = ''; 
 
             if (data.gameState === 'deceased') {
-                // 【核心修改】遊戲一開始就偵測到死亡
                 if(data.roundData) {
                     updateUI('', data.roundData, null);
                 }
