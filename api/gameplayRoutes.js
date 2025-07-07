@@ -24,26 +24,26 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
         const userDocRef = db.collection('users').doc(userId);
-        
+
         const userDoc = await userDocRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
         if (userProfile.isDeceased) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
-        
+
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const [summaryDoc, savesSnapshot] = await Promise.all([
             summaryDocRef.get(),
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get()
         ]);
-        
+
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         let recentHistoryRounds = [];
         if (currentRound > 0) {
             savesSnapshot.forEach(doc => recentHistoryRounds.push(doc.data()));
             recentHistoryRounds.sort((a, b) => a.R - b.R);
         }
-        
+
         const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
         let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
@@ -54,12 +54,12 @@ const interactRouteHandler = async (req, res) => {
 
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
-        
+
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
-        
+
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
-        
+
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
 
         if (romanceEventNarrative) {
@@ -72,13 +72,13 @@ const interactRouteHandler = async (req, res) => {
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion(modelName, aiResponse.roundData)
         ]);
-        
+
         aiResponse.suggestion = suggestion;
-        
+
         const inventoryState = await getInventoryState(userId);
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
-        
+
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
@@ -102,9 +102,9 @@ const interactRouteHandler = async (req, res) => {
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
-        
+
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
-        
+
         if (daysToAdvance > 0) {
             for (let i = 0; i < daysToAdvance; i++) { currentDate = advanceDate(currentDate); }
         } else {
@@ -117,27 +117,30 @@ const interactRouteHandler = async (req, res) => {
         const newExternalPower = Math.max(0, Math.min(999, playerPower.external + (powerChange.external || 0)));
         const newLightness = Math.max(0, Math.min(999, playerPower.lightness + (powerChange.lightness || 0)));
         let newMorality = Math.max(-100, Math.min(100, playerMorality + moralityChange));
-        
+
         Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay, ...currentDate });
 
+        // 【核心修改】處理死亡判斷
+        if (aiResponse.roundData.playerState === 'dead') {
+             // 如果AI提供了具體的死因，就用它；否則，使用一個通用的描述
+             aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你在這次事件中不幸殞命。';
+             await userDocRef.update({ isDeceased: true });
+        }
+
         await Promise.all([
-             userDocRef.update({ 
-                timeOfDay: nextTimeOfDay || currentTimeOfDay, 
-                internalPower: newInternalPower, 
-                externalPower: newExternalPower, 
+             userDocRef.update({
+                timeOfDay: nextTimeOfDay || currentTimeOfDay,
+                internalPower: newInternalPower,
+                externalPower: newExternalPower,
                 lightness: newLightness,
-                morality: newMorality, 
-                preferredModel: modelName, 
-                ...currentDate 
+                morality: newMorality,
+                preferredModel: modelName,
+                ...currentDate
             }),
             summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
             userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData)
         ]);
 
-        if (aiResponse.roundData.playerState === 'dead') {
-             await userDocRef.update({ isDeceased: true });
-        }
-        
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
@@ -182,7 +185,7 @@ const combatActionRouteHandler = async (req, res) => {
 
             const postCombatAction = `戰鬥剛剛結束。結局：${combatResult.outcome?.summary || '戰鬥結束'}。`;
             // Re-use the interact handler for post-combat story generation
-            const mockedReq = { 
+            const mockedReq = {
                 user: { id: userId, username: playerProfile.username },
                 body: { action: postCombatAction, round: combatState.R, model: modelName }
             };
@@ -239,13 +242,13 @@ router.post('/end-chat', async (req, res) => {
     try {
         const chatSummary = await getAIChatSummary(model, username, npcName, fullChatHistory);
         if (!chatSummary) throw new Error('AI未能成功總結對話內容。');
-        
+
         const savesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const currentRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
-        
+
         req.body.action = chatSummary;
         req.body.round = currentRound;
-        
+
         interactRouteHandler(req, res);
 
     } catch (error) {
