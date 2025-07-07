@@ -2,14 +2,15 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService'); // 【核心修改】
-const { getInventoryState, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
+const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
+const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory } = require('./gameHelpers'); // 【核心修改】
 
 const db = admin.firestore();
 
+// 【核心修改】這個API現在會回傳原始、詳細的背包物件
 router.get('/inventory', async (req, res) => {
     try {
-        const inventoryData = await getInventoryState(req.user.id);
+        const inventoryData = await getRawInventory(req.user.id);
         res.json(inventoryData);
     } catch (error) {
         res.status(500).json({ message: '讀取背包資料時發生內部錯誤。' });
@@ -168,35 +169,29 @@ router.post('/force-suicide', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const modelName = req.body.model || 'gemini'; // 從請求中獲取模型名稱
 
-        // 【核心修改】獲取最後一次的存檔資料
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         if (lastSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到最後的存檔，無法決定死因。' });
         }
         const lastRoundData = lastSaveSnapshot.docs[0].data();
 
-        // 【核心修改】呼叫 AI 生成死因
         const deathCause = await getAIDeathCause(modelName, username, lastRoundData);
 
-        // 將玩家標記為已死亡
         await userDocRef.update({ isDeceased: true });
 
-        // 使用 AI 生成的死因創建最終存檔
         const finalRoundData = {
-            ...lastRoundData, // 繼承大部分最後的狀態
+            ...lastRoundData, 
             R: lastRoundData.R + 1,
             playerState: 'dead',
-            story: deathCause, // 【核心修改】
-            PC: deathCause, // 【核心修改】
+            story: deathCause, 
+            PC: deathCause, 
             EVT: '天命已至',
         };
         await userDocRef.collection('game_saves').doc(`R${finalRoundData.R}`).set(finalRoundData);
 
-        // 更新快取和圖書館
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(自殺):", err));
 
-        // 回傳最終回合的資料給前端
         res.json({
             story: finalRoundData.story,
             roundData: finalRoundData,
