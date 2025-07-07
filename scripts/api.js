@@ -44,4 +44,7 @@ export const api = {
     getRelations: () => fetchApi('/api/game/state/get-relations'),
     getNovel: () => fetchApi('/api/game/state/get-novel'),
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
+    
+    // Epilogue Route 【核心新增】
+    getEpilogue: () => fetchApi('/api/epilogue'),
 };
