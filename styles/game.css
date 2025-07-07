@@ -45,31 +45,29 @@ body.dark-theme .menu-toggle {
 .story-header {
     position: sticky;
     top: 0;
-    backg-light-bg); /* 修改：背景色改為與body一致，消除「白邊」感 */
-    /* 【核心修改】減少75%的上下邊距 (0.5rem * 0.25 = 0.125rem)，並將左右邊距設為2rem，讓內容靠左 */
-    padding: 0.25rem 1rem;
+    /* 【***核心修改***】將背景色改為更淺的頁面背景色 */
+    background-color: var(--light-bg);
+    padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
     transition: padding 0.4s ease-out;
 }
 body.dark-theme .story-header {
     border-bottom: 1px solid var(--dark-border);
-    background-color: var(--dark-bg); /* 修改：暗色模式的背景色也與body一致 */
+    /* 【***核心修改***】暗色模式也一併修改 */
+    background-color: var(--dark-bg);
 }
 
 .status-bar {
     display: flex;
     flex-wrap: wrap;
-    /* 【核心修改】加寬左右文字的間距 */
-    gap: 0.5rem 1.8rem;
+    gap: 0.5rem 1.5rem;
     color: var(--light-text-secondary);
     font-family: var(--font-sans);
     font-size: 0.9rem;
     overflow: hidden;
-    /* max-height: 120px;
     opacity: 1;
     transition: max-height 0.4s ease-out, opacity 0.4s ease-out, gap 0.4s ease-out, padding 0.4s ease-out;
-    /* 移除：不再需要獨立的padding */
 }
 body.dark-theme .status-bar {
     color: var(--dark-text-secondary);
@@ -88,10 +86,10 @@ body.dark-theme .status-bar {
     gap: 0;
 }
 
+
 .story-panel {
     position: relative;
     flex-grow: 1;
-    /* 【核心修改】移除padding-top，因為header背景色已改，不再需要手動推開 */
     padding: 1rem 2rem 2rem 2rem;
     overflow-y: auto;
 }
