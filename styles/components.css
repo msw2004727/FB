@@ -424,3 +424,22 @@ body.dark-theme .romance-event {
     background-color: #4d2b33;
     color: #ffb3c1;
 }
+
+/* --- 【核心修改】儀表板頭部樣式調整 --- */
+.dashboard-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    /* 修改 padding，將右側內邊距從 1.5rem 增加到 3.5rem */
+    padding: 1rem 3.5rem 1rem 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+    flex-shrink: 0;
+}
+body.dark-theme .dashboard-header {
+    border-bottom: 1px solid var(--dark-border);
+}
+.dashboard-header .header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
