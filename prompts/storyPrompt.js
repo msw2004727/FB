@@ -74,24 +74,45 @@ ${longTermSummary}
 }
 \`\`\`
 
-**【範例一：玩家在山洞中發現一本秘笈】**
+---
+
+## 【核心新增】武學系統 (Martial Arts System)
+
+當玩家透過奇遇、閱讀秘笈、高人指點或自行頓悟等方式，學會一門新的武學時，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 **\`skillChanges\`** 的**陣列**。如果本回合沒有學會任何新武學，請回傳一個**空陣列 \`[]\`**。
+
+陣列中的每一個物件，都代表一門新習得的武學，其結構必須如下：
+
 \`\`\`json
-"itemChanges": [{
-  "action": "add",
-  "itemName": "洗髓經",
-  "quantity": 1,
-  "itemType": "秘笈",
-  "rarity": "傳說",
-  "description": "傳聞源自達摩祖師的無上心法，有易筋洗髓、脫胎換骨之效。"
-}]
+{
+  "skillName": "武學的準確名稱",
+  "skillType": "內功 | 外功 | 輕功 | 拳腳 | 兵器 | 暗器 | 醫術 | 毒術 | 雜學",
+  "level": 0,
+  "exp": 0,
+  "description": "一段關於此武學的簡短描述文字，說明其來歷或效果。",
+  "isNewlyAcquired": true
+}
 \`\`\`
 
-**【範例二：玩家使用了一顆丹藥】**
+**【範例一：玩家讀了秘笈】**
 \`\`\`json
-"itemChanges": [{
-  "action": "remove",
-  "itemName": "大還丹",
-  "quantity": 1
+"skillChanges": [{
+  "skillName": "羅漢拳",
+  "skillType": "拳腳",
+  "level": 1,
+  "exp": 0,
+  "description": "源自少林寺的基礎拳法，招式大開大闔，講究穩紮穩打。",
+  "isNewlyAcquired": true
+}]
+\`\`\`
+**【範例二：玩家自創武功】**
+\`\`\`json
+"skillChanges": [{
+  "skillName": "驚鴻掠影步",
+  "skillType": "輕功",
+  "level": 0,
+  "exp": 50,
+  "description": "你融合自身所學，創造出的獨門步法，身法飄忽不定，難以捉摸。",
+  "isNewlyAcquired": true
 }]
 \`\`\`
 
@@ -108,40 +129,11 @@ ${longTermSummary}
 -   這個物件**只能**包含四個鍵：\`"name"\` (真實姓名)、\`"status"\` (狀態描述)、\`"friendliness"\`，以及最重要的**\`"isNew": true\`**。
 -   **【絕對禁止】** 在這個階段**不要**生成詳細的背景、個性、裝備等資訊，那將由另一個AI在背景完成。
 
-**首次相遇範例（JSON的\`NPC\`部分）：**
-\`\`\`json
-"NPC": [{
-  "name": "孫婆婆",
-  "status": "一位滿臉皺紋、眼神卻很銳利的老婦人，正坐在門口抽著旱煙。",
-  "friendliness": "neutral",
-  "isNew": true
-}]
-\`\`\`
-
 ### 情況二：再次遇到已知的NPC
 -   當玩家與之前見過面的NPC重逢時，你需要在 \`NPC\` 陣列中提供一個包含該角色更新後狀態的完整物件。
 -   這個物件應包含 \`"name"\`、\`"status"\`、更新後的 \`"friendliness"\`，以及該角色的 \`"personality"\`（此資訊應從舊摘要中獲取）。
 -   **【嚴格規則】** 在這種情況下，**絕對不能**包含 \`isNew\` 這個鍵。
 -   如果這位NPC在本回合的劇情中死亡，你必須在其物件中，額外加入一個 **\`"isDeceased": true\`** 的欄位。
-
-**再次相遇範例（JSON的\`NPC\`部分）：**
-\`\`\`json
-"NPC": [{
-  "name": "王大夫",
-  "status": "看到你康復了許多，露出了欣慰的笑容",
-  "friendliness": "friendly"
-}]
-\`\`\`
-
-**NPC死亡範例（JSON的\`NPC\`部分）：**
-\`\`\`json
-"NPC": [{
-  "name": "黑風寨頭目",
-  "status": "被你一劍封喉，倒在血泊之中。",
-  "friendliness": "sworn_enemy",
-  "isDeceased": true
-}]
-\`\`\`
 
 ---
 ## 【參考用】給「人物設定師AI」的詳細NPC檔案範本
@@ -151,6 +143,7 @@ ${longTermSummary}
   "npcId": "王大夫",
   "name": "王大夫",
   "gender": "男",
+  "isDeceased": false,
   "allegiance": "中立善良",
   "isRomanceable": true,
   "romanceOrientation": "異性戀",
@@ -306,6 +299,7 @@ ${longTermSummary}
     - moralityChange: (數字) 正邪值的變化，可以是正數、負數或零。
     - itemChanges: (陣列) 根據最新的「物品帳本系統」規則生成。
     - romanceChanges: (陣列) 根據最新的「戀愛與心動值系統」規則生成。
+    - skillChanges: (陣列) 【核心新增】根據最新的「武學系統」規則生成。
     - ATM: (陣列) [氛圍, 感官細節]
     - EVT: (字串) 事件摘要
     - LOC: (陣列) [地點名稱, {地點狀態}]
