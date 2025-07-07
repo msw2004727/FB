@@ -12,7 +12,9 @@ const {
     getInventoryState,
     createNpcProfileInBackground,
     invalidateNovelCache,
-    updateLibraryNovel
+    updateLibraryNovel,
+    updateSkills,      // 【核心新增】
+    getPlayerSkills    // 【核心新增】
 } = require('./gameHelpers');
 
 const db = admin.firestore();
@@ -57,8 +59,10 @@ const interactRouteHandler = async (req, res) => {
 
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
 
+        // 處理物品、戀愛、武學的變化
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
+        await updateSkills(userId, aiResponse.roundData.skillChanges); // 【核心新增】
 
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
 
@@ -67,29 +71,26 @@ const interactRouteHandler = async (req, res) => {
         }
         aiResponse.roundData.story = aiResponse.story;
 
-
-        const [newSummary, suggestion] = await Promise.all([
+        // 並行獲取更新後的狀態
+        const [newSummary, suggestion, inventoryState, skills] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
-            getAISuggestion(modelName, aiResponse.roundData)
+            getAISuggestion(modelName, aiResponse.roundData),
+            getInventoryState(userId),
+            getPlayerSkills(userId) // 【核心新增】
         ]);
 
         aiResponse.suggestion = suggestion;
-
-        const inventoryState = await getInventoryState(userId);
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
+        aiResponse.roundData.skills = skills; // 【核心新增】
 
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
-
-                // 【核心修改】檢查並標記NPC死亡
                 if (npc.isDeceased) {
                     console.log(`[生死簿系統] 偵測到NPC ${npc.name} 已死亡，正在更新其檔案...`);
-                    // 在背景更新該NPC的檔案，將其標記為已故
                     return npcDocRef.set({ isDeceased: true }, { merge: true });
                 }
-
                 if (npc.isNew) {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
@@ -190,13 +191,10 @@ const combatActionRouteHandler = async (req, res) => {
             await combatDocRef.delete();
 
             const postCombatAction = `戰鬥剛剛結束。結局：${combatResult.outcome?.summary || '戰鬥結束'}。`;
-            // Re-use the interact handler for post-combat story generation
             const mockedReq = {
                 user: { id: userId, username: playerProfile.username },
                 body: { action: postCombatAction, round: combatState.R, model: modelName }
             };
-            // This is a simplified call; in a real scenario you might need to adjust more state
-            // For now, let's just create a new round based on the outcome
              const lastRoundSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
              const lastRoundData = lastRoundSnapshot.docs[0].data();
              const newRoundData = {
@@ -235,7 +233,6 @@ const combatActionRouteHandler = async (req, res) => {
 router.post('/interact', interactRouteHandler);
 router.post('/combat-action', combatActionRouteHandler);
 router.post('/end-chat', async (req, res) => {
-    // This route is now a proxy to the interactRouteHandler
     const { getAIChatSummary } = require('../services/aiService');
     const userId = req.user.id;
     const username = req.user.username;
