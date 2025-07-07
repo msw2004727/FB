@@ -61,7 +61,15 @@ const interactRouteHandler = async (req, res) => {
 
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
-        await updateSkills(userId, aiResponse.roundData.skillChanges);
+        
+        // 【核心修改】接收 updateSkills 回傳的升級通知
+        const levelUpNotifications = await updateSkills(userId, aiResponse.roundData.skillChanges);
+
+        // 如果有升級通知，將其加入到故事開頭
+        if (levelUpNotifications && levelUpNotifications.length > 0) {
+            const notificationHtml = levelUpNotifications.map(msg => `<div class="random-event-message romance-event">${msg}</div>`).join('');
+            aiResponse.story = notificationHtml + aiResponse.story;
+        }
 
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
 
