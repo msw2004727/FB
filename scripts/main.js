@@ -1,6 +1,6 @@
 // scripts/main.js
 import { api } from './api.js';
-import { updateUI, handleApiError, appendMessageToStory } from './uiUpdater.js';
+import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 
@@ -37,6 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const endChatBtn = document.getElementById('end-chat-btn');
     const giveItemBtn = document.getElementById('give-item-btn');
     const cancelGiveBtn = document.getElementById('cancel-give-btn');
+
+    // --- 【***核心新增函式***】---
+    // 動態設定遊戲容器高度，以避免行動裝置上 100vh 的問題
+    function setGameContainerHeight() {
+        if (gameContainer) {
+            gameContainer.style.height = `${window.innerHeight}px`;
+        }
+    }
+
 
     // --- 遊戲狀態變數 ---
     let gameState = {
@@ -121,7 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data && data.roundData) {
                 data.roundData.suggestion = data.suggestion;
+                
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, data.randomEvent);
+                
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
             } else {
@@ -182,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             gameState.currentRound = newRoundData.roundData.R;
             gameState.roundData = newRoundData.roundData;
+            addRoundTitleToStory(newRoundData.roundData.EVT || `第 ${newRoundData.roundData.R} 回`);
             updateUI(newRoundData.story, newRoundData.roundData, null);
         } else {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
@@ -202,12 +215,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.openChatModalUI(profile);
                 chatInput.focus();
             } catch (error) {
-                // 【核心修改】判斷錯誤訊息類型
                 if (error.message && error.message.includes('並未見到')) {
-                    // 如果是特定錯誤，直接顯示劇情旁白
                     appendMessageToStory(error.message, 'system-message');
                 } else {
-                    // 如果是其他錯誤，才使用通用錯誤處理
                     handleApiError(error);
                 }
             } finally {
@@ -257,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
                 appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
                 data.roundData.suggestion = data.suggestion;
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
@@ -292,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data && data.roundData) {
                 data.roundData.suggestion = data.suggestion;
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, null); 
                 gameState.currentRound = data.roundData.R; 
                 gameState.roundData = data.roundData; 
@@ -423,6 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
 
+        // 【***核心修改***】
+        // 在頁面載入時和視窗大小改變時，都呼叫新的高度設定函式
+        setGameContainerHeight();
+        window.addEventListener('resize', setGameContainerHeight);
+
         loadInitialGame();
     }
 
@@ -435,6 +452,8 @@ document.addEventListener('DOMContentLoaded', () => {
                  aiModelSelector.value = data.roundData.preferredModel;
                  localStorage.setItem('preferred_ai_model', data.roundData.preferredModel);
             }
+            
+            storyTextContainer.innerHTML = ''; 
 
             if (data.gameState === 'deceased') {
                 modal.showDeceasedScreen();
@@ -445,23 +464,29 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
-                storyTextContainer.innerHTML = '';
+                
                 if (data.prequel) {
                     const prequelDiv = document.createElement('div');
                     prequelDiv.className = 'prequel-summary';
                     prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                     storyTextContainer.appendChild(prequelDiv);
                 }
+
                 data.roundData.suggestion = data.suggestion;
-                updateUI(null, data.roundData, null);
+                
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
+                updateUI(data.story, data.roundData, null);
             }
         } catch (error) {
             if (error.message.includes('找不到存檔')) {
                 storyTextContainer.innerHTML = '';
                 const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
-                appendMessageToStory(initialMessage, 'system-message');
                 const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, suggestion: '先檢查一下自己的身體狀況吧。' };
+                
+                addRoundTitleToStory(roundZeroData.EVT);
+                appendMessageToStory(initialMessage, 'system-message');
                 updateUI(null, roundZeroData, null);
+
             } else {
                 handleApiError(error);
             }
