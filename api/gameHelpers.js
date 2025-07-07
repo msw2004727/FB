@@ -118,13 +118,15 @@ const updateInventory = async (userId, itemChanges) => {
                     inventory[itemName].quantity -= quantity;
                     if (inventory[itemName].quantity <= 0) delete inventory[itemName];
                 } else {
-                    throw new Error(`物品移除失敗：試圖移除不存在或數量不足的物品'${itemName}'。`);
+                    // Do not throw error, just log it. This can happen if AI makes a mistake.
+                    console.warn(`物品移除警告：試圖移除不存在或數量不足的物品'${itemName}'。`);
                 }
             }
         }
         transaction.set(inventoryRef, inventory);
     });
 };
+
 
 const updateRomanceValues = async (userId, romanceChanges) => {
     if (!romanceChanges || romanceChanges.length === 0) return;
@@ -169,6 +171,7 @@ const checkAndTriggerRomanceEvent = async (userId, username, romanceChanges, rou
     return triggeredEventNarrative;
 };
 
+// 此函式維持原樣，用於生成顯示在儀表板上的摘要字串
 const getInventoryState = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
@@ -181,11 +184,24 @@ const getInventoryState = async (userId) => {
         if (name === '銀兩') {
             money = data.quantity || 0;
         } else {
-            otherItems.push(`${name} x${data.quantity}`);
+            if(data.quantity > 0) { // 只顯示數量大於0的物品
+                 otherItems.push(`${name} x${data.quantity}`);
+            }
         }
     }
     return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
 };
+
+// 【核心新增】此函式用於提供給「贈予」彈窗，回傳的是完整的物品物件
+const getRawInventory = async (userId) => {
+    const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
+    const doc = await inventoryRef.get();
+    if (!doc.exists) {
+        return {}; // 如果沒有背包資料，回傳一個空物件
+    }
+    return doc.data(); // 直接回傳從資料庫讀取的原始資料
+};
+
 
 module.exports = {
     TIME_SEQUENCE,
@@ -197,5 +213,6 @@ module.exports = {
     updateInventory,
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
-    getInventoryState
+    getInventoryState,
+    getRawInventory // 【核心新增】
 };
