@@ -53,13 +53,22 @@ router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
     try {
-        const npcDocRef = db.collection('users').doc(userId).collection('npcs').doc(npcName);
-        const npcDoc = await npcDocRef.get();
+        const userDocRef = db.collection('users').doc(userId);
+        const npcDocRef = userDocRef.collection('npcs').doc(npcName);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+
+        const [npcDoc, summaryDoc] = await Promise.all([
+            npcDocRef.get(),
+            summaryDocRef.get()
+        ]);
+
         if (!npcDoc.exists) {
             return res.status(404).json({ message: '對話目標不存在。' });
         }
         const npcProfile = npcDoc.data();
-        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage);
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖事，無人知。';
+
+        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary);
         res.json({ reply: aiReply });
     } catch (error) {
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
