@@ -254,7 +254,7 @@ body.dark-theme .dashboard-header {
 
     /* 1. 調整標題字體大小與間距，使其在窄視窗更協調 */
     .round-title {
-        font-size: 1.5rem; /* 將字體從 2rem 縮小 */
+        font-size: 1.0rem; /* 將字體從 2rem 縮小 */
         margin-bottom: 1.5rem; /* 調整下方間距 */
     }
 
