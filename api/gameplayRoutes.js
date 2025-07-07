@@ -50,8 +50,13 @@ const interactRouteHandler = async (req, res) => {
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
         let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
+        
+        // 【核心修改】先處理武學升級，拿到升級事件
+        const preActionSkillChanges = req.body.skillChanges || []; // 假設未來可能有從前端直接發起的修練
+        const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality);
+        // 【核心修改】將升級事件傳遞給故事AI
+        const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
 
         const newRoundNumber = (currentRound || 0) + 1;
@@ -62,14 +67,8 @@ const interactRouteHandler = async (req, res) => {
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
         
-        // 【核心修改】接收 updateSkills 回傳的升級通知
-        const levelUpNotifications = await updateSkills(userId, aiResponse.roundData.skillChanges);
-
-        // 如果有升級通知，將其加入到故事開頭
-        if (levelUpNotifications && levelUpNotifications.length > 0) {
-            const notificationHtml = levelUpNotifications.map(msg => `<div class="random-event-message romance-event">${msg}</div>`).join('');
-            aiResponse.story = notificationHtml + aiResponse.story;
-        }
+        // 處理AI故事中發生的武學變化
+        await updateSkills(userId, aiResponse.roundData.skillChanges);
 
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
 
