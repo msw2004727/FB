@@ -80,7 +80,7 @@ const interactRouteHandler = async (req, res) => {
 
         const [newSummary, suggestion, inventoryState, skills] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
-            getAISuggestion(modelName, aiResponse.roundData),
+            getAISuggestion('deepseek', aiResponse.roundData), // 【核心修改】固定使用 'deepseek' 模型
             getInventoryState(userId),
             getPlayerSkills(userId)
         ]);
