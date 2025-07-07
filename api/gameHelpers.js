@@ -53,11 +53,18 @@ const updateLibraryNovel = async (userId, username) => {
 
         const lastRoundData = snapshot.docs[snapshot.docs.length - 1].data();
         const isDeceased = lastRoundData.playerState === 'dead';
+        const yearName = lastRoundData.yearName || '元祐';
+        const year = lastRoundData.year || 1;
+        const month = lastRoundData.month || 1;
+        const day = lastRoundData.day || 1;
+        const latestEvent = lastRoundData.EVT || '初入江湖';
+
+        const novelTitle = `江湖路 - ${yearName}${year}年${month}月${day}日 - ${latestEvent} (${username})`;
 
         const libraryDocRef = db.collection('library_novels').doc(userId);
         await libraryDocRef.set({
             playerName: username,
-            novelTitle: `${username}的江湖路`,
+            novelTitle: novelTitle,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             storyHTML: fullStoryHTML,
             isDeceased,
