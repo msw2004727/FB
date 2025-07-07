@@ -44,7 +44,7 @@ body.dark-theme .auth-title {
     width: 240px; /* 從 120px 放大 */
     height: 240px; /* 從 120px 放大 */
     object-fit: contain;
-    margin: 0 auto 1rem auto; /* 上0, 左右自動, 下1rem */
+    margin: 0 auto 0.5rem; /* 上0, 左右自動, 下1rem */
 }
 
 .input-group {
