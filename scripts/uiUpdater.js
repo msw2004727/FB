@@ -4,7 +4,7 @@ import { MAX_POWER } from './config.js';
 // --- 獲取所有和UI更新相關的DOM元素 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
 const storyTextContainer = document.getElementById('story-text-wrapper');
-const roundTitleEl = document.getElementById('round-title');
+// const roundTitleEl = document.getElementById('round-title'); // 移除：我們不再需要更新這個靜態標題
 const statusBarEl = document.getElementById('status-bar');
 const pcContent = document.getElementById('pc-content');
 const internalPowerBar = document.getElementById('internal-power-bar');
@@ -20,7 +20,6 @@ const qstContent = document.getElementById('qst-content');
 const psyContent = document.getElementById('psy-content');
 const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
-// 【核心新增】獲取錢袋的顯示元素
 const moneyContent = document.getElementById('money-content');
 
 
@@ -33,6 +32,16 @@ export function appendMessageToStory(htmlContent, className) {
     storyTextContainer.appendChild(p);
     storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
 }
+
+// 【***核心新增函式***】
+// 這個函式專門用來在故事區塊中插入一個新的回合標題
+export function addRoundTitleToStory(titleText) {
+    const titleEl = document.createElement('h2');
+    titleEl.className = 'round-title';
+    titleEl.textContent = titleText;
+    storyTextContainer.appendChild(titleEl);
+}
+
 
 function highlightNpcNames(text, npcs) {
     if (!text) return '';
@@ -55,14 +64,14 @@ function updateMoralityBar(moralityValue) {
         moralityBarIndicator.style.left = `${percentage}%`;
 
         let colorVar;
-        if (moralityValue > 10) { 
+        if (moralityValue > 10) {
             colorVar = 'var(--morality-justice-light)';
-        } else if (moralityValue < -10) { 
+        } else if (moralityValue < -10) {
             colorVar = 'var(--morality-evil-light)';
-        } else { 
+        } else {
             colorVar = 'var(--morality-neutral-light)';
         }
-        
+
         if (document.body.classList.contains('dark-theme')) {
              if (moralityValue > 10) {
                 colorVar = 'var(--morality-justice-dark)';
@@ -98,13 +107,14 @@ export function updateUI(storyText, data, randomEvent) {
     }
     if (!data) return;
 
-    roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
-    
+    // 移除：不再更新靜態的回合標題
+    // roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
+
     const atmosphere = data.ATM?.[0] || '未知';
     const weather = data.WRD || '晴朗';
     const location = data.LOC?.[0] || '未知之地';
     const dateString = `${data.yearName || '元祐'}${data.year || 1}年${data.month || 1}月${data.day || 1}日`;
-    
+
     statusBarEl.innerHTML = `
         <div class="status-item"><i class="fas fa-calendar-alt"></i> ${dateString}</div>
         <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
@@ -118,7 +128,7 @@ export function updateUI(storyText, data, randomEvent) {
     updatePowerBar(internalPowerBar, internalPowerValue, data.internalPower);
     updatePowerBar(externalPowerBar, externalPowerValue, data.externalPower);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, data.lightness);
-    
+
     updateMoralityBar(data.morality);
 
     npcContent.innerHTML = '';
@@ -131,8 +141,7 @@ export function updateUI(storyText, data, randomEvent) {
     } else {
         npcContent.textContent = '未見人煙';
     }
-    
-    // 【核心修改】更新錢袋和物品欄位
+
     if (moneyContent) {
         moneyContent.textContent = `${data.money || 0} 文錢`;
     }
