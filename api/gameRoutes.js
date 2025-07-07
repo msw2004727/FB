@@ -25,7 +25,6 @@ const db = admin.firestore();
 // --- Helper Functions ---
 
 /**
- * 【***核心新增***】
  * 清除指定使用者的小說快取，強制下次讀取時重新生成。
  * @param {string} userId - 使用者的ID
  */
@@ -360,7 +359,7 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             appearance: npcData.appearance,
             friendliness: npcData.friendliness || 'neutral',
             romanceValue: npcData.romanceValue || 0,
-            friendlinessValue: npcData.friendlinessValue || 0
+            friendlinessValue: npcData.friendlinessValue || 0 // 【***核心修改***】
         };
 
         res.json(publicProfile);
@@ -509,7 +508,6 @@ router.post('/give-item', async (req, res) => {
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
 
-        // 【***核心修改***】 呼叫快取清除函式
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
@@ -665,7 +663,6 @@ const interactRouteHandler = async (req, res) => {
              await userDocRef.update({ isDeceased: true });
         }
         
-        // 【***核心修改***】 呼叫快取清除函式
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
@@ -824,7 +821,6 @@ router.post('/combat-action', async (req, res) => {
             const suggestion = await getAISuggestion(modelName, aiResponse.roundData);
             await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData);
             
-            // 【***核心修改***】 呼叫快取清除函式
             await invalidateNovelCache(userId);
             updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
 
@@ -974,7 +970,6 @@ router.post('/restart', async (req, res) => {
             preferredModel: admin.firestore.FieldValue.delete()
         });
         
-        // 【***核心修改***】 呼叫快取清除函式
         await invalidateNovelCache(userId);
 
         res.status(200).json({ message: '新的輪迴已開啟，願你這次走得更遠。' });
@@ -1030,7 +1025,6 @@ router.post('/force-suicide', async (req, res) => {
 
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
         
-        // 【***核心修改***】 呼叫快取清除函式
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
