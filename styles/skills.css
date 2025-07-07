@@ -1,0 +1,239 @@
+/* styles/skills.css */
+
+/* --- 武學彈窗 --- */
+.skills-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 1015;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    backdrop-filter: blur(4px);
+}
+
+.skills-modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.skills-modal-content {
+    background-color: var(--light-surface-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    height: 85%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    transform: scale(0.95);
+    transition: transform 0.4s ease;
+    border: 1px solid var(--light-border);
+}
+
+.skills-modal-overlay.visible .skills-modal-content {
+    transform: scale(1);
+}
+
+body.dark-theme .skills-modal-content {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+}
+
+.skills-modal-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+}
+
+body.dark-theme .skills-modal-header {
+    border-bottom-color: var(--dark-border);
+}
+
+.skills-modal-header h3 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    color: var(--light-accent);
+}
+
+body.dark-theme .skills-modal-header h3 {
+    color: var(--dark-accent);
+}
+
+.skills-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--light-text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+}
+
+.skills-modal-close:hover {
+    color: var(--light-text-primary);
+}
+
+body.dark-theme .skills-modal-close:hover {
+    color: var(--dark-text-primary);
+}
+
+/* --- 頁籤系統 --- */
+.skills-modal-tabs {
+    flex-shrink: 0;
+    display: flex;
+    padding: 0.5rem 1.5rem 0 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+    gap: 1rem;
+    background-color: var(--light-bg);
+}
+
+body.dark-theme .skills-modal-tabs {
+    border-bottom-color: var(--dark-border);
+    background-color: var(--dark-bg);
+}
+
+.skill-tab {
+    padding: 0.8rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    font-weight: bold;
+    color: var(--light-text-secondary);
+    border-bottom: 3px solid transparent;
+    transition: color 0.3s, border-color 0.3s;
+}
+
+.skill-tab.active {
+    color: var(--light-accent);
+    border-bottom-color: var(--light-accent);
+}
+
+body.dark-theme .skill-tab.active {
+    color: var(--dark-accent);
+    border-bottom-color: var(--dark-accent);
+}
+
+/* --- 武學內容區塊 --- */
+.skills-modal-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.skill-tab-content {
+    display: none;
+}
+
+.skill-tab-content.active {
+    display: block;
+}
+
+.skill-entry {
+    background: var(--light-bg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--light-border);
+}
+
+body.dark-theme .skill-entry {
+    background: var(--dark-bg);
+    border-color: var(--dark-border);
+}
+
+.skill-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.skill-entry-header h4 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
+    color: var(--light-text-primary);
+}
+
+body.dark-theme .skill-entry-header h4 {
+    color: var(--dark-text-primary);
+}
+
+.skill-entry-header .skill-type {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--light-text-secondary);
+    background: var(--light-border);
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+}
+body.dark-theme .skill-entry-header .skill-type {
+    color: var(--dark-text-secondary);
+    background: var(--dark-border);
+}
+
+.skill-description {
+    font-size: 0.95rem;
+    color: var(--light-text-secondary);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+    font-style: italic;
+}
+
+/* --- 經驗值計量條 --- */
+.skill-progress-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.skill-progress-container .level-label {
+    font-family: var(--font-sans);
+    font-weight: bold;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.exp-bar-background {
+    flex-grow: 1;
+    height: 12px;
+    background-color: var(--light-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+body.dark-theme .exp-bar-background {
+    background-color: var(--dark-border);
+}
+
+.exp-bar-fill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--light-accent);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+body.dark-theme .exp-bar-fill {
+    background-color: var(--dark-accent);
+}
+
+.exp-text {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--light-text-secondary);
+    min-width: 80px;
+    text-align: right;
+}
