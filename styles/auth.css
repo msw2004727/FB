@@ -32,7 +32,7 @@ body.dark-theme .auth-container {
     font-size: 2.5rem;
     font-weight: 600;
     margin-top: 0;
-    margin-bottom: 1rem; /* 修改：調整下方間距以容納Logo */
+    margin-bottom: 0.5rem; /* 修改：調整下方間距以容納Logo */
 }
 body.dark-theme .auth-title {
     color: var(--dark-accent);
@@ -44,7 +44,7 @@ body.dark-theme .auth-title {
     width: 240px; /* 從 120px 放大 */
     height: 240px; /* 從 120px 放大 */
     object-fit: contain;
-    margin: 0 auto 2rem auto; /* 上0, 左右自動, 下2rem */
+    margin: 0 auto 1rem auto; /* 上0, 左右自動, 下1rem */
 }
 
 .input-group {
