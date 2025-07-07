@@ -45,17 +45,23 @@ app.use(express.static('public'));
 
 
 // --- API 路由 ---
+// 【核心修改】重新組織路由，使其更清晰
 const authRoutes = require('./api/authRoutes');
 const gameRoutes = require('./api/gameRoutes');
-const gameplayRoutes = require('./api/gameplayRoutes');
-const npcRoutes = require('./api/npcRoutes');
-const bountyRoutes = require('./api/bountyRoutes'); // 【核心新增】
+const bountyRoutes = require('./api/bountyRoutes');
+const libraryRoutes = require('./api/libraryRoutes'); // 載入之前被遺漏的圖書館路由
 
+// 公開路由 (例如圖書館，不需要登入即可查看)
+app.use('/api/library', libraryRoutes);
+
+// 身份驗證路由
 app.use('/api/auth', authRoutes);
+
+// 主要遊戲邏輯路由 (身份驗證在 gameRoutes 內部處理)
 app.use('/api/game', gameRoutes);
-app.use('/api/gameplay', gameplayRoutes);
-app.use('/api/npcs', npcRoutes);
-app.use('/api/bounties', bountyRoutes); // 【核心新增】
+
+// 懸賞任務路由 (身份驗證在 bountyRoutes 內部處理)
+app.use('/api/bounties', bountyRoutes);
 
 
 // --- 伺服器啟動 ---
