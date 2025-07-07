@@ -41,10 +41,10 @@ body.dark-theme .auth-title {
 /* 【核心修改】Logo圖片樣式 - 尺寸放大 */
 .auth-logo {
     display: block;
-    width: 240px; /* 從 120px 放大 */
-    height: 240px; /* 從 120px 放大 */
+    width: 100%;
+    height: auto;
     object-fit: contain;
-    margin: 0 auto 0.5rem; /* 上0, 左右自動, 下1rem */
+    margin: 0 auto 1rem auto; /* 上0, 左右自動, 下1rem */
 }
 
 .input-group {
