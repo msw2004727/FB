@@ -66,11 +66,12 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
         const userDocRef = db.collection('users').doc(userId);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
         // --- 1. 並行獲取所有需要的資料 ---
         const [userDoc, summaryDoc, savesSnapshot, skills] = await Promise.all([
             userDocRef.get(),
-            userDocRef.collection('game_state').doc('summary').get(),
+            summaryDocRef.get(),
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get(),
             getPlayerSkills(userId)
         ]);
@@ -89,7 +90,7 @@ const interactRouteHandler = async (req, res) => {
             npcs: lastSave.NPC?.map(n => n.name) || [],
             skills: skills?.map(s => s.name) || []
         };
-        const classification = await getAIActionClassification('gemini', playerAction, contextForClassifier);
+        const classification = await getAIActionClassification(modelName, playerAction, contextForClassifier);
         
         let aiResponse;
 
@@ -143,11 +144,10 @@ const interactRouteHandler = async (req, res) => {
         }
         aiResponse.roundData.story = aiResponse.story;
         
-        // 【***核心修改***】統一在此處更新所有好感度、戀愛度、物品等數值
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
-            updateFriendlinessValues(userId, aiResponse.roundData.NPC), // <--- 新增的友好度更新呼叫
+            updateFriendlinessValues(userId, aiResponse.roundData.NPC),
             updateSkills(userId, aiResponse.roundData.skillChanges)
         ]);
 
@@ -181,7 +181,6 @@ const interactRouteHandler = async (req, res) => {
             await Promise.all(npcUpdatePromises);
         }
 
-        // 【***核心修改***】統一的戰鬥觸發點
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
             const combatState = { 
