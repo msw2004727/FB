@@ -1,0 +1,263 @@
+/* --- 圖書館頁面專用樣式 --- */
+
+/* --- 主體與頂部 --- */
+.library-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem 1.5rem;
+    box-sizing: border-box;
+    font-family: var(--font-sans);
+}
+
+.library-header {
+    text-align: center;
+    padding-bottom: 2rem;
+    margin-bottom: 3rem;
+    border-bottom: 1px solid var(--light-border);
+}
+
+.library-header h1 {
+    font-family: var(--font-serif);
+    font-size: 2.8rem;
+    font-weight: 600;
+    color: var(--light-accent);
+    margin: 0 0 0.5rem 0;
+}
+
+.library-header p {
+    font-size: 1rem;
+    color: var(--light-text-secondary);
+    margin: 0;
+}
+
+.library-header .back-to-game-btn {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--light-border);
+    border-radius: 20px;
+    color: var(--light-text-secondary);
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.library-header .back-to-game-btn:hover {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+}
+
+.library-header .back-to-game-btn i {
+    margin-right: 0.5rem;
+}
+
+
+/* --- 小說卡片列表 --- */
+.novel-list-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.novel-card {
+    background-color: var(--light-surface-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+}
+
+.novel-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed var(--light-border);
+}
+
+.card-title {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    margin: 0;
+    color: var(--light-text-primary);
+}
+
+.card-status {
+    flex-shrink: 0;
+    margin-left: 1rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: bold;
+    border-radius: 12px;
+}
+
+.card-status.status-ongoing {
+    background-color: #e7f5ff;
+    color: #1c7ed6;
+}
+
+.card-status.status-deceased {
+    background-color: #f8f9fa;
+    color: #868e96;
+}
+
+.card-body {
+    flex-grow: 1;
+}
+
+.card-body p {
+    margin: 0 0 0.75rem 0;
+    color: var(--light-text-secondary);
+    font-size: 0.9rem;
+}
+
+.card-body p i {
+    margin-right: 0.6rem;
+    width: 1em;
+}
+
+.card-footer {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--light-border);
+}
+
+.card-footer p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--light-text-secondary);
+    text-align: right;
+}
+
+/* --- 載入中 & 空狀態提示 --- */
+.loading-placeholder, .empty-message, .error-message {
+    grid-column: 1 / -1; /* 佔滿整行 */
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--light-text-secondary);
+}
+
+.loader-dots span {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin: 0 4px;
+    background-color: var(--light-accent);
+    animation: prequel-bounce 1.4s infinite ease-in-out both;
+}
+.loader-dots span:nth-of-type(1) { animation-delay: -0.32s; }
+.loader-dots span:nth-of-type(2) { animation-delay: -0.16s; }
+
+
+/* --- 小說閱讀彈窗 Modal --- */
+.novel-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1020;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+.novel-modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.novel-modal-content {
+    background-color: var(--light-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    height: 85%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.novel-modal-overlay.visible .novel-modal-content {
+    transform: scale(1);
+}
+
+.novel-modal-header {
+    flex-shrink: 0;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--light-border);
+    position: relative;
+}
+
+.novel-modal-header h2 {
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    margin: 0 0 0.25rem 0;
+    color: var(--light-accent);
+}
+
+.novel-modal-header p {
+    margin: 0;
+    color: var(--light-text-secondary);
+}
+
+.close-modal-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--light-text-secondary);
+    cursor: pointer;
+    transition: color 0.3s;
+}
+.close-modal-btn:hover {
+    color: var(--light-text-primary);
+}
+
+.novel-modal-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 2rem;
+}
+
+.novel-modal-body .chapter {
+    margin-bottom: 2.5rem;
+}
+
+.novel-modal-body .chapter h2 {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--light-border);
+    color: var(--light-accent);
+}
+
+.novel-modal-body .chapter p {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 2.2;
+    text-align: justify;
+}
