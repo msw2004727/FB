@@ -159,6 +159,25 @@ ${levelUpText}
 ---
 
 ## NPC資料結構新規則 (最重要)：
+當你生成與NPC的互動時，你**必須**在 \`NPC\` 陣列中的每個NPC物件裡，同時提供**質化**與**量化**的友好度變化。
+
+1.  **\`friendliness\` (字串)**: 描述NPC**當下**的態度。必須是以下7個層級之一：\`devoted\`, \`trusted\`, \`friendly\`, \`neutral\`, \`wary\`, \`hostile\`, \`sworn_enemy\`。
+2.  **\`friendlinessChange\` (數字)**: 本回合玩家的行動對該NPC友好度造成的**具體數值變化**。
+    -   一個善意的舉動可能回傳 \`"friendlinessChange": 5\`。
+    -   完成一個重要任務可能回傳 \`"friendlinessChange": 20\`。
+    -   一個冒犯的行為可能回傳 \`"friendlinessChange": -10\`。
+    -   如果沒有任何影響關係的互動，**必須**回傳 \`"friendlinessChange": 0\`。
+
+**範例**：玩家幫助了王大夫。
+\`\`\`json
+"NPC": [
+  {
+    "name": "王大夫",
+    "status": "對你露出了讚許的微笑。",
+    "friendliness": "friendly",
+    "friendlinessChange": 10
+  }
+]
 
 當你生成與NPC的互動時，必須區分以下兩種情況：
 
