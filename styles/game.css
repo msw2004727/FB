@@ -17,25 +17,6 @@
     flex-direction: column;
     transition: background-color 0.3s, border-color 0.3s;
 }
-body.dark-theme .dashboard {/* --- 遊戲主頁面樣式 --- */
-.game-container { display: flex; height: 100vh; width: 100%; overflow: hidden; }
-.main-content {
-    position: relative;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    transition: margin-right 0.4s ease;
-}
-.dashboard {
-    width: 320px;
-    flex-shrink: 0;
-    background-color: var(--light-surface-bg);
-    border-left: 1px solid var(--light-border);
-    display: flex;
-    flex-direction: column;
-    transition: background-color 0.3s, border-color 0.3s;
-}
 body.dark-theme .dashboard {
     background-color: var(--dark-bg);
     border-left: 1px solid var(--dark-border);
@@ -119,6 +100,152 @@ body.dark-theme .status-bar {
 }
 body.dark-theme .round-title {
     color: var(--dark-accent);
+}
+#story-text-wrapper p {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 2;
+    margin-bottom: 1.5rem;
+}
+.player-action-log {
+    text-align: right;
+    font-style: italic;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .player-action-log {
+    color: var(--dark-text-secondary);
+}
+.system-message {
+    text-align: center;
+    font-style: italic;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .system-message {
+    color: var(--dark-text-secondary);
+}
+
+.story-footer {
+    position: relative;
+    border-top: 1px solid var(--light-border);
+    background: var(--light-surface-bg);
+    z-index: 10;
+}
+body.dark-theme .story-footer {
+    border-top: 1px solid var(--dark-border);
+    background: var(--dark-surface-bg);
+}
+
+.input-action-wrapper {
+    display: flex;
+    align-items: stretch;
+}
+
+#player-input,
+#submit-button {
+    padding: 1.1rem 2rem;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    border: none;
+    box-sizing: border-box;
+}
+
+#player-input {
+    flex-grow: 1;
+    min-width: 100px;
+    background: transparent;
+    color: var(--light-text-primary);
+}
+body.dark-theme #player-input {
+    color: var(--dark-text-primary);
+}
+#player-input:focus {
+    outline: none;
+}
+
+#submit-button {
+    flex-shrink: 0;
+    min-width: 120px;
+    background-color: var(--light-accent);
+    border-left: 1px solid var(--light-border);
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+body.dark-theme #submit-button {
+    border-left: 1px solid var(--dark-border);
+}
+#submit-button:hover {
+    opacity: 0.8;
+}
+#submit-button:disabled {
+    background-color: var(--light-text-secondary);
+    cursor: not-allowed;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+    flex-shrink: 0;
+}
+body.dark-theme .dashboard-header {
+    border-bottom: 1px solid var(--dark-border);
+}
+.dashboard-header .header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.dashboard-content {
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .menu-toggle {
+        display: block;
+    }
+    .dashboard {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        transform: translateX(100%);
+        transition: transform 0.4s ease;
+        z-index: 1000;
+        box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    }
+    .game-container.sidebar-open .dashboard {
+        transform: translateX(0);
+    }
+    .header-toggle-btn {
+        top: 13px;
+        left: 15px;
+        right: auto;
+        z-index: 1002;
+    }
+
+    /* --- 以下為本次修改 --- */
+
+    /* 調整標題樣式，使其與劇情文字大小一致，並優化間距 */
+    .round-title {
+        font-size: 1.1rem; /* 與劇情文字大小(1.1rem)一致 */
+        font-weight: bold; /* 保持粗體以作區分 */
+        line-height: 1.5;  /* 增加行高避免文字擁擠 */
+        margin: 0.5rem 0 1rem 0; /* 調整上下間距 */
+        text-align: left; /* 改為左對齊，在窄視窗更易讀 */
+        color: var(--light-text-secondary); /* 顏色改為次要文字色，不那麼刺眼 */
+    }
+
+    body.dark-theme .round-title {
+        color: var(--dark-text-secondary);
+    }
 }
 #story-text-wrapper p {
     font-family: var(--font-serif);
