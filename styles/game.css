@@ -45,16 +45,14 @@ body.dark-theme .menu-toggle {
 .story-header {
     position: sticky;
     top: 0;
-    /* 【***核心修改***】將背景色改為更淺的頁面背景色 */
     background-color: var(--light-bg);
-    padding: 0.75rem 1.5rem;
+    padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
-    transition: padding 0.4s ease-out;
+    transition: padding 0.4s ease-out, background-color 0.3s;
 }
 body.dark-theme .story-header {
     border-bottom: 1px solid var(--dark-border);
-    /* 【***核心修改***】暗色模式也一併修改 */
     background-color: var(--dark-bg);
 }
 
@@ -92,7 +90,14 @@ body.dark-theme .status-bar {
     flex-grow: 1;
     padding: 1rem 2rem 2rem 2rem;
     overflow-y: auto;
+    /* 【***核心修改***】明確設定內文區塊的背景色 */
+    background-color: var(--light-surface-bg);
 }
+body.dark-theme .story-panel {
+    background-color: var(--dark-surface-bg);
+}
+
+
 .round-title {
     font-family: var(--font-serif);
     font-weight: 600;
