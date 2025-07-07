@@ -56,20 +56,13 @@ function displayRomanceValue(value) {
 }
 
 function displayFriendlinessBar(value) {
-    // 數值範圍是 -100 到 100，總範圍是 200。我們將其轉換為 0% 到 100% 的百分比。
     const percentage = ((value || 0) + 100) / 200 * 100;
-    
     const barContainer = document.createElement('div');
     barContainer.className = 'friendliness-bar-container';
-
-    // 【***核心修改***】生成新的 HTML 結構，包含底圖、填充條和指示器
+    const gradientColor = `linear-gradient(to right, #dc3545, #868e96 ${percentage}%, #198754)`;
     barContainer.innerHTML = `
-        <div class="friendliness-bar-labels">
-            <span>死敵</span>
-            <span title="好感度: ${value}">崇拜</span>
-        </div>
-        <div class="friendliness-bar-background">
-            <div class="friendliness-bar-fill" style="width: ${percentage}%;"></div>
+        <div class="friendliness-bar-labels"><span>死敵</span><span>崇拜</span></div>
+        <div class="friendliness-bar-background" style="background: ${gradientColor};">
             <div class="friendliness-bar-indicator" style="left: ${percentage}%;"></div>
         </div>
     `;
@@ -149,35 +142,15 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
         const inventory = await api.getInventory();
         giveInventoryList.innerHTML = '';
         let hasItems = false;
-        
-        // 將物品轉換為陣列並排序，確保 "銀兩" 總在最前面
-        const sortedInventory = Object.entries(inventory).sort(([a], [b]) => {
-            if (a === '銀兩') return -1;
-            if (b === '銀兩') return 1;
-            return a.localeCompare(b);
-        });
-
-        for (const [itemName, itemData] of sortedInventory) {
+        for (const [itemName, itemData] of Object.entries(inventory)) {
             if (itemData.quantity > 0) {
                 hasItems = true;
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'give-item';
-                
-                let iconClass = 'fa-box-open';
-                if (itemName === '銀兩' || itemData.itemType === '財寶') {
-                    iconClass = 'fa-coins';
-                } else if (itemData.itemType === '武器') {
-                    iconClass = 'fa-glaive-battle-axe'; // 假設是武器圖示
-                } else if (itemData.itemType === '秘笈') {
-                    iconClass = 'fa-book-scroll'; // 假設是秘笈圖示
-                }
-
-                itemDiv.innerHTML = `<i class="fas ${iconClass}"></i> ${itemName} (數量: ${itemData.quantity})`;
-                itemDiv.title = `類型: ${itemData.itemType}\n稀有度: ${itemData.rarity}\n描述: ${itemData.description}`;
-
+                itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
                 itemDiv.addEventListener('click', () => {
                     if (itemName === '銀兩') {
-                        const amount = prompt(`你要給予多少銀兩？ (你目前擁有 ${itemData.quantity} 文)`, itemData.quantity);
+                        const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
                         if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
                             giveItemCallback({ type: 'money', amount: parseInt(amount), itemName: '銀兩' });
                         } else if (amount !== null) {
@@ -199,7 +172,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
 export function closeGiveItemModal() { giveItemModal.classList.remove('visible'); }
 
 
-// --- 武學總覽彈窗 ---
+// --- 【核心新增】武學總覽彈窗 ---
 export function openSkillsModal(skillsData) {
     if (!skillsModal || !skillsTabsContainer || !skillsBodyContainer) return;
 
@@ -224,33 +197,32 @@ export function openSkillsModal(skillsData) {
     const skillTypes = Object.keys(skillsByType);
 
     skillTypes.forEach((type, index) => {
+        // 創建頁籤按鈕
         const tabButton = document.createElement('button');
         tabButton.className = 'skill-tab';
         tabButton.textContent = type;
         tabButton.dataset.tab = type;
         
+        // 創建頁籤內容區塊
         const tabContent = document.createElement('div');
         tabContent.className = 'skill-tab-content';
         tabContent.id = `tab-${type}`;
 
         skillsByType[type].forEach(skill => {
-            const maxLevel = skill.max_level || 10;
-            let expToNextLevel = (skill.level === 0) ? 100 : skill.level * 100;
-            if (skill.level >= maxLevel) expToNextLevel = skill.exp; // 已滿級，分母等於分子
-
-            const expPercentage = (skill.level >= maxLevel) ? 100 : (skill.exp / expToNextLevel) * 100;
+            const expToNextLevel = (skill.level + 1) * 100;
+            const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
             
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
             skillEntry.innerHTML = `
                 <div class="skill-entry-header">
                     <h4>${skill.name}</h4>
-                    <span class="skill-type" title="功體加成: ${skill.power_type}">${skill.type}</span>
+                    <span class="skill-type">${skill.type}</span>
                 </div>
                 <p class="skill-description">${skill.description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
-                    <span class="level-label" title="潛力上限: ${maxLevel}級">等級 ${skill.level}</span>
-                    <div class="exp-bar-background" title="${skill.exp} / ${expToNextLevel}">
+                    <span class="level-label">等級 ${skill.level}</span>
+                    <div class="exp-bar-background">
                         <div class="exp-bar-fill" style="width: ${expPercentage}%;"></div>
                     </div>
                     <span class="exp-text">${skill.exp} / ${expToNextLevel}</span>
@@ -268,8 +240,7 @@ export function openSkillsModal(skillsData) {
         }
     });
 
-    // 事件監聽只綁定一次在容器上
-    const tabClickHandler = (e) => {
+    skillsTabsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('skill-tab')) {
             const tabName = e.target.dataset.tab;
             
@@ -279,11 +250,7 @@ export function openSkillsModal(skillsData) {
             e.target.classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
         }
-    };
-    
-    // 移除舊的監聽器再新增，防止重複綁定
-    skillsTabsContainer.removeEventListener('click', tabClickHandler);
-    skillsTabsContainer.addEventListener('click', tabClickHandler);
+    });
 
     skillsModal.classList.add('visible');
 }
