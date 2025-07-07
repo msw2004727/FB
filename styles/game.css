@@ -47,7 +47,7 @@ body.dark-theme .menu-toggle {
     top: 0;
     backg-light-bg); /* 修改：背景色改為與body一致，消除「白邊」感 */
     /* 【核心修改】減少75%的上下邊距 (0.5rem * 0.25 = 0.125rem)，並將左右邊距設為2rem，讓內容靠左 */
-    padding: 1.5rem 1rem;
+    padding: 1rem 1rem;
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
     transition: padding 0.4s ease-out;
