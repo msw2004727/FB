@@ -226,7 +226,7 @@ body.dark-theme .dashboard-header {
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap; /* 允許換行 */
-    justify-content: flex-end; /* 靠右對齊 */
+    /* justify-content: flex-end; */ /* 移除此行，解決換行後無法對齊的問題 */
 }
 .dashboard-content {
     padding: 1.5rem;
@@ -262,5 +262,10 @@ body.dark-theme .dashboard-header {
         left: 15px;
         right: auto;
         z-index: 1002;
+    }
+
+    /* 【核心修改】調整窄視窗儀表板頂部的 padding */
+    .dashboard-header {
+        padding: 1rem; /* 縮小四周的 padding，讓按鈕集體往左移 */
     }
 }
