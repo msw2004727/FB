@@ -8,7 +8,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
     const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
     const currentDateString = `${userProfile.yearName || '元祐'}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`;
-    const playerGender = userProfile.gender || 'male'; // 【***核心新增***】取得玩家性別以供AI判斷
+    const playerGender = userProfile.gender || 'male';
 
     return `
 你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。
@@ -122,6 +122,7 @@ ${longTermSummary}
 -   當玩家與之前見過面的NPC重逢時，你需要在 \`NPC\` 陣列中提供一個包含該角色更新後狀態的完整物件。
 -   這個物件應包含 \`"name"\`、\`"status"\`、更新後的 \`"friendliness"\`，以及該角色的 \`"personality"\`（此資訊應從舊摘要中獲取）。
 -   **【嚴格規則】** 在這種情況下，**絕對不能**包含 \`isNew\` 這個鍵。
+-   **【核心新增：死亡標記規則】如果這位NPC在本回合的劇情中死亡，你必須在其物件中，額外加入一個 `"isDeceased": true` 的欄位。**
 
 **再次相遇範例（JSON的\`NPC\`部分）：**
 \`\`\`json
@@ -129,6 +130,16 @@ ${longTermSummary}
   "name": "王大夫",
   "status": "看到你康復了許多，露出了欣慰的笑容",
   "friendliness": "friendly"
+}]
+\`\`\`
+
+**NPC死亡範例（JSON的\`NPC\`部分）：**
+\`\`\`json
+"NPC": [{
+  "name": "黑風寨頭目",
+  "status": "被你一劍封喉，倒在血泊之中。",
+  "friendliness": "sworn_enemy",
+  "isDeceased": true
 }]
 \`\`\`
 
@@ -309,7 +320,7 @@ ${longTermSummary}
     - enterCombat: (可選的布林)
     - combatants: (可選的物件陣列)
     - combatIntro: (可選的字串，僅在 enterCombat 為 true 時提供)
-7. 【死亡判定規則】如果故事的發展對玩家造成了不可逆轉的致命後果（例如：被利刃刺穿心臟、服下劇毒且無解藥、墜入萬丈深淵），你必須在 "story" 中描述其死亡的结局，並將 "playerState" 欄位的值設為 "dead"。**【核心新增】與此同時，你還必須在 \`roundData\` 物件中，額外加入一個名為 \`causeOfDeath\` 的字串欄位，用來簡短描述導致玩家死亡的直接原因（例如：「被黑衣人一劍穿心」、「服下毒酒，毒發身亡」）。**
+7. 【死亡判定規則】如果故事的發展對玩家造成了不可逆轉的致命後果（例如：被利刃刺穿心臟、服下劇毒且無解藥、墜入萬丈深淵），你必須在 "story" 中描述其死亡的结局，並將 "playerState" 欄位的值設為 "dead"。與此同時，你還必須在 \`roundData\` 物件中，額外加入一個名為 \`causeOfDeath\` 的字串欄位，用來簡短描述導致玩家死亡的直接原因（例如：「被黑衣人一劍穿心」、「服下毒酒，毒發身亡」）。
 8. **絕對邏輯性**: 所有事件和物品的出現都必須有合理的因果關係。友好度的變化必須基於玩家的行動和故事的發展。
 9. **NPC的靈魂**: 你創造的每位NPC，都必須有基本的個性、動機和背景故事。你在描述NPC的反應時，必須嚴格參考其 "personality" 標籤。例如，一個'正直'的NPC絕不會接受賄賂；一個'膽小'的NPC在面對危險時可能會逃跑。
 10. **寫實的成長**: 主角雖然是奇才，但成長需要過程。
