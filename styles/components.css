@@ -67,11 +67,18 @@ body.dark-theme .info-card h4 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem; /* 與原 h4 的 margin-bottom 保持一致 */
+    /* 將原本 h4 的樣式轉移到這裡 */
+    margin: 0 0 0.75rem 0;
+    border-bottom: 1px solid var(--light-border);
+    padding-bottom: 0.5rem;
 }
-/* 讓 h4 不再有底線和 margin-bottom，因為被轉移到 flex 容器上了 */
+body.dark-theme .card-header-flex {
+    border-bottom-color: var(--dark-border);
+}
+
+/* 讓在 flex 容器內的 h4 不再有重複的樣式 */
 .card-header-flex h4 {
-    margin-bottom: 0;
+    margin: 0;
     border-bottom: none;
     padding-bottom: 0;
 }
@@ -130,13 +137,13 @@ body.dark-theme .header-toggle-btn:hover {
 
 /* --- 【核心新增】圓形圖示按鈕樣式 (for 查看武學) --- */
 .header-icon-btn {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     background: transparent;
     border: 1px solid var(--light-border);
     border-radius: 50%;
     color: var(--light-text-secondary);
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
     display: flex;
     align-items: center;
