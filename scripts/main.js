@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeIcon = themeSwitcher.querySelector('i');
     const logoutButton = document.getElementById('logout-btn');
     const suicideButton = document.getElementById('suicide-btn');
-    const restartButton = document.getElementById('restart-btn');
+    // 【***核心修改***】 移除 restartButton 的獲取
+    // const restartButton = document.getElementById('restart-btn'); 
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
     const storyTextContainer = document.getElementById('story-text-wrapper');
@@ -38,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const giveItemBtn = document.getElementById('give-item-btn');
     const cancelGiveBtn = document.getElementById('cancel-give-btn');
 
-    // --- 【***核心新增函式***】---
     // 動態設定遊戲容器高度，以避免行動裝置上 100vh 的問題
     function setGameContainerHeight() {
         if (gameContainer) {
@@ -373,8 +373,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         suicideButton.addEventListener('click', async () => {
             if (gameState.isRequesting) return;
-            if (window.confirm("你確定要了卻此生，重新輪迴嗎？")) {
-                setLoadingState(true, '英雄末路，輪迴將啟...');
+            if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) { // 修改確認文字
+                setLoadingState(true, '英雄末路，傳奇落幕...');
                 try {
                     const data = await api.forceSuicide();
                     updateUI(data.story, data.roundData, data.randomEvent);
@@ -385,6 +385,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+        // 【***核心修改***】 移除 restartButton 的事件監聽器
+        /*
         restartButton.addEventListener('click', async () => {
             try {
                 await api.startNewGame();
@@ -394,6 +397,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`開啟新的輪迴時發生錯誤：${error.message}`);
             }
         });
+        */
+
         submitButton.addEventListener('click', handlePlayerAction);
         playerInput.addEventListener('keypress', (e) => {
              if (e.key === 'Enter' && !e.isComposing) {
@@ -435,8 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
 
-        // 【***核心修改***】
-        // 在頁面載入時和視窗大小改變時，都呼叫新的高度設定函式
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);
 
