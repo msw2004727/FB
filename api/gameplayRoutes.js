@@ -57,7 +57,7 @@ const interactRouteHandler = async (req, res) => {
         // --- 3. 【新流程】根據分類結果，執行不同的處理邏輯 ---
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-                // 如果是戰鬥，直接構造一個觸發戰鬥的aiResponse，不經過故事AI
+                // 如果是玩家主動戰鬥，直接構造一個觸發戰鬥的aiResponse，不經過故事AI
                 const combatIntroText = `你對 ${classification.details.target || '對手'} 發起了攻擊，一場惡鬥一觸即發！`;
                 aiResponse = {
                     story: combatIntroText,
@@ -78,11 +78,6 @@ const interactRouteHandler = async (req, res) => {
                 };
                 break;
             
-            // 未來可以新增 SKILL_PRACTICE 等其他專職處理路徑
-            // case 'SKILL_PRACTICE':
-            //     ...
-            //     break;
-
             case 'GENERAL_STORY':
             default:
                 // 對於通用故事，呼叫原本的核心故事AI
@@ -148,9 +143,17 @@ const interactRouteHandler = async (req, res) => {
             await Promise.all(npcUpdatePromises);
         }
 
-        // 如果戰鬥已觸發，填充戰鬥狀態
+        // 【***核心修改***】統一的戰鬥觸發點
+        // 不論是玩家主動攻擊(aiResponse已預設好)，還是NPC在劇情中攻擊(故事AI會回傳enterCombat:true)
+        // 都在這裡統一檢查並設定戰鬥狀態
         if (aiResponse.roundData.enterCombat) {
-            const combatState = { turn: 1, player: { username: username }, enemies: aiResponse.roundData.combatants, log: [aiResponse.roundData.combatIntro] };
+            console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
+            const combatState = { 
+                turn: 1, 
+                player: { username: username }, 
+                enemies: aiResponse.roundData.combatants, 
+                log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
+            };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
@@ -235,16 +238,8 @@ const combatActionRouteHandler = async (req, res) => {
         const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
-        combatState.turn++;
-        
-        if (combatResult.enemies) {
-            combatState.enemies = combatResult.enemies;
-        }
-        if(combatResult.player) {
-            combatState.player = { ...combatState.player, ...combatResult.player };
-        }
         combatState.log.push(combatResult.narrative);
-
+        combatState.turn++;
 
         if (combatResult.combatOver) {
             await combatDocRef.delete();
