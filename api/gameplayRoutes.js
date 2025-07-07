@@ -14,11 +14,50 @@ const {
     invalidateNovelCache,
     updateLibraryNovel,
     updateSkills,
-    getPlayerSkills
+    getPlayerSkills,
+    getFriendlinessLevel // 確保 getFriendlinessLevel 已從 gameHelpers 引入
 } = require('./gameHelpers');
 const { triggerBountyGeneration } = require('./worldEngine');
 
 const db = admin.firestore();
+
+// 【***核心新增***】專門用來更新NPC友好度的函式
+const updateFriendlinessValues = async (userId, npcChanges) => {
+    if (!npcChanges || npcChanges.length === 0) return;
+    const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+
+    const promises = npcChanges.map(async (change) => {
+        // 確保有NPC名稱和一個非零的友好度變化值
+        if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) {
+            return;
+        }
+
+        const npcDocRef = userNpcsRef.doc(change.name);
+        try {
+            await db.runTransaction(async (transaction) => {
+                const npcDoc = await transaction.get(npcDocRef);
+                // 只更新已存在的NPC，不在此處創建新NPC
+                if (!npcDoc.exists) {
+                    console.warn(`[友好度系統] 嘗試更新一個不存在的NPC檔案: ${change.name}`);
+                    return;
+                }
+                const currentFriendliness = npcDoc.data().friendlinessValue || 0;
+                const newFriendlinessValue = currentFriendliness + change.friendlinessChange;
+                
+                // 更新數值和對應的友好度等級描述
+                transaction.update(npcDocRef, { 
+                    friendlinessValue: newFriendlinessValue,
+                    friendliness: getFriendlinessLevel(newFriendlinessValue)
+                });
+            });
+        } catch (error) {
+            console.error(`[友好度系統] 更新NPC "${change.name}" 友好度時出錯:`, error);
+        }
+    });
+
+    await Promise.all(promises);
+};
+
 
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
@@ -57,12 +96,11 @@ const interactRouteHandler = async (req, res) => {
         // --- 3. 【新流程】根據分類結果，執行不同的處理邏輯 ---
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-                // 如果是玩家主動戰鬥，直接構造一個觸發戰鬥的aiResponse，不經過故事AI
                 const combatIntroText = `你對 ${classification.details.target || '對手'} 發起了攻擊，一場惡鬥一觸即發！`;
                 aiResponse = {
                     story: combatIntroText,
                     roundData: {
-                        ...lastSave, // 繼承大部分狀態
+                        ...lastSave,
                         EVT: `遭遇戰：對決${classification.details.target}`,
                         PC: `你決定與${classification.details.target}一決高下。`,
                         IMP: `觸發了與${classification.details.target}的戰鬥`,
@@ -71,7 +109,7 @@ const interactRouteHandler = async (req, res) => {
                         itemChanges: [],
                         romanceChanges: [],
                         skillChanges: [],
-                        enterCombat: true, // <--- 關鍵：觸發戰鬥
+                        enterCombat: true,
                         combatants: [{ name: classification.details.target, status: '準備應戰' }],
                         combatIntro: combatIntroText,
                     }
@@ -80,7 +118,6 @@ const interactRouteHandler = async (req, res) => {
             
             case 'GENERAL_STORY':
             default:
-                // 對於通用故事，呼叫原本的核心故事AI
                 const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
                 const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
                 const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
@@ -100,23 +137,25 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        // 觸發戀愛事件 (如果有的話)
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
         if (romanceEventNarrative) {
             aiResponse.story = romanceEventNarrative + aiResponse.story;
         }
         aiResponse.roundData.story = aiResponse.story;
-
-        // 並行處理各種狀態更新
-        await updateInventory(userId, aiResponse.roundData.itemChanges);
-        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
-        await updateSkills(userId, aiResponse.roundData.skillChanges);
+        
+        // 【***核心修改***】統一在此處更新所有好感度、戀愛度、物品等數值
+        await Promise.all([
+            updateInventory(userId, aiResponse.roundData.itemChanges),
+            updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
+            updateFriendlinessValues(userId, aiResponse.roundData.NPC), // <--- 新增的友好度更新呼叫
+            updateSkills(userId, aiResponse.roundData.skillChanges)
+        ]);
 
         const [newSummary, suggestion, inventoryState, updatedSkills] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion('deepseek', aiResponse.roundData),
             getInventoryState(userId),
-            getPlayerSkills(userId), // 重新獲取一次確保最新
+            getPlayerSkills(userId),
         ]);
         
         aiResponse.suggestion = suggestion;
@@ -124,7 +163,6 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.money = inventoryState.money;
         aiResponse.roundData.skills = updatedSkills;
 
-        // 更新NPC狀態
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
@@ -144,8 +182,6 @@ const interactRouteHandler = async (req, res) => {
         }
 
         // 【***核心修改***】統一的戰鬥觸發點
-        // 不論是玩家主動攻擊(aiResponse已預設好)，還是NPC在劇情中攻擊(故事AI會回傳enterCombat:true)
-        // 都在這裡統一檢查並設定戰鬥狀態
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
             const combatState = { 
@@ -158,7 +194,6 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
 
-        // 更新玩家核心數值和時間
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
         let currentDate = { yearName: userProfile.yearName, year: userProfile.year, month: userProfile.month, day: userProfile.day };
         if (daysToAdvance > 0) {
@@ -176,13 +211,11 @@ const interactRouteHandler = async (req, res) => {
 
         Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...currentDate });
         
-        // 死亡處理
         if (aiResponse.roundData.playerState === 'dead') {
              aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你在這次事件中不幸殞命。';
              await userDocRef.update({ isDeceased: true });
         }
 
-        // --- 5. 儲存本回合所有結果 ---
         await Promise.all([
              userDocRef.update({
                 timeOfDay: aiResponse.roundData.timeOfDay,
@@ -196,7 +229,6 @@ const interactRouteHandler = async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
-        // 隨機觸發懸賞生成
         if (newRoundNumber > 5 && Math.random() < 0.2) { 
             triggerBountyGeneration(userId, newSummary).catch(err => console.error("背景生成懸賞失敗:", err));
         }
@@ -250,7 +282,6 @@ const combatActionRouteHandler = async (req, res) => {
             const postCombatSummary = combatResult.outcome.summary || '戰鬥結束';
             const playerChanges = combatResult.outcome.playerChanges || {};
             
-            // 更新玩家主檔案的數值
             const powerChange = playerChanges.powerChange || {};
             const finalPowerUpdate = {
                 internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
@@ -260,12 +291,10 @@ const combatActionRouteHandler = async (req, res) => {
             };
             await userDocRef.update(finalPowerUpdate);
             
-            // 處理物品變化
             if (combatResult.outcome.itemChanges) {
                 await updateInventory(userId, combatResult.outcome.itemChanges);
             }
 
-            // 重新取得更新後的玩家資料，以建立準確的存檔
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
@@ -328,12 +357,10 @@ router.post('/end-chat', async (req, res) => {
 
         const savesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const currentRound = savesSnapshot.empty ? 0 : savesSnapshot.docs[0].data().R;
-
-        // 將總結作為新的玩家行動，重新進入互動路由
+        
         req.body.action = chatSummary;
         req.body.round = currentRound;
         
-        // 直接呼叫 interactRouteHandler 來處理後續流程
         interactRouteHandler(req, res);
 
     } catch (error) {
