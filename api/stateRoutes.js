@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills } = require('./gameHelpers'); // 【核心修改】
+const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills } = require('./gameHelpers');
 
 const db = admin.firestore();
 
@@ -13,6 +13,17 @@ router.get('/inventory', async (req, res) => {
         res.json(inventoryData);
     } catch (error) {
         res.status(500).json({ message: '讀取背包資料時發生內部錯誤。' });
+    }
+});
+
+// 【核心新增】專門用來獲取武學列表的API
+router.get('/skills', async (req, res) => {
+    try {
+        const skills = await getPlayerSkills(req.user.id);
+        res.json(skills);
+    } catch (error) {
+        console.error(`[API /skills] 獲取玩家 ${req.user.id} 武學時出錯:`, error);
+        res.status(500).json({ message: '獲取武學資料時發生內部錯誤。' });
     }
 });
 
@@ -87,7 +98,6 @@ router.get('/latest-game', async (req, res) => {
 
         let latestGameData = snapshot.docs[0].data();
         
-        // 【核心修改】並行獲取背包和武學資料
         const [inventoryState, skills] = await Promise.all([
             getInventoryState(userId),
             getPlayerSkills(userId)
@@ -146,7 +156,7 @@ router.post('/restart', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
         
-        const collections = ['game_saves', 'npcs', 'game_state', 'skills']; // 新增 skills
+        const collections = ['game_saves', 'npcs', 'game_state', 'skills'];
         for (const col of collections) {
             const snapshot = await userDocRef.collection(col).get();
             const batch = db.batch();
@@ -154,7 +164,7 @@ router.post('/restart', async (req, res) => {
             await batch.commit();
         }
 
-        await userDocRef.set({ // Use set to overwrite and define initial state
+        await userDocRef.set({
             username: req.user.username,
             internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
             timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1
@@ -207,6 +217,5 @@ router.post('/force-suicide', async (req, res) => {
         res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
-
 
 module.exports = router;
