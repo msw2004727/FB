@@ -2,6 +2,10 @@
 
 const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const combatLog = combatState.log.join('\n');
+    // 將玩家的武學列表轉換為易讀的字串
+    const skillsString = playerProfile.skills && playerProfile.skills.length > 0
+        ? playerProfile.skills.map(s => `${s.name} (等級: ${s.level})`).join('、')
+        : '無';
 
     return `
 你是一位冷靜、公平且精通武學的「戰鬥裁判」。你的任務是根據當前的戰鬥狀態和玩家的指令，裁定並描述一回合的攻防結果。
@@ -13,10 +17,11 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 ## 裁定核心準則：
 
 1.  **實力判斷**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}）作為最重要的判斷依據。功力高的玩家執行高難度動作的成功率更高。
-2.  **情境判斷**: 需考慮敵人數量（目前敵人: ${combatState.enemies.map(e => e.name).join('、')}）和戰鬥日誌中的歷史紀錄（${combatLog}）。以一敵多時，玩家的行動會更加困難。
-3.  **創意與合理性**: 玩家可能會下達富有想像力的指令。你需要判斷其合理性。例如，「一招擊敗所有人」在初期是不合理的，但「攻擊A的同時，側身躲避B的攻擊」則是合理的。
-4.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家行動的結果後，**必須接著描述敵人的反擊或反應**。
-5.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
+2.  **【核心新增】武學加成**: 你必須參考玩家已學會的武學。如果玩家的指令中明確提到了他已學會的招式（例如指令是「我使用羅漢拳攻擊」且玩家確實會「羅漢拳」），你必須在敘述中體現出招式的效果，並在判定中給予相應的優勢。
+3.  **情境判斷**: 需考慮敵人數量（目前敵人: ${combatState.enemies.map(e => e.name).join('、')}）和戰鬥日誌中的歷史紀錄（${combatLog}）。以一敵多時，玩家的行動會更加困難。
+4.  **創意與合理性**: 玩家可能會下達富有想像力的指令。你需要判斷其合理性。例如，「一招擊敗所有人」在初期是不合理的，但「攻擊A的同時，側身躲避B的攻擊」則是合理的。
+5.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家行動的結果後，**必須接著描述敵人的反擊或反應**。
+6.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
 
 ## 回傳格式規則：
 
@@ -77,6 +82,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 ---
 ## 【當前戰鬥情境】
 - **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness})
+- **玩家已學會的武學**: ${skillsString}
 - **敵人**: ${JSON.stringify(combatState.enemies)}
 - **戰鬥紀錄**: ${combatLog}
 
