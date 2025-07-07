@@ -26,14 +26,17 @@ app.use(cors({ origin: 'https://msw2004727.github.io' }));
 app.use(express.json());
 
 // --- 載入 API 路由 ---
+const authMiddleware = require('./middleware/auth'); // 【核心新增】
 const authRoutes = require('./api/authRoutes');
 const gameRoutes = require('./api/gameRoutes'); // 主遊戲路由器
 const libraryRoutes = require('./api/libraryRoutes');
+const epilogueRoutes = require('./api/epilogue.js'); // 【核心新增】
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
 app.use('/api/game', gameRoutes); // 所有跟遊戲相關的請求都走這裡
 app.use('/api/library', libraryRoutes);
+app.use('/api/epilogue', authMiddleware, epilogueRoutes); // 【核心新增】
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
