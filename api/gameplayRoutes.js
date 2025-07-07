@@ -1,7 +1,7 @@
 // /api/gameplayRoutes.js
 const express = require('express');
 const router = express.Router();
-const admin = require('firebase-admin');
+const admin = 'firebase-admin';
 const { getAIStory, getAISummary, getAISuggestion, getAICombatAction } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
@@ -52,9 +52,11 @@ const interactRouteHandler = async (req, res) => {
         let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
         
-        const preActionSkillChanges = req.body.skillChanges || [];
+        // 【核心修改】先處理武學升級，拿到升級事件
+        const preActionSkillChanges = req.body.skillChanges || []; // 假設未來可能有從前端直接發起的修練
         const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
+        // 【核心修改】將升級事件傳遞給故事AI
         const aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
 
@@ -66,6 +68,7 @@ const interactRouteHandler = async (req, res) => {
         await updateInventory(userId, aiResponse.roundData.itemChanges);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
         
+        // 處理AI故事中發生的武學變化
         await updateSkills(userId, aiResponse.roundData.skillChanges);
 
         const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
@@ -78,7 +81,7 @@ const interactRouteHandler = async (req, res) => {
 
         const [newSummary, suggestion, inventoryState, skills] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
-            getAISuggestion('deepseek', aiResponse.roundData),
+            getAISuggestion('deepseek', aiResponse.roundData), // 【核心修改】固定使用 'deepseek' 模型
             getInventoryState(userId),
             getPlayerSkills(userId)
         ]);
@@ -187,12 +190,13 @@ const combatActionRouteHandler = async (req, res) => {
         let combatState = combatDoc.data();
         combatState.log.push(`> ${action}`);
 
+        // 【核心修改】將玩家資料和武學資料合併傳給AI
         const [userDoc, skills] = await Promise.all([
             userDocRef.get(),
             getPlayerSkills(userId)
         ]);
         let playerProfile = userDoc.exists ? userDoc.data() : {};
-        playerProfile.skills = skills;
+        playerProfile.skills = skills; // 將武學列表附加到玩家檔案中
 
         const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
