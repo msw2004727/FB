@@ -183,7 +183,7 @@ const getInventoryState = async (userId) => {
         if (name === '銀兩') {
             money = data.quantity || 0;
         } else {
-            if(data.quantity > 0) { // 只顯示數量大於0的物品
+            if(data.quantity > 0) {
                  otherItems.push(`${name} x${data.quantity}`);
             }
         }
@@ -202,10 +202,15 @@ const getRawInventory = async (userId) => {
 
 const updateSkills = async (userId, skillChanges) => {
     if (!skillChanges || skillChanges.length === 0) return;
+
     const skillsCollectionRef = db.collection('users').doc(userId).collection('skills');
+
     for (const skill of skillChanges) {
+        const skillDocRef = skillsCollectionRef.doc(skill.skillName);
+        
+        // 【核心修改】區分「新學會」和「修練」
         if (skill.isNewlyAcquired) {
-            const skillDocRef = skillsCollectionRef.doc(skill.skillName);
+            // 如果是新學會的武學，使用 set 建立或覆蓋資料
             await skillDocRef.set({
                 name: skill.skillName,
                 type: skill.skillType,
@@ -214,12 +219,20 @@ const updateSkills = async (userId, skillChanges) => {
                 description: skill.description,
                 acquiredAt: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
-            console.log(`[武學系統] 已為玩家 ${userId} 新增/更新武學: ${skill.skillName}`);
+            console.log(`[武學系統] 已為玩家 ${userId} 新增武學: ${skill.skillName}`);
+        } else if (skill.expChange > 0) {
+            // 如果是修練已有的武學，使用 update 和 increment 來增加熟練度
+            // 未來可以在這裡加入升級判斷邏輯
+            // const doc = await skillDocRef.get();
+            // if (doc.exists) { const currentExp = doc.data().exp; ... }
+            await skillDocRef.update({
+                exp: admin.firestore.FieldValue.increment(skill.expChange)
+            });
+            console.log(`[武學系統] 玩家 ${userId} 修練了 ${skill.skillName}，熟練度增加了 ${skill.expChange}`);
         }
     }
 };
 
-// 【核心新增】獲取玩家所有武學的函式
 const getPlayerSkills = async (userId) => {
     const skillsSnapshot = await db.collection('users').doc(userId).collection('skills').get();
     if (skillsSnapshot.empty) {
@@ -245,5 +258,5 @@ module.exports = {
     getInventoryState,
     getRawInventory,
     updateSkills,
-    getPlayerSkills // 【核心新增】
+    getPlayerSkills
 };
