@@ -21,7 +21,7 @@ export const gameTips = [
     "【任務】「任務日誌(QST)」會記錄你接下的委託。常常查看，以免忘記了對別人的承諾。",
     "【新手保護】在你武功總和低於100前，你只會遇到凡人與小角色。努力變強，才能探索更廣闊的江湖。",
     "【偷竊】你可以嘗試「偷走他的錢袋」等指令，但請注意，這種行為會大幅降低你的立場值，並可能引來追殺。",
-    "【友好度】NPC對你的態度分為七個等級：<span style='color:#8B0000; font-weight:bold;'>死敵</span>、<span style='color:#dc3545; font-weight:bold;'>敵對</span>、<span style='color:#856404; font-weight:bold;'>警惕</span>、<span style='color:#7a6e62; font-weight:bold;'>中立</span>、<span style='color:#6fcf97; font-weight:bold;'>友善</span>、<span style='color:#20c997; font-weight:bold;'>信賴</span>、<span style='color:#198754; font-weight:bold;'>崇拜</span>。顏色越暖，關係越差。",
+    "【友好度】NPC對你的態度分為七個等級：死敵、敵對、警惕、中立、友善、信賴、崇拜。顏色越暖，關係越差。",
     "【死亡】江湖險惡，死亡是常見的結局。但這並非終點，你可以「回顧生平」，然後「開啟新的輪迴」。",
     "【輪迴】若對當前的江湖人生不滿意，可以隨時在儀表板點擊「骷髏頭」了卻此生，開啟新的輪迴。",
     "【天氣】天氣不僅是背景，下雨天可能會讓你行動不便，而黑夜則適合進行秘密行動。",
