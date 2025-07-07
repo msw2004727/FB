@@ -42,7 +42,8 @@ const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/na
 const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
 const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
 const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
-const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js'); // 【核心新增】
+const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
+const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
 
 
 // 統一的AI調度中心
@@ -124,8 +125,8 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
     }
 }
 
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality);
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
     try {
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text);
@@ -157,8 +158,8 @@ async function getAISuggestion(modelName, roundData) {
     }
 }
 
-async function getAIEncyclopedia(modelName, longTermSummary, username) {
-    const prompt = getEncyclopediaPrompt(longTermSummary, username);
+async function getAIEncyclopedia(modelName, longTermSummary, username, npcDetails) {
+    const prompt = getEncyclopediaPrompt(longTermSummary, username, npcDetails);
     try {
         const text = await callAI(modelName, prompt, true);
         const data = parseJsonResponse(text);
@@ -251,8 +252,8 @@ async function getAINarrativeForGive(modelName, lastRoundData, playerName, npcNa
     }
 }
 
-async function getRelationGraph(modelName, longTermSummary, username) {
-    const prompt = getRelationGraphPrompt(longTermSummary, username);
+async function getRelationGraph(modelName, longTermSummary, username, npcDetails) {
+    const prompt = getRelationGraphPrompt(longTermSummary, username, npcDetails);
     try {
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text).mermaidSyntax;
@@ -268,7 +269,6 @@ async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType
         return await callAI(modelName, prompt, false);
     } catch (error) {
         console.error("[AI 任務失敗] 言情小說家任務:", error);
-        // 返回一個通用的、符合情境的預設文本
         return `\n你與${npcProfile.name}的緣分，似乎在悄然間發生了些許變化，但具體是何種變化，卻又難以言說。`;
     }
 }
@@ -280,12 +280,10 @@ async function getAIEpilogue(modelName, playerData) {
         return story;
     } catch (error) {
         console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
-        // 提供一個優雅的備用結局
         return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
     }
 }
 
-// 【核心新增】
 async function getAIDeathCause(modelName, username, lastRoundData) {
     const prompt = getDeathCausePrompt(username, lastRoundData);
     try {
@@ -293,8 +291,18 @@ async function getAIDeathCause(modelName, username, lastRoundData) {
         return cause.replace(/["“”]/g, '');
     } catch (error) {
         console.error(`[AI 任務失敗] 司命星君任務 for ${username}:`, error);
-        // 提供一個通用的備用死因
         return "似乎是積勞成疾，舊傷復發，在睡夢中安然離世。";
+    }
+}
+
+async function getAIActionClassification(modelName, playerAction, context) {
+    const prompt = getActionClassifierPrompt(playerAction, context);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 總導演AI任務:", error);
+        return { actionType: 'GENERAL_STORY', details: {} };
     }
 }
 
@@ -317,5 +325,6 @@ module.exports = {
     getRelationGraph,
     getAIRomanceEvent,
     getAIEpilogue,
-    getAIDeathCause, // 【核心新增】
+    getAIDeathCause,
+    getAIActionClassification,
 };
