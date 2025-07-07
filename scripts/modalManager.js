@@ -56,8 +56,6 @@ function displayRomanceValue(value) {
     chatNpcInfo.prepend(heartsContainer);
 }
 
-
-// 【***核心新增函式***】
 // 根據友好度數值，創建並顯示計量棒
 function displayFriendlinessBar(value) {
     // 將友好度數值從 -100 到 100 的範圍，轉換為 0% 到 100% 的百分比
@@ -67,7 +65,6 @@ function displayFriendlinessBar(value) {
     barContainer.className = 'friendliness-bar-container';
 
     // 根據百分比決定漸層色的起點
-    // 例如，50% 時是灰色，100% 時是綠色，0% 時是紅色
     const gradientColor = `linear-gradient(to right, #dc3545, #868e96 ${percentage}%, #198754)`;
 
     barContainer.innerHTML = `
@@ -80,19 +77,16 @@ function displayFriendlinessBar(value) {
         </div>
     `;
 
-    // 為了讓漸層效果更好，我們直接將背景設定在 bar-background 上
     const barBackground = barContainer.querySelector('.friendliness-bar-background');
     if(barBackground) {
         barBackground.style.background = gradientColor;
     }
 
-    // 清除舊的計量棒（如果有的話）
     const existingBar = chatNpcInfo.querySelector('.friendliness-bar-container');
     if (existingBar) {
         existingBar.remove();
     }
 
-    // 將新的計量棒插入到 NPC 資訊區塊的最下方
     chatNpcInfo.appendChild(barContainer);
 }
 
@@ -139,10 +133,8 @@ export function openChatModalUI(profile) {
     chatNpcName.textContent = `與 ${profile.name} 交談`;
     chatNpcInfo.innerHTML = profile.appearance || '';
     
-    // 【***核心修改***】
-    // 呼叫函式來顯示心動值和新的友好度計量棒
     displayRomanceValue(profile.romanceValue);
-    displayFriendlinessBar(profile.friendlinessValue); // 新增呼叫
+    displayFriendlinessBar(profile.friendlinessValue);
 
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
     chatModal.classList.add('visible');
@@ -185,30 +177,33 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
         let hasItems = false;
 
         for (const [itemName, itemData] of Object.entries(inventory)) {
-            hasItems = true;
-            const itemDiv = document.createElement('div');
-            itemDiv.classList.add('give-item');
-            
-            let iconClass = 'fa-box-open';
-            if (itemName === '銀兩') {
-                iconClass = 'fa-coins';
-            }
-
-            itemDiv.innerHTML = `<i class="fas ${iconClass}"></i> ${itemName} (數量: ${itemData.quantity})`;
-            
-            itemDiv.addEventListener('click', () => {
+            // 【***核心修改***】 只有當物品數量大於0時，才顯示在清單上
+            if (itemData.quantity > 0) {
+                hasItems = true;
+                const itemDiv = document.createElement('div');
+                itemDiv.classList.add('give-item');
+                
+                let iconClass = 'fa-box-open';
                 if (itemName === '銀兩') {
-                    const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
-                    if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
-                        giveItemCallback({ type: 'money', amount: parseInt(amount), itemName: '銀兩' });
-                    } else if (amount !== null) {
-                        alert('請輸入有效的數量。');
-                    }
-                } else {
-                    giveItemCallback({ type: 'item', itemId: itemName, itemName: itemName });
+                    iconClass = 'fa-coins';
                 }
-            });
-            giveInventoryList.appendChild(itemDiv);
+
+                itemDiv.innerHTML = `<i class="fas ${iconClass}"></i> ${itemName} (數量: ${itemData.quantity})`;
+                
+                itemDiv.addEventListener('click', () => {
+                    if (itemName === '銀兩') {
+                        const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
+                        if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
+                            giveItemCallback({ type: 'money', amount: parseInt(amount), itemName: '銀兩' });
+                        } else if (amount !== null) {
+                            alert('請輸入有效的數量。');
+                        }
+                    } else {
+                        giveItemCallback({ type: 'item', itemId: itemName, itemName: itemName });
+                    }
+                });
+                giveInventoryList.appendChild(itemDiv);
+            }
         }
 
         if (!hasItems) {
