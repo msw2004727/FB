@@ -19,8 +19,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-        // 向後端請求百科資料 (注意：這個 API 端點我們稍後才會建立)
-        const response = await fetch(`${backendBaseUrl}/api/game/get-encyclopedia`, {
+        // 【核心修改】將API路徑修正為後端真實存在的路徑
+        const response = await fetch(`${backendBaseUrl}/api/game/state/get-encyclopedia`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
