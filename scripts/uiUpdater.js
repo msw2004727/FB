@@ -4,7 +4,6 @@ import { MAX_POWER } from './config.js';
 // --- 獲取所有和UI更新相關的DOM元素 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
 const storyTextContainer = document.getElementById('story-text-wrapper');
-// const roundTitleEl = document.getElementById('round-title'); // 移除：我們不再需要更新這個靜態標題
 const statusBarEl = document.getElementById('status-bar');
 const pcContent = document.getElementById('pc-content');
 const internalPowerBar = document.getElementById('internal-power-bar');
@@ -21,6 +20,7 @@ const psyContent = document.getElementById('psy-content');
 const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
 const moneyContent = document.getElementById('money-content');
+const skillsContent = document.getElementById('skills-content'); // 【核心新增】
 
 
 // --- UI 更新函式 ---
@@ -33,8 +33,6 @@ export function appendMessageToStory(htmlContent, className) {
     storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
 }
 
-// 【***核心新增函式***】
-// 這個函式專門用來在故事區塊中插入一個新的回合標題
 export function addRoundTitleToStory(titleText) {
     const titleEl = document.createElement('h2');
     titleEl.className = 'round-title';
@@ -107,9 +105,6 @@ export function updateUI(storyText, data, randomEvent) {
     }
     if (!data) return;
 
-    // 移除：不再更新靜態的回合標題
-    // roundTitleEl.textContent = data.EVT || `第 ${data.R || 0} 回`;
-
     const atmosphere = data.ATM?.[0] || '未知';
     const weather = data.WRD || '晴朗';
     const location = data.LOC?.[0] || '未知之地';
@@ -146,6 +141,22 @@ export function updateUI(storyText, data, randomEvent) {
         moneyContent.textContent = `${data.money || 0} 文錢`;
     }
     itmContent.textContent = data.ITM || '身無長物';
+    
+    // 【核心新增】更新武學列表
+    if (skillsContent) {
+        skillsContent.innerHTML = ''; // 先清空
+        if (data.skills && Array.isArray(data.skills) && data.skills.length > 0) {
+            data.skills.forEach(skill => {
+                const skillLine = document.createElement('div');
+                skillLine.className = 'skill-item';
+                skillLine.innerHTML = `<strong>${skill.name}</strong> <span class="skill-level">(Lv.${skill.level || 0})</span>`;
+                skillLine.title = `類型: ${skill.type}\n描述: ${skill.description}`;
+                skillsContent.appendChild(skillLine);
+            });
+        } else {
+            skillsContent.textContent = '尚未習得任何武學';
+        }
+    }
 
     qstContent.textContent = data.QST || '暫無要事';
     psyContent.textContent = data.PSY || '心如止水';
