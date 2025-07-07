@@ -43,30 +43,33 @@ body.dark-theme .menu-toggle {
 }
 
 .story-header {
-    position: sticky; /* 新增：讓標頭固定 */
-    top: 0;           /* 新增：定位在最頂部 */
-    background-color: var(--light-surface-bg); /* 新增：增加背景色避免滾動時內容穿透 */
-    padding: 0.5rem 2rem;
+    position: sticky; 
+    top: 0;          
+    background-color: var(--light-surface-bg); 
+    /* 【核心修改】增加上下高度，並移除左右內邊距，使其貼邊 */
+    padding: 1.5rem 0; 
     border-bottom: 1px solid var(--light-border);
     z-index: 10;
     transition: padding 0.4s ease-out;
 }
 body.dark-theme .story-header {
     border-bottom: 1px solid var(--dark-border);
-    background-color: var(--dark-surface-bg); /* 新增：暗色主題的背景色 */
+    background-color: var(--dark-surface-bg);
 }
 
 .status-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1.2rem; /* 修改：減少了狀態文字的間距，使其更緊湊 */
+    gap: 0.5rem 1.2rem; 
     color: var(--light-text-secondary);
     font-family: var(--font-sans);
     font-size: 0.9rem;
     overflow: hidden;
-    max-height: 120px; /* 確保有足夠的初始高度 */
+    max-height: 120px; 
     opacity: 1;
     transition: max-height 0.4s ease-out, opacity 0.4s ease-out, gap 0.4s ease-out, padding 0.4s ease-out;
+    /* 【核心新增】將左右內邊距從父層移到此處，讓內容對齊 */
+    padding: 0 2rem;
 }
 body.dark-theme .status-bar {
     color: var(--dark-text-secondary);
@@ -75,7 +78,6 @@ body.dark-theme .status-bar {
     margin-right: 0.5rem;
 }
 
-/* 【***這就是修正的核心***】 */
 .story-header.collapsed {
     padding-top: 0;
     padding-bottom: 0;
@@ -96,9 +98,9 @@ body.dark-theme .status-bar {
 .round-title {
     font-family: var(--font-serif);
     font-weight: 600;
-    font-size: 1.3rem; /* 修改：縮小了標題字體大小 */
+    font-size: 1.3rem; 
     text-align: center;
-    margin: 1.5rem 0; /* 修改：調整了標題的上下間距 */
+    margin: 1.5rem 0; 
     color: var(--light-accent);
 }
 body.dark-theme .round-title {
