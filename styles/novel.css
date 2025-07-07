@@ -19,11 +19,12 @@ body.dark-theme .novel-header {
 /* 為標題和連結的容器新增 Flexbox 排版 */
 .title-with-link {
     display: flex;
-    justify-content: space-between;
+    justify-content: center; /* 【***核心修改***】改為置中對齊 */
     align-items: center;
     flex-wrap: wrap; /* 在窄螢幕上允許換行 */
     gap: 1rem; /* 標題和按鈕之間的間距 */
     margin-bottom: 0.5rem; /* 與下方的 <p> 標籤保留一些距離 */
+    position: relative; /* 【***核心修改***】為絕對定位的按鈕提供基準點 */
 }
 
 
@@ -33,7 +34,7 @@ body.dark-theme .novel-header {
     font-weight: 600;
     color: var(--light-text-primary);
     margin: 0; /* 移除 h1 的預設 margin */
-    text-align: center; /* 讓標題文字靠左對齊 */
+    text-align: center; /* 確保標題文字在自己的容器內是置中的 */
 }
 body.dark-theme .novel-header h1 {
     color: var(--dark-text-primary);
@@ -60,13 +61,18 @@ body.dark-theme .novel-header h1 {
     border: 1px solid var(--light-border);
     transition: all 0.3s ease;
     flex-shrink: 0; /* 防止按鈕在空間不足時被過度壓縮 */
+    /* 【***核心修改***】將按鈕絕對定位到容器右側，使其不影響標題置中 */
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .library-link:hover {
     background-color: var(--light-surface-bg);
     color: var(--light-text-primary);
     box-shadow: 0 4px 15px rgba(0,0,0,0.07);
-    transform: translateY(-2px);
+    transform: translateY(calc(-50% - 2px)); /* 【***核心修改***】結合絕對定位的 transform，以維持垂直置中和懸停效果 */
 }
 
 .library-link .icon-circle {
