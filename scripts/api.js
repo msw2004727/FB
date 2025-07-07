@@ -43,7 +43,10 @@ export const api = {
     getRelations: () => fetchApi('/api/game/state/get-relations'),
     getNovel: () => fetchApi('/api/game/state/get-novel'),
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
-    getSkills: () => fetchApi('/api/game/state/skills'), // 【核心新增】
+    getSkills: () => fetchApi('/api/game/state/skills'),
+
+    // 【核心新增】Bounty Route
+    getBounties: () => fetchApi('/api/bounties'),
 
     // Epilogue Route
     getEpilogue: () => fetchApi('/api/epilogue'),
