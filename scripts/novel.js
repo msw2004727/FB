@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    // --- 【新增】登入守衛 ---
+    // --- 登入守衛 ---
     const token = localStorage.getItem('jwt_token');
     const username = localStorage.getItem('username');
 
@@ -13,28 +13,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const novelTitle = document.getElementById('novel-title');
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 
-    // 【新增】設定個人化標題
+    // 設定個人化標題
     if (username) {
         novelTitle.textContent = `${username}的江湖路`;
     }
 
-    // 【新增】高亮NPC姓名的輔助函式
-    function highlightNpcNames(text, npcs) {
-        let highlightedText = text;
-        if (npcs && Array.isArray(npcs) && npcs.length > 0) {
-            // 根據名字長度排序，避免短名字覆蓋長名字 (例如 "阿" 覆蓋 "阿牛")
-            const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
-            sortedNpcs.forEach(npc => {
-                const regex = new RegExp(npc.name, 'g');
-                const replacement = `<span class="npc-name npc-${npc.friendliness}">${npc.name}</span>`;
-                highlightedText = highlightedText.replace(regex, replacement);
-            });
-        }
-        return highlightedText;
-    }
-
     try {
-        const response = await fetch(`${backendBaseUrl}/api/game/get-novel`, {
+        // 向後端請求已經由後端完整渲染好的小說HTML
+        const response = await fetch(`${backendBaseUrl}/api/game/state/get-novel`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -46,29 +32,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             throw new Error(data.message || '無法獲取故事內容。');
         }
         
-        novelContent.innerHTML = ''; // 清空載入中訊息
-
-        if (data.novel && data.novel.length > 0) {
-            data.novel.forEach((chapterData, index) => {
-                if(chapterData && chapterData.text && chapterData.text.trim() !== '') {
-                    const chapterDiv = document.createElement('div');
-                    chapterDiv.className = 'chapter';
-
-                    const title = document.createElement('h2');
-                    title.textContent = `第 ${index + 1} 回`; // 將章改為回，更符合武俠小說風格
-
-                    const content = document.createElement('p');
-                    
-                    // 【已修改】使用輔助函式處理文字，並將換行符轉換
-                    const processedText = highlightNpcNames(chapterData.text, chapterData.npcs);
-                    content.innerHTML = processedText.replace(/\n/g, '<br>');
-
-                    chapterDiv.appendChild(title);
-                    chapterDiv.appendChild(content);
-                    novelContent.appendChild(chapterDiv);
-                }
-            });
+        // 直接檢查後端回傳的 data.novelHTML 是否有內容
+        if (data && data.novelHTML && data.novelHTML.trim() !== '') {
+            // 如果有，直接將這段HTML呈現在頁面上
+            novelContent.innerHTML = data.novelHTML;
         } else {
+            // 如果沒有，或為空字串，則顯示提示訊息
             novelContent.innerHTML = '<p class="loading">您的故事還未寫下第一筆...</p>';
         }
 
