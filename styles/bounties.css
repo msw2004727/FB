@@ -1,0 +1,185 @@
+/* styles/bounties.css */
+
+/* --- 主體與容器 --- */
+.bounty-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem 1.5rem;
+    box-sizing: border-box;
+    font-family: var(--font-sans);
+}
+
+.bounty-header {
+    text-align: center;
+    padding-bottom: 2rem;
+    margin-bottom: 3rem;
+    border-bottom: 1px solid var(--light-border);
+}
+body.dark-theme .bounty-header {
+    border-bottom-color: var(--dark-border);
+}
+
+.bounty-header h1 {
+    font-family: var(--font-serif);
+    font-size: 2.8rem;
+    font-weight: 600;
+    color: var(--light-accent);
+    margin: 0 0 0.5rem 0;
+}
+body.dark-theme .bounty-header h1 {
+    color: var(--dark-accent);
+}
+
+.bounty-header p {
+    font-size: 1rem;
+    color: var(--light-text-secondary);
+    margin: 0;
+}
+body.dark-theme .bounty-header p {
+    color: var(--dark-text-secondary);
+}
+
+.back-to-game-btn {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--light-border);
+    border-radius: 20px;
+    color: var(--light-text-secondary);
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+body.dark-theme .back-to-game-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+.back-to-game-btn:hover {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+}
+body.dark-theme .back-to-game-btn:hover {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+    border-color: var(--dark-accent);
+}
+.back-to-game-btn i {
+    margin-right: 0.5rem;
+}
+
+
+/* --- 懸賞卡片列表 --- */
+.bounty-list-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+.bounty-card {
+    background-color: var(--light-surface-bg);
+    border: 1px solid var(--light-border);
+    border-left: 5px solid var(--light-accent);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+body.dark-theme .bounty-card {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+    border-left-color: var(--dark-accent);
+}
+.bounty-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+}
+body.dark-theme .bounty-card:hover {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.bounty-card.difficulty-低 { border-left-color: #28a745; }
+.bounty-card.difficulty-中 { border-left-color: #ffc107; }
+.bounty-card.difficulty-高 { border-left-color: #dc3545; }
+
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed var(--light-border);
+}
+body.dark-theme .card-header {
+    border-bottom-color: var(--dark-border);
+}
+
+
+.card-title {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    margin: 0;
+    color: var(--light-text-primary);
+}
+body.dark-theme .card-title {
+    color: var(--dark-text-primary);
+}
+
+.card-difficulty {
+    flex-shrink: 0;
+    margin-left: 1rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: bold;
+    border-radius: 12px;
+    color: #fff;
+}
+.card-difficulty.difficulty-低 { background-color: #28a745; }
+.card-difficulty.difficulty-中 { background-color: #ffc107; color: #333; }
+.card-difficulty.difficulty-高 { background-color: #dc3545; }
+
+
+.card-body {
+    flex-grow: 1;
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
+.card-footer {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--light-border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .card-footer {
+    border-top-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+
+/* --- 載入中 & 空狀態提示 --- */
+.loading-placeholder, .empty-message {
+    grid-column: 1 / -1; /* 佔滿整行 */
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .loading-placeholder, body.dark-theme .empty-message {
+    color: var(--dark-text-secondary);
+}
+.loader-dots span {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin: 0 4px;
+    background-color: var(--light-accent);
+    animation: prequel-bounce 1.4s infinite ease-in-out both;
+}
+.loader-dots span:nth-of-type(1) { animation-delay: -0.32s; }
+.loader-dots span:nth-of-type(2) { animation-delay: -0.16s; }
