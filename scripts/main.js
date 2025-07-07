@@ -1,6 +1,7 @@
 // scripts/main.js
 import { api } from './api.js';
-import { updateUI, handleApiError, appendMessageToStory } from './uiUpdater.js';
+// 匯入我們新增的 addRoundTitleToStory 函式
+import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 
@@ -121,7 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data && data.roundData) {
                 data.roundData.suggestion = data.suggestion;
+                
+                // 【***核心修改***】
+                // 先插入新回合的標題
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
+                // 然後再更新UI，渲染故事內容和儀表板
                 updateUI(data.story, data.roundData, data.randomEvent);
+                
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
             } else {
@@ -182,6 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             gameState.currentRound = newRoundData.roundData.R;
             gameState.roundData = newRoundData.roundData;
+            // 【***核心修改***】
+            addRoundTitleToStory(newRoundData.roundData.EVT || `第 ${newRoundData.roundData.R} 回`);
             updateUI(newRoundData.story, newRoundData.roundData, null);
         } else {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
@@ -202,12 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.openChatModalUI(profile);
                 chatInput.focus();
             } catch (error) {
-                // 【核心修改】判斷錯誤訊息類型
                 if (error.message && error.message.includes('並未見到')) {
-                    // 如果是特定錯誤，直接顯示劇情旁白
                     appendMessageToStory(error.message, 'system-message');
                 } else {
-                    // 如果是其他錯誤，才使用通用錯誤處理
                     handleApiError(error);
                 }
             } finally {
@@ -257,6 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
                 appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
                 data.roundData.suggestion = data.suggestion;
+                // 【***核心修改***】
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, data.randomEvent);
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
@@ -292,6 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data && data.roundData) {
                 data.roundData.suggestion = data.suggestion;
+                 // 【***核心修改***】
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, null); 
                 gameState.currentRound = data.roundData.R; 
                 gameState.roundData = data.roundData; 
@@ -435,6 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
                  aiModelSelector.value = data.roundData.preferredModel;
                  localStorage.setItem('preferred_ai_model', data.roundData.preferredModel);
             }
+            
+            storyTextContainer.innerHTML = ''; // 清空容器
 
             if (data.gameState === 'deceased') {
                 modal.showDeceasedScreen();
@@ -445,23 +457,33 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
-                storyTextContainer.innerHTML = '';
+                
                 if (data.prequel) {
                     const prequelDiv = document.createElement('div');
                     prequelDiv.className = 'prequel-summary';
                     prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                     storyTextContainer.appendChild(prequelDiv);
                 }
+
                 data.roundData.suggestion = data.suggestion;
-                updateUI(null, data.roundData, null);
+                
+                // 【***核心修改***】
+                // 載入遊戲時，也先插入標題，再渲染內容
+                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
+                updateUI(data.story, data.roundData, null);
             }
         } catch (error) {
             if (error.message.includes('找不到存檔')) {
                 storyTextContainer.innerHTML = '';
                 const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
-                appendMessageToStory(initialMessage, 'system-message');
                 const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, suggestion: '先檢查一下自己的身體狀況吧。' };
+                
+                // 【***核心修改***】
+                // 新遊戲開始時，先插入標題，再顯示提示訊息
+                addRoundTitleToStory(roundZeroData.EVT);
+                appendMessageToStory(initialMessage, 'system-message');
                 updateUI(null, roundZeroData, null);
+
             } else {
                 handleApiError(error);
             }
