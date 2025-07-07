@@ -1,116 +1,124 @@
-/* --- 小說頁面樣式 --- */
+/* --- 小說/百科閱讀頁面樣式 --- */
 .novel-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem 1.5rem;
-    font-family: var(--font-sans);
+    box-sizing: border-box;
 }
 
 .novel-header {
+    text-align: center;
     padding-bottom: 2rem;
     margin-bottom: 2rem;
     border-bottom: 1px solid var(--light-border);
 }
-
-/* 【***核心修改***】新增 title-container 樣式，使用flex排版 */
-.title-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap; /* 在窄螢幕換行 */
-    gap: 1rem;
+body.dark-theme .novel-header {
+    border-bottom-color: var(--dark-border);
 }
 
-.title-container h1 {
+.novel-header h1 {
     font-family: var(--font-serif);
-    font-size: 2.5rem;
+    font-size: 2.8rem;
     font-weight: 600;
-    color: var(--light-accent);
+    color: var(--light-text-primary);
+    margin: 0 0 0.5rem 0;
+}
+body.dark-theme .novel-header h1 {
+    color: var(--dark-text-primary);
+}
+
+.novel-header p {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--light-text-secondary);
     margin: 0;
 }
 
-.title-container h1 i {
-    margin-right: 1rem;
-}
-
-/* 【***核心修改***】新增圖書館連結按鈕的完整樣式 */
-.library-link-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
-    background-color: var(--light-surface-bg);
-    padding: 0.5rem 1rem 0.5rem 0.5rem;
-    border-radius: 30px;
-    text-decoration: none;
-    color: var(--light-text-secondary);
-    border: 1px solid var(--light-border);
-    transition: all 0.3s ease;
-}
-
-.library-link-button:hover {
-    background-color: var(--light-bg);
-    color: var(--light-text-primary);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-}
-
-.library-link-button .icon-circle {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background-color: var(--light-accent);
-    color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1rem;
-}
-
-.library-link-button span {
-    font-weight: bold;
-    font-size: 0.9rem;
-}
-
-
-.novel-controls {
-    margin-top: 1.5rem;
-    text-align: right;
-}
-
-.control-btn {
+.back-to-game-btn {
     display: inline-block;
-    padding: 0.5rem 1rem;
+    margin-top: 1.5rem;
+    padding: 0.6rem 1.2rem;
     border: 1px solid var(--light-border);
     border-radius: 20px;
     color: var(--light-text-secondary);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-family: var(--font-sans);
+    font-weight: bold;
     transition: all 0.3s ease;
 }
+body.dark-theme .back-to-game-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
 
-.control-btn:hover {
+.back-to-game-btn:hover {
     background-color: var(--light-accent);
     color: #fff;
     border-color: var(--light-accent);
 }
+body.dark-theme .back-to-game-btn:hover {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+    border-color: var(--dark-accent);
+}
 
-.control-btn i {
+.back-to-game-btn i {
     margin-right: 0.5rem;
 }
 
-.novel-content-area {
+.novel-content .chapter {
+    margin-bottom: 3rem;
+}
+
+.novel-content .chapter h2 {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--light-accent);
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--light-border);
+}
+body.dark-theme .novel-content .chapter h2 {
+    color: var(--dark-accent);
+    border-bottom-color: var(--dark-border);
+}
+
+.novel-content .chapter p {
     font-family: var(--font-serif);
     font-size: 1.1rem;
     line-height: 2.2;
     text-align: justify;
 }
 
-.novel-content-area p {
-    margin-bottom: 1.5rem;
+.novel-content .loading {
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--light-text-secondary);
+}
+.novel-content .loading i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
 }
 
-.novel-content-area .loading {
-    text-align: center;
-    padding: 3rem 0;
-    color: var(--light-text-secondary);
-    font-style: italic;
+/* 百科頁面專用 */
+#encyclopedia-content .entry {
+    margin-bottom: 2rem;
+}
+#encyclopedia-content .entry-title {
+    font-family: var(--font-sans);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--light-text-primary);
+    margin-bottom: 0.5rem;
+}
+body.dark-theme #encyclopedia-content .entry-title {
+    color: var(--dark-text-primary);
+}
+#encyclopedia-content .entry-content {
+    padding-left: 1rem;
+    border-left: 3px solid var(--light-border);
+}
+body.dark-theme #encyclopedia-content .entry-content {
+    border-left-color: var(--dark-border);
 }
