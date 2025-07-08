@@ -266,8 +266,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await api.combatAction({ action: actionText, model: aiModelSelector.value });
             if (data.status === 'COMBAT_ONGOING') {
                 modal.appendToCombatLog(data.narrative);
+                // 【核心修改】新增：如果戰鬥持續中，則呼叫UI更新函式
+                if (data.updatedState) {
+                    modal.updateCombatUI(data.updatedState);
+                }
             } else if (data.status === 'COMBAT_END') {
-                data.newRound.roundData.suggestion = data.newRound.suggestion;
                 modal.appendToCombatLog(data.newRound.story, 'combat-summary');
                 setTimeout(() => endCombat(data.newRound), 2000);
             }
