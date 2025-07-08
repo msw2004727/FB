@@ -230,6 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
         playerInput.focus();
+        // 【核心修正】在戰鬥完全結束後，呼叫 setLoadingState 以確保所有輸入框都根據最新的 gameState 解除鎖定
+        setLoadingState(false);
     }
 
     async function handleNpcClick(event) {
