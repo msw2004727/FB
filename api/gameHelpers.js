@@ -118,7 +118,6 @@ const updateInventory = async (userId, itemChanges) => {
                     inventory[itemName].quantity -= quantity;
                     if (inventory[itemName].quantity <= 0) delete inventory[itemName];
                 } else {
-                    // Do not throw error, just log it. This can happen if AI makes a mistake.
                     console.warn(`物品移除警告：試圖移除不存在或數量不足的物品'${itemName}'。`);
                 }
             }
@@ -147,28 +146,35 @@ const updateRomanceValues = async (userId, romanceChanges) => {
     await Promise.all(promises);
 };
 
-const checkAndTriggerRomanceEvent = async (userId, username, romanceChanges, roundData, model) => {
-    if (!romanceChanges || romanceChanges.length === 0) return "";
-    let triggeredEventNarrative = "";
+// 【核心修改】重寫整個函式，使其主動掃描所有NPC，並回傳一個簡單的指令物件
+const checkAndTriggerRomanceEvent = async (userId) => {
     const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
-    for (const { npcName } of romanceChanges) {
-        const npcDocRef = userNpcsRef.doc(npcName);
-        const npcDoc = await npcDocRef.get();
-        if (!npcDoc.exists) continue;
-
-        const npcProfile = npcDoc.data();
-        const { romanceValue = 0, triggeredRomanceEvents = [] } = npcProfile;
-
-        if (romanceValue >= 50 && !triggeredRomanceEvents.includes('level_1')) {
-            const playerProfileForEvent = { username, location: roundData.LOC[0] };
-            const eventNarrative = await getAIRomanceEvent(model, playerProfileForEvent, npcProfile, 'level_1');
-            if (eventNarrative) {
-                triggeredEventNarrative += `<div class="random-event-message romance-event">${eventNarrative}</div>`;
-                await npcDocRef.update({ triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1') });
-            }
-        }
+    const npcsSnapshot = await userNpcsRef.get();
+    if (npcsSnapshot.empty) {
+        return null;
     }
-    return triggeredEventNarrative;
+
+    // 掃描所有NPC，找出第一個滿足觸發條件的
+    for (const doc of npcsSnapshot.docs) {
+        const npcProfile = doc.data();
+        const { name, romanceValue = 0, triggeredRomanceEvents = [] } = npcProfile;
+        
+        // 條件1：心動值達到50，且從未觸發過level_1事件
+        if (romanceValue >= 50 && !triggeredRomanceEvents.includes('level_1')) {
+            // 標記事件已觸發，防止重複
+            await doc.ref.update({
+                triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1')
+            });
+            console.log(`[戀愛系統] 偵測到與 ${name} 的 level_1 事件觸發條件！`);
+            // 回傳一個指令物件，而不是故事文字
+            return { npcName: name, eventType: 'level_1' };
+        }
+        
+        // 可以在此處添加更多觸發條件，例如 level_2, level_3...
+        // if (romanceValue >= 100 && !triggeredRomanceEvents.includes('level_2')) { ... }
+    }
+
+    return null; // 沒有任何事件被觸發
 };
 
 const getInventoryState = async (userId) => {
