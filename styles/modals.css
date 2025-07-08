@@ -284,12 +284,63 @@ body.dark-theme .combat-header h3 {
     color: var(--dark-accent);
 }
 
-.combat-enemies-list {
-    text-align: center;
+/* 【核心新增】戰鬥陣營顯示樣式 */
+.combat-roster {
+    display: flex;
+    justify-content: space-around;
+    gap: 1rem;
+    margin-top: 1rem;
+    font-family: var(--font-sans);
     font-size: 0.9rem;
-    color: var(--light-text-secondary);
-    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background-color: rgba(0,0,0,0.02);
+    border: 1px solid var(--light-border);
+    border-radius: 6px;
 }
+body.dark-theme .combat-roster {
+    background-color: rgba(255,255,255,0.02);
+    border-color: var(--dark-border);
+}
+.combat-roster-group {
+    flex: 1;
+    text-align: center;
+}
+.combat-roster-group strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .combat-roster-group strong {
+    color: var(--dark-text-secondary);
+}
+.roster-names {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.roster-names span {
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-weight: bold;
+}
+#combat-allies .roster-names span {
+    background-color: #d4edda;
+    color: #155724;
+}
+body.dark-theme #combat-allies .roster-names span {
+    background-color: #2e4b37;
+    color: #a3e6b8;
+}
+#combat-enemies .roster-names span {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+body.dark-theme #combat-enemies .roster-names span {
+    background-color: #5c2b30;
+    color: #f5c6cb;
+}
+
 
 .combat-log-area {
     flex-grow: 1;
@@ -380,7 +431,6 @@ body.dark-theme #combat-input {
     color: var(--dark-text-primary);
 }
 
-/* 【核心修改】通用戰鬥按鈕樣式 */
 .combat-button {
     flex-shrink: 0;
     border: none;
@@ -664,7 +714,7 @@ body.dark-theme .chat-footer {
     cursor: pointer;
     font-weight: bold;
     transition: all 0.3s;
-    font-size: 1.1rem;
+    font-size: 1.1rem; 
 }
 .end-chat-btn:hover {
     background-color: #c92a2a;
@@ -713,7 +763,6 @@ body.dark-theme .romance-hearts .far.fa-heart {
 }
 
 
-/* --- 友好度計量棒 --- */
 .friendliness-bar-container {
     width: 100%;
     margin-top: 1rem;
@@ -761,7 +810,6 @@ body.dark-theme .friendliness-bar-indicator {
     border-color: var(--dark-text-primary);
 }
 
-/* --- 結局彈窗樣式 --- */
 .epilogue-modal-overlay {
     position: fixed;
     top: 0;
