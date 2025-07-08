@@ -91,14 +91,44 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
 
 
 /**
- * 根據當前世界摘要，觸發一次新的懸賞生成。
+ * 【核心修改】根據詳細的玩家情境，觸發一次新的懸賞生成。
  * @param {string} userId - 玩家的ID
  * @param {string} longTermSummary - 長期故事摘要
  */
 async function triggerBountyGeneration(userId, longTermSummary) {
     console.log(`[世界引擎] 正在為玩家 ${userId} 嘗試生成新的懸賞...`);
+    
     try {
-        const prompt = getBountyGeneratorPrompt(longTermSummary);
+        const userDocRef = db.collection('users').doc(userId);
+        
+        // 【核心修改】並行獲取生成懸賞所需的所有情境資料
+        const [npcsSnapshot, lastSaveSnapshot] = await Promise.all([
+            userDocRef.collection('npcs').get(),
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
+        ]);
+
+        if (lastSaveSnapshot.empty) {
+            console.warn(`[世界引擎] 找不到玩家 ${userId} 的最新存檔，無法生成懸賞。`);
+            return;
+        }
+
+        const npcDetails = npcsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                name: data.name,
+                background: data.background || '背景不詳'
+            };
+        });
+
+        const playerLocation = lastSaveSnapshot.docs[0].data().LOC[0] || '未知之地';
+
+        const playerContext = {
+            longTermSummary,
+            npcDetails,
+            playerLocation
+        };
+
+        const prompt = getBountyGeneratorPrompt(playerContext);
         const bountyJsonString = await callAI('deepseek', prompt, true); 
         const newBountyData = JSON.parse(bountyJsonString);
 
@@ -108,7 +138,7 @@ async function triggerBountyGeneration(userId, longTermSummary) {
         }
 
         newBountyData.status = 'active';
-        newBountyData.isRead = false; // 【核心修改】新增此行
+        newBountyData.isRead = false;
         newBountyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         
         const expireDate = new Date();
