@@ -104,7 +104,6 @@ router.post('/rebuild-npc', async (req, res) => {
             return res.status(404).json({ message: `在存檔中找不到NPC「${npcName}」的初見情境。` });
         }
 
-        // 【核心修改】從「提交請求」改為「等待請求完成」
         await createNpcProfileInBackground(userId, username, { name: npcName, isNew: true }, firstMentionRound);
         
         res.json({ message: `已成功為「${npcName}」重建檔案。` });
@@ -119,41 +118,42 @@ router.post('/rebuild-npc', async (req, res) => {
 router.get('/locations', async (req, res) => {
     const userId = req.user.id;
     try {
+        // 【核心修改】現在讀取全域的locations和玩家個人的location_states
         const locationsRef = db.collection('locations');
-        const userSavesRef = db.collection('users').doc(userId).collection('game_saves');
+        const playerStatesRef = db.collection('users').doc(userId).collection('location_states');
 
-        const locationsSnapshot = await locationsRef.get();
-        const existingLocations = new Map();
+        const [locationsSnapshot, playerStatesSnapshot] = await Promise.all([
+            locationsRef.get(),
+            playerStatesRef.get()
+        ]);
+
+        const allLocations = new Map();
+
+        // 先加入所有已知的共享模板
         locationsSnapshot.forEach(doc => {
             const data = doc.data();
-            existingLocations.set(doc.id, {
+            allLocations.set(doc.id, {
                 id: doc.id,
                 name: data.locationName || doc.id,
-                isGhost: false
+                isGhost: false,
+                hasState: false // 預設玩家沒有個人狀態
             });
         });
-
-        const savesSnapshot = await userSavesRef.get();
-        const mentionedLocationNames = new Set();
-        savesSnapshot.forEach(doc => {
-            const roundData = doc.data();
-            if (roundData.LOC && roundData.LOC[0]) {
-                mentionedLocationNames.add(roundData.LOC[0]);
-            }
-        });
         
-        mentionedLocationNames.forEach(name => {
-            if (!existingLocations.has(name)) {
-                existingLocations.set(name, { id: name, name: name, isGhost: true });
+        // 更新有個人狀態的地點
+        playerStatesSnapshot.forEach(doc => {
+            if (allLocations.has(doc.id)) {
+                allLocations.get(doc.id).hasState = true;
             }
         });
 
-        res.json(Array.from(existingLocations.values()));
+        res.json(Array.from(allLocations.values()));
     } catch (error) {
         console.error(`[GM工具] 獲取地區列表時出錯:`, error);
         res.status(500).json({ message: '獲取地區列表失敗。' });
     }
 });
+
 
 router.post('/rebuild-location', async (req, res) => {
     const userId = req.user.id;
@@ -166,8 +166,8 @@ router.post('/rebuild-location', async (req, res) => {
         const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get();
         const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。';
 
-        // 【核心修改】從「提交請求」改為「等待請求完成」
-        await generateAndCacheLocation(locationName, '未知', worldSummary);
+        // 【核心修改】呼叫 generateAndCacheLocation 時，正確傳入 userId
+        await generateAndCacheLocation(userId, locationName, '未知', worldSummary);
         
         res.json({ message: `已成功為「${locationName}」重建檔案。` });
     } catch (error) {
@@ -184,7 +184,7 @@ router.get('/item-templates', async (req, res) => {
         if (itemsSnapshot.empty) {
             return res.json([]);
         }
-        const itemList = itemsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().itemName }));
+        const itemList = itemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         res.json(itemList);
     } catch (error) {
         console.error(`[GM工具] 獲取物品模板時出錯:`, error);
@@ -203,28 +203,22 @@ router.post('/update-player-resources', async (req, res) => {
         if (money !== undefined && !isNaN(money)) {
             const moneyAmount = Number(money);
             const inventoryRef = userDocRef.collection('game_state').doc('inventory');
-            const inventorySnapshot = await inventoryRef.get();
-            const inventoryData = inventorySnapshot.exists ? inventorySnapshot.data() : {};
-            let moneyKey = Object.keys(inventoryData).find(key => inventoryData[key].templateId === '銀兩');
-            
-            if (!moneyKey) {
-                moneyKey = uuidv4(); 
-            }
-
-            const moneyItem = {
-                templateId: '銀兩',
-                quantity: moneyAmount,
-                history: { event: '創世神之力介入', time: new Date().toISOString() }
-            };
-            promises.push(inventoryRef.set({ [moneyKey]: moneyItem }, { merge: true }));
+             await db.runTransaction(async transaction => {
+                const doc = await transaction.get(inventoryRef);
+                let inventory = doc.exists ? doc.data() : {};
+                inventory['銀兩'] = {
+                    ...(inventory['銀兩'] || {}),
+                    quantity: moneyAmount,
+                    itemType: '財寶',
+                    rarity: '普通',
+                    description: '流通的貨幣。'
+                };
+                transaction.set(inventoryRef, inventory);
+            });
         }
 
         if (itemChange && itemChange.itemName && itemChange.action) {
-            const fakeRoundData = {
-                EVT: '創世神之力介入',
-                yearName: '混沌', year: 0, month: 0, day: 0
-            };
-            promises.push(updateInventory(userId, [itemChange], fakeRoundData));
+            promises.push(updateInventory(userId, [itemChange]));
         }
 
         await Promise.all(promises);
