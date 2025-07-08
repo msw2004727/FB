@@ -39,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const giveItemBtn = document.getElementById('give-item-btn');
     const cancelGiveBtn = document.getElementById('cancel-give-btn');
     const closeSkillsBtn = document.getElementById('close-skills-btn');
-    // 【核心新增】獲取GM面板相關元素
     const gmPanel = document.getElementById('gm-panel');
     const gmCloseBtn = document.getElementById('gm-close-btn');
     const gmMenu = document.getElementById('gm-menu');
@@ -143,10 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
 
-        // 【核心修改】檢查是否為GM指令
         if (actionText.toUpperCase() === '/GM') {
             playerInput.value = '';
             gmPanel.classList.add('visible');
+            // 【核心修改】打開面板時，自動載入第一個功能頁(NPC管理)的數據
+            loadNpcManagementData();
             return;
         }
 
@@ -171,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.roundData.suggestion = data.suggestion;
                 
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                // 【核心修改】將地點資料傳遞給UI更新器
                 updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
                 
                 gameState.currentRound = data.roundData.R;
@@ -262,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.currentRound = newRoundData.roundData.R;
             gameState.roundData = newRoundData.roundData;
             addRoundTitleToStory(newRoundData.roundData.EVT || `第 ${newRoundData.roundData.R} 回`);
-            updateUI(newRoundData.story, newRoundData.roundData, null);
+            updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
         } else {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
@@ -336,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
                 data.roundData.suggestion = data.suggestion;
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, data.randomEvent);
+                updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
             } else {
@@ -372,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data && data.roundData) {
                 data.roundData.suggestion = data.suggestion;
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, null); 
+                updateUI(data.story, data.roundData, null, data.locationData); 
                 gameState.currentRound = data.roundData.R; 
                 gameState.roundData = data.roundData; 
             } else {
@@ -384,6 +383,74 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.currentChatNpc = null;
             gameState.chatHistory = [];
             setLoadingState(false); 
+        }
+    }
+
+    // --- 【核心新增】GM面板功能函式 ---
+    async function loadNpcManagementData() {
+        const npcManagementPage = document.getElementById('npc-management');
+        npcManagementPage.innerHTML = '<h3>NPC關係管理</h3><p>正在從後端獲取NPC列表...</p>';
+        try {
+            const npcList = await api.getNpcsForGM(); // 假設api.js有此函式
+            const container = document.createElement('div');
+            container.className = 'npc-list-container';
+
+            if (npcList.length === 0) {
+                npcManagementPage.innerHTML = '<h3>NPC關係管理</h3><p>資料庫中尚無任何NPC檔案。</p>';
+                return;
+            }
+
+            npcList.forEach(npc => {
+                const card = document.createElement('div');
+                card.className = 'npc-control-card';
+                card.innerHTML = `
+                    <h4>${npc.name}</h4>
+                    <div class="gm-control-group">
+                        <label><span>友好度</span><span class="value-display" id="friend-val-${npc.id}">${npc.friendlinessValue}</span></label>
+                        <input type="range" class="gm-slider" id="friend-slider-${npc.id}" min="-100" max="100" value="${npc.friendlinessValue}">
+                    </div>
+                    <div class="gm-control-group">
+                        <label><span>心動值</span><span class="value-display" id="romance-val-${npc.id}">${npc.romanceValue}</span></label>
+                        <input type="range" class="gm-slider" id="romance-slider-${npc.id}" min="0" max="100" value="${npc.romanceValue}">
+                    </div>
+                    <button class="gm-save-button" data-npc-id="${npc.id}">儲存變更</button>
+                `;
+                container.appendChild(card);
+            });
+
+            npcManagementPage.innerHTML = '<h3>NPC關係管理</h3>';
+            npcManagementPage.appendChild(container);
+            
+            // 為所有新生成的元素綁定事件
+            container.querySelectorAll('.gm-slider').forEach(slider => {
+                slider.addEventListener('input', (e) => {
+                    document.getElementById(e.target.id.replace('slider', 'val')).textContent = e.target.value;
+                });
+            });
+
+            container.querySelectorAll('.gm-save-button').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const npcId = e.target.dataset.npcId;
+                    const friendliness = document.getElementById(`friend-slider-${npcId}`).value;
+                    const romance = document.getElementById(`romance-slider-${npcId}`).value;
+                    e.target.textContent = '儲存中...';
+                    e.target.disabled = true;
+                    try {
+                        await api.updateNpcForGM({ npcId, friendlinessValue: friendliness, romanceValue: romance });
+                        e.target.textContent = '儲存成功!';
+                    } catch (error) {
+                        e.target.textContent = `錯誤: ${error.message}`;
+                    } finally {
+                        setTimeout(() => {
+                           e.target.textContent = '儲存變更';
+                           e.target.disabled = false;
+                        }, 2000);
+                    }
+                });
+            });
+
+        } catch (error) {
+            npcManagementPage.innerHTML = `<h3>NPC關係管理</h3><p>獲取資料失敗: ${error.message}</p>`;
         }
     }
 
@@ -446,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setLoadingState(true, '英雄末路，傳奇落幕...');
                 try {
                     const data = await api.forceSuicide({ model: aiModelSelector.value });
-                    updateUI(data.story, data.roundData, null);
+                    updateUI(data.story, data.roundData, null, data.locationData);
                     handlePlayerDeath();
                 } catch (error) {
                     handleApiError(error);
@@ -474,7 +541,6 @@ document.addEventListener('DOMContentLoaded', () => {
             closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
         }
 
-        // 【核心新增】GM面板的事件監聽
         gmCloseBtn.addEventListener('click', () => gmPanel.classList.remove('visible'));
         gmPanel.addEventListener('click', (e) => {
             if (e.target === gmPanel) {
@@ -486,14 +552,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const link = e.target.closest('a');
             if (!link) return;
 
-            // 處理菜單項的高亮狀態
             gmMenu.querySelectorAll('a').forEach(a => a.classList.remove('active'));
             link.classList.add('active');
 
-            // 顯示對應的內容頁面
             const targetPageId = link.getAttribute('href').substring(1);
             gmContent.querySelectorAll('.gm-page').forEach(page => page.classList.remove('active'));
             document.getElementById(targetPageId).classList.add('active');
+            
+            // 【核心修改】點擊不同菜單時，載入對應的數據
+            if(targetPageId === 'npc-management') {
+                loadNpcManagementData();
+            }
         });
 
 
