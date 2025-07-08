@@ -7,15 +7,15 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(15, 10, 22, 0.85);
-    z-index: 2000;
+    background-color: rgba(15, 10, 22, 0.85); /* 深紫色調背景 */
+    z-index: 2000; /* 確保在最上層 */
     display: flex;
     justify-content: center;
     align-items: center;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.4s ease, visibility 0.4s ease;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px); /* 毛玻璃效果 */
 }
 
 .gm-panel-overlay.visible {
@@ -29,9 +29,9 @@
     height: 90%;
     max-width: 1400px;
     max-height: 800px;
-    background: #1e1e2f;
+    background: #1e1e2f; /* 深藍紫色面板背景 */
     border-radius: 16px;
-    border: 1px solid rgba(132, 94, 247, 0.5);
+    border: 1px solid rgba(132, 94, 247, 0.5); /* 亮紫色邊框 */
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
     display: flex;
     overflow: hidden;
@@ -69,7 +69,7 @@
 .gm-panel-header .gm-icon {
     font-size: 2.5rem;
     margin-bottom: 1rem;
-    color: #845ef7;
+    color: #845ef7; /* 亮紫色 */
 }
 
 .gm-panel-menu {
@@ -84,7 +84,7 @@
     align-items: center;
     gap: 1rem;
     padding: 1rem 2rem;
-    color: #a0a0c0;
+    color: #a0a0c0; /* 淺灰紫色 */
     text-decoration: none;
     font-size: 1rem;
     font-weight: bold;
@@ -161,25 +161,48 @@
     border-bottom: 1px solid rgba(132, 94, 247, 0.3);
 }
 
-/* 【核心新增】NPC管理頁面的專屬樣式 */
-.npc-list-container {
+/* NPC & 地區管理通用樣式 */
+.gm-grid-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
 }
 
-.npc-control-card {
+.gm-control-card {
     background: rgba(40, 40, 60, 0.8);
     border-radius: 10px;
     padding: 1.5rem;
     border: 1px solid rgba(132, 94, 247, 0.3);
+    display: flex;
+    flex-direction: column;
 }
 
-.npc-control-card h4 {
+.gm-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.gm-card-header h4 {
     font-size: 1.2rem;
     color: #c0c0e0;
-    margin: 0 0 1.5rem 0;
-    text-align: center;
+    margin: 0;
+}
+
+.gm-status-tag {
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+    color: #fff;
+}
+.gm-status-tag.ghost {
+    background-color: #e03131; /* 紅色 */
+}
+
+.gm-card-body {
+    flex-grow: 1;
 }
 
 .gm-control-group {
@@ -210,6 +233,9 @@
     border-radius: 4px;
     transition: opacity .2s;
 }
+.gm-slider:disabled {
+    background: #333;
+}
 .gm-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -219,6 +245,10 @@
     cursor: pointer;
     border-radius: 50%;
 }
+.gm-slider:disabled::-webkit-slider-thumb {
+    background: #555;
+    cursor: not-allowed;
+}
 .gm-slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
@@ -226,23 +256,36 @@
     cursor: pointer;
     border-radius: 50%;
 }
+.gm-slider:disabled::-moz-range-thumb {
+    background: #555;
+    cursor: not-allowed;
+}
 
-.gm-save-button {
+.gm-button {
     width: 100%;
     margin-top: 1rem;
     padding: 0.7rem;
-    background: #845ef7;
     border: none;
     border-radius: 8px;
     color: #fff;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
-.gm-save-button:hover {
+.gm-button.save {
+    background: #845ef7;
+}
+.gm-button.rebuild {
+    background: #22b8cf; /* 青色 */
+}
+.gm-button:hover {
     opacity: 0.85;
 }
-.gm-save-button:disabled {
+.gm-button:disabled {
     background: #626288;
     cursor: not-allowed;
 }
