@@ -2,14 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-// 【核心修改】引入新的 getAISurrenderResult
+// 【核心修改】從 aiService 引入 getAISurrenderResult
 const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
     updateInventory,
     updateRomanceValues,
-    checkAndTriggerRomanceEvent,
+    checkAndTriggerRomanceEvent, // 【核心修改】我們仍會使用此函式，但用途不同
     getInventoryState,
     createNpcProfileInBackground,
     invalidateNovelCache,
@@ -80,6 +80,10 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
 
+        // 【核心修改】提前檢查是否觸發戀愛事件
+        const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId, username, modelName);
+
+
         const contextForClassifier = {
             location: lastSave.LOC?.[0] || '未知之地',
             npcs: lastSave.NPC?.map(n => n.name) || [],
@@ -122,7 +126,8 @@ const interactRouteHandler = async (req, res) => {
                 const preActionSkillChanges = req.body.skillChanges || [];
                 const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-                aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
+                // 【核心修改】將 romanceEventToWeave 作為新參數傳給 getAIStory
+                aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
         }
@@ -131,10 +136,11 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
-        if (romanceEventNarrative) {
-            aiResponse.story = romanceEventNarrative + aiResponse.story;
-        }
+        // 【核心修改】移除舊的、獨立的戀愛事件敘述添加邏輯
+        // const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
+        // if (romanceEventNarrative) {
+        //     aiResponse.story = romanceEventNarrative + aiResponse.story;
+        // }
         aiResponse.roundData.story = aiResponse.story;
         
         await Promise.all([
@@ -334,7 +340,6 @@ const combatActionRouteHandler = async (req, res) => {
     }
 };
 
-// 【核心新增】處理認輸的路由
 const surrenderRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const { model } = req.body;
@@ -356,15 +361,12 @@ const surrenderRouteHandler = async (req, res) => {
         const playerProfile = userDoc.data();
         const combatState = combatDoc.data();
 
-        // 呼叫新的AI來處理認輸邏輯
         const surrenderResult = await getAISurrenderResult(modelName, playerProfile, combatState);
         if (!surrenderResult) throw new Error("談判專家AI未能生成有效回應。");
 
-        // 將AI的回應加入戰鬥日誌
         combatState.log.push(surrenderResult.narrative);
         await combatDocRef.set(combatState);
 
-        // 如果對方不接受認輸，則戰鬥繼續
         if (!surrenderResult.accepted) {
             return res.json({
                 status: 'SURRENDER_REJECTED',
@@ -372,13 +374,11 @@ const surrenderRouteHandler = async (req, res) => {
             });
         }
         
-        // 如果對方接受認輸，則處理後續
-        await combatDocRef.delete(); // 刪除戰鬥狀態
+        await combatDocRef.delete(); 
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastRoundData = lastSaveSnapshot.docs[0].data();
         const playerChanges = surrenderResult.outcome.playerChanges || {};
         
-        // 更新玩家狀態
         const powerChange = playerChanges.powerChange || {};
         const finalPowerUpdate = {
             internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
@@ -388,12 +388,10 @@ const surrenderRouteHandler = async (req, res) => {
         };
         await userDocRef.update(finalPowerUpdate);
         
-        // 更新物品
         if (playerChanges.itemChanges) {
             await updateInventory(userId, playerChanges.itemChanges);
         }
 
-        // 產生新的遊戲回合
         const updatedUserDoc = await userDocRef.get();
         const updatedUserProfile = updatedUserDoc.data();
         const inventoryState = await getInventoryState(userId);
@@ -434,7 +432,7 @@ const surrenderRouteHandler = async (req, res) => {
 
 router.post('/interact', interactRouteHandler);
 router.post('/combat-action', combatActionRouteHandler);
-router.post('/combat-surrender', surrenderRouteHandler); // 【核心修改】註冊新的路由
+router.post('/combat-surrender', surrenderRouteHandler);
 router.post('/end-chat', async (req, res) => {
     const { getAIChatSummary } = require('../services/aiService');
     const userId = req.user.id;
