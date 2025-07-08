@@ -4,9 +4,58 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
 const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills } = require('./gameHelpers');
-const { generateAndCacheLocation } = require('./worldEngine'); // 【核心新增】引入世界引擎
+const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
+
+// 輔助函式，用於合併地點的靜態和動態資料
+const getMergedLocationData = async (userId, locationName) => {
+    if (!locationName) return null;
+
+    try {
+        const staticDocRef = db.collection('locations').doc(locationName);
+        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
+
+        const [staticDoc, dynamicDoc] = await Promise.all([
+            staticDocRef.get(),
+            dynamicDocRef.get()
+        ]);
+
+        if (!staticDoc.exists) {
+            // 如果連靜態模板都不存在，說明是全新的地點，觸發背景生成
+            console.log(`[讀取系統] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
+            generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
+            return {
+                locationId: locationName,
+                locationName: locationName,
+                description: "此地詳情尚在傳聞之中...",
+            };
+        }
+        
+        // 如果靜態模板存在，但玩家的動態狀態不存在，也觸發一次初始化
+        if (staticDoc.exists && !dynamicDoc.exists) {
+             console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
+             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
+        }
+
+        const staticData = staticDoc.data() || {};
+        const dynamicData = dynamicDoc.data() || {};
+
+        // 合併資料：以靜態資料為基礎，用動態資料覆蓋
+        return { ...staticData, ...dynamicData };
+
+    } catch (error) {
+        console.error(`[讀取系統] 合併地點 ${locationName} 的資料時出錯:`, error);
+        return {
+            locationId: locationName,
+            locationName: locationName,
+            description: "讀取此地詳情時發生錯誤...",
+        };
+    }
+};
+
 
 router.get('/inventory', async (req, res) => {
     try {
@@ -98,20 +147,9 @@ router.get('/latest-game', async (req, res) => {
 
         let latestGameData = snapshot.docs[0].data();
         
-        let locationData = null;
+        // 【核心修改】使用新的輔助函式來獲取合併後的地點資料
         const currentLocationName = latestGameData.LOC?.[0];
-        if (currentLocationName) {
-            const locationDoc = await db.collection('locations').doc(currentLocationName).get();
-            if (locationDoc.exists) {
-                locationData = locationDoc.data();
-            } else {
-                // 【核心修改】如果地點檔案不存在，立刻在背景觸發建檔程序
-                console.log(`[讀取系統] 偵測到未建檔的地點: ${currentLocationName}，將在背景生成...`);
-                // 我們不需要等待它完成，直接繼續執行
-                generateAndCacheLocation(currentLocationName, '未知', '初次抵達，資訊尚不明朗。')
-                    .catch(err => console.error(`[世界引擎] 初始地點 ${currentLocationName} 的背景生成失敗:`, err));
-            }
-        }
+        const locationData = await getMergedLocationData(userId, currentLocationName);
 
         const [inventoryState, skills] = await Promise.all([
             getInventoryState(userId),
@@ -172,12 +210,19 @@ router.post('/restart', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
         
-        const collections = ['game_saves', 'npcs', 'game_state', 'skills'];
+        // 【核心修改】刪除舊的個人化資料，現在還包括 location_states
+        const collections = ['game_saves', 'npcs', 'game_state', 'skills', 'location_states', 'bounties'];
         for (const col of collections) {
-            const snapshot = await userDocRef.collection(col).get();
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
+            try {
+                const snapshot = await userDocRef.collection(col).get();
+                if(!snapshot.empty){
+                    const batch = db.batch();
+                    snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+            } catch (e) {
+                console.warn(`清除集合 ${col} 失敗，可能該集合尚不存在。`, e.message);
+            }
         }
 
         await userDocRef.set({
@@ -192,6 +237,7 @@ router.post('/restart', async (req, res) => {
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
+
 
 router.post('/force-suicide', async (req, res) => {
     const userId = req.user.id;
