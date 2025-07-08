@@ -118,6 +118,7 @@ const updateInventory = async (userId, itemChanges) => {
                     inventory[itemName].quantity -= quantity;
                     if (inventory[itemName].quantity <= 0) delete inventory[itemName];
                 } else {
+                    // Do not throw error, just log it. This can happen if AI makes a mistake.
                     console.warn(`物品移除警告：試圖移除不存在或數量不足的物品'${itemName}'。`);
                 }
             }
@@ -146,7 +147,6 @@ const updateRomanceValues = async (userId, romanceChanges) => {
     await Promise.all(promises);
 };
 
-// 【核心修改】重寫整個函式，使其主動掃描所有NPC，並回傳一個簡單的指令物件
 const checkAndTriggerRomanceEvent = async (userId) => {
     const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
     const npcsSnapshot = await userNpcsRef.get();
