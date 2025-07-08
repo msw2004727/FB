@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-btn');
     const suicideButton = document.getElementById('suicide-btn');
     const skillsBtn = document.getElementById('skills-btn');
-    const bountiesBtn = document.getElementById('bounties-btn'); // 【核心新增】獲取懸賞按鈕
+    const bountiesBtn = document.getElementById('bounties-btn');
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
     const combatSurrenderBtn = document.getElementById('combat-surrender-btn'); 
@@ -114,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.setChatLoading(isLoading && gameState.isInChat);
     }
 
-    // 【核心新增】一個專門用來更新懸賞按鈕狀態的函式
     function updateBountyButton(hasNew) {
         if (bountiesBtn) {
             bountiesBtn.classList.toggle('has-new-bounty', hasNew);
@@ -141,6 +140,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.showDeceasedScreen();
             });
             console.error("獲取結局失敗:", error);
+        }
+    }
+
+    // 【核心新增】處理NPC主動發起對話的函式
+    async function startProactiveChat(proactiveData) {
+        const { npcName, openingLine, itemChanges } = proactiveData;
+        
+        try {
+            // 先獲取NPC的最新公開資料，確保頭像和狀態正確
+            const profile = await api.getNpcProfile(npcName);
+            
+            gameState.isInChat = true;
+            gameState.currentChatNpc = npcName;
+            gameState.chatHistory = [];
+
+            // 打開對話視窗
+            modal.openChatModalUI(profile); 
+            
+            // 將NPC的開場白加入對話紀錄
+            modal.appendChatMessage('npc', openingLine);
+            gameState.chatHistory.push({ speaker: 'npc', message: openingLine });
+
+            // 如果NPC贈送了物品，顯示提示
+            if (itemChanges && itemChanges.length > 0) {
+                const itemNames = itemChanges.map(item => `${item.itemName} x${item.quantity}`).join('、');
+                const giftMessage = `你獲得了來自 ${npcName} 的贈禮：${itemNames}。`;
+                modal.appendChatMessage('system', giftMessage); // 在對話窗中顯示系統訊息
+                gameState.chatHistory.push({ speaker: 'system', message: giftMessage });
+            }
+
+            chatInput.focus();
+        } catch (error) {
+            console.error(`啟動與 ${npcName} 的主動對話失敗:`, error);
+            // 即使獲取檔案失敗，也顯示一個通用的錯誤訊息，避免流程中斷
+            appendMessageToStory(`[系統] ${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
         }
     }
 
@@ -190,13 +224,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
 
-                // 【核心修改】在收到回應後，更新懸賞按鈕狀態
                 updateBountyButton(data.hasNewBounties);
 
                 if (data.roundData.playerState === 'dead') {
                     setLoadingState(false);
                     handlePlayerDeath();
                     return;
+                }
+                
+                // 【核心修改】檢查並觸發NPC主動對話
+                if (data.proactiveChat) {
+                    setLoadingState(false); // 先結束主要讀取動畫
+                    startProactiveChat(data.proactiveChat); // 再彈出對話窗
+                    return; // 彈出對話窗後，暫停後續執行
                 }
 
             } else {
@@ -209,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleApiError(error);
         } finally {
-            if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
+            if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
                  setLoadingState(false);
             }
             const endTime = performance.now();
@@ -355,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
-                updateBountyButton(data.hasNewBounties); //【核心修改】結束對話後也更新懸賞狀態
+                updateBountyButton(data.hasNewBounties);
             } else {
                 throw new Error('從伺服器收到的回應格式不正確。');
             }
@@ -392,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUI(data.story, data.roundData, null, data.locationData); 
                 gameState.currentRound = data.roundData.R; 
                 gameState.roundData = data.roundData; 
-                updateBountyButton(data.hasNewBounties); //【核心修改】贈予物品後也更新懸賞狀態
+                updateBountyButton(data.hasNewBounties);
             } else {
                 throw new Error("從伺服器收到的回應格式不正確。");
             }
@@ -441,7 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            // 綁定新按鈕的事件
             document.getElementById('gm-save-money').addEventListener('click', async (e) => {
                 const money = document.getElementById('gm-money').value;
                 if (money === '' || isNaN(money)) { alert('請輸入有效的數字'); return; }
@@ -738,7 +777,6 @@ document.addEventListener('DOMContentLoaded', () => {
             closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
         }
 
-        // 【核心新增】為懸賞按鈕添加點擊事件，點擊後立即移除光暈
         if (bountiesBtn) {
             bountiesBtn.addEventListener('click', () => {
                 updateBountyButton(false);
@@ -832,7 +870,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, null, data.locationData);
 
-                // 【核心修改】在初始載入時，更新懸賞按鈕狀態
                 updateBountyButton(data.hasNewBounties);
             }
         } catch (error) {
