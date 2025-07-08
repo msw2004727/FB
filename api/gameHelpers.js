@@ -3,14 +3,13 @@ const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
 const { getOrGenerateItemTemplate } = require('./itemManager');
-const { generateAndCacheLocation } = require('./worldEngine'); // 新增：引入世界引擎的功能
+const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-// 新增：從 stateRoutes.js 搬移過來的共用函式
 const getMergedLocationData = async (userId, locationName) => {
     if (!locationName) return null;
 
@@ -24,7 +23,6 @@ const getMergedLocationData = async (userId, locationName) => {
         ]);
 
         if (!staticDoc.exists) {
-            // 如果連靜態模板都不存在，說明是全新的地點，觸發背景生成
             console.log(`[讀取系統] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
                 .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
@@ -35,7 +33,6 @@ const getMergedLocationData = async (userId, locationName) => {
             };
         }
         
-        // 如果靜態模板存在，但玩家的動態狀態不存在，也觸發一次初始化
         if (staticDoc.exists && !dynamicDoc.exists) {
              console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
              generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
@@ -45,7 +42,6 @@ const getMergedLocationData = async (userId, locationName) => {
         const staticData = staticDoc.data() || {};
         const dynamicData = dynamicDoc.data() || {};
 
-        // 合併資料：以靜態資料為基礎，用動態資料覆蓋
         return { ...staticData, ...dynamicData };
 
     } catch (error) {
@@ -138,7 +134,8 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             console.log(`[NPC系統] "${npcName}" 的檔案已存在，取消建立。`);
             return;
         }
-        const npcProfile = await getAINpcProfile('deepseek', username, npcName, roundData);
+        // 【核心修改】移除 modelName 參數
+        const npcProfile = await getAINpcProfile(username, npcName, roundData);
         if (npcProfile) {
             npcProfile.currentLocation = roundData.LOC[0];
             npcProfile.friendlinessValue = npcData.friendlinessValue || 0;
@@ -293,7 +290,8 @@ const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
                 
                 console.log(`[戀愛系統] 偵測到與 ${name} 的 ${trigger.level} 事件觸發條件！`);
                 
-                const romanceEventResultText = await getAIRomanceEvent('gemini', playerProfile, npcProfile, trigger.level);
+                // 【核心修改】移除 modelName 參數
+                const romanceEventResultText = await getAIRomanceEvent(playerProfile, npcProfile, trigger.level);
                 
                 try {
                     const romanceEventResult = JSON.parse(romanceEventResultText);
@@ -309,7 +307,7 @@ const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
                     }
                 } catch(e){
                      console.error('[戀愛系統] 解析AI回傳的戀愛事件JSON時出錯:', e);
-                     return null; // 解析失敗則不觸發事件
+                     return null;
                 }
             }
         }
@@ -489,5 +487,5 @@ module.exports = {
     updateSkills,
     getPlayerSkills,
     processNpcUpdates,
-    getMergedLocationData, // 新增：匯出共用函式
+    getMergedLocationData,
 };
