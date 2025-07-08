@@ -6,7 +6,6 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
         ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
 
-    // 【核心新增】將盟友資訊格式化，如果沒有盟友則顯示'無'
     const alliesString = combatState.allies && combatState.allies.length > 0
         ? combatState.allies.map(a => `${a.name} (狀態: ${a.status || '良好'})`).join('、')
         : '無';
@@ -48,24 +47,6 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 6.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
 
-## 【核心修改】戰利品生成規則 (Loot Generation)
-當戰鬥勝利結束時（\`combatOver: true\`），你**必須**在回傳的 \`outcome.playerChanges\` 物件中，額外加入一個名為 **\`itemChanges\`** 的**陣列**，用來描述玩家獲得的戰利品。
-- **邏輯性**: 戰利品必須與被擊敗的敵人類型高度相關。
-    - 擊敗**人類**敵人（如：山賊、官兵），可能掉落他們身上的**武器、裝備、金錢或道具**。
-    - 擊敗**野獸**（如：猛虎、巨蟒），應該掉落**材料**（如：虎皮、蛇膽）。
-- **格式**: \`itemChanges\` 陣列中的每個物件，都必須遵循「物品帳本系統」的 "add" 操作格式。
-    \`\`\`json
-    {
-      "action": "add",
-      "itemName": "戰利品的準確名稱",
-      "quantity": 1,
-      "itemType": "武器 | 裝備 | 道具 | 材料 | 財寶",
-      "rarity": "普通 | 稀有",
-      "description": "一段關於此戰利品的簡短描述。"
-    }
-    \`\`\`
-- 如果戰鬥結束時沒有任何戰利品（例如友好切磋），則回傳一個**空陣列 \`[]\`**。
-
 ## 回傳格式規則：
 
 你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。
@@ -77,40 +58,22 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ### 2. 當戰鬥結束時：
 - \`combatOver\` 必須為 \`true\`。
-- \`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」。
+- \`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」。**你的描述可以包含敵人倒下後，其身上的物品掉落或顯露出來的線索，引導玩家進行後續的探索。**
 - **必須**包含 \`outcome\` 欄位，用來總結戰果。
     - \`summary\`: (字串) 對整場戰鬥的簡短總結。
-    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。**必須**包含 PC, powerChange, moralityChange, itemChanges 四個鍵。
+    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。**現在只需要**包含 PC, powerChange, moralityChange 三個鍵。**絕對不要包含 itemChanges**。
 
 **範例 (JSON):**
 \`\`\`json
 {
-  "narrative": "你抓住最後的機會，用盡十成功力使出『龍象般若功』，雙掌推出，正中那山賊頭目的胸口，只聽得筋骨寸斷之聲，他如斷線風箏般飛出，掙扎幾下便不再動彈。剩餘的嘍囉見狀，嚇得屁滾尿流，四散奔逃。",
+  "narrative": "你抓住最後的機會，用盡十成功力使出『龍象般若功』，雙掌推出，正中那山賊頭目的胸口，只聽得筋骨寸斷之聲，他如斷線風箏般飛出，掙扎幾下便不再動彈。他腰間那個鼓鼓囊囊的錢袋，也隨之滾落到一旁。",
   "combatOver": true,
   "outcome": {
     "summary": "經過一番苦戰，你成功擊退了來襲的山賊。",
     "playerChanges": {
       "PC": "你雖然獲勝，但也受了些內傷，氣血翻湧。",
       "powerChange": { "internal": -10, "external": 5, "lightness": -5 },
-      "moralityChange": 5,
-      "itemChanges": [
-        {
-          "action": "add",
-          "itemName": "鬼頭刀",
-          "quantity": 1,
-          "itemType": "武器",
-          "rarity": "普通",
-          "description": "山賊頭目使用的大刀，刀刃上有些許缺口。"
-        },
-        {
-          "action": "add",
-          "itemName": "一袋錢幣",
-          "quantity": 50,
-          "itemType": "財寶",
-          "rarity": "普通",
-          "description": "從山賊身上搜出的錢袋，裡面裝著一些銅錢。"
-        }
-      ]
+      "moralityChange": 5
     }
   }
 }
