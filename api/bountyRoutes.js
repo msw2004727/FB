@@ -3,20 +3,16 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
-const { getRewardGeneratorPrompt } = require('../prompts/rewardGeneratorPrompt.js'); // 新增：引入獎勵生成器
-const { callAI } = require('../services/aiService'); // 新增：引入AI呼叫中心
-const { updateInventory, updateSkills } = require('./gameHelpers'); // 新增：引入玩家資料更新工具
+// 【核心修改】引入了兩個新的 Prompt 模組
+const { getRewardGeneratorPrompt } = require('../prompts/rewardGeneratorPrompt.js');
+const { getBountyCompletionValidatorPrompt } = require('../prompts/bountyCompletionValidatorPrompt.js');
+const { callAI } = require('../services/aiService');
+const { updateInventory, updateSkills, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
 
 const db = admin.firestore();
 
-// 所有此路由下的請求都需要先經過身份驗證
 router.use(authMiddleware);
 
-/**
- * @route   GET /api/bounties
- * @desc    獲取當前玩家所有活躍的懸賞任務
- * @access  Private
- */
 router.get('/', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -34,7 +30,7 @@ router.get('/', async (req, res) => {
         }
 
         const bountiesList = [];
-        const batch = db.batch(); // 【核心修改】初始化一個批次寫入
+        const batch = db.batch();
         
         snapshot.docs.forEach(doc => {
             const data = doc.data();
@@ -47,13 +43,11 @@ router.get('/', async (req, res) => {
                 expireAt: data.expireAt.toDate() 
             });
 
-            // 【核心修改】如果懸賞是未讀的，就將其加入到更新佇列中
             if (data.isRead === false) {
                 batch.update(doc.ref, { isRead: true });
             }
         });
 
-        // 【核心修改】非同步地提交所有更新
         await batch.commit();
         console.log(`[懸賞系統] 已將玩家 ${userId} 的 ${snapshot.docs.length} 條懸賞標記為已讀。`);
 
@@ -65,12 +59,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-
-/**
- * @route   POST /api/bounties/claim
- * @desc    玩家嘗試領取懸賞獎勵
- * @access  Private
- */
+// 【核心修改】重構整個 /claim 路由的邏輯
 router.post('/claim', async (req, res) => {
     const userId = req.user.id;
     const { bountyTitle } = req.body;
@@ -84,37 +73,46 @@ router.post('/claim', async (req, res) => {
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const bountiesRef = userDocRef.collection('bounties');
 
-        // 1. 查找對應的懸賞
-        const bountyQuery = await bountiesRef.where('title', '==', bountyTitle).where('status', '==', 'active').limit(1).get();
+        const [userDoc, summaryDoc, bountyQuery] = await Promise.all([
+            userDocRef.get(),
+            summaryDocRef.get(),
+            bountiesRef.where('title', '==', bountyTitle).where('status', '==', 'active').limit(1).get()
+        ]);
+
         if (bountyQuery.empty) {
             return res.status(404).json({ message: `找不到名為「${bountyTitle}」的活躍懸賞。` });
         }
+        if (!summaryDoc.exists) {
+            return res.status(404).json({ message: '你的江湖事蹟尚無記載，無法判斷任務是否完成。' });
+        }
+
         const bountyDoc = bountyQuery.docs[0];
         const bountyData = bountyDoc.data();
-
-        // 2. 獲取玩家檔案和世界摘要以供AI判斷
-        const [userDoc, summaryDoc] = await Promise.all([userDocRef.get(), summaryDocRef.get()]);
         const playerProfile = userDoc.data();
-        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "";
+        const longTermSummary = summaryDoc.data().text;
 
-        // 在真實場景中，這裡應該有一個更複雜的AI或邏輯來驗證玩家是否真的完成了任務。
-        // 目前我們簡化這個流程，只要長期摘要中包含相關成功的關鍵字，就視為完成。
-        // 這個驗證可以放在 storyPrompt.js 中讓主AI完成，這裡我們假設主AI已經驗證通過。
+        // 步驟 1: 呼叫專門的AI來驗證任務是否已完成
+        const validationPrompt = getBountyCompletionValidatorPrompt(bountyData, longTermSummary);
+        const validationJsonString = await callAI('openai', validationPrompt, true);
+        const validationResult = JSON.parse(validationJsonString);
 
-        // 3. 呼叫獎勵生成AI
+        if (!validationResult.isCompleted) {
+            return res.status(400).json({ message: `你尚未達成懸賞「${bountyTitle}」的目標。(${validationResult.reason})` });
+        }
+
+        console.log(`[懸賞系統] 驗證通過: 玩家 ${req.user.username} 已完成懸賞: ${bountyTitle}`);
+
+        // 步驟 2: 呼叫獎勵生成AI
         const rewardPrompt = getRewardGeneratorPrompt(bountyData, playerProfile);
         const rewardJsonString = await callAI('gemini', rewardPrompt, true);
         const rewards = JSON.parse(rewardJsonString);
 
-        // 4. 分發獎勵
+        // 步驟 3: 分發獎勵
         const { powerChange, moralityChange, itemChanges } = rewards;
-
         const updatePromises = [];
         if (itemChanges && itemChanges.length > 0) {
             updatePromises.push(updateInventory(userId, itemChanges));
         }
-        // 未來也可以處理武學等其他獎勵
-        // if (rewards.skillChanges) { updatePromises.push(updateSkills(userId, rewards.skillChanges)); }
         
         const updates = {};
         if (powerChange) {
@@ -131,12 +129,11 @@ router.post('/claim', async (req, res) => {
         
         await Promise.all(updatePromises);
         
-        // 5. 更新懸賞狀態
+        // 步驟 4: 更新懸賞狀態
         await bountyDoc.ref.update({ status: 'completed' });
+        console.log(`[懸賞系統] 玩家 ${req.user.username} 成功領取懸賞獎勵。`);
 
-        console.log(`[懸賞系統] 玩家 ${req.user.username} 成功領取懸賞: ${bountyTitle}`);
-
-        // 6. 構造一個新的回合數據返回給前端，用來展示獎勵結果
+        // 步驟 5: 構造一個新的回合數據返回給前端
         const newStory = `你成功領取了「${bountyTitle}」的懸賞，發布者對你的義舉表示感謝，並給予了你應得的報酬。`;
         
         let rewardSummary = '你獲得了：';
@@ -144,13 +141,11 @@ router.post('/claim', async (req, res) => {
             rewardSummary += itemChanges.map(item => `${item.itemName} x${item.quantity}`).join('、');
         }
         
-        // 為了讓前端能刷新狀態，我們需要回傳一個完整的 roundData 物件
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastRoundData = lastSaveSnapshot.docs[0].data();
-        
         const updatedUserDoc = await userDocRef.get();
         const updatedUserProfile = updatedUserDoc.data();
-        const inventoryState = await getInventoryState(userId);
+        const inventoryState = await require('./gameHelpers').getInventoryState(userId);
 
         const finalRoundData = {
             ...lastRoundData,
@@ -158,7 +153,7 @@ router.post('/claim', async (req, res) => {
             story: newStory,
             PC: rewardSummary,
             EVT: `完成懸賞：${bountyTitle}`,
-            QST: '暫無要事', // 清空任務日誌
+            QST: '暫無要事',
             internalPower: updatedUserProfile.internalPower,
             externalPower: updatedUserProfile.externalPower,
             lightness: updatedUserProfile.lightness,
@@ -167,8 +162,9 @@ router.post('/claim', async (req, res) => {
             money: inventoryState.money,
         };
         
-        // 為了確保一致性，將這個獎勵回合也存檔
         await userDocRef.collection('game_saves').doc(`R${finalRoundData.R}`).set(finalRoundData);
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, req.user.username).catch(err => console.error("背景更新圖書館(懸賞)失敗:", err));
         
         res.json({
             message: '懸賞領取成功！',
