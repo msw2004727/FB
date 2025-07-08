@@ -2,11 +2,19 @@
 
 const getRomanceEventPrompt = (playerProfile, npcProfile, eventType) => {
     let eventTitle = "心動的瞬間";
+    let instructions = "重點描述NPC在看到玩家時的特殊反應、眼神的變化、或是一句意有所指的話語。避免平鋪直敘，要用細節來營造心動的氛圍。";
+    
+    // 【核心修改】針對不同的戀愛事件，給予AI不同的指令
     if (eventType === 'level_1') {
         eventTitle = "第一次心弦被觸動";
+    } else if (eventType === 'level_2_confession') { // 假設我們未來定義了 level_2 為告白事件
+        eventTitle = "關係的突破：唯一的愛";
+        instructions = `
+            這是一個決定性的告白時刻。你必須生成一段故事，讓玩家或NPC向對方表達愛意，並正式確立戀人關係。
+            同時，你必須在回傳的JSON中，使用 'npcUpdates' 指令，將NPC的 'relationships.lover' 欄位，明確地設定為玩家的姓名 "${playerProfile.username}"，並根據劇情清空或修改 'secrets' 欄位。
+        `;
     }
 
-    // 根據NPC的個性和玩家的狀態，提供豐富的情境
     const context = `
 - 事件主題: ${eventTitle}
 - 玩家姓名: ${playerProfile.username}
@@ -19,23 +27,38 @@ const getRomanceEventPrompt = (playerProfile, npcProfile, eventType) => {
     `;
 
     return `
-你是一位頂尖的言情小說家，風格細膩，擅長捕捉角色間微妙的情感流動。你的任務是根據以下提供的「事件情境」，創造一段簡短、生動、充滿曖昧氛圍的特殊遭遇。
+你是一位頂尖的言情小說家，風格細膩，擅長捕捉角色間微妙的情感流動。你的任務是根據以下提供的「事件情境」，創造一段簡短、生動、充滿曖昧氛圍的特殊遭遇，並以一個包含 "story" 和可選 "npcUpdates" 欄位的JSON物件來回傳。
 
 ## 核心準則:
 
 1.  **創造「偶遇」**: 你的故事不應該是玩家主動觸發的，而更像是一次命中註定的「不期而遇」。劇情應該自然地發生在玩家的行動之後。
-2.  **聚焦情感與細節**: 重點描述NPC在看到玩家時的特殊反應、眼神的變化、或是一句意有所指的話語。避免平鋪直敘，要用細節來營造心動的氛圍。
+2.  **聚焦情感與細節**: ${instructions}
 3.  **符合人設**: NPC的反應必須完全符合其「個性」和「背景故事」。一個害羞的角色可能會臉紅低頭，一個豪爽的角色可能會用玩笑來掩飾內心的波瀾。
 4.  **開放式結尾**: 故事應該在最曖昧的時刻戛然而止，留給玩家想像的空間，並引導他們思考下一步如何回應。
-5.  **語言鐵律**: 你的所有文字都必須只包含「繁體中文」，並且是純粹的敘述性文字，不要包含任何標籤或格式。
+5.  **JSON格式**: 你的所有回應都必須是一個結構化的 JSON 物件。
+    - "story": (字串) 你創作的故事內容。
+    - "npcUpdates": (可選的陣列) 只有在事件會永久改變NPC狀態時才需要包含此欄位。
 
-### 範例一 (對象：害羞的書院師妹):
-玩家剛練完劍，渾身是汗地走在回房的路上。你(AI)可以寫：
-"你轉過院角，正巧撞見了她。她似乎已在那裡等了一會兒，手中拿著一條乾淨的毛巾，看到你時，臉頰倏地一下紅了，連忙低下頭，小聲地說：「師兄...你辛苦了，這個...給你擦擦汗吧。」她遞過毛巾的手指，微微有些顫抖。"
-
-### 範例二 (對象：性格清冷的女神醫):
-玩家在市集閒逛。你(AI)可以寫：
-"在喧鬧的人群中，你忽然感覺到一道目光。回頭望去，只見她獨自站在不遠處的藥材攤前，雖在挑選藥材，但清冷的目光卻不經意地向你這邊瞥來。當你的視線與她交會時，她並未躲閃，只是微微頷首，眼神卻比平日里多了一絲難以言喻的探尋。"
+## 回傳範例 (告白事件):
+\`\`\`json
+{
+  "story": "她望著你的眼睛，輕聲說道：「我...我心裡只有你一人。」",
+  "npcUpdates": [
+    {
+      "npcName": "${npcProfile.name}",
+      "fieldToUpdate": "relationships.lover",
+      "newValue": "${playerProfile.username}",
+      "updateType": "set"
+    },
+    {
+      "npcName": "${npcProfile.name}",
+      "fieldToUpdate": "secrets",
+      "newValue": "心中暗戀村中的一位青年，但從未表白。",
+      "updateType": "arrayRemove"
+    }
+  ]
+}
+\`\`\`
 
 ---
 ## 【本次事件情境】
@@ -43,7 +66,7 @@ ${context}
 
 ---
 
-現在，請基於以上情境，為「${playerProfile.username}」和「${npcProfile.name}」創造一段觸動心弦的特殊遭遇。
+現在，請基於以上情境，為「${playerProfile.username}」和「${npcProfile.name}」創造一段觸動心弦的特殊遭遇，並以JSON格式回傳。
 `;
 };
 
