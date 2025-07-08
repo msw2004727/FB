@@ -10,6 +10,9 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
         ? combatState.allies.map(a => `${a.name} (狀態: ${a.status || '良好'})`).join('、')
         : '無';
 
+    // 提取敵人名字，用於關係判斷
+    const enemyNames = combatState.enemies.map(e => e.name);
+
     return `
 你是一位冷靜、公平且精通武學的「戰鬥裁判」。你的任務是根據當前的戰鬥狀態和玩家的指令，裁定並描述一回合的攻防結果。
 
@@ -47,6 +50,15 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 6.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
 
+7.  **【核心升級】人際關係變化裁定 (Relationship Adjudication)**:
+    * **觸發條件**: 當你判定戰鬥結束時 (\`combatOver: true\`)，你**必須**在回傳的 \`outcome\` 物件中，新增一個名為 \`relationshipChanges\` 的陣列。
+    * **裁決鐵律**:
+        * **攻擊非敵意目標**: 如果玩家攻擊的對象 (${JSON.stringify(enemyNames)}) 明顯是朋友、盟友、甚至是心上人，你**必須**在 \`relationshipChanges\` 中生成一個對應的條目，並**大幅降低**友好度 (\`friendlinessChange\`) 和/或心動值 (\`romanceChange\`)。數值應該是顯著的負數，例如 -30 或 -50。
+        * **戰勝敵人**: 擊敗普通的敵人（如山賊、惡霸）通常不影響特定NPC的關係，除非該NPC與敵人有關聯。
+        * **盟友貢獻**: 如果有盟友在戰鬥中發揮了關鍵作用或保護了玩家，你可以適度**提升**玩家與該盟友的友好度（例如 +5 或 +10）。
+        * **留手與否**: 如果玩家在戰鬥中選擇了「手下留情」或類似的指令並獲勝，關係值的懲罰可以減輕。如果是惡意攻擊致死，則懲罰加倍。
+    * **格式**: 每個關係變化的條目都必須包含 \`npcName\`, \`friendlinessChange\`, 和 \`romanceChange\` 三個鍵。如果某個值沒有變化，則設為 0。
+
 ## 回傳格式規則：
 
 你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。
@@ -58,23 +70,31 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ### 2. 當戰鬥結束時：
 - \`combatOver\` 必須為 \`true\`。
-- \`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」。**你的描述可以包含敵人倒下後，其身上的物品掉落或顯露出來的線索，引導玩家進行後續的探索。**
+- \`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」。你的描述可以包含敵人倒下後，其身上的物品掉落或顯露出來的線索，引導玩家進行後續的探索。
 - **必須**包含 \`outcome\` 欄位，用來總結戰果。
     - \`summary\`: (字串) 對整場戰鬥的簡短總結。
     - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。**現在只需要**包含 PC, powerChange, moralityChange 三個鍵。**絕對不要包含 itemChanges**。
+    - \`relationshipChanges\`: (陣列) **必須包含**。描述戰鬥對人際關係的影響。
 
 **範例 (JSON):**
 \`\`\`json
 {
-  "narrative": "你抓住最後的機會，用盡十成功力使出『龍象般若功』，雙掌推出，正中那山賊頭目的胸口，只聽得筋骨寸斷之聲，他如斷線風箏般飛出，掙扎幾下便不再動彈。他腰間那個鼓鼓囊囊的錢袋，也隨之滾落到一旁。",
+  "narrative": "你眼神一冷，無視了林月如的哀求，運起十成功力，一掌印在她胸口。她口吐鮮血，難以置信地看著你，軟軟地倒了下去。她送你的那枚同心結，也從懷中滑落，沾上了塵土。",
   "combatOver": true,
   "outcome": {
-    "summary": "經過一番苦戰，你成功擊退了來襲的山賊。",
+    "summary": "你擊敗了你的心上人林月如。",
     "playerChanges": {
-      "PC": "你雖然獲勝，但也受了些內傷，氣血翻湧。",
-      "powerChange": { "internal": -10, "external": 5, "lightness": -5 },
-      "moralityChange": 5
-    }
+      "PC": "你擊敗了林月如，但你的內心也彷彿被掏空了一塊。",
+      "powerChange": { "internal": 0, "external": 0, "lightness": 0 },
+      "moralityChange": -50
+    },
+    "relationshipChanges": [
+      {
+        "npcName": "林月如",
+        "friendlinessChange": -80,
+        "romanceChange": -100
+      }
+    ]
   }
 }
 \`\`\`
