@@ -1,7 +1,8 @@
 // prompts/storyPrompt.js
 const { getItemLedgerRule } = require('./story_components/itemLedgerRule.js');
 const { getMartialArtsRule } = require('./story_components/martialArtsRule.js');
-const { getNpcRule } = require('./story_components/npcRule.js'); // 【核心新增】
+const { getNpcRule } = require('./story_components/npcRule.js');
+const { getInteractionRule } = require('./story_components/interactionRule.js'); // 【核心新增】
 
 // 【核心修改】函式簽名增加了新的參數 locationContext
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null) => {
@@ -118,34 +119,7 @@ ${getNpcRule()}
 
 ---
 
-## 友好度系統 (非常重要)：
-你必須使用以下7個層級來定義NPC對玩家的態度。友好度的變化必須基於玩家的行為和故事發展。
--   **崇拜 (devoted)**: NPC將玩家視為偶像或恩人，願意為玩家付出一切。
--   **信賴 (trusted)**: NPC完全信任玩家，視玩家為可靠的盟友或摯友。
--   **友善 (friendly)**: NPC對玩家抱有好感，樂於交流和提供幫助。
--   **中立 (neutral)**: NPC對玩家沒有預設立場，態度會根據玩家的行為而改變。
--   **警惕 (wary)**: NPC對玩家抱有疑慮或戒心，會保持距離，互動謹慎。
--   **敵對 (hostile)**: NPC將玩家視為敵人，可能會主動挑釁或攻擊。
--   **死敵 (sworn_enemy)**: NPC與玩家有不共戴天之仇，會不惜一切代價與玩家為敵。
-
-## 戰鬥模式規則 (非常重要)：
-當劇情發展到可能發生武力衝突或武藝較量時，你必須遵循以下規則來判斷是否觸發戰鬥系統。
-
-1.  **觸發時機 (雙向原則)**:
-    * **玩家發起**: 當玩家的行動明確表示要與人動手時，無論是敵對的 (例如：「攻擊山賊」、「教訓這個惡霸」) 還是友好的 (例如：「與林教頭切磋一下」、「找李大哥比試武藝」)，都應視為一個互動發起。
-    * **NPC發起**: 當NPC的行動或對白表現出強烈的互動意圖時，無論是敵對的攻擊 (例如：山賊大喝一聲「拿命來！」，便提刀衝了過來) 還是友好的比試邀請 (例如：一位好鬥的武師說「看你也是練家子，不如我們來比劃比劃？」)，都應視為一個互動發起。
-
-2.  **交鋒與拒絕判斷**:
-    * 在判定一方發起互動後，你**必須**先決定另一方的反應是「應戰/同意」還是「逃離/拒絕/退讓」。此判斷需基於雙方的實力、關係、個性及情境。
-    * **如果雙方都同意或被迫進入交鋒**，你才算真正進入戰鬥。此時你必須在回傳的 \`roundData\` 中，額外加入三個欄位：
-        1.  \`"enterCombat": true\`
-        2.  \`"combatants"\`: 一個包含所有對手姓名和初始狀態的**物件陣列**。**【關鍵注意】** 這個陣列只能包含**對手**的資料，絕對不能包含玩家「${username}」自己。
-        3.  **\`"combatIntro"\`**: (字串) 一段約50-100字的文字，生動地描述戰鬥發生的原因、對手的來歷或場景的氛圍，作為戰鬥彈窗的開場白。
-    * **如果任何一方選擇逃離、拒絕或退讓**，則**不應**觸發戰鬥。你的 "story" 敘述應專注於描述該情節，並且**絕對不能**包含 \`enterCombat\` 欄位。
-
-3.  **【再次強調的禁令】**: 當你判斷應觸發戰鬥系統時，你的 "story" 敘述應該在戰鬥**發生之前**就結束。你**絕對禁止**自行推演戰鬥過程或直接在你的 "story" 中給出任何戰鬥結果。將詳細的戰鬥過程交給後續的「戰鬥裁判」AI。
-
-4.  **例外情況**：如果對手是完全不會武功的平民，且玩家對其使用暴力，則直接在故事中描述結果，**不要**觸發戰鬥系統。
+${getInteractionRule()}
 
 ## 【核心新增】懸賞任務特殊處理規則
 
