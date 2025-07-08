@@ -224,11 +224,9 @@ const updateRomanceValues = async (userId, romanceChanges) => {
     await Promise.all(promises);
 };
 
-// 【核心修改】重構此函式，讓它直接觸發AI並回傳結果
 const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
     const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
-    // 優化查詢，只撈取心動值大於門檻的NPC
-    const npcsSnapshot = await userNpcsRef.where('romanceValue', '>=', 50).get();
+    const npcsSnapshot = await userNpcsRef.where('romanceValue', '>=', 150).get();
     if (npcsSnapshot.empty) {
         return null;
     }
@@ -237,10 +235,8 @@ const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
         const npcProfile = doc.data();
         const { name, romanceValue = 0, triggeredRomanceEvents = [] } = npcProfile;
         
-        // 未來可擴充更多事件等級
         const eventTriggers = [
-            // { level: 'level_2_confession', threshold: 150 },
-            { level: 'level_1', threshold: 50 }
+            { level: 'level_2_confession', threshold: 150 }
         ];
 
         for (const trigger of eventTriggers) {
@@ -248,20 +244,23 @@ const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
                 
                 console.log(`[戀愛系統] 偵測到與 ${name} 的 ${trigger.level} 事件觸發條件！`);
                 
-                // 直接呼叫AI生成事件，並期待它回傳一個包含故事和更新指令的物件
-                const romanceEventResult = await getAIRomanceEvent('gemini', playerProfile, npcProfile, trigger.level);
+                const romanceEventResultText = await getAIRomanceEvent('gemini', playerProfile, npcProfile, trigger.level);
                 
-                if (romanceEventResult && romanceEventResult.story) {
-                    // 標記此事件已被觸發，避免重複
-                    await doc.ref.update({
-                        triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion(trigger.level)
-                    });
-                    
-                    // 返回一個包含故事和更新指令的完整物件
-                    return {
-                        eventStory: romanceEventResult.story,
-                        npcUpdates: romanceEventResult.npcUpdates || []
-                    };
+                try {
+                    const romanceEventResult = JSON.parse(romanceEventResultText);
+                    if (romanceEventResult && romanceEventResult.story) {
+                        await doc.ref.update({
+                            triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion(trigger.level)
+                        });
+                        
+                        return {
+                            eventStory: romanceEventResult.story,
+                            npcUpdates: romanceEventResult.npcUpdates || []
+                        };
+                    }
+                } catch(e){
+                     console.error('[戀愛系統] 解析AI回傳的戀愛事件JSON時出錯:', e);
+                     return null; // 解析失敗則不觸發事件
                 }
             }
         }
