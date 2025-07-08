@@ -266,10 +266,16 @@ async function getRelationGraph(modelName, longTermSummary, username, npcDetails
 async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType) {
     const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
     try {
-        return await callAI(modelName, prompt, false);
+        // AI應回傳一個JSON物件，我們要求AI直接給JSON格式
+        const text = await callAI(modelName, prompt, true);
+        // 清理並解析以確保其為有效JSON物件
+        const jsonObj = parseJsonResponse(text);
+        // 將其再次字串化，以符合舊有函式（gameHelpers.js中的checkAndTriggerRomanceEvent）對字串的預期
+        return JSON.stringify(jsonObj);
     } catch (error) {
         console.error("[AI 任務失敗] 言情小說家任務:", error);
-        return `\n你與${npcProfile.name}的緣分，似乎在悄然間發生了些許變化，但具體是何種變化，卻又難以言說。`;
+        // 回傳一個空的JSON物件字串，避免下游的JSON.parse出錯
+        return "{}";
     }
 }
 
