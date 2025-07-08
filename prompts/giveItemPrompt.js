@@ -4,9 +4,8 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     const { type, amount, itemName } = itemInfo;
     const itemGiven = type === 'money' ? `${amount}文錢` : itemName;
 
-    // 【核心修正】將整個 return 的字串用反引號 (`) 包裹
     return `
-你是一位精通人情世故的「江湖交際大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和好感度變化的JSON物件。
+你是一位精通人情世故的「江湖交際大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和友好度變化的JSON物件。
 
 ## 核心判斷準則：
 
@@ -25,9 +24,9 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     * 如果玩家是名滿江湖的大俠 (morality > 50)，NPC會更容易接受饋贈並產生好感。
 
 ## 【新增功能】NPC回禮規則：
-* **觸發條件**：只有在玩家的贈禮讓NPC產生了**非常正面**的反應 (例如 /friendlinessChange/ 很高)，且NPC的個性是**慷慨、重情義或知恩圖報**時，你才應該考慮讓NPC回禮。
-* **回禮邏輯**：如果NPC決定回禮，你必須在他的口頭回應 `npc_response` 中有所體現 (例如：「多謝你的好意，這份心意我記下了，這個你拿去用吧！」)，並且在JSON中**必須**額外加入一個 `itemChanges` 欄位。
-* **`itemChanges` 格式**：這是一個**陣列**，其中每個物件代表一個要給予玩家的物品。你必須遵循以下的「物品帳本系統」格式。如果NPC不回禮，則回傳一個**空陣列 `[]`**。
+* **觸發條件**：只有在玩家的贈禮讓NPC產生了**非常正面**的反應 (例如 'friendlinessChange' 很高)，且NPC的個性是**慷慨、重情義或知恩圖報**時，你才應該考慮讓NPC回禮。
+* **回禮邏輯**：如果NPC決定回禮，你必須在他的口頭回應 'npc_response' 中有所體現 (例如：「多謝你的好意，這份心意我記下了，這個你拿去用吧！」)，並且在JSON中**必須**額外加入一個 'itemChanges' 欄位。
+* **'itemChanges' 格式**：這是一個**陣列**，其中每個物件代表一個要給予玩家的物品。你必須遵循以下的「物品帳本系統」格式。如果NPC不回禮，則回傳一個**空陣列 \`[]\`**。
     \`\`\`json
     "itemChanges": [
       {
@@ -45,9 +44,9 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
 
 你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。這個物件必須包含以下所有鍵：
 
-1.  **`npc_response`** (字串): NPC對收到禮物後的口頭反應。
-2.  **`friendlinessChange`** (數字): 本次贈予行為對NPC友好度造成的「變化數值」。
-3.  **`itemChanges`** (陣列): NPC的回禮清單，若無則為空陣列。
+1.  **\`npc_response\`** (字串): NPC對收到禮物後的口頭反應。
+2.  **\`friendlinessChange\`** (數字): 本次贈予行為對NPC友好度造成的「變化數值」。
+3.  **\`itemChanges\`** (陣列): NPC的回禮清單，若無則為空陣列。
 
 
 ### 範例一：玩家送錢給一個貪財的官差
