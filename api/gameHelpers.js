@@ -1,7 +1,8 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
-const { getOrGenerateItemTemplate } = require('./itemManager'); // 【核心新增】
+const { getOrGenerateItemTemplate } = require('./itemManager');
+
 const db = admin.firestore();
 
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
@@ -100,7 +101,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// 【核心修改】整個 updateInventory 函式被重寫，以整合 itemManager
 const updateInventory = async (userId, itemChanges) => {
     if (!itemChanges || itemChanges.length === 0) return;
 
@@ -113,10 +113,9 @@ const updateInventory = async (userId, itemChanges) => {
 
             for (const change of itemChanges) {
                 const { action, itemName, quantity = 1 } = change;
-                const itemKey = itemName; // 直接用物品名稱作為庫存中的key
+                const itemKey = itemName; 
 
                 if (action === 'add') {
-                    // 1. 獲取或生成物品的標準化設計圖
                     const template = await getOrGenerateItemTemplate(itemName);
                     if (!template) {
                         console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
@@ -124,10 +123,8 @@ const updateInventory = async (userId, itemChanges) => {
                     }
                     
                     if (inventory[itemKey]) {
-                        // 如果物品已存在，只增加數量
                         inventory[itemKey].quantity = (inventory[itemKey].quantity || 0) + quantity;
                     } else {
-                        // 如果是新物品，從設計圖中複製資訊
                         inventory[itemKey] = {
                             quantity: quantity,
                             itemType: template.itemType || '其他',
@@ -149,7 +146,6 @@ const updateInventory = async (userId, itemChanges) => {
                         console.warn(`[物品系統] 警告：試圖移除不存在或數量不足的物品'${itemName}'。`);
                     }
                 } else if (action === 'remove_all') {
-                    // 【核心新增】處理特殊指令，例如來自認輸場景的指令
                     if (change.itemType === '財寶') {
                         for (const key in inventory) {
                             if (inventory[key].itemType === '財寶') {
@@ -165,6 +161,40 @@ const updateInventory = async (userId, itemChanges) => {
     } catch (error) {
         console.error(`[物品系統] 在更新玩家 ${userId} 的背包時發生錯誤:`, error);
     }
+};
+
+// 【核心新增】重新加入被意外刪除的函式
+const updateFriendlinessValues = async (userId, npcChanges) => {
+    if (!npcChanges || npcChanges.length === 0) return;
+    const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+
+    const promises = npcChanges.map(async (change) => {
+        if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) {
+            return;
+        }
+
+        const npcDocRef = userNpcsRef.doc(change.name);
+        try {
+            await db.runTransaction(async (transaction) => {
+                const npcDoc = await transaction.get(npcDocRef);
+                if (!npcDoc.exists) {
+                    console.warn(`[友好度系統] 嘗試更新一個不存在的NPC檔案: ${change.name}`);
+                    return;
+                }
+                const currentFriendliness = npcDoc.data().friendlinessValue || 0;
+                const newFriendlinessValue = currentFriendliness + change.friendlinessChange;
+                
+                transaction.update(npcDocRef, { 
+                    friendlinessValue: newFriendlinessValue,
+                    friendliness: getFriendlinessLevel(newFriendlinessValue)
+                });
+            });
+        } catch (error) {
+            console.error(`[友好度系統] 更新NPC "${change.name}" 友好度時出錯:`, error);
+        }
+    });
+
+    await Promise.all(promises);
 };
 
 
@@ -213,7 +243,7 @@ const checkAndTriggerRomanceEvent = async (userId) => {
 const getInventoryState = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
     const doc = await inventoryRef.get();
-    if (!doc.exists) return { money: 0, itemsString: '行囊空空' };
+    if (!doc.exists) return { money: 0, itemsString: '身無長物' };
 
     const inventory = doc.data();
     const otherItems = [];
@@ -227,7 +257,7 @@ const getInventoryState = async (userId) => {
             }
         }
     }
-    return { money, itemsString: otherItems.length > 0 ? otherItems.join('身無長物') : '身無長物' };
+    return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
 };
 
 const getRawInventory = async (userId) => {
@@ -329,6 +359,7 @@ module.exports = {
     updateLibraryNovel,
     createNpcProfileInBackground,
     updateInventory,
+    updateFriendlinessValues, // 【核心新增】重新匯出此函式
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
     getInventoryState,
