@@ -205,14 +205,16 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        aiResponse.roundData.story = aiResponse.story;
-        
-        // 【核心新增】檢查AI是否要求移除瀕死狀態
+        // 【核心修改】在處理其他數據前，優先處理瀕死狀態的解除
         if (aiResponse.roundData.removeDeathCountdown) {
             await userDocRef.update({ deathCountdown: admin.firestore.FieldValue.delete() });
-            delete userProfile.deathCountdown; // 同步記憶體狀態
+            delete userProfile.deathCountdown; // 同步記憶體狀態，確保本回合後續邏輯正確
+            // 清除回合數據中的標記，避免不必要的儲存
+            delete aiResponse.roundData.removeDeathCountdown;
         }
-
+        
+        aiResponse.roundData.story = aiResponse.story;
+        
         const allNpcUpdates = [
             ...(aiResponse.roundData.npcUpdates || []),
             ...(romanceEventData ? romanceEventData.npcUpdates : [])
