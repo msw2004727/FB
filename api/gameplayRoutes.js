@@ -146,13 +146,16 @@ const interactRouteHandler = async (req, res) => {
             updateSkills(userId, aiResponse.roundData.skillChanges)
         ]);
 
-        const [newSummary, suggestion, inventoryState, updatedSkills] = await Promise.all([
+        // 【核心修改】將查詢新懸賞的動作加入到並行處理中
+        const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion('deepseek', aiResponse.roundData),
             getInventoryState(userId),
             getPlayerSkills(userId),
+            userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get()
         ]);
         
+        aiResponse.hasNewBounties = !newBountiesSnapshot.empty; // 【核心修改】新增此行
         aiResponse.suggestion = suggestion;
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
@@ -185,7 +188,7 @@ const interactRouteHandler = async (req, res) => {
                     skills: skills 
                 }, 
                 enemies: aiResponse.roundData.combatants,
-                allies: aiResponse.roundData.allies || [], // 【核心修改】新增此行
+                allies: aiResponse.roundData.allies || [], 
                 log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
             };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
