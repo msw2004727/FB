@@ -1,6 +1,7 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
+const { getOrGenerateItemTemplate } = require('./itemManager'); // 【核心新增】
 const db = admin.firestore();
 
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
@@ -99,32 +100,71 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
+// 【核心修改】整個 updateInventory 函式被重寫，以整合 itemManager
 const updateInventory = async (userId, itemChanges) => {
     if (!itemChanges || itemChanges.length === 0) return;
+
     const inventoryRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
-    await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(inventoryRef);
-        let inventory = doc.exists ? doc.data() : {};
-        for (const change of itemChanges) {
-            const { action, itemName, quantity = 1, itemType, rarity, description } = change;
-            if (action === 'add') {
-                if (inventory[itemName]) {
-                    inventory[itemName].quantity += quantity;
-                } else {
-                    inventory[itemName] = { quantity, itemType: itemType || '其他', rarity: rarity || '普通', description: description || '一個神秘的物品。', addedAt: admin.firestore.FieldValue.serverTimestamp() };
-                }
-            } else if (action === 'remove') {
-                if (inventory[itemName] && inventory[itemName].quantity >= quantity) {
-                    inventory[itemName].quantity -= quantity;
-                    if (inventory[itemName].quantity <= 0) delete inventory[itemName];
-                } else {
-                    // Do not throw error, just log it. This can happen if AI makes a mistake.
-                    console.warn(`物品移除警告：試圖移除不存在或數量不足的物品'${itemName}'。`);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const inventoryDoc = await transaction.get(inventoryRef);
+            let inventory = inventoryDoc.exists ? inventoryDoc.data() : {};
+
+            for (const change of itemChanges) {
+                const { action, itemName, quantity = 1 } = change;
+                const itemKey = itemName; // 直接用物品名稱作為庫存中的key
+
+                if (action === 'add') {
+                    // 1. 獲取或生成物品的標準化設計圖
+                    const template = await getOrGenerateItemTemplate(itemName);
+                    if (!template) {
+                        console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
+                        continue;
+                    }
+                    
+                    if (inventory[itemKey]) {
+                        // 如果物品已存在，只增加數量
+                        inventory[itemKey].quantity = (inventory[itemKey].quantity || 0) + quantity;
+                    } else {
+                        // 如果是新物品，從設計圖中複製資訊
+                        inventory[itemKey] = {
+                            quantity: quantity,
+                            itemType: template.itemType || '其他',
+                            rarity: template.rarity || '普通',
+                            description: template.baseDescription || '一個神秘的物品。',
+                            addedAt: admin.firestore.FieldValue.serverTimestamp()
+                        };
+                    }
+                     console.log(`[物品系統] 已為玩家 ${userId} 新增物品: ${itemName} x${quantity}`);
+
+                } else if (action === 'remove') {
+                    if (inventory[itemKey] && inventory[itemKey].quantity >= quantity) {
+                        inventory[itemKey].quantity -= quantity;
+                        if (inventory[itemKey].quantity <= 0) {
+                            delete inventory[itemKey];
+                        }
+                         console.log(`[物品系統] 已為玩家 ${userId} 移除物品: ${itemName} x${quantity}`);
+                    } else {
+                        console.warn(`[物品系統] 警告：試圖移除不存在或數量不足的物品'${itemName}'。`);
+                    }
+                } else if (action === 'remove_all') {
+                    // 【核心新增】處理特殊指令，例如來自認輸場景的指令
+                    if (change.itemType === '財寶') {
+                        for (const key in inventory) {
+                            if (inventory[key].itemType === '財寶') {
+                                console.log(`[物品系統] 因特殊事件，移除財寶: ${key}`);
+                                delete inventory[key];
+                            }
+                        }
+                    }
                 }
             }
-        }
-        transaction.set(inventoryRef, inventory);
-    });
+            transaction.set(inventoryRef, inventory);
+        });
+    } catch (error) {
+        console.error(`[物品系統] 在更新玩家 ${userId} 的背包時發生錯誤:`, error);
+    }
 };
 
 
@@ -154,27 +194,20 @@ const checkAndTriggerRomanceEvent = async (userId) => {
         return null;
     }
 
-    // 掃描所有NPC，找出第一個滿足觸發條件的
     for (const doc of npcsSnapshot.docs) {
         const npcProfile = doc.data();
         const { name, romanceValue = 0, triggeredRomanceEvents = [] } = npcProfile;
         
-        // 條件1：心動值達到50，且從未觸發過level_1事件
         if (romanceValue >= 50 && !triggeredRomanceEvents.includes('level_1')) {
-            // 標記事件已觸發，防止重複
             await doc.ref.update({
                 triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1')
             });
             console.log(`[戀愛系統] 偵測到與 ${name} 的 level_1 事件觸發條件！`);
-            // 回傳一個指令物件，而不是故事文字
             return { npcName: name, eventType: 'level_1' };
         }
-        
-        // 可以在此處添加更多觸發條件，例如 level_2, level_3...
-        // if (romanceValue >= 100 && !triggeredRomanceEvents.includes('level_2')) { ... }
     }
 
-    return null; // 沒有任何事件被觸發
+    return null; 
 };
 
 const getInventoryState = async (userId) => {
@@ -194,7 +227,7 @@ const getInventoryState = async (userId) => {
             }
         }
     }
-    return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
+    return { money, itemsString: otherItems.length > 0 ? otherItems.join('身無長物') : '身無長物' };
 };
 
 const getRawInventory = async (userId) => {
