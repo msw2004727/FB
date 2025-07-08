@@ -39,7 +39,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         ? `\n## 【重要地點情境參考】\n你當前正處於「${locationContext.locationName}」，以下是關於此地的詳細情報，你在生成故事時必須嚴格參考這些設定，確保你的描述（如天氣、統治者、氛圍等）與之相符：\n\`\`\`json\n${JSON.stringify(locationContext, null, 2)}\n\`\`\``
         : `\n## 【重要地點情境參考】\n你目前身處一個未知之地，關於此地的詳細情報尚不明朗。`;
 
-    // 【核心新增】將 NPC 的完整檔案作為上下文傳遞給 AI
     const npcContextInstruction = Object.keys(npcContext).length > 0
         ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的**個性(personality)、秘密(secrets)和目標(goals)**，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！\n\`\`\`json\n${JSON.stringify(npcContext, null, 2)}\n\`\`\``
         : '';
@@ -71,6 +70,16 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
     return `
 你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的非戰鬥指令，生成接下來發生的故事。
+
+## 【核心世界觀鐵律：時代錯置處理】
+主角的靈魂來自現代，有時會產生不屬於這個武俠世界的幻想。當玩家的指令中包含明顯的現代物品或概念時（例如：手機、摩托車、手槍、網路、電燈），你**絕對禁止**讓這些東西真實地出現。
+你的任務是以一種**幽默、巧妙的方式**化解這個指令，將其描述為主角的「幻想」或「誤認」。
+- **範例一**：玩家輸入「我騎上摩托車離開」。
+    - **你的敘述應為**：「你腦中閃過一個名為『摩托車』的鐵馬幻象，它能風馳電掣，日行千里。你搖了搖頭，甩開這不切實際的幻想，還是得靠自己的雙腿趕路。」
+- **範例二**：玩家輸入「我從口袋掏出手機」。
+    - **你的敘述應為**：「你下意識地往口袋一摸，以為能掏出那個名為『手機』的、能與千里之外的人溝通的法寶。結果只摸出了一塊冰冷的石頭，你才猛然驚醒，這裡已不是你熟悉的那個世界。」
+此規則的優先級很高，你必須嚴格遵守，以維持遊戲世界觀的一致性。
+
 ${dyingInstruction}
 ${romanceInstruction}
 
