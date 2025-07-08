@@ -196,7 +196,22 @@ const interactRouteHandler = async (req, res) => {
                 const preActionSkillChanges = req.body.skillChanges || [];
                 const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-                aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
+                // 【核心修改】獲取在場NPC的完整檔案，作為AI生成故事的參考
+                const npcContext = {};
+                if (lastSave.NPC && lastSave.NPC.length > 0) {
+                    const npcPromises = lastSave.NPC.map(npcInScene => 
+                        db.collection('users').doc(userId).collection('npcs').doc(npcInScene.name).get()
+                    );
+                    const npcDocs = await Promise.all(npcPromises);
+                    npcDocs.forEach(doc => {
+                        if (doc.exists) {
+                            npcContext[doc.id] = doc.data();
+                        }
+                    });
+                }
+
+                // 【核心修改】將 npcContext 傳遞給AI
+                aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
         }
@@ -205,11 +220,9 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        // 【核心修改】在處理其他數據前，優先處理瀕死狀態的解除
         if (aiResponse.roundData.removeDeathCountdown) {
             await userDocRef.update({ deathCountdown: admin.firestore.FieldValue.delete() });
-            delete userProfile.deathCountdown; // 同步記憶體狀態，確保本回合後續邏輯正確
-            // 清除回合數據中的標記，避免不必要的儲存
+            delete userProfile.deathCountdown; 
             delete aiResponse.roundData.removeDeathCountdown;
         }
         
