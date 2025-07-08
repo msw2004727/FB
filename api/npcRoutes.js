@@ -68,7 +68,17 @@ router.post('/npc-chat', async (req, res) => {
         const npcProfile = npcDoc.data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖事，無人知。';
 
-        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary);
+        // 【核心修改】獲取NPC所在地的詳細情報
+        let locationContext = null;
+        if (npcProfile.currentLocation) {
+            const locationDoc = await db.collection('locations').doc(npcProfile.currentLocation).get();
+            if (locationDoc.exists) {
+                locationContext = locationDoc.data();
+            }
+        }
+
+        // 【核心修改】將地點情報傳遞給AI
+        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, locationContext);
         res.json({ reply: aiReply });
     } catch (error) {
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
@@ -115,7 +125,6 @@ router.post('/give-item', async (req, res) => {
             friendliness: getFriendlinessLevel(newFriendlinessValue)
         });
 
-        // 【***核心修改***】 根據贈予類型，決定要移除的物品名稱和數量
         const itemNameToRemove = type === 'money' ? '銀兩' : itemName;
         const quantityToRemove = type === 'money' ? amount : (amount || 1);
         await updateInventory(userId, [{ action: 'remove', itemName: itemNameToRemove, quantity: quantityToRemove }]);
