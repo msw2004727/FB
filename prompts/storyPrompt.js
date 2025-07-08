@@ -63,6 +63,17 @@ ${locationContextInstruction}
 
 ${systemInteractionRules}
 
+## 【核心新增】NPC檔案更新系統 (npcUpdates)
+與「地點更新」類似，如果你的故事中，發生了足以**永久性改變**某位NPC狀態的重大事件，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 \`"npcUpdates"\` 的**物件陣列**。
+- **時機**: 只有在發生了足以影響NPC檔案的**關鍵事件**時才觸發。例如：NPC更換了裝備、失去了親人、改變了人生目標、習得了新技能，或是與他人的關係發生了根本性轉變（例如與心上人分手）。
+- **結構**: \`{ "npcName": "要更新的NPC姓名", "fieldToUpdate": "要更新的欄位路徑", "newValue": "新的值", "updateType": "set | arrayUnion | arrayRemove" }\`
+- **欄位路徑**: 使用點表示法，例如 \`equipment\`、\`relationships.lover\`、\`goals\`。
+- **更新類型**: \`set\` 用於直接覆蓋欄位值，\`arrayUnion\` 用於向陣列欄位中添加新元素，\`arrayRemove\` 用於從陣列中移除元素。
+- **範例**:
+    - 故事中李鐵匠為你打造了一把新劍並自己裝備了：\`"npcUpdates": [{ "npcName": "李鐵匠", "fieldToUpdate": "equipment", "newValue": "精鋼劍", "updateType": "arrayUnion" }]\`
+    - 故事中王大夫的心上人不幸去世：\`"npcUpdates": [{ "npcName": "王大夫", "fieldToUpdate": "relationships.lover", "newValue": "已故的妻子", "updateType": "set" }]\`
+- **注意**: 這只適用於**重大且永久**的改變。普通的對話或情緒變化**不應**觸發此系統。如果沒有此類事件，則**不要**包含此欄位。
+
 ## 長期故事摘要 (世界核心記憶):
 ${longTermSummary}
 ${levelUpText}
