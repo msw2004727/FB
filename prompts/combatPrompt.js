@@ -10,8 +10,10 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
         ? combatState.allies.map(a => `${a.name} (狀態: ${a.status || '良好'})`).join('、')
         : '無';
 
-    // 提取敵人名字，用於關係判斷
     const enemyNames = combatState.enemies.map(e => e.name);
+    
+    // 【核心修改】從戰鬥狀態中獲取 isSparring 標記
+    const isSparring = combatState.isSparring || false;
 
     return `
 你是一位冷靜、公平且精通武學的「戰鬥裁判」。你的任務是根據當前的戰鬥狀態和玩家的指令，裁定並描述一回合的攻防結果。
@@ -50,13 +52,16 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 6.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
 
-7.  **【核心升級】人際關係變化裁定 (Relationship Adjudication)**:
+7.  **【全新系統】人際關係變化裁定 (Relationship Adjudication)**:
     * **觸發條件**: 當你判定戰鬥結束時 (\`combatOver: true\`)，你**必須**在回傳的 \`outcome\` 物件中，新增一個名為 \`relationshipChanges\` 的陣列。
-    * **裁決鐵律**:
-        * **攻擊非敵意目標**: 如果玩家攻擊的對象 (${JSON.stringify(enemyNames)}) 明顯是朋友、盟友、甚至是心上人，你**必須**在 \`relationshipChanges\` 中生成一個對應的條目，並**大幅降低**友好度 (\`friendlinessChange\`) 和/或心動值 (\`romanceChange\`)。數值應該是顯著的負數，例如 -30 或 -50。
-        * **戰勝敵人**: 擊敗普通的敵人（如山賊、惡霸）通常不影響特定NPC的關係，除非該NPC與敵人有關聯。
-        * **盟友貢獻**: 如果有盟友在戰鬥中發揮了關鍵作用或保護了玩家，你可以適度**提升**玩家與該盟友的友好度（例如 +5 或 +10）。
-        * **留手與否**: 如果玩家在戰鬥中選擇了「手下留情」或類似的指令並獲勝，關係值的懲罰可以減輕。如果是惡意攻擊致死，則懲罰加倍。
+    * **裁決鐵律 (依序判斷)**:
+        1.  **判斷戰鬥性質**: 首先檢查本次戰鬥是否為「友好切磋」(\`isSparring: true\`)。
+        2.  **如果「是」切磋**: 關係變化應為中性或正面。友好度(\`friendlinessChange\`)可以為 0 或小幅增加 (例如 +5，代表英雄相惜)。心動值(\`romanceChange\`)通常不變，除非有極特殊的浪漫情節發生。
+        3.  **如果「不是」切磋**: 這代表是一場真實的敵對戰鬥。你**必須**降低對手的友好度。
+            * 如果對手原本是朋友或心上人，友好度和心動值**必須大幅降低** (例如 -30 到 -80)。
+            * 如果對手是陌生人或本來的敵人，友好度也應有**小幅降低** (例如 -5 到 -10)，代表敵意加深。
+            * 此規則對所有戰敗方NPC生效。
+        4.  **盟友加成**: 無論是否為切磋，如果有盟友在戰鬥中提供了幫助，你可以適度提升玩家與**該盟友**的友好度 (+5)。
     * **格式**: 每個關係變化的條目都必須包含 \`npcName\`, \`friendlinessChange\`, 和 \`romanceChange\` 三個鍵。如果某個值沒有變化，則設為 0。
 
 ## 回傳格式規則：
@@ -84,7 +89,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
   "outcome": {
     "summary": "你擊敗了你的心上人林月如。",
     "playerChanges": {
-      "PC": "你擊敗了林月如，但你的內心也彷彿被掏空了一塊。",
+      "PC": "你擊敗了林月...如，但你的內心也彷彿被掏空了一塊。",
       "powerChange": { "internal": 0, "external": 0, "lightness": 0 },
       "moralityChange": -50
     },
@@ -103,6 +108,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 ## 【當前戰鬥情境】
 - **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness})
 - **玩家已學會的武學**: ${skillsString}
+- **戰鬥性質**: ${isSparring ? '友好切磋' : '生死搏鬥'}
 - **盟友**: ${alliesString}
 - **敵人**: ${JSON.stringify(combatState.enemies)}
 - **戰鬥紀錄**: ${combatLog}
