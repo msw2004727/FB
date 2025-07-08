@@ -62,12 +62,35 @@ body.dark-theme .info-card h4 {
     line-height: 1.7; 
 }
 
-/* --- 【核心新增】卡片標題 Flex 容器 --- */
+/* 【核心新增】地點資訊欄的專屬樣式 */
+#location-info .location-ruler {
+    font-weight: bold;
+    color: var(--light-text-primary);
+}
+body.dark-theme #location-info .location-ruler {
+    color: var(--dark-text-primary);
+}
+#location-info .location-desc {
+    font-size: 0.85rem;
+    color: var(--light-text-secondary);
+    font-style: italic;
+    margin-top: 0.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body.dark-theme #location-info .location-desc {
+    color: var(--dark-text-secondary);
+}
+
+
+/* 卡片標題 Flex 容器 */
 .card-header-flex {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    /* 將原本 h4 的樣式轉移到這裡 */
     margin: 0 0 0.75rem 0;
     border-bottom: 1px solid var(--light-border);
     padding-bottom: 0.5rem;
@@ -76,7 +99,6 @@ body.dark-theme .card-header-flex {
     border-bottom-color: var(--dark-border);
 }
 
-/* 讓在 flex 容器內的 h4 不再有重複的樣式 */
 .card-header-flex h4 {
     margin: 0;
     border-bottom: none;
@@ -135,7 +157,6 @@ body.dark-theme .header-toggle-btn:hover {
     color: var(--dark-text-primary);
 }
 
-/* --- 【核心新增】圓形圖示按鈕樣式 (for 查看武學) --- */
 .header-icon-btn {
     width: 32px;
     height: 32px;
@@ -149,7 +170,7 @@ body.dark-theme .header-toggle-btn:hover {
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
-    flex-shrink: 0; /* 防止按鈕被壓縮 */
+    flex-shrink: 0; 
 }
 .header-icon-btn:hover {
     background-color: var(--light-accent);
@@ -167,7 +188,7 @@ body.dark-theme .header-icon-btn:hover {
     border-color: var(--dark-accent);
 }
 .header-icon-btn .fas {
-    margin: 0; /* 覆蓋掉 .info-card i 的 margin-right */
+    margin: 0; 
 }
 
 
@@ -246,7 +267,7 @@ body.dark-theme .action-suggestion {
 .npc-name {
     font-weight: bold;
     transition: color 0.3s ease;
-    cursor: pointer; /* 讓滑鼠移上去時有手形指標 */
+    cursor: pointer; 
 }
 .npc-name:hover {
     text-decoration: underline;
@@ -395,14 +416,14 @@ body.dark-theme .random-event-message {
 
 /* --- AI 核心切換提示樣式 --- */
 .ai-switch-notification {
-    color: #155724; /* 醒目的綠色 */
-    background-color: #d4edda; /* 淡綠色背景 */
+    color: #155724; 
+    background-color: #d4edda; 
     border: 1px solid #c3e6cb;
     border-radius: 4px;
     padding: 0.75rem 1.25rem;
     margin-top: 1rem;
     text-align: center;
-    font-style: normal; /* 取消系統訊息的斜體 */
+    font-style: normal;
     font-weight: bold;
     transition: opacity 0.5s ease-in-out;
 }
@@ -417,13 +438,13 @@ body.dark-theme .ai-switch-notification {
     opacity: 0;
 }
 
-/* --- 【核心新增】戀愛事件特殊樣式 --- */
+/* --- 戀愛事件特殊樣式 --- */
 .romance-event {
-    border-style: solid; /* 使用實線，更突出 */
-    border-color: #e54865; /* 使用浪漫的粉紅色作為邊框 */
-    background-color: #fff0f3; /* 淡粉色背景 */
-    color: #a6324a; /* 深粉色文字 */
-    font-weight: 600; /* 加粗字體 */
+    border-style: solid; 
+    border-color: #e54865; 
+    background-color: #fff0f3; 
+    color: #a6324a; 
+    font-weight: 600; 
 }
 
 body.dark-theme .romance-event {
@@ -432,12 +453,10 @@ body.dark-theme .romance-event {
     color: #ffb3c1;
 }
 
-/* --- 【核心修改】儀表板頭部樣式調整 --- */
 .dashboard-header {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    /* 修改 padding，將右側內邊距從 1.5rem 增加到 3.5rem */
     padding: 1rem 3.5rem 1rem 1.5rem;
     border-bottom: 1px solid var(--light-border);
     flex-shrink: 0;
@@ -451,16 +470,15 @@ body.dark-theme .dashboard-header {
     gap: 0.5rem;
 }
 
-/* --- 【核心新增】武學總覽提示文字 --- */
 .header-action-group {
     display: flex;
     align-items: center;
 }
 
 .header-prompt-text {
-    font-size: 0.75rem; /* XS 大小 */
+    font-size: 0.75rem; 
     color: var(--light-text-secondary);
-    margin-right: 0.5rem; /* 與按鈕的間距 */
+    margin-right: 0.5rem; 
 }
 
 body.dark-theme .header-prompt-text {
