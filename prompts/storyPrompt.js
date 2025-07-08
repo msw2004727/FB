@@ -1,7 +1,7 @@
 // prompts/storyPrompt.js
 
-// 函式現在會接收完整的日期物件
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = []) => {
+// 【核心修改】函式簽名增加了新的參數 romanceEventToWeave
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -10,13 +10,18 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const currentDateString = `${userProfile.yearName || '元祐'}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`;
     const playerGender = userProfile.gender || 'male';
 
-    // 【核心新增】將升級事件轉換為給AI的文字提示
     const levelUpText = levelUpEvents.length > 0
         ? `\n## 【武學突破】\n在本回合中，玩家的武學境界發生了突破！你必須在你的故事敘述中，為以下事件生成一段充滿意境的描述，來體現玩家的成長，而不是簡單地告知。事件如下：\n${levelUpEvents.map(e => `- 「${e.skillName}」已突破至【${e.levelUpTo}成】境界。`).join('\n')}`
+        : '';
+    
+    // 【核心新增】戀愛事件的特殊指令
+    const romanceInstruction = romanceEventToWeave
+        ? `\n## 【最高優先級特殊劇情指令：戀愛場景編織】\n在本回合的故事中，你**必須**將以下指定的「戀愛互動場景」自然地、無縫地編織進你的敘述裡。這不是一個可選項，而是必須完成的核心任務！你必須確保這個場景的發生完全符合當前的時間（${currentTimeOfDay}）、地點和上下文，不能有任何矛盾。\n- **需編織的事件**: 與NPC「${romanceEventToWeave.npcName}」發生一次「${romanceEventToWeave.eventType}」類型的初次心動互動。這通常表現為一次不經意的偶遇、一個充滿深意的眼神交換、或是一句關切的問候。`
         : '';
 
     return `
 你是一個名為「江湖百曉生」的AI，是這個世界的頂級故事大師。你的風格基於金庸武俠小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的非戰鬥指令，生成接下來發生的故事。
+${romanceInstruction}
 
 ## 【最高優先級鐵律】系統分工原則
 你的首要任務是判斷玩家的行動屬於「劇情互動」還是「戰鬥請求」。
@@ -342,8 +347,8 @@ ${levelUpText}
 1.  **核心概念**：除了「友好度」代表的普通人際關係，「心動值 (romanceValue)」是衡量戀愛可能性的獨立指標。
 
 2.  **判斷依據**：你必須基於NPC的**個性 (personality)**、**戀愛傾向 (romanceOrientation)** 以及**現有感情狀況 (relationships.lover)** 來決定心動值的變化。
-    * **一個「內向害羞」的角色**，可能因玩家一次大膽的保護而心動值飆升。
-    * **一個「玩世不恭」的角色**，可能對普通的示好無動於衷，卻會對能與之鬥智鬥勇的玩家產生興趣。
+    * 一個「內向害羞」的角色**，可能因玩家一次大膽的保護而心動值飆升。
+    * 一個「玩世不恭」的角色**，可能對普通的示好無動於衷，卻會對能與之鬥智鬥勇的玩家產生興趣。
     * **【最重要】如果NPC已有戀人 (lover)**，要使其心動值的增長變得**極其困難**。玩家需要付出巨大努力，或在特殊情境下（例如其戀人背叛、或玩家拯救了NPC的性命）才可能使其動心。反之，輕浮或不當的行為會導致心動值**急劇下降**。
 
 3.  **【***核心修改***】【戀愛相容性鐵律】** 在你決定要增加一位NPC的心動值之前，你**必須**先進行相容性檢查。此規則基於NPC的詳細資料，這些資料應能從【長期故事摘要】中推斷出來。
