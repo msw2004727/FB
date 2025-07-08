@@ -224,9 +224,11 @@ const updateRomanceValues = async (userId, romanceChanges) => {
     await Promise.all(promises);
 };
 
-const checkAndTriggerRomanceEvent = async (userId) => {
+// 【核心修改】重構此函式，讓它直接觸發AI並回傳結果
+const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
     const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
-    const npcsSnapshot = await userNpcsRef.get();
+    // 優化查詢，只撈取心動值大於門檻的NPC
+    const npcsSnapshot = await userNpcsRef.where('romanceValue', '>=', 50).get();
     if (npcsSnapshot.empty) {
         return null;
     }
@@ -235,12 +237,33 @@ const checkAndTriggerRomanceEvent = async (userId) => {
         const npcProfile = doc.data();
         const { name, romanceValue = 0, triggeredRomanceEvents = [] } = npcProfile;
         
-        if (romanceValue >= 50 && !triggeredRomanceEvents.includes('level_1')) {
-            await doc.ref.update({
-                triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion('level_1')
-            });
-            console.log(`[戀愛系統] 偵測到與 ${name} 的 level_1 事件觸發條件！`);
-            return { npcName: name, eventType: 'level_1' };
+        // 未來可擴充更多事件等級
+        const eventTriggers = [
+            // { level: 'level_2_confession', threshold: 150 },
+            { level: 'level_1', threshold: 50 }
+        ];
+
+        for (const trigger of eventTriggers) {
+            if (romanceValue >= trigger.threshold && !triggeredRomanceEvents.includes(trigger.level)) {
+                
+                console.log(`[戀愛系統] 偵測到與 ${name} 的 ${trigger.level} 事件觸發條件！`);
+                
+                // 直接呼叫AI生成事件，並期待它回傳一個包含故事和更新指令的物件
+                const romanceEventResult = await getAIRomanceEvent('gemini', playerProfile, npcProfile, trigger.level);
+                
+                if (romanceEventResult && romanceEventResult.story) {
+                    // 標記此事件已被觸發，避免重複
+                    await doc.ref.update({
+                        triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion(trigger.level)
+                    });
+                    
+                    // 返回一個包含故事和更新指令的完整物件
+                    return {
+                        eventStory: romanceEventResult.story,
+                        npcUpdates: romanceEventResult.npcUpdates || []
+                    };
+                }
+            }
         }
     }
 
@@ -365,11 +388,6 @@ const getPlayerSkills = async (userId) => {
     return skills;
 };
 
-/**
- * 【核心新增】處理來自AI的NPC檔案更新指令
- * @param {string} userId - 玩家的ID
- * @param {Array<Object>} updates - AI生成的更新指令陣列
- */
 const processNpcUpdates = async (userId, updates) => {
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
         return;
@@ -391,7 +409,7 @@ const processNpcUpdates = async (userId, updates) => {
             updatePayload[fieldToUpdate] = admin.firestore.FieldValue.arrayUnion(newValue);
         } else if (updateType === 'arrayRemove') {
             updatePayload[fieldToUpdate] = admin.firestore.FieldValue.arrayRemove(newValue);
-        } else { // 預設為 'set'
+        } else { 
             updatePayload[fieldToUpdate] = newValue;
         }
 
@@ -422,5 +440,5 @@ module.exports = {
     getRawInventory,
     updateSkills,
     getPlayerSkills,
-    processNpcUpdates // 【核心新增】匯出新函式
+    processNpcUpdates
 };
