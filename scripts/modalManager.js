@@ -10,7 +10,7 @@ const combatTitle = document.getElementById('combat-title');
 const combatEnemies = document.getElementById('combat-enemies');
 const combatLog = document.getElementById('combat-log');
 const combatLoader = document.getElementById('combat-loader');
-const combatSkillsInfo = document.getElementById('combat-skills-info'); // 【核心新增】
+const combatSkillsInfo = document.getElementById('combat-skills-info');
 
 const chatModal = document.getElementById('chat-modal');
 const chatNpcName = document.getElementById('chat-npc-name');
@@ -35,6 +35,13 @@ const skillsBodyContainer = document.getElementById('skills-body-container');
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
+    // 【核心修改】如果心動值為0或未定義，則不顯示任何愛心
+    if (!value || value <= 0) {
+        const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
+        if (existingHearts) existingHearts.remove();
+        return;
+    }
+
     let level = 0;
     if (value >= 90) level = 5;
     else if (value >= 70) level = 4;
@@ -104,13 +111,12 @@ export function openCombatModal(initialState) {
         appendToCombatLog(initialState.log[0], 'combat-intro-text');
     }
 
-    // 【核心修改】處理武學資訊的顯示
     if (combatSkillsInfo) {
-        combatSkillsInfo.innerHTML = ''; // 清空舊內容
+        combatSkillsInfo.innerHTML = ''; 
         const playerSkills = initialState.player?.skills || [];
         if (playerSkills.length > 0) {
             playerSkills.forEach(skill => {
-                if(skill.level > 0) { // 只顯示已經學會的 (等級>0)
+                if(skill.level > 0) { 
                     const skillTag = document.createElement('span');
                     skillTag.className = 'combat-skill-tag';
                     skillTag.innerHTML = `${skill.name} <span class="skill-level">${skill.level}成</span>`;
