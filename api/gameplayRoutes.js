@@ -8,7 +8,7 @@ const {
     advanceDate,
     updateInventory,
     updateRomanceValues,
-    updateFriendlinessValues, // 【核心新增】
+    updateFriendlinessValues,
     checkAndTriggerRomanceEvent,
     getInventoryState,
     createNpcProfileInBackground,
@@ -23,7 +23,6 @@ const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
 
-// 【核心修改】將合併地點資料的輔助函式也加入此檔案
 const getMergedLocationData = async (userId, locationName) => {
     if (!locationName) return null;
     try {
@@ -203,6 +202,7 @@ const interactRouteHandler = async (req, res) => {
         
         const currentLocationForUpdate = aiResponse.roundData.LOC?.[0];
         if (locationUpdates && Array.isArray(locationUpdates) && currentLocationForUpdate) {
+            // 【核心修改】將 userId 傳遞給 processLocationUpdates
             processLocationUpdates(userId, currentLocationForUpdate, locationUpdates)
                 .catch(err => console.error(`[檔案管理員] 地點 ${currentLocationForUpdate} 的即時更新失敗:`, err));
         }
