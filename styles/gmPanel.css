@@ -7,15 +7,15 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(15, 10, 22, 0.85); /* 深紫色調背景 */
-    z-index: 2000; /* 確保在最上層 */
+    background-color: rgba(15, 10, 22, 0.85);
+    z-index: 2000;
     display: flex;
     justify-content: center;
     align-items: center;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.4s ease, visibility 0.4s ease;
-    backdrop-filter: blur(8px); /* 毛玻璃效果 */
+    backdrop-filter: blur(8px);
 }
 
 .gm-panel-overlay.visible {
@@ -29,9 +29,9 @@
     height: 90%;
     max-width: 1400px;
     max-height: 800px;
-    background: #1e1e2f; /* 深藍紫色面板背景 */
+    background: #1e1e2f;
     border-radius: 16px;
-    border: 1px solid rgba(132, 94, 247, 0.5); /* 亮紫色邊框 */
+    border: 1px solid rgba(132, 94, 247, 0.5);
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
     display: flex;
     overflow: hidden;
@@ -69,7 +69,7 @@
 .gm-panel-header .gm-icon {
     font-size: 2.5rem;
     margin-bottom: 1rem;
-    color: #845ef7; /* 亮紫色 */
+    color: #845ef7;
 }
 
 .gm-panel-menu {
@@ -84,7 +84,7 @@
     align-items: center;
     gap: 1rem;
     padding: 1rem 2rem;
-    color: #a0a0c0; /* 淺灰紫色 */
+    color: #a0a0c0;
     text-decoration: none;
     font-size: 1rem;
     font-weight: bold;
@@ -159,4 +159,90 @@
     margin-bottom: 2rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid rgba(132, 94, 247, 0.3);
+}
+
+/* 【核心新增】NPC管理頁面的專屬樣式 */
+.npc-list-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.npc-control-card {
+    background: rgba(40, 40, 60, 0.8);
+    border-radius: 10px;
+    padding: 1.5rem;
+    border: 1px solid rgba(132, 94, 247, 0.3);
+}
+
+.npc-control-card h4 {
+    font-size: 1.2rem;
+    color: #c0c0e0;
+    margin: 0 0 1.5rem 0;
+    text-align: center;
+}
+
+.gm-control-group {
+    margin-bottom: 1.25rem;
+}
+
+.gm-control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #a0a0c0;
+}
+
+.gm-control-group .value-display {
+    font-weight: bold;
+    color: #fff;
+}
+
+.gm-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #4a4a6a;
+    outline: none;
+    border-radius: 4px;
+    transition: opacity .2s;
+}
+.gm-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #845ef7;
+    cursor: pointer;
+    border-radius: 50%;
+}
+.gm-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #845ef7;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.gm-save-button {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.7rem;
+    background: #845ef7;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.gm-save-button:hover {
+    opacity: 0.85;
+}
+.gm-save-button:disabled {
+    background: #626288;
+    cursor: not-allowed;
 }
