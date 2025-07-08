@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction } = require('../services/aiService');
+// 【核心修改】引入新的 getAISurrenderResult
+const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -175,12 +176,11 @@ const interactRouteHandler = async (req, res) => {
 
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
-            // 【核心修改】將玩家的武學資料(skills)也一起存入戰鬥狀態中
             const combatState = { 
                 turn: 1, 
                 player: { 
                     username: username,
-                    skills: skills // <--- 新增此行
+                    skills: skills 
                 }, 
                 enemies: aiResponse.roundData.combatants, 
                 log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
@@ -334,8 +334,107 @@ const combatActionRouteHandler = async (req, res) => {
     }
 };
 
+// 【核心新增】處理認輸的路由
+const surrenderRouteHandler = async (req, res) => {
+    const userId = req.user.id;
+    const { model } = req.body;
+    const modelName = model || 'deepseek';
+
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const combatDocRef = userDocRef.collection('game_state').doc('current_combat');
+
+        const [userDoc, combatDoc] = await Promise.all([userDocRef.get(), combatDocRef.get()]);
+
+        if (!combatDoc.exists) {
+            return res.status(404).json({ message: "戰鬥不存在或已結束，無法認輸。" });
+        }
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: "找不到玩家資料。" });
+        }
+
+        const playerProfile = userDoc.data();
+        const combatState = combatDoc.data();
+
+        // 呼叫新的AI來處理認輸邏輯
+        const surrenderResult = await getAISurrenderResult(modelName, playerProfile, combatState);
+        if (!surrenderResult) throw new Error("談判專家AI未能生成有效回應。");
+
+        // 將AI的回應加入戰鬥日誌
+        combatState.log.push(surrenderResult.narrative);
+        await combatDocRef.set(combatState);
+
+        // 如果對方不接受認輸，則戰鬥繼續
+        if (!surrenderResult.accepted) {
+            return res.json({
+                status: 'SURRENDER_REJECTED',
+                narrative: surrenderResult.narrative
+            });
+        }
+        
+        // 如果對方接受認輸，則處理後續
+        await combatDocRef.delete(); // 刪除戰鬥狀態
+        const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const lastRoundData = lastSaveSnapshot.docs[0].data();
+        const playerChanges = surrenderResult.outcome.playerChanges || {};
+        
+        // 更新玩家狀態
+        const powerChange = playerChanges.powerChange || {};
+        const finalPowerUpdate = {
+            internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
+            externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
+            lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
+            morality: admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0)
+        };
+        await userDocRef.update(finalPowerUpdate);
+        
+        // 更新物品
+        if (playerChanges.itemChanges) {
+            await updateInventory(userId, playerChanges.itemChanges);
+        }
+
+        // 產生新的遊戲回合
+        const updatedUserDoc = await userDocRef.get();
+        const updatedUserProfile = updatedUserDoc.data();
+        const inventoryState = await getInventoryState(userId);
+
+        const newRoundData = {
+             ...lastRoundData,
+             R: lastRoundData.R + 1,
+             story: surrenderResult.narrative,
+             PC: playerChanges.PC || surrenderResult.outcome.summary,
+             EVT: `向 ${combatState.enemies.map(e => e.name).join('、')} 認輸`,
+             internalPower: updatedUserProfile.internalPower,
+             externalPower: updatedUserProfile.externalPower,
+             lightness: updatedUserProfile.lightness,
+             morality: updatedUserProfile.morality,
+             ITM: inventoryState.itemsString,
+             money: inventoryState.money,
+        };
+        
+        await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
+
+        res.json({
+            status: 'SURRENDER_ACCEPTED',
+            narrative: surrenderResult.narrative,
+            newRound: {
+                story: newRoundData.story,
+                roundData: newRoundData,
+                suggestion: "留得青山在，不怕沒柴燒。接下來你打算怎麼辦？"
+            }
+        });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /combat-surrender 錯誤:`, error);
+        res.status(500).json({ message: error.message || "認輸時發生未知錯誤" });
+    }
+};
+
 router.post('/interact', interactRouteHandler);
 router.post('/combat-action', combatActionRouteHandler);
+router.post('/combat-surrender', surrenderRouteHandler); // 【核心修改】註冊新的路由
 router.post('/end-chat', async (req, res) => {
     const { getAIChatSummary } = require('../services/aiService');
     const userId = req.user.id;
