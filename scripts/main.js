@@ -27,9 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeIcon = themeSwitcher.querySelector('i');
     const logoutButton = document.getElementById('logout-btn');
     const suicideButton = document.getElementById('suicide-btn');
-    const skillsBtn = document.getElementById('skills-btn'); // 【核心新增】
+    const skillsBtn = document.getElementById('skills-btn');
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
+    const combatSurrenderBtn = document.getElementById('combat-surrender-btn'); // 【核心新增】
     const storyTextContainer = document.getElementById('story-text-wrapper');
     const chatInput = document.getElementById('chat-input');
     const chatActionBtn = document.getElementById('chat-action-btn');
@@ -37,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const endChatBtn = document.getElementById('end-chat-btn');
     const giveItemBtn = document.getElementById('give-item-btn');
     const cancelGiveBtn = document.getElementById('cancel-give-btn');
-    const closeSkillsBtn = document.getElementById('close-skills-btn'); // 【核心新增】
+    const closeSkillsBtn = document.getElementById('close-skills-btn');
 
     // 動態設定遊戲容器高度
     function setGameContainerHeight() {
@@ -86,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
         combatInput.disabled = isLoading;
         combatActionButton.disabled = isLoading;
+        combatSurrenderBtn.disabled = isLoading; // 【核心新增】
         chatInput.disabled = isLoading;
         chatActionBtn.disabled = isLoading;
         endChatBtn.disabled = isLoading;
@@ -217,6 +219,33 @@ document.addEventListener('DOMContentLoaded', () => {
             if (gameState.isInCombat) setLoadingState(false);
         }
     }
+    
+    // 【核心新增】處理認輸的函式
+    async function handleSurrender() {
+        if (gameState.isRequesting) return;
+        setLoadingState(true);
+        modal.appendToCombatLog('> 你決定停手，嘗試向對方認輸...', 'player-action-log surrender-log');
+
+        try {
+            const data = await api.combatSurrender({ model: aiModelSelector.value });
+            modal.appendToCombatLog(data.narrative); // 顯示交涉過程
+
+            if (data.status === 'SURRENDER_REJECTED') {
+                // 認輸被拒絕，戰鬥繼續
+            } else if (data.status === 'SURRENDER_ACCEPTED') {
+                // 認輸被接受，延遲後結束戰鬥
+                setTimeout(() => endCombat(data.newRound), 3000);
+            }
+        } catch (error) {
+            modal.appendToCombatLog(`[系統錯誤] ${error.message}`);
+        } finally {
+            // 如果認輸被拒絕，確保輸入框可用
+            if (gameState.isInCombat && !document.getElementById('deceased-overlay').classList.contains('visible')) {
+                setLoadingState(false);
+            }
+        }
+    }
+
 
     function endCombat(newRoundData) {
         gameState.isInCombat = false;
@@ -230,7 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
             appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
         }
         playerInput.focus();
-        // 【核心修正】在戰鬥完全結束後，呼叫 setLoadingState 以確保所有輸入框都根據最新的 gameState 解除鎖定
         setLoadingState(false);
     }
 
@@ -419,7 +447,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 【核心新增】為武學按鈕綁定事件
         if (skillsBtn) {
             skillsBtn.addEventListener('click', async () => {
                 if (gameState.isRequesting) return;
@@ -435,7 +462,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // 【核心新增】為武學彈窗的關閉按鈕綁定事件
         if (closeSkillsBtn) {
             closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
         }
@@ -444,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
         playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
         combatActionButton.addEventListener('click', handleCombatAction);
         combatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handleCombatAction(); } });
+        combatSurrenderBtn.addEventListener('click', handleSurrender); // 【核心新增】
         storyTextContainer.addEventListener('click', handleNpcClick);
         chatActionBtn.addEventListener('click', sendChatMessage);
         chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendChatMessage(); } });
