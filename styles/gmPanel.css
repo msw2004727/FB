@@ -289,3 +289,55 @@
     background: #626288;
     cursor: not-allowed;
 }
+
+/* 玩家屬性編輯頁面專屬樣式 */
+.gm-form-section {
+    background: rgba(30, 30, 50, 0.6);
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(132, 94, 247, 0.2);
+}
+
+.gm-form-section h4 {
+    margin: 0 0 1.5rem 0;
+    color: #a0a0c0;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.gm-input-group {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.gm-input-group label {
+    flex-shrink: 0;
+    width: 80px;
+    font-weight: bold;
+}
+
+.gm-input, .gm-select {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    background: #2a2a4a;
+    border: 1px solid #4a4a6a;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 1rem;
+}
+.gm-input:focus, .gm-select:focus {
+    outline: none;
+    border-color: #845ef7;
+}
+
+.gm-input[type="number"] {
+    width: 120px;
+    flex-grow: 0;
+}
+
+.gm-button-group {
+    display: flex;
+    gap: 1rem;
+}
