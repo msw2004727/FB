@@ -2,9 +2,10 @@
 const { getItemLedgerRule } = require('./story_components/itemLedgerRule.js');
 const { getMartialArtsRule } = require('./story_components/martialArtsRule.js');
 const { getNpcRule } = require('./story_components/npcRule.js');
-const { getInteractionRule } = require('./story_components/interactionRule.js'); // 【核心新增】
+const { getInteractionRule } = require('./story_components/interactionRule.js');
+const { getPlayerAttributeRule } = require('./story_components/playerAttributeRule.js');
+const { getRomanceRule } = require('./story_components/romanceRule.js');
 
-// 【核心修改】函式簽名增加了新的參數 locationContext
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
@@ -25,6 +26,16 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const locationContextInstruction = locationContext
         ? `\n## 【重要地點情境參考】\n你當前正處於「${locationContext.locationName}」，以下是關於此地的詳細情報，你在生成故事時必須嚴格參考這些設定，確保你的描述（如天氣、統治者、氛圍等）與之相符：\n\`\`\`json\n${JSON.stringify(locationContext, null, 2)}\n\`\`\``
         : `\n## 【重要地點情境參考】\n你目前身處一個未知之地，關於此地的詳細情報尚不明朗。`;
+
+    const playerAttributeRules = getPlayerAttributeRule({
+        currentDateString,
+        currentTimeOfDay,
+        timeSequence,
+        playerMorality,
+        playerPower
+    });
+    
+    const romanceRules = getRomanceRule({ playerGender });
 
 
     return `
@@ -85,41 +96,18 @@ ${levelUpText}
 -   **解除限制**：此時，玩家已經具備一定的實力。你可以自由發揮，生成各種符合武俠世界觀的人物、事件和地點，包括一流高手和重大的江湖陰謀。
 
 ---
-## 【重要】NPC發起戰鬥規則 (NPC-Initiated Combat Rule)
-與「玩家主動攻擊」（已由總導演AI處理）不同，你（故事大師AI）負責處理在你的劇情中「NPC主動發起」的戰鬥。
-1.  **觸發時機**：在你的故事敘述中，如果NPC的行動或對白表現出強烈的動武意圖，例如：
-    * **敵對攻擊**：山賊大喝一聲「拿命來！」，便提刀衝了過來。
-    * **友善比試**：一位好鬥的武師說「看你也是練家子，不如我們來比劃比劃？」。
-    * **劇情突襲**：在你轉身時，背後突然傳來一陣惡風！
-2.  **【核心標記鐵律】**：當你生成了符合上述時機的劇情時，你**必須**在回傳的 \`roundData\` 物件中，額外加入以下三個欄位：
-    1.  \`"enterCombat": true\`
-    2.  \`"combatants"\`: 一個包含所有對手姓名和初始狀態的物件陣列。
-    3.  **【核心修改】\`"combatIntro"\`**: (字串) 一段約50-100字的文字，生動地描述戰鬥發生的原因與場景氛圍。**這段文字必須保持中立和張力**，例如「空氣中的氣氛陡然緊張，一場交鋒在所難免。你屏氣凝神，準備應對接下來的一切！」或「話不投機半句多，對方眼神一凜，亮出了兵刃，看來一场較量勢在必行。」**絕對禁止**使用「惡鬥」、「血戰」等預設立場的詞彙。
-3.  **敘述停止點**：你的 "story" 敘述應該在戰鬥**一觸即發的瞬間**就結束。**絕對禁止**自行推演任何詳細的戰鬥過程或結果。
-
-**範例**：
--   玩家行動：\`我靜靜地看著他，不發一語。\`
--   你生成的 \`story\`: \`"見你沉默不語，那山賊頭目失去了耐心，他狂吼一聲，高舉鬼頭刀便朝你當頭劈來！"\`
--   你回傳的 \`roundData\` 中必須包含:
-    \`\`\`json
-    "enterCombat": true,
-    "combatants": [{"name": "山賊頭目", "status": "怒不可遏"}],
-    "combatIntro": "山賊頭目失去了耐心，他狂吼一聲，高舉鬼頭刀便朝你當頭劈來，看來一場血戰在所難免。"
-    \`\`\`
 
 ${getItemLedgerRule()}
-
 ---
-
 ${getMartialArtsRule()}
-
 ---
-
 ${getNpcRule()}
-
 ---
-
 ${getInteractionRule()}
+---
+${playerAttributeRules}
+---
+${romanceRules}
 
 ## 【核心新增】懸賞任務特殊處理規則
 
@@ -132,76 +120,6 @@ ${getInteractionRule()}
     }
     \`\`\`
 3.  **故事與其他欄位**：當你回傳 \`claimBounty\` 物件時，你的 \`story\` 欄位應為一句簡單的交接話語，例如「你走到告示板前，撕下了那張懸賞。」或「你找到了當初發布懸賞的NPC，向他說明了情況。」。其餘欄位（如powerChange, itemChanges等）應設為預設空值。**絕對禁止**自己編寫任何關於獲得獎勵的內容。
-
-## 時間與日期規則 (非常重要)：
-1.  **行動前的日期與時辰是：** ${currentDateString} ${currentTimeOfDay}
-2.  **時辰順序是：** ${JSON.stringify(timeSequence)}。深夜之後會回到隔天的清晨。
-3.  **你的描述必須反映時辰與季節**：你的故事敘述必須與你決定的最終時辰相符。同時，你應根據當前月份（例如：1-3月為春，4-6月為夏...）來描述相應的季節特徵（例如「春暖花開」、「酷暑難耐」、「秋高氣爽」、「寒風刺骨」），讓世界更真實。
-4.  **【關鍵】時間判斷權力**：你現在擁有完全的時間控制權。你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`timeOfDay\` 的字串欄位。這個欄位的值必須是你判斷該回合行動結束後，**最終應該到達的時辰**。
-    * 如果行動只花費很短時間（如說幾句話），\`timeOfDay\` 應回傳與行動前相同的時辰。
-    * 如果行動花費大量時間（如長途跋涉、練功、休息），你必須根據行動內容，決定一個合理的未來時辰並回傳。
-5.  **【新增】天數判斷建議**：如果玩家的行動明確暗示了**跨越多日**，你**應該**在 \`roundData\` 物件中額外提供一個名為 \`daysToAdvance\` 的**數字**欄位。
-    * 例如：玩家說「閉關七日」，你應回傳 \`"daysToAdvance": 7\`。
-    * 例如：玩家說「我要睡個好覺」，這通常指一夜，你應回傳 \`"daysToAdvance": 1\`。
-    * **如果玩家的行動沒有明確指明跨越多日，則「不要」包含 \`daysToAdvance\` 這個欄位。**
-
-## 正邪系統 (非常重要)：
-1.  **玩家目前的立場傾向是：** ${playerMorality} (範圍從 -100 極惡 到 +100 極善，0為絕對中立)。
-2.  **你必須將此數值作為核心判斷依據**：當生成NPC的反應、事件的走向、甚至角色的內心獨白時，都要考慮到這個立場傾向。
-    * **高正義值 (+50 ~ +100)**：玩家會被認為是義士、大俠。NPC可能會主動尋求幫助，官府可能會視你為友，但邪派人士會對你抱有敵意。
-    * **略偏正義 (+1 ~ +49)**：玩家的行為傾向於行俠仗義，會獲得善良NPC的好感。
-    * **中立 (0)**：玩家的行為不偏不倚，NPC會根據你的具體行動來判斷你的為人。
-    * **略偏邪惡 (-1 ~ -49)**：玩家為達目的不擇手段，可能會吸引一些邪道中人，正派人士會對你抱持警惕。
-    .
-    * **高邪惡值 (-50 ~ -100)**：玩家被視為魔頭、惡霸。正派人士會追殺你，但你可能會在黑道中建立威望，或讓普通人感到恐懼。
-3.  **立場不是標籤，而是氛圍**：不要在故事中直接說「因為你是個好人」，而是要透過NPC的言行（例如「像您這樣的大俠...」）或事件的發展（例如「村民們聽聞你的義舉，紛紛送來食物」）來體現。
-4.  **立場變化判斷**：你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`moralityChange\` 的數值欄位，代表本回合玩家的行動對其立場造成的變化。
-    * 例如：拯救無辜，\`moralityChange\` 應為正值 (如 \`10\`)。偷竊或傷害無辜，應為負值 (如 \`-15\`)。
-    * 若行動無關道德，則回傳 \`0\`。
-
-## 武功規則 (非常重要)：
-1.  **玩家目前的武功修為是：** 內功: ${playerPower.internal} / 999, 外功: ${playerPower.external} / 999, 輕功: ${playerPower.lightness} / 999。
-2.  **內功** 代表真氣、內力，影響招式威力和持久力。**外功** 代表招式技巧、筋骨強度，影響命中和防禦。**輕功** 代表身法、速度與閃避能力，影響移動和戰鬥中的靈活性。
-3.  你在判斷任何與NPC的實力對比、戰鬥、或任何需要體力/技巧/速度的行動結果時，**必須**將這三個數值作為**最核心的判斷依據**。
-4.  你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`powerChange\` 的物件，格式為 \`{ "internal": X, "external": Y, "lightness": Z }\`，其中X、Y和Z代表本回合內功、外功與輕功的變化值。
-    * 如果玩家學習或練習**外功招式** (如劍法、拳法)，你應該增加 \`external\` 的值。
-    * 如果玩家打坐、修練**內功心法**，你應該增加 \`internal\` 的值。
-    * 如果玩家練習**身法、步法或進行敏捷相關的訓練**，你應該增加 \`lightness\` 的值。
-    * 如果玩家受傷，你應該**減少**對應的數值（例如內傷減內功，筋骨受損減外功，腿部受創減輕功）。
-    * 如果沒有任何變化，則回傳 \`{ "internal": 0, "external": 0, "lightness": 0 }\`。
-
-## 【新增】戀愛與心動值系統 (Romance & Affection System)
-你現在必須處理玩家與NPC之間更細膩的感情變化。
-
-1.  **核心概念**：除了「友好度」代表的普通人際關係，「心動值 (romanceValue)」是衡量戀愛可能性的獨立指標。
-
-2.  **判斷依據**：你必須基於NPC的**個性 (personality)**、**戀愛傾向 (romanceOrientation)** 以及**現有感情狀況 (relationships.lover)** 來決定心動值的變化。
-    * 一個「內向害羞」的角色**，可能因玩家一次大膽的保護而心動值飆升。
-    * 一個「玩世不恭」的角色**，可能對普通的示好無動於衷，卻會對能與之鬥智鬥勇的玩家產生興趣。
-    * **【最重要】如果NPC已有戀人 (lover)**，要使其心動值的增長變得**極其困難**。玩家需要付出巨大努力，或在特殊情境下（例如其戀人背叛、或玩家拯救了NPC的性命）才可能使其動心。反之，輕浮或不當的行為會導致心動值**急劇下降**。
-
-3.  **【***核心修改***】【戀愛相容性鐵律】** 在你決定要增加一位NPC的心動值之前，你**必須**先進行相容性檢查。此規則基於NPC的詳細資料，這些資料應能從【長期故事摘要】中推斷出來。
-    * **玩家性別**: ${playerGender}
-    * **檢查流程**:
-        1.  查看該NPC的 'romanceOrientation' (戀愛傾向) 是什麼。
-        2.  如果傾向是 **"異性戀"**，則只有在玩家性別與NPC性別**不同**時，才**可能**增加心動值。
-        3.  如果傾向是 **"同性戀"**，則只有在玩家性別與NPC性別**相同**時，才**可能**增加心動值。
-        4.  如果傾向是 **"雙性戀"**，則玩家的性別**不會**成為增加心動值的阻礙。
-        5.  如果傾向是 **"無性戀"**，或者不滿足上述任何條件（例如異性戀NPC遇到了同性玩家），則其心動值**絕對不能**因本次互動而增加。
-
-4.  **心動值變化判斷**：你的回傳資料中，\`roundData\` 物件**必須**包含一個名為 \`romanceChanges\` 的**陣列**。如果沒有任何NPC的心動值發生變化，請回傳一個**空陣列 \`[]\`**。
-    * 陣列中的每一個物件，都代表一位NPC的心動值變化，其結構必須如下：
-      \`\`\`json
-      {
-        "npcName": "受影響的NPC姓名",
-        "valueChange": 10
-      }
-      \`\`\`
-    * **正面行為範例**：在**滿足相容性鐵律的前提下**，捨身保護、贈送極具心意的禮物、觸動其內心的對話、完成其個人任務等，應產生**正值**變化（如 \`15\`）。
-    * **負面行為範例**：言辭輕浮、傷害其親友、與其競爭對手關係密切、在其面前表現出魯莽或殘忍的一面等，應產生**負值**變化（如 \`-20\`）。
-    * 如果行動與戀愛無關，則不產生任何變化。
-
----
 
 ## 你必須嚴格遵守以下的規則：
 1.  【重要】玩家的姓名是「${username}」。在你的所有 "story" 敘述中，請務必使用這個名字來稱呼玩家，絕對禁止使用「主角」這個詞。
