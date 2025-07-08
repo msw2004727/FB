@@ -80,7 +80,7 @@ function displayFriendlinessBar(value) {
 }
 
 /**
- * 【核心新增】創建或更新戰鬥中單個角色的UI元素（包含血條）
+ * 【核心修改】創建或更新戰鬥中單個角色的UI元素（包含血條）
  * @param {object} character - 角色數據
  * @param {string} type - 'player', 'ally', 'enemy'
  * @returns {HTMLElement} - 創建好的角色卡片元素
@@ -92,12 +92,13 @@ function createCharacterCard(character, type) {
 
     const hpPercentage = (character.hp / character.maxHp) * 100;
 
+    // 【核心修改】將 hp-text 移入 hp-bar-container 以符合新的CSS樣式
     card.innerHTML = `
         <div class="combatant-name">${character.name || character.username}</div>
         <div class="hp-bar-container">
             <div class="hp-bar-fill" style="width: ${hpPercentage}%;"></div>
+            <div class="hp-text">${character.hp} / ${character.maxHp}</div>
         </div>
-        <div class="hp-text">${character.hp} / ${character.maxHp}</div>
     `;
     return card;
 }
