@@ -92,6 +92,28 @@ function updatePowerBar(barElement, valueElement, currentValue) {
     }
 }
 
+// 【核心新增】一個專門處理倒數計時器顯示的函式
+function updateDeathCountdownUI(countdownValue) {
+    let countdownEl = document.getElementById('death-countdown-timer');
+    
+    if (countdownValue && countdownValue > 0) {
+        if (!countdownEl) {
+            countdownEl = document.createElement('div');
+            countdownEl.id = 'death-countdown-timer';
+            countdownEl.className = 'death-countdown';
+            // 將它插入到角色狀態(pcContent)的後面
+            pcContent.parentNode.insertBefore(countdownEl, pcContent.nextSibling);
+        }
+        countdownEl.innerHTML = `<i class="fas fa-hourglass-half"></i> 氣息將絕 (剩餘 ${countdownValue} 回合)`;
+    } else {
+        // 如果沒有倒數值，就移除這個元素
+        if (countdownEl) {
+            countdownEl.remove();
+        }
+    }
+}
+
+
 export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
         const eventDiv = document.createElement('div');
@@ -120,6 +142,9 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     `;
 
     pcContent.textContent = roundData.PC || '狀態穩定';
+
+    // 【核心修改】呼叫新的UI更新函式
+    updateDeathCountdownUI(roundData.deathCountdown);
 
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower);
@@ -154,14 +179,13 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
         moneyContent.textContent = `${roundData.money || 0} 文錢`;
     }
     
-    // 【核心修改】更新ITM的渲染邏輯
-    itmContent.innerHTML = ''; // 先清空舊內容
+    itmContent.innerHTML = ''; 
     if (roundData.ITM && roundData.ITM !== '身無長物') {
-        const items = roundData.ITM.split('、'); // 按「、」拆分物品字串
+        const items = roundData.ITM.split('、'); 
         items.forEach(itemText => {
-            const itemDiv = document.createElement('div'); // 為每個物品創建一個div
+            const itemDiv = document.createElement('div'); 
             itemDiv.textContent = itemText.trim();
-            itmContent.appendChild(itemDiv); // 將div加入到容器中
+            itmContent.appendChild(itemDiv); 
         });
     } else {
         itmContent.textContent = '身無長物';
