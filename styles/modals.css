@@ -664,6 +664,7 @@ body.dark-theme .chat-footer {
     cursor: pointer;
     font-weight: bold;
     transition: all 0.3s;
+    font-size: 1.1rem;
 }
 .end-chat-btn:hover {
     background-color: #c92a2a;
