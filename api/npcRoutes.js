@@ -56,10 +56,12 @@ router.post('/npc-chat', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const npcDocRef = userDocRef.collection('npcs').doc(npcName);
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+        const locationsRef = db.collection('locations');
 
-        const [npcDoc, summaryDoc] = await Promise.all([
+        const [npcDoc, summaryDoc, allLocationsSnapshot] = await Promise.all([
             npcDocRef.get(),
-            summaryDocRef.get()
+            summaryDocRef.get(),
+            locationsRef.get() // 【核心修改】一次性獲取所有已知地點的名稱
         ]);
 
         if (!npcDoc.exists) {
@@ -68,17 +70,34 @@ router.post('/npc-chat', async (req, res) => {
         const npcProfile = npcDoc.data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖事，無人知。';
 
-        // 【核心修改】獲取NPC所在地的詳細情報
-        let locationContext = null;
+        // 獲取NPC所在的本地情報
+        let localLocationContext = null;
         if (npcProfile.currentLocation) {
-            const locationDoc = await db.collection('locations').doc(npcProfile.currentLocation).get();
+            const locationDoc = await locationsRef.doc(npcProfile.currentLocation).get();
             if (locationDoc.exists) {
-                locationContext = locationDoc.data();
+                localLocationContext = locationDoc.data();
+            }
+        }
+        
+        // 【核心修改】智慧判斷玩家是否在詢問一個外地，並獲取其情報
+        let remoteLocationContext = null;
+        const knownLocationNames = allLocationsSnapshot.docs.map(doc => doc.id);
+        
+        for (const locName of knownLocationNames) {
+            // 如果玩家的訊息中包含了某個已知地點的名稱，
+            // 且這個地點不是NPC當前所在地，就將其視為「外地」
+            if (playerMessage.includes(locName) && locName !== npcProfile.currentLocation) {
+                const remoteLocationDoc = await locationsRef.doc(locName).get();
+                if (remoteLocationDoc.exists) {
+                    remoteLocationContext = remoteLocationDoc.data();
+                    console.log(`[情報網系統] 偵測到外地詢問: ${locName}`);
+                    break; // 只處理第一個找到的地點
+                }
             }
         }
 
-        // 【核心修改】將地點情報傳遞給AI
-        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, locationContext);
+        // 將本地和外地情報都傳遞給AI
+        const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
         res.json({ reply: aiReply });
     } catch (error) {
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
