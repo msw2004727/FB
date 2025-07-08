@@ -8,8 +8,6 @@ const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
-// 輔助函式 getMergedLocationData 已被搬移到 gameHelpers.js
-
 router.get('/inventory', async (req, res) => {
     try {
         const inventoryData = await getRawInventory(req.user.id);
@@ -37,8 +35,9 @@ router.get('/get-relations', async (req, res) => {
         const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
         const summaryDoc = await summaryDocRef.get();
 
+        // 【核心修改】如果沒有摘要，回傳一個安全的提示圖，而不是404錯誤
         if (!summaryDoc.exists || !summaryDoc.data().text) {
-            return res.status(404).json({ message: '尚無足夠的故事摘要來生成關係圖。' });
+            return res.json({ mermaidSyntax: 'graph TD;\nA["尚無足夠的江湖經歷來繪製關係圖"];' });
         }
 
         const longTermSummary = summaryDoc.data().text;
@@ -48,9 +47,10 @@ router.get('/get-relations', async (req, res) => {
             npcDetails[data.name] = { romanceValue: data.romanceValue || 0 };
         });
 
-        const mermaidSyntax = await getRelationGraph('deepseek', longTermSummary, username, npcDetails);
+        const mermaidSyntax = await getRelationGraph(longTermSummary, username, npcDetails);
         res.json({ mermaidSyntax });
     } catch (error) {
+        console.error(`[關係圖API] 替玩家 ${username} 生成關係圖時出錯:`, error);
         res.status(500).json({ message: '梳理人物脈絡時發生未知錯誤。' });
     }
 });
@@ -63,8 +63,9 @@ router.get('/get-encyclopedia', async (req, res) => {
         const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
         const summaryDoc = await summaryDocRef.get();
 
+        // 【核心修改】如果沒有摘要，回傳一個安全的提示HTML，而不是讓AI處理
         if (!summaryDoc.exists || !summaryDoc.data().text) {
-            return res.json({ encyclopediaHtml: '<p class="loading">你的江湖經歷尚淺。</p>' });
+            return res.json({ encyclopediaHtml: '<p class="loading">你的江湖經歷尚淺，還沒有可供編撰的百科內容。</p>' });
         }
 
         const longTermSummary = summaryDoc.data().text;
@@ -74,9 +75,10 @@ router.get('/get-encyclopedia', async (req, res) => {
             npcDetails[data.name] = { romanceValue: data.romanceValue || 0 };
         });
 
-        let encyclopediaHtml = await getAIEncyclopedia('deepseek', longTermSummary, username, npcDetails);
+        let encyclopediaHtml = await getAIEncyclopedia(longTermSummary, username, npcDetails);
         res.json({ encyclopediaHtml });
     } catch (error) {
+        console.error(`[百科API] 替玩家 ${username} 生成百科時出錯:`, error);
         res.status(500).json({ message: "編撰百科時發生未知錯誤。" });
     }
 });
@@ -93,7 +95,6 @@ router.get('/latest-game', async (req, res) => {
             return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
         }
 
-        // 【核心修改】將查詢新懸賞的動作加入到並行處理中
         const [snapshot, newBountiesSnapshot] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get()
@@ -116,8 +117,8 @@ router.get('/latest-game', async (req, res) => {
         Object.assign(latestGameData, { ...inventoryState, ...userData, skills: skills });
 
         const [prequelText, suggestion] = await Promise.all([
-            getAIPrequel(userData.preferredModel || 'openai', [latestGameData]),
-            getAISuggestion(userData.preferredModel || 'openai', latestGameData)
+            getAIPrequel(userData.preferredModel, [latestGameData]),
+            getAISuggestion(latestGameData)
         ]);
 
         res.json({
@@ -126,9 +127,10 @@ router.get('/latest-game', async (req, res) => {
             roundData: latestGameData,
             suggestion: suggestion,
             locationData: locationData,
-            hasNewBounties: !newBountiesSnapshot.empty // 【核心新增】回傳是否有新懸賞的標記
+            hasNewBounties: !newBountiesSnapshot.empty
         });
     } catch (error) {
+        console.error(`[讀取進度API] 替玩家 ${req.user.id} 讀取進度時出錯:`, error);
         res.status(500).json({ message: "讀取最新進度失敗。" });
     }
 });
@@ -158,6 +160,7 @@ router.get('/get-novel', async (req, res) => {
         await novelCacheRef.set({ storyHTML: fullStoryHTML });
         res.json({ novelHTML: fullStoryHTML });
     } catch (error) {
+        console.error(`[小說API] 替玩家 ${req.user.id} 生成小說時出錯:`, error);
         res.status(500).json({ message: "生成小說時出錯。" });
     }
 });
@@ -191,6 +194,7 @@ router.post('/restart', async (req, res) => {
         await invalidateNovelCache(userId);
         res.status(200).json({ message: '新的輪迴已開啟。' });
     } catch (error) {
+        console.error(`[重啟API] 替玩家 ${req.user.id} 開啟新輪迴時出錯:`, error);
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
@@ -201,7 +205,7 @@ router.post('/force-suicide', async (req, res) => {
     const username = req.user.username;
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const modelName = req.body.model || 'gemini'; 
+        const playerModelChoice = req.body.model;
 
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         if (lastSaveSnapshot.empty) {
@@ -209,7 +213,7 @@ router.post('/force-suicide', async (req, res) => {
         }
         const lastRoundData = lastSaveSnapshot.docs[0].data();
 
-        const deathCause = await getAIDeathCause(modelName, username, lastRoundData);
+        const deathCause = await getAIDeathCause(playerModelChoice, username, lastRoundData);
 
         await userDocRef.update({ isDeceased: true });
 
