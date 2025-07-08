@@ -135,7 +135,7 @@ const interactRouteHandler = async (req, res) => {
 
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-            case 'COMBAT_SPARRING': { // 【核心修改】將切磋和攻擊都導向這裡
+            case 'COMBAT_SPARRING': { 
                 const combatSetupResult = await getAICombatSetup(playerAction, lastSave);
                 const isSparring = classification.actionType === 'COMBAT_SPARRING';
 
@@ -158,7 +158,7 @@ const interactRouteHandler = async (req, res) => {
                         allies: combatSetupResult.allies,
                         bystanders: combatSetupResult.bystanders,
                         combatIntro: combatSetupResult.combatIntro,
-                        isSparring: isSparring // 【核心修改】在這裡打上標記
+                        isSparring: isSparring 
                     }
                 };
                 break;
@@ -235,17 +235,21 @@ const interactRouteHandler = async (req, res) => {
 
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
+            // 【核心修改】為玩家設定初始HP
+            const maxHp = (userProfile.externalPower || 5) * 10 + 50;
             const combatState = { 
                 turn: 1, 
                 player: { 
                     username: username,
-                    skills: skills 
+                    skills: skills,
+                    hp: maxHp,
+                    maxHp: maxHp
                 }, 
                 enemies: aiResponse.roundData.combatants,
-                allies: aiResponse.roundData.allies || [],
+                allies: aiResponse.roundData.allies || [], 
                 bystanders: aiResponse.roundData.bystanders || [], 
                 log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'],
-                isSparring: aiResponse.roundData.isSparring || false // 【核心修改】將標記存入戰鬥狀態
+                isSparring: aiResponse.roundData.isSparring || false 
             };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
@@ -347,13 +351,29 @@ const combatActionRouteHandler = async (req, res) => {
             getPlayerSkills(userId)
         ]);
         let playerProfile = userDoc.exists ? userDoc.data() : {};
-        playerProfile.skills = skills; 
+        playerProfile.skills = skills;
+        // 【核心修改】將玩家當前HP加入到傳遞給AI的資料中
+        playerProfile.hp = combatState.player.hp;
+        playerProfile.maxHp = combatState.player.maxHp;
 
         const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, action);
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
         combatState.log.push(combatResult.narrative);
         combatState.turn++;
+        
+        // 【核心修改】處理傷害與HP更新
+        if (combatResult.damageDealt && combatResult.damageDealt.length > 0) {
+            combatResult.damageDealt.forEach(deal => {
+                if (deal.target === "玩家" || deal.target === playerProfile.username) {
+                    combatState.player.hp -= deal.damage;
+                }
+            });
+        }
+        // 【核心修改】將AI回傳的、已更新HP的敵人/盟友列表，覆蓋掉舊的狀態
+        if (combatResult.enemies) combatState.enemies = combatResult.enemies;
+        if (combatResult.allies) combatState.allies = combatResult.allies;
+
 
         if (combatResult.combatOver) {
             await combatDocRef.delete();
@@ -373,10 +393,8 @@ const combatActionRouteHandler = async (req, res) => {
                 morality: admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0)
             };
             
-            // 【核心修改】在戰鬥結束後處理關係變化
             const relationshipPromises = [];
             if (relationshipChanges.length > 0) {
-                // 將友好度變化和心動值變化分開處理
                 const friendlinessChanges = relationshipChanges.map(c => ({ name: c.npcName, friendlinessChange: c.friendlinessChange })).filter(c => c.friendlinessChange);
                 const romanceChanges = relationshipChanges.map(c => ({ npcName: c.npcName, valueChange: c.romanceChange })).filter(c => c.valueChange);
 
@@ -425,12 +443,12 @@ const combatActionRouteHandler = async (req, res) => {
             });
 
         } else {
-            if(combatResult.enemies) combatState.enemies = combatResult.enemies;
-            if(combatResult.allies) combatState.allies = combatResult.allies;
             await combatDocRef.set(combatState);
+            // 【核心修改】將完整的戰鬥狀態回傳給前端，以便更新UI
             res.json({
                 status: 'COMBAT_ONGOING',
-                narrative: combatResult.narrative
+                narrative: combatResult.narrative,
+                updatedState: combatState // 新增欄位
             });
         }
     } catch (error) {
@@ -508,7 +526,7 @@ const surrenderRouteHandler = async (req, res) => {
              money: inventoryState.money,
         };
         
-        await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
 
