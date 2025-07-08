@@ -143,37 +143,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 【核心新增】處理NPC主動發起對話的函式
     async function startProactiveChat(proactiveData) {
         const { npcName, openingLine, itemChanges } = proactiveData;
         
         try {
-            // 先獲取NPC的最新公開資料，確保頭像和狀態正確
             const profile = await api.getNpcProfile(npcName);
             
             gameState.isInChat = true;
             gameState.currentChatNpc = npcName;
             gameState.chatHistory = [];
 
-            // 打開對話視窗
             modal.openChatModalUI(profile); 
             
-            // 將NPC的開場白加入對話紀錄
             modal.appendChatMessage('npc', openingLine);
             gameState.chatHistory.push({ speaker: 'npc', message: openingLine });
 
-            // 如果NPC贈送了物品，顯示提示
             if (itemChanges && itemChanges.length > 0) {
                 const itemNames = itemChanges.map(item => `${item.itemName} x${item.quantity}`).join('、');
                 const giftMessage = `你獲得了來自 ${npcName} 的贈禮：${itemNames}。`;
-                modal.appendChatMessage('system', giftMessage); // 在對話窗中顯示系統訊息
+                modal.appendChatMessage('system', giftMessage);
                 gameState.chatHistory.push({ speaker: 'system', message: giftMessage });
             }
 
             chatInput.focus();
         } catch (error) {
             console.error(`啟動與 ${npcName} 的主動對話失敗:`, error);
-            // 即使獲取檔案失敗，也顯示一個通用的錯誤訊息，避免流程中斷
             appendMessageToStory(`[系統] ${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
         }
     }
@@ -232,11 +226,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                // 【核心修改】檢查並觸發NPC主動對話
                 if (data.proactiveChat) {
-                    setLoadingState(false); // 先結束主要讀取動畫
-                    startProactiveChat(data.proactiveChat); // 再彈出對話窗
-                    return; // 彈出對話窗後，暫停後續執行
+                    setLoadingState(false); 
+                    startProactiveChat(data.proactiveChat);
+                    return; 
                 }
 
             } else {
@@ -445,25 +438,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- GM面板功能函式 ---
+    // --- 【核心修改】GM面板功能函式 ---
     async function loadPlayerStatsData() {
         const page = document.getElementById('player-stats');
         page.innerHTML = '<h3>玩家屬性編輯</h3><p>正在載入數據...</p>';
         try {
-            const itemTemplates = await api.getItemTemplatesForGM();
+            const [playerState, itemTemplates] = await Promise.all([
+                api.getPlayerStateForGM(),
+                api.getItemTemplatesForGM()
+            ]);
             
             let optionsHtml = '<option value="">-- 請選擇物品 --</option>';
             itemTemplates.forEach(item => {
-                optionsHtml += `<option value="${item.name}">${item.name}</option>`;
+                optionsHtml += `<option value="${item.itemName}">${item.itemName}</option>`;
             });
 
             page.innerHTML = `
                 <h3>玩家屬性編輯</h3>
                 <div class="gm-form-section">
+                    <h4><i class="fa-solid fa-user-ninja"></i> 核心屬性</h4>
+                    <div class="gm-grid-container stat-grid">
+                        <div class="gm-input-group">
+                            <label for="gm-internal">內功</label>
+                            <input type="number" id="gm-internal" class="gm-input" value="${playerState.internalPower}">
+                        </div>
+                         <div class="gm-input-group">
+                            <label for="gm-external">外功</label>
+                            <input type="number" id="gm-external" class="gm-input" value="${playerState.externalPower}">
+                        </div>
+                         <div class="gm-input-group">
+                            <label for="gm-lightness">輕功</label>
+                            <input type="number" id="gm-lightness" class="gm-input" value="${playerState.lightness}">
+                        </div>
+                         <div class="gm-input-group">
+                            <label for="gm-morality">立場</label>
+                            <input type="number" id="gm-morality" class="gm-input" value="${playerState.morality}">
+                        </div>
+                    </div>
+                     <button id="gm-save-stats" class="gm-button save"><i class="fa-solid fa-floppy-disk"></i> 儲存核心屬性</button>
+                </div>
+                <div class="gm-form-section">
                     <h4><i class="fa-solid fa-coins"></i> 金錢修改</h4>
                     <div class="gm-input-group">
                         <label for="gm-money">持有金錢</label>
-                        <input type="number" id="gm-money" class="gm-input" placeholder="請輸入數量">
+                        <input type="number" id="gm-money" class="gm-input" value="${playerState.money}">
                         <button id="gm-save-money" class="gm-button save">設定</button>
                     </div>
                 </div>
@@ -472,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="gm-input-group">
                         <label for="gm-item-select">選擇物品</label>
                         <select id="gm-item-select" class="gm-select">${optionsHtml}</select>
-                        <input type="number" id="gm-item-quantity" class="gm-input" value="1">
+                        <input type="number" id="gm-item-quantity" class="gm-input" value="1" min="1">
                         <div class="gm-button-group">
                             <button id="gm-add-item" class="gm-button save">增加</button>
                             <button id="gm-remove-item" class="gm-button" style="background-color:#e03131;">移除</button>
@@ -480,51 +498,163 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `;
-
-            document.getElementById('gm-save-money').addEventListener('click', async (e) => {
-                const money = document.getElementById('gm-money').value;
-                if (money === '' || isNaN(money)) { alert('請輸入有效的數字'); return; }
-                
-                e.target.textContent = '設定中...';
-                e.target.disabled = true;
-                try {
-                    await api.updatePlayerResourcesForGM({ money: Number(money) });
-                    e.target.textContent = '設定成功!';
-                } catch (error) {
-                    e.target.textContent = '錯誤';
-                } finally {
-                    setTimeout(() => { e.target.textContent = '設定'; e.target.disabled = false; }, 2000);
-                }
-            });
-
-            const handleItemChange = async (action) => {
-                const itemName = document.getElementById('gm-item-select').value;
-                const quantity = document.getElementById('gm-item-quantity').value;
-                if (!itemName) { alert('請選擇一個物品'); return; }
-                if (!quantity || isNaN(quantity) || Number(quantity) <= 0) { alert('請輸入有效的數量'); return; }
-
-                const buttonId = action === 'add' ? 'gm-add-item' : 'gm-remove-item';
-                const button = document.getElementById(buttonId);
-                button.textContent = '處理中...';
-                button.disabled = true;
-
-                try {
-                    await api.updatePlayerResourcesForGM({
-                        itemChange: { action, itemName, quantity: Number(quantity) }
-                    });
-                    button.textContent = '操作成功!';
-                } catch (error) {
-                    button.textContent = '錯誤';
-                } finally {
-                    setTimeout(() => { button.textContent = action === 'add' ? '增加' : '移除'; button.disabled = false; }, 2000);
-                }
-            };
-
-            document.getElementById('gm-add-item').addEventListener('click', () => handleItemChange('add'));
-            document.getElementById('gm-remove-item').addEventListener('click', () => handleItemChange('remove'));
+            
+            document.getElementById('gm-save-stats').addEventListener('click', gmSavePlayerStats);
+            document.getElementById('gm-save-money').addEventListener('click', gmSavePlayerMoney);
+            document.getElementById('gm-add-item').addEventListener('click', () => gmHandleItemChange('add'));
+            document.getElementById('gm-remove-item').addEventListener('click', () => gmHandleItemChange('remove'));
 
         } catch (error) {
              page.innerHTML = `<h3>玩家屬性編輯</h3><p>載入數據失敗: ${error.message}</p>`;
+        }
+    }
+
+    async function loadLocationManagementData() {
+        const page = document.getElementById('location-editor');
+        page.innerHTML = '<h3>地區編輯與瞬移</h3><p>正在從後端獲取地區列表...</p>';
+        try {
+            const locList = await api.getLocationsForGM();
+            let optionsHtml = '<option value="">-- 請選擇目標地點 --</option>';
+            locList.forEach(loc => {
+                optionsHtml += `<option value="${loc.name}">${loc.name}</option>`;
+            });
+
+            page.innerHTML = `
+                 <h3>地區編輯與瞬移</h3>
+                <div class="gm-form-section">
+                     <h4><i class="fa-solid fa-person-falling-burst"></i> 乾坤大挪移</h4>
+                     <div class="gm-input-group">
+                        <label for="gm-location-select">選擇地點</label>
+                        <select id="gm-location-select" class="gm-select">${optionsHtml}</select>
+                         <input type="text" id="gm-new-location-name" class="gm-input" placeholder="或手動輸入新地點名稱...">
+                        <button id="gm-teleport-btn" class="gm-button save"><i class="fa-solid fa-bolt"></i> 瞬移</button>
+                    </div>
+                    <p class="gm-note">注意：瞬移後，遊戲將會自動存檔，建議您在操作後重新載入遊戲頁面以同步最新狀態。</p>
+                </div>
+                <div class="gm-grid-container" id="gm-location-grid">
+                    </div>
+            `;
+            
+            const gridContainer = document.getElementById('gm-location-grid');
+            locList.forEach(loc => {
+                const card = document.createElement('div');
+                card.className = 'gm-control-card';
+                let cardBody;
+                 if (loc.isGhost) {
+                    cardBody = `
+                        <div class="gm-card-header"><h4>${loc.name}</h4><span class="gm-status-tag ghost"><i class="fa-solid fa-map-pin"></i> 未知地區</span></div>
+                        <div class="gm-card-body"><p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">此地區存在於存檔中，但沒有詳細檔案。請重建檔案以進行管理。</p><button class="gm-button rebuild" data-location-name="${loc.name}"><i class="fa-solid fa-map-location-dot"></i> 重建檔案</button></div>
+                    `;
+                } else {
+                    cardBody = `
+                        <div class="gm-card-header"><h4>${loc.name}</h4></div>
+                        <div class="gm-card-body"><p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">詳細編輯功能開發中...</p></div>
+                        <button class="gm-button save" disabled><i class="fa-solid fa-pen-to-square"></i> 編輯</button>
+                    `;
+                }
+                card.innerHTML = cardBody;
+                gridContainer.appendChild(card);
+            });
+            
+            bindGmCardEvents(gridContainer);
+            document.getElementById('gm-teleport-btn').addEventListener('click', gmTeleport);
+
+        } catch (error) {
+            page.innerHTML = `<h3>地區編輯</h3><p>獲取資料失敗: ${error.message}</p>`;
+        }
+    }
+
+    async function gmSavePlayerStats(e) {
+        const button = e.target;
+        button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
+        button.disabled = true;
+        try {
+            const payload = {
+                internalPower: document.getElementById('gm-internal').value,
+                externalPower: document.getElementById('gm-external').value,
+                lightness: document.getElementById('gm-lightness').value,
+                morality: document.getElementById('gm-morality').value
+            };
+            await api.updatePlayerStateForGM(payload);
+            button.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功!`;
+        } catch (error) {
+            button.innerHTML = `<i class="fa-solid fa-xmark"></i> 儲存失敗`;
+        } finally {
+            setTimeout(() => {
+                button.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存核心屬性`;
+                button.disabled = false;
+            }, 2000);
+        }
+    }
+
+    async function gmSavePlayerMoney(e) {
+        const button = e.target;
+        const money = document.getElementById('gm-money').value;
+        if (money === '' || isNaN(money)) { alert('請輸入有效的數字'); return; }
+
+        button.textContent = '設定中...';
+        button.disabled = true;
+        try {
+            await api.updatePlayerResourcesForGM({ money: Number(money) });
+            button.textContent = '設定成功!';
+        } catch (error) {
+            button.textContent = '錯誤';
+        } finally {
+            setTimeout(() => { button.textContent = '設定'; button.disabled = false; }, 2000);
+        }
+    }
+    
+    async function gmHandleItemChange(action) {
+        const itemName = document.getElementById('gm-item-select').value;
+        const quantity = document.getElementById('gm-item-quantity').value;
+        if (!itemName) { alert('請選擇一個物品'); return; }
+        if (!quantity || isNaN(quantity) || Number(quantity) <= 0) { alert('請輸入有效的數量'); return; }
+
+        const buttonId = action === 'add' ? 'gm-add-item' : 'gm-remove-item';
+        const button = document.getElementById(buttonId);
+        button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 處理中...`;
+        button.disabled = true;
+
+        try {
+            await api.updatePlayerResourcesForGM({
+                itemChange: { action, itemName, quantity: Number(quantity) }
+            });
+            button.innerHTML = `<i class="fa-solid fa-check"></i> 操作成功!`;
+        } catch (error) {
+            button.innerHTML = `<i class="fa-solid fa-xmark"></i> 錯誤`;
+        } finally {
+            setTimeout(() => { 
+                button.innerHTML = action === 'add' ? '增加' : '移除';
+                button.disabled = false; 
+            }, 2000);
+        }
+    };
+    
+    async function gmTeleport(e) {
+        const button = e.target;
+        const locationName = document.getElementById('gm-new-location-name').value.trim() || document.getElementById('gm-location-select').value;
+        if (!locationName) {
+            alert('請選擇或輸入一個目標地點！');
+            return;
+        }
+
+        button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 正在傳送...`;
+        button.disabled = true;
+        try {
+            const result = await api.teleportPlayer({ locationName });
+            button.innerHTML = `<i class="fa-solid fa-check"></i> ${result.message}`;
+             setTimeout(() => {
+                alert('瞬移成功！建議您重新載入遊戲以確保所有狀態同步。');
+                window.location.reload();
+            }, 1000);
+        } catch (error) {
+            button.innerHTML = `<i class="fa-solid fa-xmark"></i> 傳送失敗`;
+            alert(`傳送失敗: ${error.message}`);
+        } finally {
+             setTimeout(() => {
+                button.innerHTML = `<i class="fa-solid fa-bolt"></i> 瞬移`;
+                button.disabled = false;
+            }, 3000);
         }
     }
     
@@ -548,29 +678,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (npc.isGhost) {
                     cardBody = `
-                        <div class="gm-card-header">
-                            <h4>${npc.name}</h4>
-                            <span class="gm-status-tag ghost"><i class="fa-solid fa-ghost"></i> 黑戶檔案</span>
-                        </div>
-                        <div class="gm-card-body">
-                           <p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">此NPC存在於存檔中，但沒有詳細檔案。請重建檔案以進行管理。</p>
-                           <button class="gm-button rebuild" data-npc-name="${npc.name}"><i class="fa-solid fa-user-check"></i> 重建檔案</button>
-                        </div>
+                        <div class="gm-card-header"><h4>${npc.name}</h4><span class="gm-status-tag ghost"><i class="fa-solid fa-ghost"></i> 黑戶檔案</span></div>
+                        <div class="gm-card-body"><p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">此NPC存在於存檔中，但沒有詳細檔案。請重建檔案以進行管理。</p><button class="gm-button rebuild" data-npc-name="${npc.name}"><i class="fa-solid fa-user-check"></i> 重建檔案</button></div>
                     `;
                 } else {
                     cardBody = `
-                        <div class="gm-card-header">
-                            <h4>${npc.name}</h4>
-                        </div>
+                        <div class="gm-card-header"><h4>${npc.name}</h4></div>
                         <div class="gm-card-body">
-                            <div class="gm-control-group">
-                                <label><span>友好度</span><span class="value-display" id="friend-val-${npc.id}">${npc.friendlinessValue}</span></label>
-                                <input type="range" class="gm-slider" id="friend-slider-${npc.id}" min="-100" max="100" value="${npc.friendlinessValue}">
-                            </div>
-                            <div class="gm-control-group">
-                                <label><span>心動值</span><span class="value-display" id="romance-val-${npc.id}">${npc.romanceValue}</span></label>
-                                <input type="range" class="gm-slider" id="romance-slider-${npc.id}" min="0" max="100" value="${npc.romanceValue}">
-                            </div>
+                            <div class="gm-control-group"><label><span>友好度</span><span class="value-display" id="friend-val-${npc.id}">${npc.friendlinessValue}</span></label><input type="range" class="gm-slider" id="friend-slider-${npc.id}" min="-100" max="100" value="${npc.friendlinessValue}"></div>
+                            <div class="gm-control-group"><label><span>心動值</span><span class="value-display" id="romance-val-${npc.id}">${npc.romanceValue}</span></label><input type="range" class="gm-slider" id="romance-slider-${npc.id}" min="0" max="100" value="${npc.romanceValue}"></div>
                         </div>
                         <button class="gm-button save" data-npc-id="${npc.id}"><i class="fa-solid fa-floppy-disk"></i> 儲存變更</button>
                     `;
@@ -586,59 +702,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             page.innerHTML = `<h3>NPC關係管理</h3><p>獲取資料失敗: ${error.message}</p>`;
-        }
-    }
-
-    async function loadLocationManagementData() {
-        const page = document.getElementById('location-editor');
-        page.innerHTML = '<h3>地區編輯</h3><p>正在從後端獲取地區列表...</p>';
-        try {
-            const locList = await api.getLocationsForGM();
-            const container = document.createElement('div');
-            container.className = 'gm-grid-container';
-
-            if (locList.length === 0) {
-                page.innerHTML = '<h3>地區編輯</h3><p>資料庫中尚無任何地區檔案。</p>';
-                return;
-            }
-
-            locList.forEach(loc => {
-                const card = document.createElement('div');
-                card.className = 'gm-control-card';
-                let cardBody;
-                 if (loc.isGhost) {
-                    cardBody = `
-                        <div class="gm-card-header">
-                            <h4>${loc.name}</h4>
-                            <span class="gm-status-tag ghost"><i class="fa-solid fa-map-pin"></i> 未知地區</span>
-                        </div>
-                        <div class="gm-card-body">
-                           <p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">此地區存在於存檔中，但沒有詳細檔案。請重建檔案以進行管理。</p>
-                           <button class="gm-button rebuild" data-location-name="${loc.name}"><i class="fa-solid fa-map-location-dot"></i> 重建檔案</button>
-                        </div>
-                    `;
-                } else {
-                    cardBody = `
-                        <div class="gm-card-header">
-                            <h4>${loc.name}</h4>
-                        </div>
-                        <div class="gm-card-body">
-                            <p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">詳細編輯功能開發中...</p>
-                        </div>
-                        <button class="gm-button save" disabled><i class="fa-solid fa-pen-to-square"></i> 編輯</button>
-                    `;
-                }
-                card.innerHTML = cardBody;
-                container.appendChild(card);
-            });
-            
-            page.innerHTML = '<h3>地區編輯</h3>';
-            page.appendChild(container);
-            
-            bindGmCardEvents(container);
-
-        } catch (error) {
-            page.innerHTML = `<h3>地區編輯</h3><p>獲取資料失敗: ${error.message}</p>`;
         }
     }
 
