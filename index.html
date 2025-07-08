@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles/components.css">
     <link rel="stylesheet" href="styles/modals.css">
     <link rel="stylesheet" href="styles/skills.css">
+    <link rel="stylesheet" href="styles/gmPanel.css">
 </head>
 <body class="light-theme">
     <div class="game-container">
@@ -107,12 +108,12 @@
                         <span class="morality-label justice">正</span>
                     </div>
                 </div>
-
+                
                 <div class="info-card">
                     <h4><i class="fas fa-map"></i> 當前地區</h4>
                     <div id="location-info">讀取中...</div>
                 </div>
-                
+
                 <div class="info-card">
                     <h4><i class="fas fa-sack-dollar"></i> 錢袋</h4>
                     <div id="money-content" class="money-display">-- 文錢</div>
@@ -282,6 +283,44 @@
                     </div>
                 <div class="skills-modal-body" id="skills-body-container">
                     </div>
+            </div>
+        </div>
+
+        <div id="gm-panel" class="gm-panel-overlay">
+            <div class="gm-panel-container">
+                <nav class="gm-panel-nav">
+                    <header class="gm-panel-header">
+                        <i class="fa-solid fa-wand-magic-sparkles gm-icon"></i>
+                        <h2>創世神<br>控制台</h2>
+                    </header>
+                    <ul id="gm-menu" class="gm-panel-menu">
+                        <li class="gm-menu-item"><a href="#player-stats" class="active"><i class="fa-solid fa-user-pen"></i> 玩家屬性</a></li>
+                        <li class="gm-menu-item"><a href="#npc-management"><i class="fa-solid fa-users-gear"></i> NPC 管理</a></li>
+                        <li class="gm-menu-item"><a href="#location-editor"><i class="fa-solid fa-map-location-dot"></i> 地區編輯</a></li>
+                        <li class="gm-menu-item"><a href="#item-spawner"><i class="fa-solid fa-box-archive"></i> 物品生成</a></li>
+                    </ul>
+                    <footer class="gm-panel-footer">
+                        <button id="gm-close-btn" class="gm-close-btn">關閉面板</button>
+                    </footer>
+                </nav>
+                <div id="gm-content" class="gm-panel-content">
+                    <div id="player-stats" class="gm-page active">
+                        <h3>玩家屬性編輯</h3>
+                        <p>此處將允許您修改玩家的金錢、武學、物品等。功能開發中...</p>
+                    </div>
+                    <div id="npc-management" class="gm-page">
+                        <h3>NPC關係管理</h3>
+                        <p>此處將允許您查看和修改所有NPC的好感度、心動值，甚至修復「黑戶」NPC。功能開發中...</p>
+                    </div>
+                    <div id="location-editor" class="gm-page">
+                        <h3>地區資訊編輯</h3>
+                        <p>此處將允許您直接編輯已探索地區的檔案。功能開發中...</p>
+                    </div>
+                    <div id="item-spawner" class="gm-page">
+                        <h3>物品/裝備生成</h3>
+                        <p>此處將允許您為自己或遊戲世界添加任何物品。功能開發中...</p>
+                    </div>
+                </div>
             </div>
         </div>
 
