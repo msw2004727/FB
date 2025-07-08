@@ -34,7 +34,7 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
         "itemName": "回贈的物品的準確名稱",
         "quantity": 1,
         "itemType": "武器 | 裝備 | 道具 | 材料 | 財寶 | 其他",
-        "rarity": "普通 | 稀有 | 史詩 | 傳說",
+        "rarity": "稀有",
         "description": "一段關於此回禮物品的簡短描述。"
       }
     ]
@@ -44,9 +44,9 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
 
 你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。這個物件必須包含以下所有鍵：
 
-1.  **\`npc_response\`** (字串): NPC對收到禮物後的口頭反應。
-2.  **\`friendlinessChange\`** (數字): 本次贈予行為對NPC友好度造成的「變化數值」。
-3.  **\`itemChanges\`** (陣列): NPC的回禮清單，若無則為空陣列。
+1.  **'npc_response'** (字串): NPC對收到禮物後的口頭反應。
+2.  **'friendlinessChange'** (數字): 本次贈予行為對NPC友好度造成的「變化數值」。
+3.  **'itemChanges'** (陣列): NPC的回禮清單，若無則為空陣列。
 
 
 ### 範例一：玩家送錢給一個貪財的官差
