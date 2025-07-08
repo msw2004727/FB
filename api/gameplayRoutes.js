@@ -17,7 +17,8 @@ const {
     updateSkills,
     getPlayerSkills,
     getFriendlinessLevel,
-    processNpcUpdates
+    processNpcUpdates,
+    getMergedLocationData // 新增：從 gameHelpers 引入
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
