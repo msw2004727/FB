@@ -505,3 +505,22 @@ body.dark-theme #npc-content > div {
     border-color: var(--dark-border);
     border-left-color: var(--dark-accent);
 }
+
+/* --- 【核心新增】隨身物品卡片樣式 --- */
+#itm-content > div {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem; /* 卡片之間的細縫 */
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+#itm-content > div:last-child {
+    margin-bottom: 0;
+}
+
+body.dark-theme #itm-content > div {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+}
