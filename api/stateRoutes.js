@@ -16,7 +16,6 @@ router.get('/inventory', async (req, res) => {
     }
 });
 
-// 【核心新增】專門用來獲取武學列表的API
 router.get('/skills', async (req, res) => {
     try {
         const skills = await getPlayerSkills(req.user.id);
@@ -98,6 +97,16 @@ router.get('/latest-game', async (req, res) => {
 
         let latestGameData = snapshot.docs[0].data();
         
+        // 【核心修改】獲取當前地點的詳細檔案
+        let locationData = null;
+        const currentLocationName = latestGameData.LOC?.[0];
+        if (currentLocationName) {
+            const locationDoc = await db.collection('locations').doc(currentLocationName).get();
+            if (locationDoc.exists) {
+                locationData = locationDoc.data();
+            }
+        }
+
         const [inventoryState, skills] = await Promise.all([
             getInventoryState(userId),
             getPlayerSkills(userId)
@@ -114,7 +123,8 @@ router.get('/latest-game', async (req, res) => {
             prequel: prequelText,
             story: latestGameData.story || "你靜靜地站在原地，思索著下一步。",
             roundData: latestGameData,
-            suggestion: suggestion
+            suggestion: suggestion,
+            locationData: locationData // 【核心修改】將地點檔案加入回傳的資料中
         });
     } catch (error) {
         res.status(500).json({ message: "讀取最新進度失敗。" });
