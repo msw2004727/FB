@@ -1,6 +1,7 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
+// 【核心修改】從 aiService 引入 getAINpcProfile 時，我們需要 playerProfile
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
@@ -124,7 +125,8 @@ const updateLibraryNovel = async (userId, username) => {
     }
 };
 
-const createNpcProfileInBackground = async (userId, username, npcData, roundData) => {
+// 【核心修改】函式簽名新增了 playerProfile 參數
+const createNpcProfileInBackground = async (userId, username, npcData, roundData, playerProfile) => {
     const npcName = npcData.name;
     console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序。`);
     try {
@@ -134,19 +136,19 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             console.log(`[NPC系統] "${npcName}" 的檔案已存在，取消建立。`);
             return;
         }
-        // 【核心修改】移除 modelName 參數
-        const npcProfile = await getAINpcProfile(username, npcName, roundData);
-        if (npcProfile) {
-            npcProfile.currentLocation = roundData.LOC[0];
-            npcProfile.friendlinessValue = npcData.friendlinessValue || 0;
-            npcProfile.friendliness = getFriendlinessLevel(npcProfile.friendlinessValue);
-            await npcDocRef.set(npcProfile);
+        // 【核心修改】將 playerProfile 傳遞給 AI 服務
+        const newNpcProfile = await getAINpcProfile(username, npcName, roundData, playerProfile);
+        if (newNpcProfile) {
+            // 【核心修改】直接使用 AI 返回的友好度，不再手動設定
+            newNpcProfile.currentLocation = roundData.LOC[0];
+            await npcDocRef.set(newNpcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
         }
     } catch (error) {
         console.error(`[NPC系統] 為 "${npcName}" 進行背景建檔時發生錯誤:`, error);
     }
 };
+
 
 const updateInventory = async (userId, itemChanges) => {
     if (!itemChanges || itemChanges.length === 0) return;
@@ -290,7 +292,6 @@ const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
                 
                 console.log(`[戀愛系統] 偵測到與 ${name} 的 ${trigger.level} 事件觸發條件！`);
                 
-                // 【核心修改】移除 modelName 參數
                 const romanceEventResultText = await getAIRomanceEvent(playerProfile, npcProfile, trigger.level);
                 
                 try {
