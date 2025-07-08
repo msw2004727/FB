@@ -311,6 +311,53 @@ body.dark-theme .combat-log-area p {
     border-bottom: none;
 }
 
+/* 【核心新增】戰鬥中的武學資訊欄樣式 */
+.combat-skills-area {
+    flex-shrink: 0;
+    padding: 0.75rem 1.5rem;
+    border-top: 1px solid var(--light-border);
+    background-color: var(--light-surface-bg);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    max-height: 100px; /* 限制最大高度 */
+    overflow-y: auto; /* 超出時可滾動 */
+}
+
+body.dark-theme .combat-skills-area {
+    border-top-color: var(--dark-border);
+    background-color: var(--dark-surface-bg);
+}
+
+.combat-skill-tag {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    color: var(--light-text-secondary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-family: var(--font-sans);
+    cursor: default; /* 預設是不可點擊的 */
+}
+
+body.dark-theme .combat-skill-tag {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+.combat-skill-tag .skill-level {
+    font-weight: bold;
+    color: var(--light-accent);
+    margin-left: 0.3rem;
+}
+
+body.dark-theme .combat-skill-tag .skill-level {
+    color: var(--dark-accent);
+}
+
+
 .combat-input-area {
     display: flex;
     border-top: 1px solid var(--light-border);
