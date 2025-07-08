@@ -8,22 +8,18 @@ const admin = require('firebase-admin');
 try {
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
     
-    // 檢查 FIREBASE_SERVICE_ACCOUNT 是否已設定
     if (!serviceAccountString) {
         throw new Error("環境變數 'FIREBASE_SERVICE_ACCOUNT' 未設定或為空。請在Render後台設定此變數。");
     }
 
     let serviceAccount;
     try {
-        // 嘗試解析 JSON 字串
         serviceAccount = JSON.parse(serviceAccountString);
     } catch (parseError) {
-        // 如果解析失敗，拋出一個更具體的錯誤
         console.error("解析 FIREBASE_SERVICE_ACCOUNT 時發生錯誤:", parseError.message);
         throw new Error("FIREBASE_SERVICE_ACCOUNT 的值不是一個有效的 JSON 格式。請檢查您是否完整複製了 .json 金鑰檔案的全部內容，且格式沒有錯誤。");
     }
 
-    // 檢查解析後的物件是否包含必要的金鑰
     if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
          throw new Error("解析後的 serviceAccount 物件缺少必要的屬性（如 project_id, private_key, client_email）。");
     }
@@ -37,7 +33,7 @@ try {
 
 } catch (error) {
     console.error("Firebase 初始化失敗:", error.message);
-    process.exit(1); // 初始化失敗時，終止應用程式
+    process.exit(1); 
 }
 
 // Express App 設定
@@ -58,6 +54,7 @@ const gameRoutes = require('./api/gameRoutes');
 const libraryRoutes = require('./api/libraryRoutes');
 const epilogueRoutes = require('./api/epilogue.js');
 const bountyRoutes = require('./api/bountyRoutes');
+const gmRoutes = require('./api/gmRoutes'); // 【核心新增】
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -65,6 +62,7 @@ app.use('/api/game', gameRoutes);
 app.use('/api/library', libraryRoutes);
 app.use('/api/epilogue', authMiddleware, epilogueRoutes);
 app.use('/api/bounties', bountyRoutes);
+app.use('/api/gm', gmRoutes); // 【核心新增】
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
