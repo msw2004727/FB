@@ -10,6 +10,7 @@ const combatTitle = document.getElementById('combat-title');
 const combatEnemies = document.getElementById('combat-enemies');
 const combatLog = document.getElementById('combat-log');
 const combatLoader = document.getElementById('combat-loader');
+const combatSkillsInfo = document.getElementById('combat-skills-info'); // 【核心新增】
 
 const chatModal = document.getElementById('chat-modal');
 const chatNpcName = document.getElementById('chat-npc-name');
@@ -26,7 +27,6 @@ const epilogueModal = document.getElementById('epilogue-modal');
 const epilogueStory = document.getElementById('epilogue-story');
 const closeEpilogueBtn = document.getElementById('close-epilogue-btn');
 
-// 【核心新增】武學彈窗元素
 const skillsModal = document.getElementById('skills-modal');
 const closeSkillsBtn = document.getElementById('close-skills-btn');
 const skillsTabsContainer = document.getElementById('skills-tabs-container');
@@ -103,6 +103,26 @@ export function openCombatModal(initialState) {
     if (initialState.log && initialState.log.length > 0) {
         appendToCombatLog(initialState.log[0], 'combat-intro-text');
     }
+
+    // 【核心修改】處理武學資訊的顯示
+    if (combatSkillsInfo) {
+        combatSkillsInfo.innerHTML = ''; // 清空舊內容
+        const playerSkills = initialState.player?.skills || [];
+        if (playerSkills.length > 0) {
+            playerSkills.forEach(skill => {
+                if(skill.level > 0) { // 只顯示已經學會的 (等級>0)
+                    const skillTag = document.createElement('span');
+                    skillTag.className = 'combat-skill-tag';
+                    skillTag.innerHTML = `${skill.name} <span class="skill-level">${skill.level}成</span>`;
+                    skillTag.title = `類型: ${skill.type}\n描述: ${skill.description}`;
+                    combatSkillsInfo.appendChild(skillTag);
+                }
+            });
+        } else {
+            combatSkillsInfo.innerHTML = '<span class="combat-skill-tag">你尚未習得任何可用於戰鬥的武學。</span>';
+        }
+    }
+    
     combatModal.classList.add('visible');
 }
 export function closeCombatModal() { combatModal.classList.remove('visible'); }
@@ -172,7 +192,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
 export function closeGiveItemModal() { giveItemModal.classList.remove('visible'); }
 
 
-// --- 【核心新增】武學總覽彈窗 ---
+// --- 武學總覽彈窗 ---
 export function openSkillsModal(skillsData) {
     if (!skillsModal || !skillsTabsContainer || !skillsBodyContainer) return;
 
@@ -197,13 +217,11 @@ export function openSkillsModal(skillsData) {
     const skillTypes = Object.keys(skillsByType);
 
     skillTypes.forEach((type, index) => {
-        // 創建頁籤按鈕
         const tabButton = document.createElement('button');
         tabButton.className = 'skill-tab';
         tabButton.textContent = type;
         tabButton.dataset.tab = type;
         
-        // 創建頁籤內容區塊
         const tabContent = document.createElement('div');
         tabContent.className = 'skill-tab-content';
         tabContent.id = `tab-${type}`;
