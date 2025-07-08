@@ -2,7 +2,6 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-// 【核心修改】引入 getAIAnachronismResponse
 const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat, getAICombatSetup, getAIAnachronismResponse } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
@@ -26,7 +25,6 @@ const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
 
-// NPC主動互動引擎 (此函式內容未變動)
 const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
     const PROACTIVE_CHAT_COOLDOWN = 5;
 
@@ -264,7 +262,6 @@ const interactRouteHandler = async (req, res) => {
             processNpcUpdates(userId, allNpcUpdates)
         ]);
         
-        // 【核心修改】重新獲取最新的玩家檔案，確保傳遞給 NPC 生成函式的資料是最新的
         const updatedUserProfileDoc = await userDocRef.get();
         userProfile = updatedUserProfileDoc.exists ? updatedUserProfileDoc.data() : {};
         
@@ -288,7 +285,6 @@ const interactRouteHandler = async (req, res) => {
                 if (npc.isDeceased) return npcDocRef.set({ isDeceased: true }, { merge: true });
                 if (npc.isNew) {
                     delete npc.isNew;
-                    // 【核心修改】將完整的 userProfile 傳遞過去
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
                 } else {
                     const newSceneLocation = aiResponse.roundData.LOC[0];
@@ -401,6 +397,7 @@ const interactRouteHandler = async (req, res) => {
     }
 };
 
+// 【核心修改】重構整個 combatActionRouteHandler 函式
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const { action, model: playerModelChoice } = req.body;
@@ -426,7 +423,25 @@ const combatActionRouteHandler = async (req, res) => {
         playerProfile.hp = combatState.player.hp;
         playerProfile.maxHp = combatState.player.maxHp;
 
-        const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, action);
+        // --- 武學使用驗證 ---
+        const knownSkill = skills.find(s => action.includes(s.name) && s.level > 0);
+        let combatResult;
+
+        if (knownSkill) {
+            // 如果玩家使用了已知的、等級大於0的武學，正常呼叫AI
+            combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, action);
+        } else {
+            // 如果找不到對應武學或等級為0，伺服器直接生成失敗結果，繞過AI
+            console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 試圖使用未知或未掌握的招式。`);
+            combatResult = {
+                narrative: `你憑著記憶，試圖施展「${action}」，卻只覺劍招散亂，不成章法，破綻百出。`,
+                damageDealt: [], // 沒有造成傷害
+                enemies: combatState.enemies, // 敵人狀態不變
+                allies: combatState.allies, // 盟友狀態不變
+                combatOver: false
+            };
+        }
+
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
         combatState.log.push(combatResult.narrative);
@@ -442,7 +457,6 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.enemies) combatState.enemies = combatResult.enemies;
         if (combatResult.allies) combatState.allies = combatResult.allies;
 
-        
         if (combatState.player.hp <= 0) {
             combatResult.combatOver = true;
             combatResult.narrative += `\n你眼前一黑，失去了所有知覺...`;
@@ -496,7 +510,6 @@ const combatActionRouteHandler = async (req, res) => {
                 userDocRef.update(playerUpdatePayload),
                 ...relationshipPromises
             ]);
-            
             
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
