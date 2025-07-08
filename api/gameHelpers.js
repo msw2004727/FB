@@ -1,7 +1,6 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
-// 【核心修改】從 aiService 引入 getAINpcProfile 時，我們需要 playerProfile
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
@@ -125,7 +124,6 @@ const updateLibraryNovel = async (userId, username) => {
     }
 };
 
-// 【核心修改】函式簽名新增了 playerProfile 參數
 const createNpcProfileInBackground = async (userId, username, npcData, roundData, playerProfile) => {
     const npcName = npcData.name;
     console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序。`);
@@ -136,10 +134,8 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             console.log(`[NPC系統] "${npcName}" 的檔案已存在，取消建立。`);
             return;
         }
-        // 【核心修改】將 playerProfile 傳遞給 AI 服務
         const newNpcProfile = await getAINpcProfile(username, npcName, roundData, playerProfile);
         if (newNpcProfile) {
-            // 【核心修改】直接使用 AI 返回的友好度，不再手動設定
             newNpcProfile.currentLocation = roundData.LOC[0];
             await npcDocRef.set(newNpcProfile);
             console.log(`[NPC系統] 成功為 "${npcName}" 建立並儲存了詳細檔案。`);
@@ -149,73 +145,84 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-
+// 【核心修改】重構整個函式以使用 Firestore Transaction
 const updateInventory = async (userId, itemChanges) => {
     if (!itemChanges || itemChanges.length === 0) return;
 
     const userInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
-    const batch = db.batch();
 
     for (const change of itemChanges) {
-        const { action, itemName, quantity = 1, itemType, rarity, description } = change;
+        const { action, itemName, quantity = 1 } = change;
 
-        if (action === 'add') {
-            const template = await getOrGenerateItemTemplate(itemName);
-            if (!template) {
-                console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
-                continue;
-            }
-            
-            if (['材料', '財寶', '道具'].includes(template.itemType)) {
-                 const stackableItemRef = userInventoryRef.doc(itemName);
-                 batch.set(stackableItemRef, { 
-                    ...template,
-                    quantity: admin.firestore.FieldValue.increment(quantity),
-                    lastAcquiredAt: admin.firestore.FieldValue.serverTimestamp()
-                 }, { merge: true });
-                 console.log(`[物品系統] 已為玩家 ${userId} 增加可堆疊物品: ${itemName} x${quantity}`);
+        try {
+            if (action === 'add') {
+                const template = await getOrGenerateItemTemplate(itemName);
+                if (!template) {
+                    console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
+                    continue;
+                }
 
-            } else {
-                for (let i = 0; i < quantity; i++) {
-                    const newItemId = uuidv4();
-                    const newItemRef = userInventoryRef.doc(newItemId);
-                    batch.set(newItemRef, {
-                        ...template,
-                        instanceId: newItemId,
-                        owner: userId,
-                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                        durability: 100,
-                        upgrades: {},
-                        lore: ""
+                if (['材料', '財寶', '道具'].includes(template.itemType)) {
+                    const stackableItemRef = userInventoryRef.doc(itemName);
+                    await db.runTransaction(async (transaction) => {
+                        transaction.set(stackableItemRef, { 
+                            ...template,
+                            quantity: admin.firestore.FieldValue.increment(quantity),
+                            lastAcquiredAt: admin.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
                     });
-                }
-                console.log(`[物品系統] 已為玩家 ${userId} 創建獨立物品實例: ${itemName} x${quantity}`);
-            }
-
-        } else if (action === 'remove') {
-            const querySnapshot = await userInventoryRef.where('itemName', '==', itemName).limit(quantity).get();
-            if (querySnapshot.empty) {
-                console.warn(`[物品系統] 警告：試圖移除不存在的物品'${itemName}'。`);
-                continue;
-            }
-            querySnapshot.forEach(doc => {
-                if (doc.data().quantity > 1) {
-                    batch.update(doc.ref, { quantity: admin.firestore.FieldValue.increment(-1) });
+                    console.log(`[物品系統] 已為玩家 ${userId} 增加可堆疊物品: ${itemName} x${quantity}`);
                 } else {
-                    batch.delete(doc.ref);
+                    const batch = db.batch();
+                    for (let i = 0; i < quantity; i++) {
+                        const newItemId = uuidv4();
+                        const newItemRef = userInventoryRef.doc(newItemId);
+                        batch.set(newItemRef, {
+                            ...template,
+                            instanceId: newItemId,
+                            owner: userId,
+                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                            durability: 100,
+                            upgrades: {},
+                            lore: ""
+                        });
+                    }
+                    await batch.commit();
+                    console.log(`[物品系統] 已為玩家 ${userId} 創建獨立物品實例: ${itemName} x${quantity}`);
                 }
-            });
-            console.log(`[物品系統] 已為玩家 ${userId} 移除物品: ${itemName} x${querySnapshot.size}`);
 
-        } else if (action === 'remove_all' && itemType === '財寶') {
-            const treasuresSnapshot = await userInventoryRef.where('itemType', '==', '財寶').get();
-            treasuresSnapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            console.log(`[物品系統] 因特殊事件，為玩家 ${userId} 移除了所有財寶。`);
+            } else if (action === 'remove') {
+                const itemRef = userInventoryRef.doc(itemName);
+                await db.runTransaction(async (transaction) => {
+                    const itemDoc = await transaction.get(itemRef);
+                    if (!itemDoc.exists) {
+                        console.warn(`[物品系統] 警告：試圖移除不存在的可堆疊物品'${itemName}'。`);
+                        return;
+                    }
+                    const currentQuantity = itemDoc.data().quantity || 0;
+                    const newQuantity = currentQuantity - quantity;
+
+                    if (newQuantity > 0) {
+                        transaction.update(itemRef, { quantity: newQuantity });
+                        console.log(`[物品系統] 已為玩家 ${userId} 減少物品: ${itemName}，剩餘: ${newQuantity}`);
+                    } else {
+                        transaction.delete(itemRef);
+                        console.log(`[物品系統] 已為玩家 ${userId} 移除最後的 ${itemName}。`);
+                    }
+                });
+            } else if (action === 'remove_all' && change.itemType === '財寶') {
+                const batch = db.batch();
+                const treasuresSnapshot = await userInventoryRef.where('itemType', '==', '財寶').get();
+                treasuresSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                console.log(`[物品系統] 因特殊事件，為玩家 ${userId} 移除了所有財寶。`);
+            }
+        } catch (error) {
+            console.error(`[物品系統] 在處理物品「${itemName}」的庫存變更時發生錯誤:`, error);
         }
     }
-    await batch.commit();
 };
 
 
@@ -413,7 +420,7 @@ const updateSkills = async (userId, skillChanges) => {
                     }
 
                     transaction.update(skillDocRef, { level: currentLevel, exp: currentExp });
-                    console.log(`[武學系統] 玩家 ${userId} 修練 ${skillChange.skillName}，熟練度增加 ${skillChange.expChange}。現有等級: ${currentLevel}, 熟練度: ${currentExp}`);
+                    console.log(`[武學系統] 玩家 ${userId} 修練 ${skillChange.skillName}，熟練度增加 ${skillChange.expChange}。熟練度: ${currentExp}`);
                 }
             });
         } catch (error) {
