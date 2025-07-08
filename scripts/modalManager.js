@@ -7,10 +7,12 @@ const deceasedTitle = document.getElementById('deceased-title');
 
 const combatModal = document.getElementById('combat-modal');
 const combatTitle = document.getElementById('combat-title');
-const combatEnemies = document.getElementById('combat-enemies');
 const combatLog = document.getElementById('combat-log');
 const combatLoader = document.getElementById('combat-loader');
 const combatSkillsInfo = document.getElementById('combat-skills-info');
+const combatAlliesContainer = document.querySelector('#combat-allies .roster-names');
+const combatEnemiesContainer = document.querySelector('#combat-enemies .roster-names');
+
 
 const chatModal = document.getElementById('chat-modal');
 const chatNpcName = document.getElementById('chat-npc-name');
@@ -102,29 +104,50 @@ export function closeEpilogueModal() {
 }
 
 // --- 戰鬥彈窗 ---
-// 【核心修改】更新 openCombatModal 函式以顯示盟友
 export function openCombatModal(initialState) {
     combatTitle.textContent = `遭遇戰`;
 
-    // 更新戰鬥陣容顯示
-    let rosterHTML = `<div><strong>敵方陣營：</strong> ${initialState.enemies.map(e => e.name).join('、')}</div>`;
-    if (initialState.allies && initialState.allies.length > 0) {
-        const playerUsername = initialState.player.username || '你';
-        rosterHTML = `<div><strong>我方陣營：</strong> ${playerUsername}、${initialState.allies.map(a => a.name).join('、')}</div>` + rosterHTML;
-    }
-    combatEnemies.innerHTML = rosterHTML;
+    // 清空舊的陣容訊息
+    if (combatAlliesContainer) combatAlliesContainer.innerHTML = '';
+    if (combatEnemiesContainer) combatEnemiesContainer.innerHTML = '';
 
+    // 填充我方陣營
+    if (combatAlliesContainer && initialState.player) {
+        const playerUsername = initialState.player.username || '你';
+        const playerSpan = document.createElement('span');
+        playerSpan.textContent = playerUsername;
+        combatAlliesContainer.appendChild(playerSpan);
+
+        if (initialState.allies && initialState.allies.length > 0) {
+            initialState.allies.forEach(ally => {
+                const allySpan = document.createElement('span');
+                allySpan.textContent = ally.name;
+                combatAlliesContainer.appendChild(allySpan);
+            });
+        }
+    }
+
+    // 填充敵方陣營
+    if (combatEnemiesContainer && initialState.enemies && initialState.enemies.length > 0) {
+        initialState.enemies.forEach(enemy => {
+            const enemySpan = document.createElement('span');
+            enemySpan.textContent = enemy.name;
+            combatEnemiesContainer.appendChild(enemySpan);
+        });
+    }
+
+    // 更新戰鬥日誌和技能
     combatLog.innerHTML = '';
     if (initialState.log && initialState.log.length > 0) {
         appendToCombatLog(initialState.log[0], 'combat-intro-text');
     }
 
     if (combatSkillsInfo) {
-        combatSkillsInfo.innerHTML = ''; 
+        combatSkillsInfo.innerHTML = '';
         const playerSkills = initialState.player?.skills || [];
         if (playerSkills.length > 0) {
             playerSkills.forEach(skill => {
-                if(skill.level > 0) { 
+                if(skill.level > 0) {
                     const skillTag = document.createElement('span');
                     skillTag.className = 'combat-skill-tag';
                     skillTag.innerHTML = `${skill.name} <span class="skill-level">${skill.level}成</span>`;
@@ -136,9 +159,10 @@ export function openCombatModal(initialState) {
             combatSkillsInfo.innerHTML = '<span class="combat-skill-tag">你尚未習得任何可用於戰鬥的武學。</span>';
         }
     }
-    
+
     combatModal.classList.add('visible');
 }
+
 export function closeCombatModal() { combatModal.classList.remove('visible'); }
 export function appendToCombatLog(text, className = '') {
     const p = document.createElement('p');
