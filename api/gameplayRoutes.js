@@ -115,6 +115,31 @@ const interactRouteHandler = async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
         
+        // 【核心新增】處理死亡倒數計時
+        if (userProfile.deathCountdown && userProfile.deathCountdown > 0) {
+            const newCountdown = userProfile.deathCountdown - 1;
+            if (newCountdown <= 0) {
+                // 時間到，玩家死亡
+                await userDocRef.update({ isDeceased: true, deathCountdown: admin.firestore.FieldValue.delete() });
+                const lastSaveData = savesSnapshot.docs[0]?.data() || {};
+                const finalSave = {
+                    ...lastSaveData,
+                    R: lastSaveData.R + 1,
+                    playerState: 'dead',
+                    PC: '你終究沒能撐過去，在傷痛中耗盡了最後一絲氣力。',
+                    story: '你的意識逐漸模糊，江湖中的恩怨情仇如走馬燈般在眼前閃過，最終，一切歸於永恆的寂靜。',
+                    EVT: '氣力耗盡，傷重不治'
+                };
+                await userDocRef.collection('game_saves').doc(`R${finalSave.R}`).set(finalSave);
+                // 直接回傳死亡結果，中斷後續流程
+                return res.json({ roundData: finalSave });
+            } else {
+                // 還沒死，更新倒數計時
+                await userDocRef.update({ deathCountdown: newCountdown });
+                userProfile.deathCountdown = newCountdown; // 更新記憶體中的狀態
+            }
+        }
+        
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
         
@@ -286,9 +311,17 @@ const interactRouteHandler = async (req, res) => {
 
         Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...currentDate });
         
+        // 【核心修改】將玩家死亡的最終決定權交給倒數計時器
         if (aiResponse.roundData.playerState === 'dead') {
-             aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你在這次事件中不幸殞命。';
-             await userDocRef.update({ isDeceased: true });
+             // 確保即使AI回傳死亡，我們也先進入瀕死狀態
+             await userDocRef.update({ deathCountdown: 10 });
+             aiResponse.roundData.playerState = 'dying';
+             aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你身受致命重傷，氣若游絲。';
+        }
+
+        // 把倒數計時也存入回合數據，方便前端顯示
+        if (userProfile.deathCountdown) {
+            aiResponse.roundData.deathCountdown = userProfile.deathCountdown;
         }
 
         await Promise.all([
@@ -370,15 +403,14 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.enemies) combatState.enemies = combatResult.enemies;
         if (combatResult.allies) combatState.allies = combatResult.allies;
 
-        // 【核心修改】在此處加入玩家死亡判定
+        
         if (combatState.player.hp <= 0) {
-            // 如果玩家HP歸零，強制設定 combatOver 為 true，並覆蓋AI可能的回應
             combatResult.combatOver = true;
             combatResult.narrative += `\n你眼前一黑，失去了所有知覺...`;
             combatResult.outcome = {
-                summary: '你不敵對手，戰敗身亡。',
+                summary: '你不敵對手，身受重傷，倒在血泊之中。',
                 playerChanges: {
-                    PC: `你被${combatState.enemies.map(e => e.name).join('、')}擊敗了。`,
+                    PC: `你被${combatState.enemies.map(e => e.name).join('、')}擊敗，身受致命傷。`,
                     powerChange: { internal: 0, external: 0, lightness: 0 },
                     moralityChange: 0,
                 },
@@ -417,15 +449,16 @@ const combatActionRouteHandler = async (req, res) => {
                 }
             }
 
+            // 【核心修改】將玩家死亡的最終決定權交給倒數計時器
+            const playerUpdatePayload = { ...finalPowerUpdate };
+            if (combatState.player.hp <= 0) {
+                playerUpdatePayload.deathCountdown = 10;
+            }
             await Promise.all([
-                userDocRef.update(finalPowerUpdate),
+                userDocRef.update(playerUpdatePayload),
                 ...relationshipPromises
             ]);
             
-            // 【核心修改】如果玩家戰敗，則更新其死亡狀態
-            if (combatState.player.hp <= 0) {
-                await userDocRef.update({ isDeceased: true });
-            }
             
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
@@ -437,15 +470,15 @@ const combatActionRouteHandler = async (req, res) => {
                  story: combatResult.narrative,
                  PC: playerChanges.PC || postCombatSummary,
                  EVT: postCombatSummary,
-                 // 【核心修改】如果玩家死亡，則在這裡也標記
-                 playerState: combatState.player.hp <= 0 ? 'dead' : 'alive',
-                 causeOfDeath: combatState.player.hp <= 0 ? `在與${combatState.enemies.map(e => e.name).join('、')}的戰鬥中被擊殺。` : null,
+                 playerState: combatState.player.hp <= 0 ? 'dying' : 'alive',
+                 causeOfDeath: null, // 死因由倒數計時結束時決定
                  internalPower: updatedUserProfile.internalPower,
                  externalPower: updatedUserProfile.externalPower,
                  lightness: updatedUserProfile.lightness,
                  morality: updatedUserProfile.morality,
                  ITM: inventoryState.itemsString,
                  money: inventoryState.money,
+                 deathCountdown: updatedUserProfile.deathCountdown || null,
             };
             
              await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
@@ -457,7 +490,7 @@ const combatActionRouteHandler = async (req, res) => {
                 newRound: {
                     story: newRoundData.story,
                     roundData: newRoundData,
-                    suggestion: combatState.player.hp <= 0 ? "你的江湖路已到盡頭..." : "戰鬥結束了，你接下來打算怎麼辦？"
+                    suggestion: combatState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
                 }
             });
 
