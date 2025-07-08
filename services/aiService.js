@@ -4,7 +4,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 
-// 1. Google Gemini
+// 1. Google Gemini (保留以備未來可能重新啟用)
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 
@@ -45,7 +45,7 @@ const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
 const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
 const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
 const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
-const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js'); // 【核心新增】
+const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 
 
 // 統一的AI調度中心
@@ -58,15 +58,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
             messages: [{ role: "user", content: prompt }],
         };
 
-        // 【核心修改】將 'gemini' 的請求導向到 'openai'
-        let effectiveModel = modelName;
-        if (modelName === 'gemini') {
-            console.log(`[AI 調度中心] 模型 'gemini' 已被重定向至 'openai'。`);
-            effectiveModel = 'openai';
-        }
-
-
-        switch (effectiveModel) {
+        // 【核心修改】移除全局重定向，現在根據傳入的 modelName 進行選擇
+        switch (modelName) {
             case 'openai':
                 options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
@@ -91,8 +84,18 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 const grokResult = await grok.chat.completions.create(options);
                 textResponse = grokResult.choices[0].message.content;
                 break;
-            default: // 【核心修改】預設也改為 openai
-                console.log(`[AI 調度中心] 未知或預設模型，已導向至 'openai'。`);
+            case 'gemini':
+                // 注意：這裡仍然保留了 gemini 的呼叫邏輯，但我們會在呼叫它的地方進行修改
+                const generationConfig = {};
+                if (isJsonExpected) {
+                    generationConfig.response_mime_type = "application/json";
+                }
+                const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
+                textResponse = (await geminiResult.response).text();
+                break;
+            default:
+                // 如果傳入未知的模型名稱，預設使用 openai
+                console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
                 options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
@@ -102,7 +105,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
         }
         return textResponse;
     } catch (error) {
-        console.error(`[AI 調度中心] 使用模型 ${modelName} (實際為 ${effectiveModel}) 時出錯:`, error);
+        console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, error);
         throw new Error(`AI模型 ${modelName} 呼叫失敗，請檢查API金鑰與服務狀態。`);
     }
 }
@@ -275,7 +278,8 @@ async function getRelationGraph(modelName, longTermSummary, username, npcDetails
 async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType) {
     const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
     try {
-        const text = await callAI(modelName, prompt, true);
+        // 【核心修改】將寫死的 'gemini' 改為 'openai'
+        const text = await callAI('openai', prompt, true);
         const jsonObj = parseJsonResponse(text);
         return JSON.stringify(jsonObj);
     } catch (error) {
@@ -332,7 +336,6 @@ async function getAISurrenderResult(modelName, playerProfile, combatState) {
     }
 }
 
-// 【核心新增】為NPC主動發起對話而設計的AI服務
 async function getAIProactiveChat(modelName, playerProfile, npcProfile, triggerEvent) {
     const prompt = getProactiveChatPrompt(playerProfile, npcProfile, triggerEvent);
     try {
@@ -370,5 +373,5 @@ module.exports = {
     getAIDeathCause,
     getAIActionClassification,
     getAISurrenderResult,
-    getAIProactiveChat, // 【核心新增】
+    getAIProactiveChat,
 };
