@@ -235,7 +235,6 @@ const interactRouteHandler = async (req, res) => {
 
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
-            // 【核心修改】為玩家設定初始HP
             const maxHp = (userProfile.externalPower || 5) * 10 + 50;
             const combatState = { 
                 turn: 1, 
@@ -352,7 +351,6 @@ const combatActionRouteHandler = async (req, res) => {
         ]);
         let playerProfile = userDoc.exists ? userDoc.data() : {};
         playerProfile.skills = skills;
-        // 【核心修改】將玩家當前HP加入到傳遞給AI的資料中
         playerProfile.hp = combatState.player.hp;
         playerProfile.maxHp = combatState.player.maxHp;
 
@@ -362,7 +360,6 @@ const combatActionRouteHandler = async (req, res) => {
         combatState.log.push(combatResult.narrative);
         combatState.turn++;
         
-        // 【核心修改】處理傷害與HP更新
         if (combatResult.damageDealt && combatResult.damageDealt.length > 0) {
             combatResult.damageDealt.forEach(deal => {
                 if (deal.target === "玩家" || deal.target === playerProfile.username) {
@@ -370,10 +367,24 @@ const combatActionRouteHandler = async (req, res) => {
                 }
             });
         }
-        // 【核心修改】將AI回傳的、已更新HP的敵人/盟友列表，覆蓋掉舊的狀態
         if (combatResult.enemies) combatState.enemies = combatResult.enemies;
         if (combatResult.allies) combatState.allies = combatResult.allies;
 
+        // 【核心修改】在此處加入玩家死亡判定
+        if (combatState.player.hp <= 0) {
+            // 如果玩家HP歸零，強制設定 combatOver 為 true，並覆蓋AI可能的回應
+            combatResult.combatOver = true;
+            combatResult.narrative += `\n你眼前一黑，失去了所有知覺...`;
+            combatResult.outcome = {
+                summary: '你不敵對手，戰敗身亡。',
+                playerChanges: {
+                    PC: `你被${combatState.enemies.map(e => e.name).join('、')}擊敗了。`,
+                    powerChange: { internal: 0, external: 0, lightness: 0 },
+                    moralityChange: 0,
+                },
+                relationshipChanges: []
+            };
+        }
 
         if (combatResult.combatOver) {
             await combatDocRef.delete();
@@ -411,6 +422,11 @@ const combatActionRouteHandler = async (req, res) => {
                 ...relationshipPromises
             ]);
             
+            // 【核心修改】如果玩家戰敗，則更新其死亡狀態
+            if (combatState.player.hp <= 0) {
+                await userDocRef.update({ isDeceased: true });
+            }
+            
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
@@ -421,6 +437,9 @@ const combatActionRouteHandler = async (req, res) => {
                  story: combatResult.narrative,
                  PC: playerChanges.PC || postCombatSummary,
                  EVT: postCombatSummary,
+                 // 【核心修改】如果玩家死亡，則在這裡也標記
+                 playerState: combatState.player.hp <= 0 ? 'dead' : 'alive',
+                 causeOfDeath: combatState.player.hp <= 0 ? `在與${combatState.enemies.map(e => e.name).join('、')}的戰鬥中被擊殺。` : null,
                  internalPower: updatedUserProfile.internalPower,
                  externalPower: updatedUserProfile.externalPower,
                  lightness: updatedUserProfile.lightness,
@@ -438,17 +457,16 @@ const combatActionRouteHandler = async (req, res) => {
                 newRound: {
                     story: newRoundData.story,
                     roundData: newRoundData,
-                    suggestion: "戰鬥結束了，你接下來打算怎麼辦？"
+                    suggestion: combatState.player.hp <= 0 ? "你的江湖路已到盡頭..." : "戰鬥結束了，你接下來打算怎麼辦？"
                 }
             });
 
         } else {
             await combatDocRef.set(combatState);
-            // 【核心修改】將完整的戰鬥狀態回傳給前端，以便更新UI
             res.json({
                 status: 'COMBAT_ONGOING',
                 narrative: combatResult.narrative,
-                updatedState: combatState // 新增欄位
+                updatedState: combatState 
             });
         }
     } catch (error) {
@@ -526,7 +544,7 @@ const surrenderRouteHandler = async (req, res) => {
              money: inventoryState.money,
         };
         
-        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
+        await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
 
