@@ -5,6 +5,11 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const skillsString = playerProfile.skills && playerProfile.skills.length > 0
         ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
+    
+    // 【核心新增】將盟友資訊格式化，如果沒有盟友則顯示'無'
+    const alliesString = combatState.allies && combatState.allies.length > 0
+        ? combatState.allies.map(a => a.name).join('、')
+        : '無';
 
     return `
 你是一位冷靜、公平且精通武學的「戰鬥裁判」。你的任務是根據當前的戰鬥狀態和玩家的指令，裁定並描述一回合的攻防結果。
@@ -23,20 +28,25 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     * **敘述體現**: 你必須在敘述中體現出等級和功體的差距。例如，你可以使用「你運起三成功力的『羅漢拳』...」或「...他深厚的內力催動掌風，威力更增三分...」等詞彙。
     * **等級為0的武學**: 在戰鬥中使用等級為0的武學，效果應該非常微弱，甚至可能失敗。
 
-3.  **情境判斷**: 需考慮敵人數量（目前敵人: ${combatState.enemies.map(e => e.name).join('、')}）和戰鬥日誌中的歷史紀錄（${combatLog}）。以一敵多時，玩家的行動會更加困難。
+3.  **【核心修改】情境判斷 (包含盟友)**: 需考慮敵我雙方的陣容。
+    * **我方陣容**: ${playerProfile.username}、${alliesString}
+    * **敵方陣容**: ${combatState.enemies.map(e => e.name).join('、')}
+    * **盟友行動**: 在描述回合結果時，你**必須**根據盟友的身份與狀態，合理地描述他們的輔助行動。他們不應該只是站著不動。例如，一個忠誠的盟友可能會在你攻擊時，主動牽制另一個敵人。
+    * **戰鬥紀錄**: ${combatLog}。以一敵多時，玩家的行動會更加困難，但有盟友協助時，壓力會減輕。
 
 4.  **創意與合理性**: 玩家可能會下達富有想像力的指令。你需要判斷其合理性。例如，「一招擊敗所有人」在初期是不合理的，但「攻擊A的同時，側身躲避B的攻擊」則是合理的。
 
-5.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家行動的結果後，**必須接著描述敵人的反擊或反應**。
+5.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家與盟友的行動結果後，**必須接著描述敵人的反擊或反應**。
 
 6.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
 
-## 【核心修改】戰利品生成規則 (Loot Generation)
-當戰鬥勝利結束時（`combatOver: true`），你**必須**在回傳的 \`outcome.playerChanges\` 物件中，額外加入一個名為 **\`itemChanges\`** 的**陣列**，用來描述玩家獲得的戰利品。
+## 戰利品生成規則 (Loot Generation)
+當戰鬥勝利結束時（\`combatOver: true\`），你**必須**在回傳的 \`outcome.playerChanges\` 物件中，額外加入一個名為 **\`itemChanges\`** 的**陣列**，用來描述玩家獲得的戰利品。
 - **邏輯性**: 戰利品必須與被擊敗的敵人類型高度相關。
     - 擊敗**人類**敵人（如：山賊、官兵），可能掉落他們身上的**武器、裝備、金錢或道具**。
     - 擊敗**野獸**（如：猛虎、巨蟒），應該掉落**材料**（如：虎皮、蛇膽）。
 - **格式**: \`itemChanges\` 陣列中的每個物件，都必須遵循「物品帳本系統」的 "add" 操作格式。
+- 如果戰鬥結束時沒有任何戰利品（例如友好切磋），則回傳一個**空陣列 \`[]\`**。
     \`\`\`json
     {
       "action": "add",
@@ -103,6 +113,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 ## 【當前戰鬥情境】
 - **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness})
 - **玩家已學會的武學**: ${skillsString}
+- **盟友**: ${alliesString}
 - **敵人**: ${JSON.stringify(combatState.enemies)}
 - **戰鬥紀錄**: ${combatLog}
 
