@@ -62,6 +62,39 @@ body.dark-theme .info-card h4 {
     line-height: 1.7; 
 }
 
+/* 【核心新增】瀕死倒數計時器樣式 */
+@keyframes pulse-red {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+.death-countdown {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    font-weight: bold;
+    text-align: center;
+    animation: pulse-red 2s infinite ease-in-out;
+}
+body.dark-theme .death-countdown {
+    background-color: #5c2b30;
+    color: #f5c6cb;
+    border-color: #8c2a34;
+}
+
+
 /* 【核心新增】地點資訊欄的專屬樣式 */
 #location-info .location-ruler {
     font-weight: bold;
