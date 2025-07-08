@@ -17,7 +17,7 @@ const {
     updateSkills,
     getPlayerSkills,
     getFriendlinessLevel,
-    processNpcUpdates // 【核心修改】引入新函式
+    processNpcUpdates // 引入新函式
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
@@ -82,7 +82,8 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
         
-        const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId);
+        const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
+        const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
 
         const currentLocationName = lastSave.LOC?.[0];
         const locationContext = await getMergedLocationData(userId, currentLocationName);
@@ -140,12 +141,17 @@ const interactRouteHandler = async (req, res) => {
         
         aiResponse.roundData.story = aiResponse.story;
         
+        const allNpcUpdates = [
+            ...(aiResponse.roundData.npcUpdates || []),
+            ...(romanceEventData ? romanceEventData.npcUpdates : [])
+        ];
+        
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
             updateFriendlinessValues(userId, aiResponse.roundData.NPC),
             updateSkills(userId, aiResponse.roundData.skillChanges),
-            processNpcUpdates(userId, aiResponse.roundData.npcUpdates) // 【核心修改】呼叫新函式
+            processNpcUpdates(userId, allNpcUpdates)
         ]);
 
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
