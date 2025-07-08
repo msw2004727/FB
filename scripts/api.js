@@ -51,10 +51,12 @@ export const api = {
     // Epilogue Route
     getEpilogue: () => fetchApi('/api/epilogue'),
 
-    // 【核心新增】GM Panel Routes
+    // GM Panel Routes
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
     updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
     rebuildNpcForGM: (body) => fetchApi('/api/gm/rebuild-npc', { method: 'POST', body: JSON.stringify(body) }),
     getLocationsForGM: () => fetchApi('/api/gm/locations'),
     rebuildLocationForGM: (body) => fetchApi('/api/gm/rebuild-location', { method: 'POST', body: JSON.stringify(body) }),
+    getItemTemplatesForGM: () => fetchApi('/api/gm/item-templates'),
+    updatePlayerResourcesForGM: (body) => fetchApi('/api/gm/update-player-resources', { method: 'POST', body: JSON.stringify(body) }),
 };
