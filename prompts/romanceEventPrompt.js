@@ -11,7 +11,7 @@ const getRomanceEventPrompt = (playerProfile, npcProfile, eventType) => {
         eventTitle = "關係的突破：唯一的愛";
         instructions = `
             這是一個決定性的告白時刻。你必須生成一段故事，讓玩家或NPC向對方表達愛意，並正式確立戀人關係。
-            同時，你必須在回傳的JSON中，使用 'npcUpdates' 指令，將NPC的 'relationships.lover' 欄位，明確地設定為玩家的姓名 "${playerProfile.username}"，並根據劇情清空或修改 'secrets' 欄位。
+            同時，你必須根據NPC的個性，在回傳的JSON中，使用 'npcUpdates' 指令來更新他的感情狀態。
         `;
     }
 
@@ -39,10 +39,43 @@ const getRomanceEventPrompt = (playerProfile, npcProfile, eventType) => {
     - "story": (字串) 你創作的故事內容。
     - "npcUpdates": (可選的陣列) 只有在事件會永久改變NPC狀態時才需要包含此欄位。
 
+## 【NPC檔案更新鐵律】
+當生成足以確立戀愛關係的劇情時，你**必須**生成對應的 \`npcUpdates\` 指令。
+### 1. 更新 \`lover\` (心上人) 欄位
+- **判斷NPC個性**:
+    - 如果NPC的個性是**「忠貞」、「專一」或「傳統」**，你**必須**使用 \`"updateType": "set"\`，將玩家設定為**唯一的**心上人，這會覆蓋掉舊的值。
+    - 如果NPC的個性是**「多情」、「玩世不恭」或「缺乏安全感」**，你**應該**考慮使用 \`"updateType": "arrayUnion"\`，將玩家**也加入**心上人列表，這將導致NPC腳踏多條船。
+- **欄位路徑**: \`relationships.lover\`
+### 2. 更新 \`secrets\` (秘密) 欄位
+- **判斷秘密內容**:
+    - **只有在**NPC的秘密**明確是關於「暗戀」某人**時（例如 "心中暗戀村中的一位青年"），你才**應該**在確立關係後，使用 \`"updateType": "arrayRemove"\` 來移除這條秘密。
+    - 如果NPC的秘密是關於他/她的身世、過往等其他事情（例如 "其實是前朝的皇族後裔"），則**絕對不能**移除這條秘密。
+---
+
 ## 回傳範例 (告白事件):
 \`\`\`json
 {
-  "story": "她望著你的眼睛，輕聲說道：「我...我心裡只有你一人。」",
+  "story": "他輕浮地在你耳邊說道：「我的心裡，從此便多了一個妳。」",
+  "npcUpdates": [
+    {
+      "npcName": "${npcProfile.name}",
+      "fieldToUpdate": "relationships.lover",
+      "newValue": "${playerProfile.username}",
+      "updateType": "arrayUnion"
+    },
+    {
+      "npcName": "${npcProfile.name}",
+      "fieldToUpdate": "secrets",
+      "newValue": "心中暗戀隔壁村的豆腐西施。",
+      "updateType": "arrayRemove"
+    }
+  ]
+}
+\`\`\`
+## 回傳範例 (專一的NPC):
+\`\`\`json
+{
+  "story": "她望著你的眼睛，輕聲說道：「我...我心裡只有你一人了。」",
   "npcUpdates": [
     {
       "npcName": "${npcProfile.name}",
@@ -66,7 +99,7 @@ ${context}
 
 ---
 
-現在，請基於以上情境，為「${playerProfile.username}」和「${npcProfile.name}」創造一段觸動心弦的特殊遭遇，並以JSON格式回傳。
+現在，請基於以上情境和鐵律，為「${playerProfile.username}」和「${npcProfile.name}」創造一段觸動心弦的特殊遭遇，並以JSON格式回傳。
 `;
 };
 
