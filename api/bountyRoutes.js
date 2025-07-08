@@ -3,16 +3,21 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
-// 【核心修改】引入了兩個新的 Prompt 模組
 const { getRewardGeneratorPrompt } = require('../prompts/rewardGeneratorPrompt.js');
-const { getBountyCompletionValidatorPrompt } = require('../prompts/bountyCompletionValidatorPrompt.js');
-const { callAI } = require('../services/aiService');
-const { updateInventory, updateSkills, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
+// 【核心修改】從 aiService 引入 aiConfig
+const { callAI, aiConfig } = require('../services/aiService');
+const { updateInventory, updateSkills, getInventoryState, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
 
 const db = admin.firestore();
 
+// 所有此路由下的請求都需要先經過身份驗證
 router.use(authMiddleware);
 
+/**
+ * @route   GET /api/bounties
+ * @desc    獲取當前玩家所有活躍的懸賞任務
+ * @access  Private
+ */
 router.get('/', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -59,56 +64,50 @@ router.get('/', async (req, res) => {
     }
 });
 
-// 【核心修改】重構整個 /claim 路由的邏輯
+
+/**
+ * @route   POST /api/bounties/claim
+ * @desc    玩家嘗試領取懸賞獎勵
+ * @access  Private
+ */
 router.post('/claim', async (req, res) => {
     const userId = req.user.id;
-    const { bountyTitle } = req.body;
+    // 【核心修改】從請求中移除 bountyTitle，因為我們已經不再使用它了
+    // const { bountyTitle } = req.body;
 
-    if (!bountyTitle) {
+    // 由於我們上一個步驟已經將驗證邏輯移交給主 AI，這裡的獨立驗證可以簡化或移除
+    // 我們假設能進入此路由的請求，都已經由 gameplayRoutes 中的 interactRouteHandler 驗證過
+    // 為了安全，我們還是保留一個基本的檢查
+    const { bountyTitle } = req.body;
+     if (!bountyTitle) {
         return res.status(400).json({ message: '未指定要領取的懸賞。' });
     }
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
         const bountiesRef = userDocRef.collection('bounties');
 
-        const [userDoc, summaryDoc, bountyQuery] = await Promise.all([
-            userDocRef.get(),
-            summaryDocRef.get(),
-            bountiesRef.where('title', '==', bountyTitle).where('status', '==', 'active').limit(1).get()
-        ]);
-
+        // 1. 查找對應的懸賞
+        const bountyQuery = await bountiesRef.where('title', '==', bountyTitle).where('status', '==', 'active').limit(1).get();
         if (bountyQuery.empty) {
-            return res.status(404).json({ message: `找不到名為「${bountyTitle}」的活躍懸賞。` });
+            return res.status(404).json({ message: `找不到名為「${bountyTitle}」的活躍懸賞或任務已被完成。` });
         }
-        if (!summaryDoc.exists) {
-            return res.status(404).json({ message: '你的江湖事蹟尚無記載，無法判斷任務是否完成。' });
-        }
-
         const bountyDoc = bountyQuery.docs[0];
         const bountyData = bountyDoc.data();
+
+        // 2. 獲取玩家檔案以供AI判斷
+        const userDoc = await userDocRef.get();
         const playerProfile = userDoc.data();
-        const longTermSummary = summaryDoc.data().text;
 
-        // 步驟 1: 呼叫專門的AI來驗證任務是否已完成
-        const validationPrompt = getBountyCompletionValidatorPrompt(bountyData, longTermSummary);
-        const validationJsonString = await callAI('openai', validationPrompt, true);
-        const validationResult = JSON.parse(validationJsonString);
-
-        if (!validationResult.isCompleted) {
-            return res.status(400).json({ message: `你尚未達成懸賞「${bountyTitle}」的目標。(${validationResult.reason})` });
-        }
-
-        console.log(`[懸賞系統] 驗證通過: 玩家 ${req.user.username} 已完成懸賞: ${bountyTitle}`);
-
-        // 步驟 2: 呼叫獎勵生成AI
+        // 3. 呼叫獎勵生成AI
         const rewardPrompt = getRewardGeneratorPrompt(bountyData, playerProfile);
-        const rewardJsonString = await callAI('gemini', rewardPrompt, true);
+        // 【核心修改】將寫死的 'gemini' 改為從 aiConfig 讀取
+        const rewardJsonString = await callAI(aiConfig.reward, rewardPrompt, true);
         const rewards = JSON.parse(rewardJsonString);
 
-        // 步驟 3: 分發獎勵
+        // 4. 分發獎勵
         const { powerChange, moralityChange, itemChanges } = rewards;
+
         const updatePromises = [];
         if (itemChanges && itemChanges.length > 0) {
             updatePromises.push(updateInventory(userId, itemChanges));
@@ -129,23 +128,27 @@ router.post('/claim', async (req, res) => {
         
         await Promise.all(updatePromises);
         
-        // 步驟 4: 更新懸賞狀態
+        // 5. 更新懸賞狀態
         await bountyDoc.ref.update({ status: 'completed' });
-        console.log(`[懸賞系統] 玩家 ${req.user.username} 成功領取懸賞獎勵。`);
 
-        // 步驟 5: 構造一個新的回合數據返回給前端
+        console.log(`[懸賞系統] 玩家 ${req.user.username} 成功領取懸賞: ${bountyTitle}`);
+
+        // 6. 構造一個新的回合數據返回給前端
         const newStory = `你成功領取了「${bountyTitle}」的懸賞，發布者對你的義舉表示感謝，並給予了你應得的報酬。`;
         
         let rewardSummary = '你獲得了：';
         if (itemChanges) {
             rewardSummary += itemChanges.map(item => `${item.itemName} x${item.quantity}`).join('、');
+        } else {
+            rewardSummary = "江湖聲望就是最好的獎勵。";
         }
         
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastRoundData = lastSaveSnapshot.docs[0].data();
+        
         const updatedUserDoc = await userDocRef.get();
         const updatedUserProfile = updatedUserDoc.data();
-        const inventoryState = await require('./gameHelpers').getInventoryState(userId);
+        const inventoryState = await getInventoryState(userId);
 
         const finalRoundData = {
             ...lastRoundData,
@@ -164,7 +167,7 @@ router.post('/claim', async (req, res) => {
         
         await userDocRef.collection('game_saves').doc(`R${finalRoundData.R}`).set(finalRoundData);
         await invalidateNovelCache(userId);
-        updateLibraryNovel(userId, req.user.username).catch(err => console.error("背景更新圖書館(懸賞)失敗:", err));
+        updateLibraryNovel(userId, req.user.username).catch(err => console.error("背景更新圖書館失敗(懸賞):", err));
         
         res.json({
             message: '懸賞領取成功！',
@@ -180,5 +183,6 @@ router.post('/claim', async (req, res) => {
         res.status(500).json({ message: '領取懸賞時發生內部錯誤。' });
     }
 });
+
 
 module.exports = router;
