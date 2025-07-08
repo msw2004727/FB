@@ -2,14 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-// 【核心修改】從 aiService 引入 getAISurrenderResult
 const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
     updateInventory,
     updateRomanceValues,
-    checkAndTriggerRomanceEvent, // 【核心修改】我們仍會使用此函式，但用途不同
+    checkAndTriggerRomanceEvent,
     getInventoryState,
     createNpcProfileInBackground,
     invalidateNovelCache,
@@ -18,7 +17,8 @@ const {
     getPlayerSkills,
     getFriendlinessLevel
 } = require('./gameHelpers');
-const { triggerBountyGeneration } = require('./worldEngine');
+// 【核心修改】從世界引擎中，引入我們新的地點生成器
+const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
@@ -80,7 +80,6 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
 
-        // 【核心修改】提前檢查是否觸發戀愛事件
         const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId, username, modelName);
 
 
@@ -126,7 +125,6 @@ const interactRouteHandler = async (req, res) => {
                 const preActionSkillChanges = req.body.skillChanges || [];
                 const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-                // 【核心修改】將 romanceEventToWeave 作為新參數傳給 getAIStory
                 aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
@@ -136,11 +134,6 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        // 【核心修改】移除舊的、獨立的戀愛事件敘述添加邏輯
-        // const romanceEventNarrative = await checkAndTriggerRomanceEvent(userId, username, aiResponse.roundData.romanceChanges, aiResponse.roundData, modelName);
-        // if (romanceEventNarrative) {
-        //     aiResponse.story = romanceEventNarrative + aiResponse.story;
-        // }
         aiResponse.roundData.story = aiResponse.story;
         
         await Promise.all([
@@ -194,6 +187,24 @@ const interactRouteHandler = async (req, res) => {
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
+        
+        // 【核心修改】在所有資料處理完畢後，觸發地點生成器
+        if (aiResponse.roundData.LOC && aiResponse.roundData.LOC[0]) {
+            const newLocationName = aiResponse.roundData.LOC[0];
+            const newLocationDescription = aiResponse.roundData.LOC[1]?.description || '';
+            // 從描述中簡單推斷地點類型，以供AI參考
+            let locationType = '未知';
+            if (newLocationDescription.includes('村')) locationType = '村莊';
+            else if (newLocationDescription.includes('鎮')) locationType = '城鎮';
+            else if (newLocationDescription.includes('城')) locationType = '城市';
+            else if (newLocationDescription.includes('寨') || newLocationDescription.includes('山')) locationType = '山寨';
+            else if (newLocationDescription.includes('派') || newLocationDescription.includes('門') || newLocationDescription.includes('寺')) locationType = '門派';
+
+            // 執行背景生成，不需要等待它完成
+            generateAndCacheLocation(newLocationName, locationType, newSummary)
+                .catch(err => console.error(`[世界引擎] 地點 ${newLocationName} 的背景生成失敗:`, err));
+        }
+
 
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
         let currentDate = { yearName: userProfile.yearName, year: userProfile.year, month: userProfile.month, day: userProfile.day };
