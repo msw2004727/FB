@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
-const { getFriendlinessLevel, createNpcProfileInBackground, updateInventory, getInventoryState } = require('./gameHelpers'); // 新增 getInventoryState
+const { getFriendlinessLevel, createNpcProfileInBackground, updateInventory, getInventoryState } = require('./gameHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { v4: uuidv4 } = require('uuid');
 
@@ -11,6 +11,31 @@ const db = admin.firestore();
 
 // 所有GM路由都需要經過身份驗證
 router.use(authMiddleware);
+
+// --- 【核心新增】獲取所有可設定關係的角色列表 (玩家+所有NPC) ---
+router.get('/characters', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    try {
+        const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
+        const characterList = [{ id: userId, name: username }]; // 將玩家自己加入列表
+
+        npcsSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.name) {
+                characterList.push({
+                    id: doc.id,
+                    name: data.name
+                });
+            }
+        });
+        res.json(characterList);
+    } catch (error) {
+        console.error(`[GM工具] 獲取角色列表時出錯:`, error);
+        res.status(500).json({ message: '獲取角色列表失敗。' });
+    }
+});
+
 
 // --- NPC管理相關API ---
 
@@ -24,11 +49,13 @@ router.get('/npcs', async (req, res) => {
         const existingNpcs = new Map();
         npcsSnapshot.forEach(doc => {
             const data = doc.data();
+            // 【核心修改】同時讀取關係數據
             existingNpcs.set(data.name || doc.id, {
                 id: doc.id,
                 name: data.name || doc.id,
                 friendlinessValue: data.friendlinessValue || 0,
                 romanceValue: data.romanceValue || 0,
+                relationships: data.relationships || {}, // 讀取關係
                 isGhost: false
             });
         });
@@ -83,6 +110,38 @@ router.post('/update-npc', async (req, res) => {
     }
 });
 
+// --- 【核心新增】更新NPC關係的API ---
+router.post('/update-npc-relationship', async (req, res) => {
+    const userId = req.user.id;
+    const { npcId, relationshipType, targetName } = req.body;
+
+    if (!npcId || !relationshipType) {
+        return res.status(400).json({ message: '缺少必要的參數(NPC ID或關係類型)。' });
+    }
+
+    try {
+        const npcRef = db.collection('users').doc(userId).collection('npcs').doc(npcId);
+        // 使用點標記法來更新巢狀物件中的特定欄位
+        const fieldToUpdate = `relationships.${relationshipType}`;
+        
+        const updatePayload = {};
+        // 如果 targetName 是空的，代表要刪除這個關係
+        updatePayload[fieldToUpdate] = targetName ? targetName : admin.firestore.FieldValue.delete();
+
+        await npcRef.set({
+            relationships: {
+                [relationshipType]: targetName || admin.firestore.FieldValue.delete()
+            }
+        }, { merge: true });
+        
+        res.json({ message: `NPC「${npcId}」的關係已更新。` });
+
+    } catch (error) {
+         console.error(`[GM工具] 更新NPC「${npcId}」的關係時出錯:`, error);
+        res.status(500).json({ message: '更新NPC關係時發生內部錯誤。' });
+    }
+});
+
 router.post('/rebuild-npc', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -114,7 +173,6 @@ router.post('/rebuild-npc', async (req, res) => {
 });
 
 // --- 地區管理相關API ---
-
 router.get('/locations', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -151,7 +209,6 @@ router.get('/locations', async (req, res) => {
     }
 });
 
-
 router.post('/rebuild-location', async (req, res) => {
     const userId = req.user.id;
     const { locationName } = req.body;
@@ -173,8 +230,6 @@ router.post('/rebuild-location', async (req, res) => {
 });
 
 // --- 玩家屬性管理API ---
-
-// 【核心新增】獲取玩家當前核心狀態的 API
 router.get('/player-state', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -198,7 +253,6 @@ router.get('/player-state', async (req, res) => {
     }
 });
 
-// 【核心新增】更新玩家核心狀態的 API
 router.post('/player-state', async (req, res) => {
     const userId = req.user.id;
     const { internalPower, externalPower, lightness, morality } = req.body;
@@ -242,23 +296,9 @@ router.post('/update-player-resources', async (req, res) => {
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        let promises = [];
-
+        
         if (money !== undefined && !isNaN(money)) {
             const moneyAmount = Number(money);
-            const moneyItem = {
-                action: 'add', // 先移除所有錢，再增加指定數量
-                itemName: '銀兩',
-                quantity: moneyAmount,
-                itemType: '財寶',
-                rarity: '普通',
-                description: '流通的貨幣。'
-            };
-            const removeMoney = {
-                action: 'remove_all',
-                itemType: '財寶', // 假設錢都屬於財寶類
-            }
-             // 這段邏輯需要修改，直接操作 inventory_items
             const moneyRef = userDocRef.collection('inventory_items').doc('銀兩');
             await moneyRef.set({
                  itemName: '銀兩',
@@ -267,14 +307,12 @@ router.post('/update-player-resources', async (req, res) => {
                  quantity: moneyAmount,
                  description: '流通的貨幣。'
             }, { merge: true });
-
         }
 
         if (itemChange && itemChange.itemName && itemChange.action) {
-            promises.push(updateInventory(userId, [itemChange]));
+            await updateInventory(userId, [itemChange]);
         }
-
-        await Promise.all(promises);
+        
         res.json({ message: '玩家資源已成功更新！' });
 
     } catch (error) {
@@ -283,7 +321,6 @@ router.post('/update-player-resources', async (req, res) => {
     }
 });
 
-// 【核心新增】玩家瞬移的 API
 router.post('/teleport', async (req, res) => {
     const userId = req.user.id;
     const { locationName } = req.body;
@@ -304,25 +341,21 @@ router.post('/teleport', async (req, res) => {
         const lastRoundData = lastSaveSnapshot.docs[0].data();
         const newRoundNumber = lastRoundData.R + 1;
 
-        // 創建一個新的系統事件存檔
         const teleportRoundData = {
-            ...lastRoundData, // 繼承上一回合的所有狀態
+            ...lastRoundData,
             R: newRoundNumber,
             EVT: '乾坤挪移',
             PC: `你感到一陣時空扭曲，下一刻已身處「${locationName}」。`,
             story: `一股無形的力量包裹住你的身體，周遭景物瞬間模糊、拉長、扭曲成絢爛的光帶。你感到一陣輕微的失重，彷彿靈魂被從軀體中抽離，穿梭於時間的洪流之中。這感覺稍縱即逝，當你再次睜開雙眼時，先前的景象已蕩然無存，取而代之的是一片全新的天地。你，已然抵達了「${locationName}」。`,
             IMP: `透過一股神秘的力量，你瞬間移動到了「${locationName}」。`,
-            LOC: [locationName, { description: '一個全新的未知之地' }], // 更新地點
-            // 清空NPC、線索等，因為是新地點
+            LOC: [locationName, { description: '一個全新的未知之地' }],
             NPC: [],
             CLS: '',
             QST: '探索這個新地方。'
         };
 
-        // 寫入新的存檔
         await savesRef.doc(`R${newRoundNumber}`).set(teleportRoundData);
         
-        // 確保世界引擎會為這個新地點生成資料
         await generateAndCacheLocation(userId, locationName);
 
         res.json({ message: `成功瞬移至「${locationName}」！請重新載入遊戲以更新畫面。` });
@@ -332,6 +365,5 @@ router.post('/teleport', async (req, res) => {
         res.status(500).json({ message: '執行乾坤挪移時發生未知錯誤。' });
     }
 });
-
 
 module.exports = router;
