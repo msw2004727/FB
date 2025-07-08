@@ -13,7 +13,7 @@ const externalPowerValue = document.getElementById('external-power-value');
 const lightnessPowerBar = document.getElementById('lightness-power-bar');
 const lightnessPowerValue = document.getElementById('lightness-power-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
-const locationInfo = document.getElementById('location-info'); // 【核心新增】
+const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
 const itmContent = document.getElementById('itm-content');
 const qstContent = document.getElementById('qst-content');
@@ -92,7 +92,6 @@ function updatePowerBar(barElement, valueElement, currentValue) {
     }
 }
 
-// 【核心修改】updateUI 函式現在也會接收 locationData
 export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
         const eventDiv = document.createElement('div');
@@ -128,7 +127,6 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
 
     updateMoralityBar(roundData.morality);
 
-    // 【核心新增】更新地點資訊欄
     if (locationInfo) {
         if (locationData) {
             locationInfo.innerHTML = `
@@ -155,7 +153,19 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (moneyContent) {
         moneyContent.textContent = `${roundData.money || 0} 文錢`;
     }
-    itmContent.textContent = roundData.ITM || '身無長物';
+    
+    // 【核心修改】更新ITM的渲染邏輯
+    itmContent.innerHTML = ''; // 先清空舊內容
+    if (roundData.ITM && roundData.ITM !== '身無長物') {
+        const items = roundData.ITM.split('、'); // 按「、」拆分物品字串
+        items.forEach(itemText => {
+            const itemDiv = document.createElement('div'); // 為每個物品創建一個div
+            itemDiv.textContent = itemText.trim();
+            itmContent.appendChild(itemDiv); // 將div加入到容器中
+        });
+    } else {
+        itmContent.textContent = '身無長物';
+    }
 
     if (skillsContent) {
         skillsContent.innerHTML = '';
