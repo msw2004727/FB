@@ -1,4 +1,5 @@
 // prompts/storyPrompt.js
+const { getItemLedgerRule } = require('./story_components/itemLedgerRule.js'); // 【核心新增】
 
 // 【核心修改】函式簽名增加了新的參數 locationContext
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null) => {
@@ -18,7 +19,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         ? `\n## 【最高優先級特殊劇情指令：戀愛場景編織】\n在本回合的故事中，你**必須**將以下指定的「戀愛互動場景」自然地、無縫地編織進你的敘述裡。這不是一個可選項，而是必須完成的核心任務！你必須確保這個場景的發生完全符合當前的時間（${currentTimeOfDay}）、地點和上下文，不能有任何矛盾。\n- **需編織的事件**: 與NPC「${romanceEventToWeave.npcName}」發生一次「${romanceEventToWeave.eventType}」類型的初次心動互動。這通常表現為一次不經意的偶遇、一個充滿深意的眼神交換、或是一句關切的問候。`
         : '';
     
-    // 【核心新增】將地點的詳細情境加入到AI的參考資料中
     const locationContextInstruction = locationContext
         ? `\n## 【重要地點情境參考】\n你當前正處於「${locationContext.locationName}」，以下是關於此地的詳細情報，你在生成故事時必須嚴格參考這些設定，確保你的描述（如天氣、統治者、氛圍等）與之相符：\n\`\`\`json\n${JSON.stringify(locationContext, null, 2)}\n\`\`\``
         : `\n## 【重要地點情境參考】\n你目前身處一個未知之地，關於此地的詳細情報尚不明朗。`;
@@ -91,7 +91,7 @@ ${levelUpText}
 2.  **【核心標記鐵律】**：當你生成了符合上述時機的劇情時，你**必須**在回傳的 \`roundData\` 物件中，額外加入以下三個欄位：
     1.  \`"enterCombat": true\`
     2.  \`"combatants"\`: 一個包含所有對手姓名和初始狀態的物件陣列。
-    3.  **【核心修改】\`"combatIntro"\`**: (字串) 一段約50-100字的文字，生動地描述戰鬥發生的原因與場景氛圍。**這段文字必須保持中立和張力**，例如「空氣中的氣氛陡然緊張，一場交鋒在所難免。你屏氣凝神，準備應對接下來的一切！」或「話不投機半句多，對方眼神一凜，亮出了兵刃，看來一場較量勢在必行。」**絕對禁止**使用「惡鬥」、「血戰」等預設立場的詞彙。
+    3.  **【核心修改】\`"combatIntro"\`**: (字串) 一段約50-100字的文字，生動地描述戰鬥發生的原因與場景氛圍。**這段文字必須保持中立和張力**，例如「空氣中的氣氛陡然緊張，一場交鋒在所難免。你屏氣凝神，準備應對接下來的一切！」或「話不投機半句多，對方眼神一凜，亮出了兵刃，看來一场較量勢在必行。」**絕對禁止**使用「惡鬥」、「血戰」等預設立場的詞彙。
 3.  **敘述停止點**：你的 "story" 敘述應該在戰鬥**一觸即發的瞬間**就結束。**絕對禁止**自行推演任何詳細的戰鬥過程或結果。
 
 **範例**：
@@ -104,37 +104,7 @@ ${levelUpText}
     "combatIntro": "山賊頭目失去了耐心，他狂吼一聲，高舉鬼頭刀便朝你當頭劈來，看來一場血戰在所難免。"
     \`\`\`
 
-## 【重要新規則】物品帳本系統 (Item Ledger System)
-
-你現在必須採用全新的物品處理方式。你不再需要記憶玩家身上有什麼，而是要回傳一個「物品變化」的清單。
-
--   在回傳的 \`roundData\` 中，**絕對不能再包含 \`ITM\` 這個鍵**。
--   取而代之，你**必須**回傳一個名為 **\`itemChanges\`** 的**陣列**。
--   如果本回合沒有任何物品增減，請回傳一個**空陣列 \`[]\`**。
--   陣列中的每一個物件，都代表一次物品的變化，其結構必須如下：
-
-### 操作一：新增物品 (Add)
-當玩家獲得新物品時，使用此結構。
-\`\`\`json
-{
-  "action": "add",
-  "itemName": "物品的準確名稱",
-  "quantity": 1,
-  "itemType": "武器 | 裝備 | 秘笈 | 書籍 | 道具 | 材料 | 財寶 | 其他",
-  "rarity": "普通 | 稀有 | 史詩 | 傳說",
-  "description": "一段關於此物品的簡短描述文字。"
-}
-\`\`\`
-
-### 操作二：移除物品 (Remove)
-當玩家消耗、失去或摧毀物品時，使用此結構。
-\`\`\`json
-{
-  "action": "remove",
-  "itemName": "要移除的物品的準確名稱",
-  "quantity": 1
-}
-\`\`\`
+${getItemLedgerRule()}
 
 ---
 
