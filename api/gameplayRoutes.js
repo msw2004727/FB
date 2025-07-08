@@ -16,7 +16,8 @@ const {
     updateLibraryNovel,
     updateSkills,
     getPlayerSkills,
-    getFriendlinessLevel
+    getFriendlinessLevel,
+    processNpcUpdates // 【核心修改】引入新函式
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
@@ -143,10 +144,10 @@ const interactRouteHandler = async (req, res) => {
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
             updateFriendlinessValues(userId, aiResponse.roundData.NPC),
-            updateSkills(userId, aiResponse.roundData.skillChanges)
+            updateSkills(userId, aiResponse.roundData.skillChanges),
+            processNpcUpdates(userId, aiResponse.roundData.npcUpdates) // 【核心修改】呼叫新函式
         ]);
 
-        // 【核心修改】將查詢新懸賞的動作加入到並行處理中
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion('deepseek', aiResponse.roundData),
@@ -155,7 +156,7 @@ const interactRouteHandler = async (req, res) => {
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get()
         ]);
         
-        aiResponse.hasNewBounties = !newBountiesSnapshot.empty; // 【核心修改】新增此行
+        aiResponse.hasNewBounties = !newBountiesSnapshot.empty;
         aiResponse.suggestion = suggestion;
         aiResponse.roundData.ITM = inventoryState.itemsString;
         aiResponse.roundData.money = inventoryState.money;
