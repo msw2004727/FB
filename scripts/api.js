@@ -29,7 +29,8 @@ export const api = {
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
     combatAction: (body) => fetchApi('/api/game/play/combat-action', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/play/end-chat', { method: 'POST', body: JSON.stringify(body) }),
-    
+    combatSurrender: (body) => fetchApi('/api/game/play/combat-surrender', { method: 'POST', body: JSON.stringify(body) }),
+
     // NPC Routes
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc/npc-profile/${npcName}`),
     npcChat: (body) => fetchApi('/api/game/npc/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
@@ -45,9 +46,13 @@ export const api = {
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
 
-    // 【核心新增】Bounty Route
+    // Bounty Route
     getBounties: () => fetchApi('/api/bounties'),
 
     // Epilogue Route
     getEpilogue: () => fetchApi('/api/epilogue'),
+
+    // 【核心新增】GM Panel Routes
+    getNpcsForGM: () => fetchApi('/api/gm/npcs'),
+    updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
 };
