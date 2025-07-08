@@ -61,7 +61,7 @@ router.post('/npc-chat', async (req, res) => {
         const [npcDoc, summaryDoc, allLocationsSnapshot] = await Promise.all([
             npcDocRef.get(),
             summaryDocRef.get(),
-            locationsRef.get() // 【核心修改】一次性獲取所有已知地點的名稱
+            locationsRef.get()
         ]);
 
         if (!npcDoc.exists) {
@@ -79,24 +79,21 @@ router.post('/npc-chat', async (req, res) => {
             }
         }
         
-        // 【核心修改】智慧判斷玩家是否在詢問一個外地，並獲取其情報
+        // 智慧判斷玩家是否在詢問一個外地，並獲取其情報
         let remoteLocationContext = null;
         const knownLocationNames = allLocationsSnapshot.docs.map(doc => doc.id);
         
         for (const locName of knownLocationNames) {
-            // 如果玩家的訊息中包含了某個已知地點的名稱，
-            // 且這個地點不是NPC當前所在地，就將其視為「外地」
             if (playerMessage.includes(locName) && locName !== npcProfile.currentLocation) {
                 const remoteLocationDoc = await locationsRef.doc(locName).get();
                 if (remoteLocationDoc.exists) {
                     remoteLocationContext = remoteLocationDoc.data();
                     console.log(`[情報網系統] 偵測到外地詢問: ${locName}`);
-                    break; // 只處理第一個找到的地點
+                    break;
                 }
             }
         }
 
-        // 將本地和外地情報都傳遞給AI
         const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
         res.json({ reply: aiReply });
     } catch (error) {
@@ -136,7 +133,7 @@ router.post('/give-item', async (req, res) => {
         const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, giveData);
         if (!aiResponse) throw new Error('AI未能生成有效的贈予反應。');
         
-        const { npc_response, friendlinessChange } = aiResponse;
+        const { npc_response, friendlinessChange, itemChanges } = aiResponse; // 新增：解構出 itemChanges
         const newFriendlinessValue = (npcProfile.friendlinessValue || 0) + friendlinessChange;
         
         await npcDocRef.update({ 
@@ -146,7 +143,21 @@ router.post('/give-item', async (req, res) => {
 
         const itemNameToRemove = type === 'money' ? '銀兩' : itemName;
         const quantityToRemove = type === 'money' ? amount : (amount || 1);
-        await updateInventory(userId, [{ action: 'remove', itemName: itemNameToRemove, quantity: quantityToRemove }]);
+        
+        // 使用一個陣列來收集所有庫存變更
+        const inventoryUpdates = [{ action: 'remove', itemName: itemNameToRemove, quantity: quantityToRemove }];
+        
+        // 【核心新增】如果NPC有回禮，也加入到庫存變更陣列中
+        let giftNarrative = "";
+        if (itemChanges && itemChanges.length > 0) {
+            itemChanges.forEach(gift => {
+                inventoryUpdates.push(gift); // 將AI生成的回禮指令加入
+                giftNarrative += ` 你收到了來自${npcName}的回禮：${gift.itemName}。`; // 準備要附加到故事裡的文字
+            });
+        }
+        
+        // 一次性更新所有庫存變化
+        await updateInventory(userId, inventoryUpdates);
         
         const newRoundNumber = lastRoundData.R + 1;
         const inventoryState = await getInventoryState(userId);
@@ -166,7 +177,8 @@ router.post('/give-item', async (req, res) => {
             newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(newFriendlinessValue) });
         }
         
-        newRoundData.story = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
+        const baseNarrative = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
+        newRoundData.story = baseNarrative + giftNarrative; // 將回禮敘事附加到主要故事後
         
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(model, longTermSummary, newRoundData),
