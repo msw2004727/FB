@@ -13,6 +13,7 @@ const externalPowerValue = document.getElementById('external-power-value');
 const lightnessPowerBar = document.getElementById('lightness-power-bar');
 const lightnessPowerValue = document.getElementById('lightness-power-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
+const locationInfo = document.getElementById('location-info'); // 【核心新增】
 const npcContent = document.getElementById('npc-content');
 const itmContent = document.getElementById('itm-content');
 const qstContent = document.getElementById('qst-content');
@@ -20,7 +21,7 @@ const psyContent = document.getElementById('psy-content');
 const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
 const moneyContent = document.getElementById('money-content');
-const skillsContent = document.getElementById('skills-content'); // 【核心新增】
+const skillsContent = document.getElementById('skills-content'); 
 
 
 // --- UI 更新函式 ---
@@ -91,7 +92,8 @@ function updatePowerBar(barElement, valueElement, currentValue) {
     }
 }
 
-export function updateUI(storyText, data, randomEvent) {
+// 【核心修改】updateUI 函式現在也會接收 locationData
+export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
         const eventDiv = document.createElement('div');
         eventDiv.className = 'random-event-message';
@@ -100,35 +102,48 @@ export function updateUI(storyText, data, randomEvent) {
     }
 
     if (storyText) {
-        const processedStory = highlightNpcNames(storyText, data.NPC);
+        const processedStory = highlightNpcNames(storyText, roundData.NPC);
         appendMessageToStory(processedStory, 'story-text');
     }
-    if (!data) return;
+    if (!roundData) return;
 
-    const atmosphere = data.ATM?.[0] || '未知';
-    const weather = data.WRD || '晴朗';
-    const location = data.LOC?.[0] || '未知之地';
-    const dateString = `${data.yearName || '元祐'}${data.year || 1}年${data.month || 1}月${data.day || 1}日`;
+    const atmosphere = roundData.ATM?.[0] || '未知';
+    const weather = roundData.WRD || '晴朗';
+    const location = roundData.LOC?.[0] || '未知之地';
+    const dateString = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日`;
 
     statusBarEl.innerHTML = `
         <div class="status-item"><i class="fas fa-calendar-alt"></i> ${dateString}</div>
-        <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${data.timeOfDay || '未知'}</div>
+        <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${roundData.timeOfDay || '未知'}</div>
         <div class="status-item"><i class="fas fa-cloud-sun"></i> 天氣: ${weather}</div>
         <div class="status-item"><i class="fas fa-theater-masks"></i> 氛圍: ${atmosphere}</div>
         <div class="status-item"><i class="fas fa-map-marked-alt"></i> 地點: ${location}</div>
     `;
 
-    pcContent.textContent = data.PC || '狀態穩定';
+    pcContent.textContent = roundData.PC || '狀態穩定';
 
-    updatePowerBar(internalPowerBar, internalPowerValue, data.internalPower);
-    updatePowerBar(externalPowerBar, externalPowerValue, data.externalPower);
-    updatePowerBar(lightnessPowerBar, lightnessPowerValue, data.lightness);
+    updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower);
+    updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower);
+    updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness);
 
-    updateMoralityBar(data.morality);
+    updateMoralityBar(roundData.morality);
+
+    // 【核心新增】更新地點資訊欄
+    if (locationInfo) {
+        if (locationData) {
+            locationInfo.innerHTML = `
+                <div>統治者：<span class="location-ruler">${locationData.governance?.ruler || '未知'}</span></div>
+                <div class="location-desc">${locationData.description || '此地詳情尚在傳聞之中...'}</div>
+            `;
+        } else {
+            locationInfo.innerHTML = '此地詳情尚在傳聞之中...';
+        }
+    }
+
 
     npcContent.innerHTML = '';
-    if (data.NPC && Array.isArray(data.NPC) && data.NPC.length > 0) {
-        data.NPC.forEach(npc => {
+    if (roundData.NPC && Array.isArray(roundData.NPC) && roundData.NPC.length > 0) {
+        roundData.NPC.forEach(npc => {
             const npcLine = document.createElement('div');
             npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
             npcContent.appendChild(npcLine);
@@ -138,20 +153,17 @@ export function updateUI(storyText, data, randomEvent) {
     }
 
     if (moneyContent) {
-        moneyContent.textContent = `${data.money || 0} 文錢`;
+        moneyContent.textContent = `${roundData.money || 0} 文錢`;
     }
-    itmContent.textContent = data.ITM || '身無長物';
+    itmContent.textContent = roundData.ITM || '身無長物';
 
-    // 【核心新增】更新武學列表
     if (skillsContent) {
-        skillsContent.innerHTML = ''; // 先清空
-        if (data.skills && Array.isArray(data.skills) && data.skills.length > 0) {
+        skillsContent.innerHTML = '';
+        if (roundData.skills && Array.isArray(roundData.skills) && roundData.skills.length > 0) {
             data.skills.forEach(skill => {
                 const skillLine = document.createElement('div');
                 skillLine.className = 'skill-item';
-                // 顯示武學名稱和等級
                 skillLine.innerHTML = `<strong>${skill.name}</strong> <span class="skill-level">(Lv.${skill.level || 0})</span>`;
-                // 將詳細描述放在滑鼠懸停提示中
                 skillLine.title = `類型: ${skill.type}\n描述: ${skill.description}`;
                 skillsContent.appendChild(skillLine);
             });
@@ -160,11 +172,11 @@ export function updateUI(storyText, data, randomEvent) {
         }
     }
 
-    qstContent.textContent = data.QST || '暫無要事';
-    psyContent.textContent = data.PSY || '心如止水';
-    clsContent.textContent = data.CLS || '尚無線索';
+    qstContent.textContent = roundData.QST || '暫無要事';
+    psyContent.textContent = roundData.PSY || '心如止水';
+    clsContent.textContent = roundData.CLS || '尚無線索';
 
-    actionSuggestion.textContent = data.suggestion ? `書僮小聲說：${data.suggestion}` : '';
+    actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
 }
 
 export function handleApiError(error) {
