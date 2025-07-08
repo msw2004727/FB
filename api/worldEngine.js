@@ -1,9 +1,8 @@
 // api/worldEngine.js
 const admin = require('firebase-admin');
 const { getBountyGeneratorPrompt } = require('../prompts/bountyGeneratorPrompt.js');
-// 【核心新增】引入我們新建立的地點生成器AI腳本
 const { getLocationGeneratorPrompt } = require('../prompts/locationGeneratorPrompt.js'); 
-const { callAI } = require('../services/aiService');
+const { callAI } = require('../services/aiService'); // 【核心新增】引入AI呼叫中心
 
 const db = admin.firestore();
 
