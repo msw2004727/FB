@@ -246,7 +246,7 @@ body.dark-theme .deceased-btn.restart-btn {
     width: 90%;
     max-width: 680px;
     height: 80%;
-    max-height: 600px;
+    max-height: 700px; /* 稍微增加最大高度 */
     display: flex;
     flex-direction: column;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -284,30 +284,23 @@ body.dark-theme .combat-header h3 {
     color: var(--dark-accent);
 }
 
-/* 【核心新增】戰鬥陣營顯示樣式 */
 .combat-roster {
     display: flex;
     justify-content: space-around;
     gap: 1rem;
     margin-top: 1rem;
     font-family: var(--font-sans);
-    font-size: 0.9rem;
-    padding: 0.75rem;
-    background-color: rgba(0,0,0,0.02);
-    border: 1px solid var(--light-border);
-    border-radius: 6px;
+    padding: 0.5rem;
 }
-body.dark-theme .combat-roster {
-    background-color: rgba(255,255,255,0.02);
-    border-color: var(--dark-border);
-}
+
 .combat-roster-group {
     flex: 1;
     text-align: center;
 }
 .combat-roster-group strong {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
     color: var(--light-text-secondary);
 }
 body.dark-theme .combat-roster-group strong {
@@ -315,30 +308,64 @@ body.dark-theme .combat-roster-group strong {
 }
 .roster-names {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
+    flex-direction: column; /* 改為垂直排列 */
+    gap: 0.75rem;
 }
-.roster-names span {
-    padding: 0.2rem 0.6rem;
-    border-radius: 4px;
+
+/* 【核心新增】戰鬥卡片樣式 */
+.combatant-card {
+    background-color: var(--light-surface-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-align: left;
+}
+body.dark-theme .combatant-card {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+}
+.combatant-card.type-player, .combatant-card.type-ally {
+    border-left: 4px solid #28a745;
+}
+.combatant-card.type-enemy {
+    border-left: 4px solid #dc3545;
+}
+
+.combatant-name {
     font-weight: bold;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
 }
-#combat-allies .roster-names span {
-    background-color: #d4edda;
-    color: #155724;
+
+.hp-bar-container {
+    height: 12px;
+    background-color: var(--light-border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
 }
-body.dark-theme #combat-allies .roster-names span {
-    background-color: #2e4b37;
-    color: #a3e6b8;
+body.dark-theme .hp-bar-container {
+    background-color: var(--dark-border);
 }
-#combat-enemies .roster-names span {
-    background-color: #f8d7da;
-    color: #721c24;
+
+.hp-bar-fill {
+    height: 100%;
+    background-color: #dc3545;
+    border-radius: 6px;
+    transition: width 0.4s ease;
 }
-body.dark-theme #combat-enemies .roster-names span {
-    background-color: #5c2b30;
-    color: #f5c6cb;
+.combatant-card.type-player .hp-bar-fill,
+.combatant-card.type-ally .hp-bar-fill {
+    background-color: #28a745;
+}
+.hp-text {
+    font-family: monospace;
+    font-size: 0.8rem;
+    text-align: right;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .hp-text {
+    color: var(--dark-text-secondary);
 }
 
 
@@ -360,6 +387,10 @@ body.dark-theme .combat-log-area p {
 }
 .combat-log-area p:last-child {
     border-bottom: none;
+}
+.combat-intro-text {
+    font-style: italic;
+    color: var(--light-text-secondary);
 }
 
 .combat-skills-area {
