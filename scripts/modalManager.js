@@ -92,12 +92,12 @@ function createCharacterCard(character, type) {
 
     const hpPercentage = (character.hp / character.maxHp) * 100;
 
-    // 【核心修改】將 hp-text 移入 hp-bar-container 以符合新的CSS樣式
+    // 【核心修改】將血量顯示從 "130 / 130" 改為只顯示 "130"
     card.innerHTML = `
         <div class="combatant-name">${character.name || character.username}</div>
-        <div class="hp-bar-container">
+        <div class="hp-bar-container" title="${character.hp} / ${character.maxHp}">
             <div class="hp-bar-fill" style="width: ${hpPercentage}%;"></div>
-            <div class="hp-text">${character.hp} / ${character.maxHp}</div>
+            <div class="hp-text">${character.hp}</div>
         </div>
     `;
     return card;
@@ -204,10 +204,13 @@ export function updateCombatUI(updatedState) {
         if (card) {
             const hpBar = card.querySelector('.hp-bar-fill');
             const hpText = card.querySelector('.hp-text');
+            const hpBarContainer = card.querySelector('.hp-bar-container');
             const hpPercentage = (character.hp / character.maxHp) * 100;
             
             hpBar.style.width = `${hpPercentage}%`;
-            hpText.textContent = `${character.hp} / ${character.maxHp}`;
+            // 【核心修改】將血量顯示從 "130 / 130" 改為只顯示 "130"
+            hpText.textContent = character.hp;
+            hpBarContainer.title = `${character.hp} / ${character.maxHp}`;
         }
     });
 }
