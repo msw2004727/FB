@@ -3,6 +3,7 @@ const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
 const { getOrGenerateItemTemplate } = require('./itemManager');
+const { generateAndCacheLocation } = require('./worldEngine'); // 新增引用
 
 const db = admin.firestore();
 
@@ -17,6 +18,58 @@ const getFriendlinessLevel = (value) => {
     if (value <= -50) return 'hostile';
     if (value <= -10) return 'wary';
     return 'neutral';
+};
+
+/**
+ * 【核心新增】
+ * 輔助函式，用於合併地點的靜態和動態資料。
+ * 這個函式從 stateRoutes.js 搬移至此，作為共用函式。
+ * @param {string} userId - 玩家的ID.
+ * @param {string} locationName - 新地點的名稱.
+ * @returns {Promise<Object|null>} 合併後的地點資料
+ */
+const getMergedLocationData = async (userId, locationName) => {
+    if (!locationName) return null;
+
+    try {
+        const staticDocRef = db.collection('locations').doc(locationName);
+        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
+
+        const [staticDoc, dynamicDoc] = await Promise.all([
+            staticDocRef.get(),
+            dynamicDocRef.get()
+        ]);
+
+        if (!staticDoc.exists) {
+            console.log(`[讀取系統] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
+            generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
+            return {
+                locationId: locationName,
+                locationName: locationName,
+                description: "此地詳情尚在傳聞之中...",
+            };
+        }
+        
+        if (staticDoc.exists && !dynamicDoc.exists) {
+             console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
+             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
+        }
+
+        const staticData = staticDoc.data() || {};
+        const dynamicData = dynamicDoc.data() || {};
+
+        return { ...staticData, ...dynamicData };
+
+    } catch (error) {
+        console.error(`[讀取系統] 合併地點 ${locationName} 的資料時出錯:`, error);
+        return {
+            locationId: locationName,
+            locationName: locationName,
+            description: "讀取此地詳情時發生錯誤...",
+        };
+    }
 };
 
 const advanceDate = (currentDate) => {
@@ -427,6 +480,7 @@ const processNpcUpdates = async (userId, updates) => {
 module.exports = {
     TIME_SEQUENCE,
     getFriendlinessLevel,
+    getMergedLocationData, // 新增導出
     advanceDate,
     invalidateNovelCache,
     updateLibraryNovel,
