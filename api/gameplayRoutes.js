@@ -22,37 +22,38 @@ const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
 
-const updateFriendlinessValues = async (userId, npcChanges) => {
-    if (!npcChanges || npcChanges.length === 0) return;
-    const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+// 【核心新增】將合併地點資料的輔助函式也加入此檔案
+const getMergedLocationData = async (userId, locationName) => {
+    if (!locationName) return null;
+    try {
+        const staticDocRef = db.collection('locations').doc(locationName);
+        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
 
-    const promises = npcChanges.map(async (change) => {
-        if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) {
-            return;
+        const [staticDoc, dynamicDoc] = await Promise.all([
+            staticDocRef.get(),
+            dynamicDocRef.get()
+        ]);
+
+        if (!staticDoc.exists) {
+            console.log(`[推進劇情] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
+            generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
+            return { locationId: locationName, locationName: locationName, description: "此地詳情尚在傳聞之中...", };
+        }
+        
+        if (staticDoc.exists && !dynamicDoc.exists) {
+             console.log(`[推進劇情] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
+             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
         }
 
-        const npcDocRef = userNpcsRef.doc(change.name);
-        try {
-            await db.runTransaction(async (transaction) => {
-                const npcDoc = await transaction.get(npcDocRef);
-                if (!npcDoc.exists) {
-                    console.warn(`[友好度系統] 嘗試更新一個不存在的NPC檔案: ${change.name}`);
-                    return;
-                }
-                const currentFriendliness = npcDoc.data().friendlinessValue || 0;
-                const newFriendlinessValue = currentFriendliness + change.friendlinessChange;
-                
-                transaction.update(npcDocRef, { 
-                    friendlinessValue: newFriendlinessValue,
-                    friendliness: getFriendlinessLevel(newFriendlinessValue)
-                });
-            });
-        } catch (error) {
-            console.error(`[友好度系統] 更新NPC "${change.name}" 友好度時出錯:`, error);
-        }
-    });
-
-    await Promise.all(promises);
+        const staticData = staticDoc.data() || {};
+        const dynamicData = dynamicDoc.data() || {};
+        return { ...staticData, ...dynamicData };
+    } catch (error) {
+        console.error(`[推進劇情] 合併地點 ${locationName} 的資料時出錯:`, error);
+        return { locationId: locationName, locationName: locationName, description: "讀取此地詳情時發生錯誤...", };
+    }
 };
 
 
@@ -82,14 +83,9 @@ const interactRouteHandler = async (req, res) => {
         
         const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId);
 
+        // 【核心修改】使用新的輔助函式來獲取合併後的地點資料，以提供給AI作為情境參考
         const currentLocationName = lastSave.LOC?.[0];
-        let locationContext = null;
-        if (currentLocationName) {
-            const locationDoc = await db.collection('locations').doc(currentLocationName).get();
-            if (locationDoc.exists) {
-                locationContext = locationDoc.data();
-            }
-        }
+        const locationContext = await getMergedLocationData(userId, currentLocationName);
 
         const contextForClassifier = {
             location: lastSave.LOC?.[0] || '未知之地',
@@ -102,7 +98,6 @@ const interactRouteHandler = async (req, res) => {
 
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-                // 【核心修改】將固定的攻擊描述，改為更中立、更具張力的文字
                 const combatIntroText = `空氣中的氣氛陡然緊張，一場交鋒在所難免。你屏氣凝神，準備應對接下來的一切！`;
                 aiResponse = {
                     story: `你決定向 ${classification.details.target || '對手'} 發起挑戰。`,
@@ -118,7 +113,7 @@ const interactRouteHandler = async (req, res) => {
                         skillChanges: [],
                         enterCombat: true,
                         combatants: [{ name: classification.details.target, status: '準備應戰' }],
-                        combatIntro: combatIntroText, // 使用新的開場白
+                        combatIntro: combatIntroText,
                     }
                 };
                 break;
@@ -201,7 +196,7 @@ const interactRouteHandler = async (req, res) => {
 
         if (mentionedLocations && Array.isArray(mentionedLocations)) {
             for (const locName of mentionedLocations) {
-                generateAndCacheLocation(locName, '未知', newSummary)
+                generateAndCacheLocation(userId, locName, '未知', newSummary)
                     .catch(err => console.error(`[世界引擎] 地點 ${locName} 的背景生成失敗:`, err));
             }
         }
@@ -251,9 +246,9 @@ const interactRouteHandler = async (req, res) => {
         if (newRoundNumber > 5 && Math.random() < 0.2) { 
             triggerBountyGeneration(userId, newSummary).catch(err => console.error("背景生成懸賞失敗:", err));
         }
-        // 【核心修改】在最終回傳前，將地點的詳細資料附加到回應中
+
         aiResponse.locationData = locationContext;
-        
+
         res.json(aiResponse);
 
     } catch (error) {
