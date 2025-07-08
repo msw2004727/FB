@@ -108,6 +108,7 @@ async function triggerBountyGeneration(userId, longTermSummary) {
         }
 
         newBountyData.status = 'active';
+        newBountyData.isRead = false; // 【核心修改】新增此行
         newBountyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         
         const expireDate = new Date();
