@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat } = require('../services/aiService'); // 【核心新增】引入 getAIProactiveChat
+const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -18,14 +18,14 @@ const {
     getPlayerSkills,
     getFriendlinessLevel,
     processNpcUpdates,
-    getMergedLocationData // 新增：從 gameHelpers 引入
+    getMergedLocationData
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
 
-// 【核心新增】NPC主動互動引擎
+// NPC主動互動引擎
 const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
     const PROACTIVE_CHAT_COOLDOWN = 5; // 觸發一次後，冷卻5個回合
 
@@ -33,7 +33,6 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
     const gameStateDoc = await gameStateRef.get();
     const engineState = gameStateDoc.exists ? gameStateDoc.data() : { proactiveChatCooldown: 0, triggeredEvents: {} };
 
-    // 1. 檢查冷卻時間
     if (engineState.proactiveChatCooldown > 0) {
         await gameStateRef.set({ proactiveChatCooldown: admin.firestore.FieldValue.increment(-1) }, { merge: true });
         return null;
@@ -42,7 +41,6 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
     const playerLocation = finalRoundData.LOC[0];
     if (!playerLocation) return null;
 
-    // 2. 獲取所有在場的NPC
     const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs')
         .where('currentLocation', '==', playerLocation)
         .get();
@@ -53,41 +51,32 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
         const npcProfile = npcDoc.data();
         const npcId = npcDoc.id;
         
-        // 確保NPC檔案中有triggeredProactiveEvents這個陣列
         if (!npcProfile.triggeredProactiveEvents) {
             npcProfile.triggeredProactiveEvents = [];
         }
 
-        // 3. 逐一檢查觸發條件
         let triggerEvent = null;
 
-        // 條件一: 信賴突破
         const trustEventId = `trust_${npcId}`;
         if (npcProfile.friendlinessValue >= 70 && !npcProfile.triggeredProactiveEvents.includes(trustEventId)) {
             triggerEvent = { type: 'TRUST_BREAKTHROUGH', details: '友好度達到信賴' };
             npcProfile.triggeredProactiveEvents.push(trustEventId);
         }
-        // 條件二: 曖昧突破
         const romanceEventId = `romance_${npcId}`;
         if (!triggerEvent && npcProfile.romanceValue >= 50 && !npcProfile.triggeredProactiveEvents.includes(romanceEventId)) {
             triggerEvent = { type: 'ROMANCE_BREAKTHROUGH', details: '心動值達到曖昧' };
             npcProfile.triggeredProactiveEvents.push(romanceEventId);
         }
-        // 更多條件可以加在這裡...
 
         if (triggerEvent) {
             console.log(`[主動互動引擎] 偵測到觸發事件: ${npcProfile.name} 的 ${triggerEvent.type}`);
             
-            // 4. 呼叫AI生成對白和贈禮
-            const proactiveChatResult = await getAIProactiveChat('deepseek', playerProfile, npcProfile, triggerEvent);
+            const proactiveChatResult = await getAIProactiveChat(playerProfile, npcProfile, triggerEvent);
 
-            // 5. 更新NPC檔案，標記事件已觸發
             await npcDoc.ref.update({ triggeredProactiveEvents: npcProfile.triggeredProactiveEvents });
             
-            // 6. 設置冷卻時間
             await gameStateRef.set({ proactiveChatCooldown: PROACTIVE_CHAT_COOLDOWN }, { merge: true });
 
-            // 7. 如果有贈禮，立即更新玩家庫存
             if (proactiveChatResult.itemChanges && proactiveChatResult.itemChanges.length > 0) {
                 await updateInventory(userId, proactiveChatResult.itemChanges);
             }
@@ -95,7 +84,7 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
             return {
                 npcName: npcProfile.name,
                 openingLine: proactiveChatResult.openingLine,
-                itemChanges: proactiveChatResult.itemChanges || [] // 確保回傳的是陣列
+                itemChanges: proactiveChatResult.itemChanges || []
             };
         }
     }
@@ -109,7 +98,7 @@ const interactRouteHandler = async (req, res) => {
     const username = req.user.username;
 
     try {
-        const { action: playerAction, round: currentRound, model: modelName = 'gemini' } = req.body;
+        const { action: playerAction, round: currentRound, model: playerModelChoice } = req.body;
         const userDocRef = db.collection('users').doc(userId);
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
@@ -139,7 +128,7 @@ const interactRouteHandler = async (req, res) => {
             npcs: lastSave.NPC?.map(n => n.name) || [],
             skills: skills?.map(s => s.name) || []
         };
-        const classification = await getAIActionClassification(modelName, playerAction, contextForClassifier);
+        const classification = await getAIActionClassification(playerModelChoice, playerAction, contextForClassifier);
         
         let aiResponse;
 
@@ -176,7 +165,7 @@ const interactRouteHandler = async (req, res) => {
                 const preActionSkillChanges = req.body.skillChanges || [];
                 const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-                aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
+                aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
         }
@@ -200,12 +189,11 @@ const interactRouteHandler = async (req, res) => {
             processNpcUpdates(userId, allNpcUpdates)
         ]);
         
-        // 【核心修改】在更新數值後，重新獲取一次玩家資料，確保傳給引擎的是最新的
         userProfile = (await userDocRef.get()).data();
         
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
-            getAISummary(modelName, longTermSummary, aiResponse.roundData),
-            getAISuggestion('deepseek', aiResponse.roundData),
+            getAISummary(longTermSummary, aiResponse.roundData),
+            getAISuggestion(aiResponse.roundData),
             getInventoryState(userId),
             getPlayerSkills(userId),
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get()
@@ -266,7 +254,6 @@ const interactRouteHandler = async (req, res) => {
                 .catch(err => console.error(`[檔案管理員] 地點 ${currentLocationForUpdate} 的即時更新失敗:`, err));
         }
 
-
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
         let currentDate = { yearName: userProfile.yearName, year: userProfile.year, month: userProfile.month, day: userProfile.day };
         if (daysToAdvance > 0) {
@@ -293,7 +280,7 @@ const interactRouteHandler = async (req, res) => {
              userDocRef.update({
                 timeOfDay: aiResponse.roundData.timeOfDay,
                 internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness,
-                morality: newMorality, preferredModel: modelName, ...currentDate
+                morality: newMorality, preferredModel: playerModelChoice
             }),
             summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
             userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData)
@@ -308,11 +295,9 @@ const interactRouteHandler = async (req, res) => {
 
         aiResponse.locationData = await getMergedLocationData(userId, aiResponse.roundData.LOC?.[0]);
 
-        // 【核心新增】呼叫主動互動引擎
         if (!aiResponse.roundData.enterCombat && aiResponse.roundData.playerState !== 'dead') {
              aiResponse.proactiveChat = await proactiveChatEngine(userId, { ...userProfile, username }, aiResponse.roundData);
              if(aiResponse.proactiveChat) {
-                // 如果觸發了互動，需要重新獲取一次庫存狀態，因為NPC可能給了你東西
                  const finalInventoryState = await getInventoryState(userId);
                  aiResponse.roundData.ITM = finalInventoryState.itemsString;
                  aiResponse.roundData.money = finalInventoryState.money;
@@ -331,8 +316,7 @@ const interactRouteHandler = async (req, res) => {
 
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
-    const { action, model } = req.body;
-    const modelName = model || 'deepseek';
+    const { action, model: playerModelChoice } = req.body;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -353,7 +337,7 @@ const combatActionRouteHandler = async (req, res) => {
         let playerProfile = userDoc.exists ? userDoc.data() : {};
         playerProfile.skills = skills; 
 
-        const combatResult = await getAICombatAction(modelName, playerProfile, combatState, action);
+        const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, action);
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
         combatState.log.push(combatResult.narrative);
@@ -377,7 +361,7 @@ const combatActionRouteHandler = async (req, res) => {
             };
             await userDocRef.update(finalPowerUpdate);
             
-            if (playerChanges.itemChanges) { // 【核心修改】從combatResult.outcome改為playerChanges
+            if (playerChanges.itemChanges) {
                 await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
             }
 
@@ -413,7 +397,6 @@ const combatActionRouteHandler = async (req, res) => {
             });
 
         } else {
-            // 如果戰鬥未結束，檢查並更新敵人和盟友的狀態
             if(combatResult.enemies) combatState.enemies = combatResult.enemies;
             if(combatResult.allies) combatState.allies = combatResult.allies;
             await combatDocRef.set(combatState);
@@ -430,8 +413,7 @@ const combatActionRouteHandler = async (req, res) => {
 
 const surrenderRouteHandler = async (req, res) => {
     const userId = req.user.id;
-    const { model } = req.body;
-    const modelName = model || 'deepseek';
+    const { model: playerModelChoice } = req.body;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -449,7 +431,7 @@ const surrenderRouteHandler = async (req, res) => {
         const playerProfile = userDoc.data();
         const combatState = combatDoc.data();
 
-        const surrenderResult = await getAISurrenderResult(modelName, playerProfile, combatState);
+        const surrenderResult = await getAISurrenderResult(playerModelChoice, playerProfile, combatState);
         if (!surrenderResult) throw new Error("談判專家AI未能生成有效回應。");
 
         combatState.log.push(surrenderResult.narrative);
@@ -521,18 +503,19 @@ const surrenderRouteHandler = async (req, res) => {
 router.post('/interact', interactRouteHandler);
 router.post('/combat-action', combatActionRouteHandler);
 router.post('/combat-surrender', surrenderRouteHandler);
+
 router.post('/end-chat', async (req, res) => {
     const { getAIChatSummary } = require('../services/aiService');
     const userId = req.user.id;
     const username = req.user.username;
-    const { npcName, fullChatHistory, model } = req.body;
+    const { npcName, fullChatHistory, model: playerModelChoice } = req.body;
 
     if (!fullChatHistory || fullChatHistory.length === 0) {
         return res.json({ message: '對話已結束，江湖故事繼續。' });
     }
 
     try {
-        const chatSummary = await getAIChatSummary(model, username, npcName, fullChatHistory);
+        const chatSummary = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
         if (!chatSummary) throw new Error('AI未能成功總結對話內容。');
 
         const savesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
@@ -540,6 +523,7 @@ router.post('/end-chat', async (req, res) => {
         
         req.body.action = chatSummary;
         req.body.round = currentRound;
+        req.body.model = playerModelChoice;
         
         interactRouteHandler(req, res);
 
