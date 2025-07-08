@@ -79,6 +79,30 @@ function displayFriendlinessBar(value) {
     chatNpcInfo.appendChild(barContainer);
 }
 
+/**
+ * 【核心新增】創建或更新戰鬥中單個角色的UI元素（包含血條）
+ * @param {object} character - 角色數據
+ * @param {string} type - 'player', 'ally', 'enemy'
+ * @returns {HTMLElement} - 創建好的角色卡片元素
+ */
+function createCharacterCard(character, type) {
+    const card = document.createElement('div');
+    card.className = `combatant-card type-${type}`;
+    card.dataset.name = character.name || character.username; // 使用data屬性來唯一標識
+
+    const hpPercentage = (character.hp / character.maxHp) * 100;
+
+    card.innerHTML = `
+        <div class="combatant-name">${character.name || character.username}</div>
+        <div class="hp-bar-container">
+            <div class="hp-bar-fill" style="width: ${hpPercentage}%;"></div>
+        </div>
+        <div class="hp-text">${character.hp} / ${character.maxHp}</div>
+    `;
+    return card;
+}
+
+
 // --- 死亡與結局 ---
 export function showDeceasedScreen() {
     const username = localStorage.getItem('username');
@@ -104,25 +128,25 @@ export function closeEpilogueModal() {
 }
 
 // --- 戰鬥彈窗 ---
+
+/**
+ * 【核心修改】重寫開啟戰鬥彈窗的函式，以支援HP顯示
+ * @param {object} initialState - 包含玩家、盟友、敵人HP的初始戰鬥狀態
+ */
 export function openCombatModal(initialState) {
     combatTitle.textContent = `遭遇戰`;
-
-    // 清空舊的陣容訊息
     if (combatAlliesContainer) combatAlliesContainer.innerHTML = '';
     if (combatEnemiesContainer) combatEnemiesContainer.innerHTML = '';
 
-    // 填充我方陣營
+    // 填充我方陣營 (包含玩家)
     if (combatAlliesContainer && initialState.player) {
-        const playerUsername = initialState.player.username || '你';
-        const playerSpan = document.createElement('span');
-        playerSpan.textContent = playerUsername;
-        combatAlliesContainer.appendChild(playerSpan);
+        const playerCard = createCharacterCard(initialState.player, 'player');
+        combatAlliesContainer.appendChild(playerCard);
 
         if (initialState.allies && initialState.allies.length > 0) {
             initialState.allies.forEach(ally => {
-                const allySpan = document.createElement('span');
-                allySpan.textContent = ally.name;
-                combatAlliesContainer.appendChild(allySpan);
+                const allyCard = createCharacterCard(ally, 'ally');
+                combatAlliesContainer.appendChild(allyCard);
             });
         }
     }
@@ -130,13 +154,11 @@ export function openCombatModal(initialState) {
     // 填充敵方陣營
     if (combatEnemiesContainer && initialState.enemies && initialState.enemies.length > 0) {
         initialState.enemies.forEach(enemy => {
-            const enemySpan = document.createElement('span');
-            enemySpan.textContent = enemy.name;
-            combatEnemiesContainer.appendChild(enemySpan);
+            const enemyCard = createCharacterCard(enemy, 'enemy');
+            combatEnemiesContainer.appendChild(enemyCard);
         });
     }
 
-    // 更新戰鬥日誌和技能
     combatLog.innerHTML = '';
     if (initialState.log && initialState.log.length > 0) {
         appendToCombatLog(initialState.log[0], 'combat-intro-text');
@@ -162,6 +184,33 @@ export function openCombatModal(initialState) {
 
     combatModal.classList.add('visible');
 }
+
+/**
+ * 【核心新增】戰鬥中更新UI的函式
+ * @param {object} updatedState - 後端回傳的最新戰鬥狀態
+ */
+export function updateCombatUI(updatedState) {
+    const allCombatants = [
+        updatedState.player,
+        ...(updatedState.allies || []),
+        ...(updatedState.enemies || [])
+    ];
+
+    allCombatants.forEach(character => {
+        if (!character) return;
+        const characterName = character.name || character.username;
+        const card = combatModal.querySelector(`.combatant-card[data-name="${characterName}"]`);
+        if (card) {
+            const hpBar = card.querySelector('.hp-bar-fill');
+            const hpText = card.querySelector('.hp-text');
+            const hpPercentage = (character.hp / character.maxHp) * 100;
+            
+            hpBar.style.width = `${hpPercentage}%`;
+            hpText.textContent = `${character.hp} / ${character.maxHp}`;
+        }
+    });
+}
+
 
 export function closeCombatModal() { combatModal.classList.remove('visible'); }
 export function appendToCombatLog(text, className = '') {
