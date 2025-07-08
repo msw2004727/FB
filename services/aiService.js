@@ -324,6 +324,7 @@ async function getAISurrenderResult(modelName, playerProfile, combatState) {
 
 // 匯出所有服務函式
 module.exports = {
+    callAI, // 【核心新增】將 callAI 函式加入匯出清單
     getNarrative,
     getAISummary,
     getAIStory,
