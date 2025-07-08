@@ -102,9 +102,10 @@ const interactRouteHandler = async (req, res) => {
 
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-                const combatIntroText = `你對 ${classification.details.target || '對手'} 發起了攻擊，一場惡鬥一觸即發！`;
+                // 【核心修改】將固定的攻擊描述，改為更中立、更具張力的文字
+                const combatIntroText = `空氣中的氣氛陡然緊張，一場交鋒在所難免。你屏氣凝神，準備應對接下來的一切！`;
                 aiResponse = {
-                    story: combatIntroText,
+                    story: `你決定向 ${classification.details.target || '對手'} 發起挑戰。`,
                     roundData: {
                         ...lastSave,
                         EVT: `遭遇戰：對決${classification.details.target}`,
@@ -117,7 +118,7 @@ const interactRouteHandler = async (req, res) => {
                         skillChanges: [],
                         enterCombat: true,
                         combatants: [{ name: classification.details.target, status: '準備應戰' }],
-                        combatIntro: combatIntroText,
+                        combatIntro: combatIntroText, // 使用新的開場白
                     }
                 };
                 break;
@@ -310,7 +311,7 @@ const combatActionRouteHandler = async (req, res) => {
             await userDocRef.update(finalPowerUpdate);
             
             if (combatResult.outcome.itemChanges) {
-                await updateInventory(userId, combatResult.outcome.itemChanges);
+                await updateInventory(userId, combatResult.outcome.itemChanges, lastRoundData);
             }
 
             const updatedUserDoc = await userDocRef.get();
@@ -406,7 +407,7 @@ const surrenderRouteHandler = async (req, res) => {
         await userDocRef.update(finalPowerUpdate);
         
         if (playerChanges.itemChanges) {
-            await updateInventory(userId, playerChanges.itemChanges);
+            await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
         }
 
         const updatedUserDoc = await userDocRef.get();
