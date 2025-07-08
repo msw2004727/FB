@@ -45,6 +45,7 @@ const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
 const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
 const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
 const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
+const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -266,15 +267,11 @@ async function getRelationGraph(modelName, longTermSummary, username, npcDetails
 async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType) {
     const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
     try {
-        // AI應回傳一個JSON物件，我們要求AI直接給JSON格式
         const text = await callAI(modelName, prompt, true);
-        // 清理並解析以確保其為有效JSON物件
         const jsonObj = parseJsonResponse(text);
-        // 將其再次字串化，以符合舊有函式（gameHelpers.js中的checkAndTriggerRomanceEvent）對字串的預期
         return JSON.stringify(jsonObj);
     } catch (error) {
         console.error("[AI 任務失敗] 言情小說家任務:", error);
-        // 回傳一個空的JSON物件字串，避免下游的JSON.parse出錯
         return "{}";
     }
 }
@@ -327,10 +324,25 @@ async function getAISurrenderResult(modelName, playerProfile, combatState) {
     }
 }
 
+// 【核心新增】為NPC主動發起對話而設計的AI服務
+async function getAIProactiveChat(modelName, playerProfile, npcProfile, triggerEvent) {
+    const prompt = getProactiveChatPrompt(playerProfile, npcProfile, triggerEvent);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 首席編劇任務:", error);
+        return {
+            openingLine: "（他/她看了你一眼，欲言又止，最終還是什麼也沒說。）",
+            itemChanges: []
+        };
+    }
+}
+
 
 // 匯出所有服務函式
 module.exports = {
-    callAI, // 【核心新增】將 callAI 函式加入匯出清單
+    callAI,
     getNarrative,
     getAISummary,
     getAIStory,
@@ -350,4 +362,5 @@ module.exports = {
     getAIDeathCause,
     getAIActionClassification,
     getAISurrenderResult,
+    getAIProactiveChat, // 【核心新增】
 };
