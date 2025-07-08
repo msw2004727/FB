@@ -33,17 +33,29 @@ router.get('/', async (req, res) => {
             return res.json([]);
         }
 
-        const bountiesList = snapshot.docs.map(doc => {
+        const bountiesList = [];
+        const batch = db.batch(); // 【核心修改】初始化一個批次寫入
+        
+        snapshot.docs.forEach(doc => {
             const data = doc.data();
-            return {
+            bountiesList.push({
                 id: doc.id,
                 title: data.title,
                 content: data.content,
                 issuer: data.issuer,
                 difficulty: data.difficulty,
                 expireAt: data.expireAt.toDate() 
-            };
+            });
+
+            // 【核心修改】如果懸賞是未讀的，就將其加入到更新佇列中
+            if (data.isRead === false) {
+                batch.update(doc.ref, { isRead: true });
+            }
         });
+
+        // 【核心修改】非同步地提交所有更新
+        await batch.commit();
+        console.log(`[懸賞系統] 已將玩家 ${userId} 的 ${snapshot.docs.length} 條懸賞標記為已讀。`);
 
         res.json(bountiesList);
 
