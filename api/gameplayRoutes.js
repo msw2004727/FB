@@ -115,11 +115,9 @@ const interactRouteHandler = async (req, res) => {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
         
-        // 【核心新增】處理死亡倒數計時
         if (userProfile.deathCountdown && userProfile.deathCountdown > 0) {
             const newCountdown = userProfile.deathCountdown - 1;
             if (newCountdown <= 0) {
-                // 時間到，玩家死亡
                 await userDocRef.update({ isDeceased: true, deathCountdown: admin.firestore.FieldValue.delete() });
                 const lastSaveData = savesSnapshot.docs[0]?.data() || {};
                 const finalSave = {
@@ -131,12 +129,10 @@ const interactRouteHandler = async (req, res) => {
                     EVT: '氣力耗盡，傷重不治'
                 };
                 await userDocRef.collection('game_saves').doc(`R${finalSave.R}`).set(finalSave);
-                // 直接回傳死亡結果，中斷後續流程
                 return res.json({ roundData: finalSave });
             } else {
-                // 還沒死，更新倒數計時
                 await userDocRef.update({ deathCountdown: newCountdown });
-                userProfile.deathCountdown = newCountdown; // 更新記憶體中的狀態
+                userProfile.deathCountdown = newCountdown; 
             }
         }
         
@@ -211,6 +207,12 @@ const interactRouteHandler = async (req, res) => {
         
         aiResponse.roundData.story = aiResponse.story;
         
+        // 【核心新增】檢查AI是否要求移除瀕死狀態
+        if (aiResponse.roundData.removeDeathCountdown) {
+            await userDocRef.update({ deathCountdown: admin.firestore.FieldValue.delete() });
+            delete userProfile.deathCountdown; // 同步記憶體狀態
+        }
+
         const allNpcUpdates = [
             ...(aiResponse.roundData.npcUpdates || []),
             ...(romanceEventData ? romanceEventData.npcUpdates : [])
@@ -311,15 +313,11 @@ const interactRouteHandler = async (req, res) => {
 
         Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...currentDate });
         
-        // 【核心修改】將玩家死亡的最終決定權交給倒數計時器
         if (aiResponse.roundData.playerState === 'dead') {
-             // 確保即使AI回傳死亡，我們也先進入瀕死狀態
-             await userDocRef.update({ deathCountdown: 10 });
-             aiResponse.roundData.playerState = 'dying';
-             aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你身受致命重傷，氣若游絲。';
+             await userDocRef.update({ isDeceased: true });
+             aiResponse.roundData.PC = aiResponse.roundData.causeOfDeath || '你在這次事件中不幸殞命。';
         }
 
-        // 把倒數計時也存入回合數據，方便前端顯示
         if (userProfile.deathCountdown) {
             aiResponse.roundData.deathCountdown = userProfile.deathCountdown;
         }
@@ -449,7 +447,6 @@ const combatActionRouteHandler = async (req, res) => {
                 }
             }
 
-            // 【核心修改】將玩家死亡的最終決定權交給倒數計時器
             const playerUpdatePayload = { ...finalPowerUpdate };
             if (combatState.player.hp <= 0) {
                 playerUpdatePayload.deathCountdown = 10;
@@ -471,7 +468,7 @@ const combatActionRouteHandler = async (req, res) => {
                  PC: playerChanges.PC || postCombatSummary,
                  EVT: postCombatSummary,
                  playerState: combatState.player.hp <= 0 ? 'dying' : 'alive',
-                 causeOfDeath: null, // 死因由倒數計時結束時決定
+                 causeOfDeath: null, 
                  internalPower: updatedUserProfile.internalPower,
                  externalPower: updatedUserProfile.externalPower,
                  lightness: updatedUserProfile.lightness,
