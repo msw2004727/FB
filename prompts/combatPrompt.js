@@ -2,7 +2,6 @@
 
 const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const combatLog = combatState.log.join('\n');
-    // 將玩家的武學列表轉換為易讀的字串
     const skillsString = playerProfile.skills && playerProfile.skills.length > 0
         ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
@@ -32,6 +31,24 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 6.  **戰鬥結束判定**: 你擁有決定戰鬥是否結束的權力。當你判斷敵人已被全數擊敗、逃跑，或玩家已經戰敗時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
 
+## 【核心修改】戰利品生成規則 (Loot Generation)
+當戰鬥勝利結束時（`combatOver: true`），你**必須**在回傳的 \`outcome.playerChanges\` 物件中，額外加入一個名為 **\`itemChanges\`** 的**陣列**，用來描述玩家獲得的戰利品。
+- **邏輯性**: 戰利品必須與被擊敗的敵人類型高度相關。
+    - 擊敗**人類**敵人（如：山賊、官兵），可能掉落他們身上的**武器、裝備、金錢或道具**。
+    - 擊敗**野獸**（如：猛虎、巨蟒），應該掉落**材料**（如：虎皮、蛇膽）。
+- **格式**: \`itemChanges\` 陣列中的每個物件，都必須遵循「物品帳本系統」的 "add" 操作格式。
+    \`\`\`json
+    {
+      "action": "add",
+      "itemName": "戰利品的準確名稱",
+      "quantity": 1,
+      "itemType": "武器 | 裝備 | 道具 | 材料 | 財寶",
+      "rarity": "普通 | 稀有",
+      "description": "一段關於此戰利品的簡短描述。"
+    }
+    \`\`\`
+- 如果戰鬥結束時沒有任何戰利品（例如友好切磋），則回傳一個**空陣列 \`[]\`**。
+
 ## 回傳格式規則：
 
 你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。
@@ -41,21 +58,12 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 - \`narrative\` 應描述本回合的攻防過程。
 - **不要**包含 \`outcome\` 欄位。
 
-**範例 (JSON):**
-\`\`\`json
-{
-  "narrative": "你運起三成內力，一招「黑虎掏心」攻向山賊頭目，他橫刀一擋，刀上傳來的力道卻讓他手臂一麻，險些握不住刀。與此同時，一旁的嘍囉甲已從你的側面攻了過來！",
-  "combatOver": false
-}
-\`\`\`
-
 ### 2. 當戰鬥結束時：
 - \`combatOver\` 必須為 \`true\`。
-- **【重要】\`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」**。例如，制勝的一擊、敵人投降或逃跑的瞬間。
+- \`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」。
 - **必須**包含 \`outcome\` 欄位，用來總結戰果。
-    - \`summary\`: (字串) 對整場戰鬥的簡短總結，例如 "經過一番苦戰，你成功擊退了所有山賊。"
-    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。
-        - **【結構鐵律】**: 這個物件**必須**包含 PC, powerChange, moralityChange 三個完整的鍵。如果沒有變化，則使用空字串 "" 或 0 作為值。powerChange 也必須包含 internal, external, lightness 三個鍵。**絕對禁止包含 ITM 鍵。**
+    - \`summary\`: (字串) 對整場戰鬥的簡短總結。
+    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。**必須**包含 PC, powerChange, moralityChange, itemChanges 四個鍵。
 
 **範例 (JSON):**
 \`\`\`json
@@ -67,22 +75,25 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     "playerChanges": {
       "PC": "你雖然獲勝，但也受了些內傷，氣血翻湧。",
       "powerChange": { "internal": -10, "external": 5, "lightness": -5 },
-      "moralityChange": 5
-    }
-  }
-}
-\`\`\`
-**範例 (無特殊變化):**
-\`\`\`json
-{
-  "narrative": "你輕鬆地閃過林教頭試探性的一拳，並順勢點到為止地將手掌停在他的喉前。林教頭抱拳認輸，稱讚你的武藝又有精進。",
-  "combatOver": true,
-  "outcome": {
-    "summary": "一場友好的切磋結束了，你略勝一籌。",
-    "playerChanges": {
-      "PC": "",
-      "powerChange": { "internal": 0, "external": 1, "lightness": 1 },
-      "moralityChange": 0
+      "moralityChange": 5,
+      "itemChanges": [
+        {
+          "action": "add",
+          "itemName": "鬼頭刀",
+          "quantity": 1,
+          "itemType": "武器",
+          "rarity": "普通",
+          "description": "山賊頭目使用的大刀，刀刃上有些許缺口。"
+        },
+        {
+          "action": "add",
+          "itemName": "一袋錢幣",
+          "quantity": 50,
+          "itemType": "財寶",
+          "rarity": "普通",
+          "description": "從山賊身上搜出的錢袋，裡面裝著一些銅錢。"
+        }
+      ]
     }
   }
 }
