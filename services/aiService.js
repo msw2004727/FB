@@ -48,6 +48,7 @@ const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt
 const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
 const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
+const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 
 
 // 統一的AI調度中心
@@ -114,6 +115,22 @@ function parseJsonResponse(text) {
     const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanJsonText);
 }
+
+// 新增的函式，專門處理時代錯置的回應
+async function getAIAnachronismResponse(playerModelChoice, playerAction, anachronisticItem) {
+    const prompt = getAnachronismPrompt(playerAction, anachronisticItem);
+    try {
+        // 這類創意寫作可以使用較為靈活的模型
+        const modelToUse = playerModelChoice || aiConfig.narrative || 'openai';
+        const response = await callAI(modelToUse, prompt, false);
+        return response.replace(/["“”]/g, '');
+    } catch (error) {
+        console.error("[AI 任務失敗] 時空守序者任務:", error);
+        // 返回一個安全的預設回應
+        return "你腦中閃過一個不屬於這個時代的念頭，但很快便將其甩開，專注於眼前的江湖事。";
+    }
+}
+
 
 async function getNarrative(roundData) {
     const prompt = getNarrativePrompt(roundData);
@@ -404,4 +421,5 @@ module.exports = {
     getAIActionClassification,
     getAISurrenderResult,
     getAIProactiveChat,
+    getAIAnachronismResponse,
 };
