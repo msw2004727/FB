@@ -58,7 +58,15 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
             messages: [{ role: "user", content: prompt }],
         };
 
-        switch (modelName) {
+        // 【核心修改】將 'gemini' 的請求導向到 'openai'
+        let effectiveModel = modelName;
+        if (modelName === 'gemini') {
+            console.log(`[AI 調度中心] 模型 'gemini' 已被重定向至 'openai'。`);
+            effectiveModel = 'openai';
+        }
+
+
+        switch (effectiveModel) {
             case 'openai':
                 options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
@@ -83,18 +91,18 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 const grokResult = await grok.chat.completions.create(options);
                 textResponse = grokResult.choices[0].message.content;
                 break;
-            case 'gemini':
-            default:
-                const generationConfig = {};
+            default: // 【核心修改】預設也改為 openai
+                console.log(`[AI 調度中心] 未知或預設模型，已導向至 'openai'。`);
+                options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
-                    generationConfig.response_mime_type = "application/json";
+                    options.response_format = { type: "json_object" };
                 }
-                const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
-                textResponse = (await geminiResult.response).text();
+                const defaultResult = await openai.chat.completions.create(options);
+                textResponse = defaultResult.choices[0].message.content;
         }
         return textResponse;
     } catch (error) {
-        console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, error);
+        console.error(`[AI 調度中心] 使用模型 ${modelName} (實際為 ${effectiveModel}) 時出錯:`, error);
         throw new Error(`AI模型 ${modelName} 呼叫失敗，請檢查API金鑰與服務狀態。`);
     }
 }
