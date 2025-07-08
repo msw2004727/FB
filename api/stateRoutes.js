@@ -3,59 +3,12 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills } = require('./gameHelpers');
+const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills, getMergedLocationData } = require('./gameHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
-// 輔助函式，用於合併地點的靜態和動態資料
-const getMergedLocationData = async (userId, locationName) => {
-    if (!locationName) return null;
-
-    try {
-        const staticDocRef = db.collection('locations').doc(locationName);
-        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
-
-        const [staticDoc, dynamicDoc] = await Promise.all([
-            staticDocRef.get(),
-            dynamicDocRef.get()
-        ]);
-
-        if (!staticDoc.exists) {
-            // 如果連靜態模板都不存在，說明是全新的地點，觸發背景生成
-            console.log(`[讀取系統] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
-            generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
-                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
-            return {
-                locationId: locationName,
-                locationName: locationName,
-                description: "此地詳情尚在傳聞之中...",
-            };
-        }
-        
-        // 如果靜態模板存在，但玩家的動態狀態不存在，也觸發一次初始化
-        if (staticDoc.exists && !dynamicDoc.exists) {
-             console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
-             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
-                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
-        }
-
-        const staticData = staticDoc.data() || {};
-        const dynamicData = dynamicDoc.data() || {};
-
-        // 合併資料：以靜態資料為基礎，用動態資料覆蓋
-        return { ...staticData, ...dynamicData };
-
-    } catch (error) {
-        console.error(`[讀取系統] 合併地點 ${locationName} 的資料時出錯:`, error);
-        return {
-            locationId: locationName,
-            locationName: locationName,
-            description: "讀取此地詳情時發生錯誤...",
-        };
-    }
-};
-
+// 輔助函式 getMergedLocationData 已被搬移到 gameHelpers.js
 
 router.get('/inventory', async (req, res) => {
     try {
