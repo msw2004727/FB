@@ -3,59 +3,63 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
-const { getFriendlinessLevel } = require('./gameHelpers');
+const { getFriendlinessLevel, createNpcProfileInBackground } = require('./gameHelpers');
+const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
 // 所有GM路由都需要經過身份驗證
 router.use(authMiddleware);
 
-/**
- * @route   GET /api/gm/npcs
- * @desc    獲取所有玩家的NPC列表及其關係數據
- * @access  Private (GM)
- */
+// --- NPC管理相關API ---
+
 router.get('/npcs', async (req, res) => {
     const userId = req.user.id;
     try {
-        const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
-        if (npcsSnapshot.empty) {
-            return res.json([]);
-        }
+        const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+        const userSavesRef = db.collection('users').doc(userId).collection('game_saves');
 
-        const npcList = npcsSnapshot.docs.map(doc => {
+        const npcsSnapshot = await userNpcsRef.get();
+        const existingNpcs = new Map();
+        npcsSnapshot.forEach(doc => {
             const data = doc.data();
-            return {
+            existingNpcs.set(data.name || doc.id, {
                 id: doc.id,
                 name: data.name || doc.id,
                 friendlinessValue: data.friendlinessValue || 0,
-                romanceValue: data.romanceValue || 0
-            };
+                romanceValue: data.romanceValue || 0,
+                isGhost: false
+            });
         });
 
-        res.json(npcList);
+        const savesSnapshot = await userSavesRef.get();
+        const mentionedNpcNames = new Set();
+        savesSnapshot.forEach(doc => {
+            const roundData = doc.data();
+            if (roundData.NPC && Array.isArray(roundData.NPC)) {
+                roundData.NPC.forEach(npc => {
+                    if (npc.name) mentionedNpcNames.add(npc.name);
+                });
+            }
+        });
+
+        mentionedNpcNames.forEach(name => {
+            if (!existingNpcs.has(name)) {
+                existingNpcs.set(name, { id: name, name: name, isGhost: true });
+            }
+        });
+
+        res.json(Array.from(existingNpcs.values()));
     } catch (error) {
-        console.error(`[GM工具] 獲取NPC列表時出錯:`, error);
         res.status(500).json({ message: '獲取NPC列表失敗。' });
     }
 });
 
-/**
- * @route   POST /api/gm/update-npc
- * @desc    更新指定NPC的關係數據
- * @access  Private (GM)
- */
 router.post('/update-npc', async (req, res) => {
     const userId = req.user.id;
     const { npcId, friendlinessValue, romanceValue } = req.body;
-
-    if (!npcId) {
-        return res.status(400).json({ message: '未提供NPC ID。' });
-    }
-
     try {
         const npcRef = db.collection('users').doc(userId).collection('npcs').doc(npcId);
-        
         const updates = {};
         if (friendlinessValue !== undefined) {
             updates.friendlinessValue = Number(friendlinessValue);
@@ -64,18 +68,98 @@ router.post('/update-npc', async (req, res) => {
         if (romanceValue !== undefined) {
             updates.romanceValue = Number(romanceValue);
         }
-
         if (Object.keys(updates).length > 0) {
             await npcRef.set(updates, { merge: true });
         }
-
         res.json({ message: `NPC「${npcId}」的數據已成功更新。` });
-
     } catch (error) {
-        console.error(`[GM工具] 更新NPC「${npcId}」時出錯:`, error);
         res.status(500).json({ message: '更新NPC數據時發生內部錯誤。' });
     }
 });
 
+router.post('/rebuild-npc', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { npcName } = req.body;
+    if (!npcName) return res.status(400).json({ message: '未提供NPC名稱。' });
+
+    try {
+        const savesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+        let firstMentionRound = null;
+        for (const doc of savesSnapshot.docs) {
+            const roundData = doc.data();
+            if (roundData.NPC?.some(npc => npc.name === npcName)) {
+                firstMentionRound = roundData;
+                break;
+            }
+        }
+
+        if (!firstMentionRound) {
+            return res.status(404).json({ message: `在存檔中找不到NPC「${npcName}」的初見情境。` });
+        }
+
+        await createNpcProfileInBackground(userId, username, { name: npcName, isNew: true }, firstMentionRound);
+        res.json({ message: `已成功為「${npcName}」提交重建檔案請求。` });
+    } catch (error) {
+        res.status(500).json({ message: '重建NPC檔案時發生內部錯誤。' });
+    }
+});
+
+// --- 地區管理相關API ---
+
+router.get('/locations', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const locationsRef = db.collection('locations');
+        const userSavesRef = db.collection('users').doc(userId).collection('game_saves');
+
+        const locationsSnapshot = await locationsRef.get();
+        const existingLocations = new Map();
+        locationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            existingLocations.set(doc.id, {
+                id: doc.id,
+                name: data.locationName || doc.id,
+                isGhost: false
+            });
+        });
+
+        const savesSnapshot = await userSavesRef.get();
+        const mentionedLocationNames = new Set();
+        savesSnapshot.forEach(doc => {
+            const roundData = doc.data();
+            if (roundData.LOC && roundData.LOC[0]) {
+                mentionedLocationNames.add(roundData.LOC[0]);
+            }
+        });
+        
+        mentionedLocationNames.forEach(name => {
+            if (!existingLocations.has(name)) {
+                existingLocations.set(name, { id: name, name: name, isGhost: true });
+            }
+        });
+
+        res.json(Array.from(existingLocations.values()));
+    } catch (error) {
+        res.status(500).json({ message: '獲取地區列表失敗。' });
+    }
+});
+
+router.post('/rebuild-location', async (req, res) => {
+    const userId = req.user.id;
+    const { locationName } = req.body;
+    if (!locationName) return res.status(400).json({ message: '未提供地區名稱。' });
+    
+    try {
+        const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get();
+        const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。';
+
+        // 直接呼叫世界引擎進行背景建檔
+        await generateAndCacheLocation(locationName, '未知', worldSummary);
+        res.json({ message: `已成功為「${locationName}」提交重建檔案請求。` });
+    } catch (error) {
+        res.status(500).json({ message: '重建地區檔案時發生內部錯誤。' });
+    }
+});
 
 module.exports = router;
