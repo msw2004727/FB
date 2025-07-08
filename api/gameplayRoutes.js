@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-// 【核心修改】從 aiService 引入 getAIAnachronismResponse
+// 【核心修改】引入 getAIAnachronismResponse
 const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat, getAICombatSetup, getAIAnachronismResponse } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
@@ -144,7 +144,6 @@ const interactRouteHandler = async (req, res) => {
         };
         const classification = await getAIActionClassification(playerModelChoice, playerAction, contextForClassifier);
         
-        // 【核心修改】將 aiResponse 和 romanceEventData 的宣告提前並給予初始值
         let aiResponse = {};
         let romanceEventData = null;
 
@@ -202,7 +201,6 @@ const interactRouteHandler = async (req, res) => {
             
             case 'GENERAL_STORY':
             default:
-                // 【核心修改】這條宣告現在只是賦值，而不是重新宣告
                 romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
                 const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
                 const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
@@ -224,7 +222,6 @@ const interactRouteHandler = async (req, res) => {
                         }
                     });
                 }
-                // 【核心修改】在呼叫 getAIStory 時，補上之前遺漏的 npcContext 參數
                 aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
@@ -267,7 +264,9 @@ const interactRouteHandler = async (req, res) => {
             processNpcUpdates(userId, allNpcUpdates)
         ]);
         
-        userProfile = (await userDocRef.get()).data();
+        // 【核心修改】重新獲取最新的玩家檔案，確保傳遞給 NPC 生成函式的資料是最新的
+        const updatedUserProfileDoc = await userDocRef.get();
+        userProfile = updatedUserProfileDoc.exists ? updatedUserProfileDoc.data() : {};
         
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
             getAISummary(longTermSummary, aiResponse.roundData),
@@ -289,7 +288,8 @@ const interactRouteHandler = async (req, res) => {
                 if (npc.isDeceased) return npcDocRef.set({ isDeceased: true }, { merge: true });
                 if (npc.isNew) {
                     delete npc.isNew;
-                    return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData);
+                    // 【核心修改】將完整的 userProfile 傳遞過去
+                    return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
                 } else {
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
