@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-// 【核心修改】引入 getAIAnachronismResponse
+// 【核心修改】從 aiService 引入 getAIAnachronismResponse
 const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat, getAICombatSetup, getAIAnachronismResponse } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
@@ -144,31 +144,31 @@ const interactRouteHandler = async (req, res) => {
         };
         const classification = await getAIActionClassification(playerModelChoice, playerAction, contextForClassifier);
         
-        let aiResponse;
+        // 【核心修改】將 aiResponse 和 romanceEventData 的宣告提前並給予初始值
+        let aiResponse = {};
+        let romanceEventData = null;
 
         switch (classification.actionType) {
-            // 【核心新增】處理時代錯置指令的邏輯分支
             case 'ANACHRONISM':
                 const anachronismStory = await getAIAnachronismResponse(playerModelChoice, playerAction, classification.details.itemName);
                 aiResponse = {
                     story: anachronismStory,
                     roundData: {
-                        ...lastSave, // 繼承上回合狀態
-                        R: lastSave.R, // 回合數不增加
+                        ...lastSave,
+                        R: lastSave.R, 
                         story: anachronismStory,
                         PC: "你從幻想中回過神來。",
                         IMP: "你的思緒飄到了不屬於這個時代的地方。",
                         EVT: "一陣恍神",
-                        // 確保不產生任何實質遊戲變化
                         powerChange: { internal: 0, external: 0, lightness: 0 },
                         moralityChange: 0,
                         itemChanges: [],
                         romanceChanges: [],
                         skillChanges: [],
-                        isAnachronism: true // 加上特殊標記
+                        isAnachronism: true
                     }
                 };
-                break; // 跳出 switch
+                break;
 
             case 'COMBAT_ATTACK':
             case 'COMBAT_SPARRING': { 
@@ -202,7 +202,8 @@ const interactRouteHandler = async (req, res) => {
             
             case 'GENERAL_STORY':
             default:
-                const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
+                // 【核心修改】這條宣告現在只是賦值，而不是重新宣告
+                romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
                 const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
                 const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
                 const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
@@ -223,15 +224,14 @@ const interactRouteHandler = async (req, res) => {
                         }
                     });
                 }
+                // 【核心修改】在呼叫 getAIStory 時，補上之前遺漏的 npcContext 參數
                 aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
         }
 
-        // 【核心修改】檢查是否為時代錯置的特殊回應
         if (aiResponse.roundData.isAnachronism) {
             const suggestion = await getAISuggestion(aiResponse.roundData);
-            // 為了讓前端能正確刷新UI，我們需要補上完整的狀態數據
             const inventoryState = await getInventoryState(userId);
             Object.assign(aiResponse.roundData, { ...inventoryState, ...userProfile, skills: skills });
             return res.json({
@@ -242,8 +242,6 @@ const interactRouteHandler = async (req, res) => {
             });
         }
         
-        // --- 後續的儲存與更新邏輯 (此處不變) ---
-
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
