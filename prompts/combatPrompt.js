@@ -6,14 +6,12 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
         ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
 
+    // 【核心新增】將盟友資訊格式化，如果沒有盟友則顯示'無'
     const alliesString = combatState.allies && combatState.allies.length > 0
-        ? combatState.allies.map(a => `${a.name} (HP: ${a.hp}/${a.maxHp}, 狀態: ${a.status || '良好'})`).join('、')
-        : '無';
-        
-    const enemiesString = combatState.enemies && combatState.enemies.length > 0
-        ? combatState.enemies.map(e => `${e.name} (HP: ${e.hp}/${e.maxHp}, 狀態: ${e.status || '正常'})`).join('、')
+        ? combatState.allies.map(a => `${a.name} (狀態: ${a.status || '良好'})`).join('、')
         : '無';
 
+    // 【核心新增】從戰鬥狀態中獲取 isSparring 標記
     const isSparring = combatState.isSparring || false;
 
     return `
@@ -25,12 +23,13 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ## 裁定核心準則：
 
-1.  **基礎實力**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}, HP: ${playerProfile.hp}/${playerProfile.maxHp}）作為所有判斷的基礎。
+1.  **基礎實力**: 你必須將玩家的武功修為（內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}）作為所有判斷的基礎。
 
 2.  **【武學等級與功體核心規則】**: 這是你最重要的判斷依據。
     * **等級威力**: 玩家使用的武學，其「等級（成數）」是威力的主要倍增器。一成功力的招式可能只是劃破皮肉，但十成功力的同一招可能開碑裂石。
     * **功體加成**: 你必須判斷武學的「功體屬性(power_type)」。一門「內功」加成的武學，其威力會被玩家的「內功」值放大；「外功」加成的武學則看玩家的「外功」值。如果玩家的對應功體很低，即使武學等級高，威力也應受到限制。
     * **敘述體現**: 你必須在敘述中體現出等級和功體的差距。例如，你可以使用「你運起三成功力的『羅漢拳』...」或「...他深厚的內力催動掌風，威力更增三分...」等詞彙。
+    * **等級為0的武學**: 在戰鬥中使用等級為0的武學，效果應該非常微弱，甚至可能失敗。
 
 3.  **【核心升級】盟友行動與旁觀者反應AI鐵律**: 你的戰鬥敘述**必須**是一個生動的群像劇，而不僅僅是玩家的個人秀。
     * **行動邏輯**:
@@ -46,66 +45,87 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     * **敘事整合**: 盟友的行動**必須**自然地融入你的戰鬥敘述中，與玩家的行動和敵人的反擊，共同構成一個完整、連貫的回合。
     * **敘事整合**: 盟友的行動和旁觀者的反應，**必須**自然地融入你的戰鬥敘述中，與玩家的行動和敵人的反擊，共同構成一個完整、連貫的回合。
 
-4.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家與盟友的行動結果後，**必須接著描述敵人的反擊或反應**。敵人的反擊也會對玩家或盟友造成傷害。
+4.  **創意與合理性**: 玩家可能會下達富有想像力的指令。你需要判斷其合理性。例如，「一招擊敗所有人」在初期是不合理的，但「攻擊A的同時，側身躲避B的攻擊」則是合理的。
 
-5.  **【鐵律五】傷害與HP計算**:
-    * **傷害裁定**: 你需要根據本回合發生的所有行動（來自玩家、盟友和敵人），計算出具體的傷害值或治療值。
-    * **回傳傷害陣列**: 你**必須**在JSON中回傳一個 \`damageDealt\` 陣列，記錄本回合所有HP的變動。傷害為正數，治療為負數。
-    * **更新角色HP**: 你**必須**在JSON回傳的 \`enemies\` 和 \`allies\` 陣列中，更新每個角色物件的 \`hp\` 欄位，以反映他們在本回合結束後的剩餘生命值。
-    * **敘述匹配**: 你的文字敘述必須和數據結果相匹配。例如，造成50點傷害的攻擊，應該被描述為一次重擊。
+5.  **攻防一體**: 你的敘述應該是一個完整的攻防回合。描述玩家與盟友的行動結果後，**必須接著描述敵人的反擊或反應**。
 
-6.  **戰鬥結束判定**: 當你判斷某個陣營的所有角色的HP都歸零或逃跑時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
+6.  **【戰鬥結束判定鐵律】**:
+    * **敵方全滅**: 當你判斷敵人已被全數擊敗、逃跑時，你必須將回傳的 \`combatOver\` 設為 \`true\`。
+    * **【核心新增】玩家戰敗**: 如果在你的判斷中，玩家承受的傷害會使其生命力耗盡，你**必須**將 \`combatOver\` 設為 \`true\`。你的 \`narrative\` 必須是描述玩家承受「最後一擊」並倒下的過程，且 \`outcome.summary\` 和 \`outcome.playerChanges.PC\` 必須反映玩家戰敗身亡的事實。
 
-7.  **【人際關係變化裁定】**:
+7.  **【核心升級】人際關係變化裁定 (Relationship Adjudication)**:
     * **觸發條件**: 當你判定戰鬥結束時 (\`combatOver: true\`)，你**必須**在回傳的 \`outcome\` 物件中，新增一個名為 \`relationshipChanges\` 的陣列。
-    * **裁決鐵律**:
-        1.  **切磋模式**: 如果是「友好切磋」(\`isSparring: true\`)，友好度(\`friendlinessChange\`)應為 0 或小幅增加 (+5)。
-        2.  **死鬥模式**: 如果「不是」切磋，則**必須**降低對手的友好度。對朋友/心上人應大幅降低(-30到-80)，對普通敵人也應小幅降低(-5到-10)。
-        3.  **盟友加成**: 幫助你的盟友，友好度可適度提升(+5)。
+    * **裁決鐵律 (依序判斷)**:
+        1.  **判斷戰鬥性質**: 首先檢查本次戰鬥是否為「友好切磋」(\`isSparring: true\`)。
+        2.  **如果「是」切磋**: 關係變化應為中性或正面。友好度(\`friendlinessChange\`)可以為 0 或小幅增加 (例如 +5，代表英雄相惜)。心動值(\`romanceChange\`)通常不變。
+        3.  **如果「不是」切磋**: 這代表是一場真實的敵對戰鬥。你**必須**降低對手的友好度。如果對手原本是朋友或心上人，友好度和心動值**必須大幅降低** (例如 -30 到 -80)。如果對手是陌生人或本來的敵人，友好度也應有**小幅降低** (例如 -5 到 -10)，代表敵意加深。
+        4.  **盟友加成**: 無論是否為切磋，如果有盟友在戰鬥中發揮了關鍵作用，你可以適度提升玩家與**該盟友**的友好度 (+5)。
+    * **格式**: 每個關係變化的條目都必須包含 \`npcName\`, \`friendlinessChange\`, 和 \`romanceChange\` 三個鍵。如果某個值沒有變化，則設為 0。
 
 ## 回傳格式規則：
 
-你的所有回應都**必須**是一個結構化的 JSON 物件。
+你的所有回應都**必須**是一個結構化的 JSON 物件，絕對不要添加任何額外的文字。
 
 ### 1. 當戰鬥仍在進行中：
 - \`combatOver\` 必須為 \`false\`。
-- \`narrative\`: (字串) 描述本回合的攻防過程。
-- \`damageDealt\`: (陣列) 記錄本回合HP變動。
-- \`enemies\`: (陣列) **必須**回傳更新HP後的敵人列表。
-- \`allies\`: (陣列) **必須**回傳更新HP後的盟友列表。
+- \`narrative\` 應描述本回合的攻防過程。
+- **不要**包含 \`outcome\` 欄位。
 
 ### 2. 當戰鬥結束時：
 - \`combatOver\` 必須為 \`true\`。
-- \`narrative\`: (字串) 描述導致戰鬥結束的「最後一幕」。
-- \`outcome\`: (物件) 包含 \`summary\`, \`playerChanges\`, 和 \`relationshipChanges\`。
+- \`narrative\` 必須描述導致戰鬥結束的「最後一幕動作」。**你的描述可以包含敵人倒下後，其身上的物品掉落或顯露出來的線索，引導玩家進行後續的探索。**
+- **必須**包含 \`outcome\` 欄位，用來總結戰果。
+    - \`summary\`: (字串) 對整場戰鬥的簡短總結。
+    - \`playerChanges\`: (物件) 玩家因戰鬥產生的最終數值變化。**現在只需要**包含 PC, powerChange, moralityChange 三個鍵。**絕對不要包含 itemChanges**。
+    - \`relationshipChanges\`: (陣列) **必須包含**。描述戰鬥對人際關係的影響。
 
-**範例 (戰鬥中):**
+**範例 (勝利):**
 \`\`\`json
 {
-  "narrative": "你運起七成功力，一招『亢龍有悔』猛然拍出，正中山賊頭目的胸膛，他慘叫一聲，噴出大口鮮血，顯然受了重創！與此同時，林婉兒從旁協助，短劍劃過另一名山賊的手臂。但那頭目也不是省油的燈，在後退的同時，反手一刀砍中了你的肩膀！",
-  "combatOver": false,
-  "damageDealt": [
-    { "target": "山賊頭目", "damage": 45 },
-    { "target": "山賊", "damage": 15 },
-    { "target": "玩家", "damage": 20 }
-  ],
-  "enemies": [
-    { "name": "山賊頭目", "status": "胸口劇痛，氣血翻湧！", "hp": 75, "maxHp": 120 },
-    { "name": "山賊", "status": "手臂掛彩，動作一滯！", "hp": 35, "maxHp": 50 }
-  ],
-  "allies": [
-    { "name": "林婉兒", "status": "一擊得手，尋找下一個機會。", "hp": 100, "maxHp": 100 }
-  ]
+  "narrative": "你抓住最後的機會，用盡十成功力使出『龍象般若功』，雙掌推出，正中那山賊頭目的胸口，只聽得筋骨寸斷之聲，他如斷線風箏般飛出，掙扎幾下便不再動彈。他腰間那個鼓鼓囊囊的錢袋，也隨之滾落到一旁。",
+  "combatOver": true,
+  "outcome": {
+    "summary": "經過一番苦戰，你成功擊退了來襲的山賊。",
+    "playerChanges": {
+      "PC": "你雖然獲勝，但也受了些內傷，氣血翻湧。",
+      "powerChange": { "internal": -10, "external": 5, "lightness": -5 },
+      "moralityChange": 5
+    },
+    "relationshipChanges": [
+      {
+        "npcName": "山賊頭目",
+        "friendlinessChange": -10,
+        "romanceChange": 0
+      }
+    ]
+  }
+}
+\`\`\`
+
+**範例 (玩家戰敗):**
+\`\`\`json
+{
+  "narrative": "山賊頭目看準你舊力已去、新力未生的空檔，發出野獸般的咆哮，手中鬼頭刀化作一道寒光，從一個你意想不到的角度劈中了你的胸膛。你只感到一陣劇痛，眼前的景象開始天旋地轉，最終徹底陷入無邊的黑暗...",
+  "combatOver": true,
+  "outcome": {
+    "summary": "你不敵山賊頭目，血濺當場。",
+    "playerChanges": {
+      "PC": "你在與山賊頭目的死鬥中，力盡不支，戰敗身亡。",
+      "powerChange": { "internal": 0, "external": 0, "lightness": 0 },
+      "moralityChange": 0
+    },
+    "relationshipChanges": []
+  }
 }
 \`\`\`
 
 ---
 ## 【當前戰鬥情境】
-- **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness}, HP: ${playerProfile.hp}/${playerProfile.maxHp})
+- **玩家**: ${playerProfile.username} (內功: ${playerProfile.internalPower}, 外功: ${playerProfile.externalPower}, 輕功: ${playerProfile.lightness})
 - **玩家已學會的武學**: ${skillsString}
 - **戰鬥性質**: ${isSparring ? '友好切磋' : '生死搏鬥'}
-- **盟友**: ${alliesString || '無'}
-- **敵人**: ${enemiesString || '無'}
+- **盟友**: ${alliesString}
+- **敵人**: ${JSON.stringify(combatState.enemies)}
 - **戰鬥紀錄**: ${combatLog}
 
 ## 【玩家本回合指令】
