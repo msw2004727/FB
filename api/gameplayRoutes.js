@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
+const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat } = require('../services/aiService'); // 【核心新增】引入 getAIProactiveChat
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -17,44 +17,89 @@ const {
     updateSkills,
     getPlayerSkills,
     getFriendlinessLevel,
-    processNpcUpdates // 引入新函式
+    processNpcUpdates
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
 
-const getMergedLocationData = async (userId, locationName) => {
-    if (!locationName) return null;
-    try {
-        const staticDocRef = db.collection('locations').doc(locationName);
-        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
+// 【核心新增】NPC主動互動引擎
+const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
+    const PROACTIVE_CHAT_COOLDOWN = 5; // 觸發一次後，冷卻5個回合
 
-        const [staticDoc, dynamicDoc] = await Promise.all([
-            staticDocRef.get(),
-            dynamicDocRef.get()
-        ]);
+    const gameStateRef = db.collection('users').doc(userId).collection('game_state').doc('engine_state');
+    const gameStateDoc = await gameStateRef.get();
+    const engineState = gameStateDoc.exists ? gameStateDoc.data() : { proactiveChatCooldown: 0, triggeredEvents: {} };
 
-        if (!staticDoc.exists) {
-            console.log(`[推進劇情] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
-            generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
-                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
-            return { locationId: locationName, locationName: locationName, description: "此地詳情尚在傳聞之中...", };
-        }
-        
-        if (staticDoc.exists && !dynamicDoc.exists) {
-             console.log(`[推進劇情] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
-             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
-                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
-        }
-
-        const staticData = staticDoc.data() || {};
-        const dynamicData = dynamicDoc.data() || {};
-        return { ...staticData, ...dynamicData };
-    } catch (error) {
-        console.error(`[推進劇情] 合併地點 ${locationName} 的資料時出錯:`, error);
-        return { locationId: locationName, locationName: locationName, description: "讀取此地詳情時發生錯誤...", };
+    // 1. 檢查冷卻時間
+    if (engineState.proactiveChatCooldown > 0) {
+        await gameStateRef.set({ proactiveChatCooldown: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+        return null;
     }
+
+    const playerLocation = finalRoundData.LOC[0];
+    if (!playerLocation) return null;
+
+    // 2. 獲取所有在場的NPC
+    const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs')
+        .where('currentLocation', '==', playerLocation)
+        .get();
+
+    if (npcsSnapshot.empty) return null;
+    
+    for (const npcDoc of npcsSnapshot.docs) {
+        const npcProfile = npcDoc.data();
+        const npcId = npcDoc.id;
+        
+        // 確保NPC檔案中有triggeredProactiveEvents這個陣列
+        if (!npcProfile.triggeredProactiveEvents) {
+            npcProfile.triggeredProactiveEvents = [];
+        }
+
+        // 3. 逐一檢查觸發條件
+        let triggerEvent = null;
+
+        // 條件一: 信賴突破
+        const trustEventId = `trust_${npcId}`;
+        if (npcProfile.friendlinessValue >= 70 && !npcProfile.triggeredProactiveEvents.includes(trustEventId)) {
+            triggerEvent = { type: 'TRUST_BREAKTHROUGH', details: '友好度達到信賴' };
+            npcProfile.triggeredProactiveEvents.push(trustEventId);
+        }
+        // 條件二: 曖昧突破
+        const romanceEventId = `romance_${npcId}`;
+        if (!triggerEvent && npcProfile.romanceValue >= 50 && !npcProfile.triggeredProactiveEvents.includes(romanceEventId)) {
+            triggerEvent = { type: 'ROMANCE_BREAKTHROUGH', details: '心動值達到曖昧' };
+            npcProfile.triggeredProactiveEvents.push(romanceEventId);
+        }
+        // 更多條件可以加在這裡...
+
+        if (triggerEvent) {
+            console.log(`[主動互動引擎] 偵測到觸發事件: ${npcProfile.name} 的 ${triggerEvent.type}`);
+            
+            // 4. 呼叫AI生成對白和贈禮
+            const proactiveChatResult = await getAIProactiveChat('deepseek', playerProfile, npcProfile, triggerEvent);
+
+            // 5. 更新NPC檔案，標記事件已觸發
+            await npcDoc.ref.update({ triggeredProactiveEvents: npcProfile.triggeredProactiveEvents });
+            
+            // 6. 設置冷卻時間
+            await gameStateRef.set({ proactiveChatCooldown: PROACTIVE_CHAT_COOLDOWN }, { merge: true });
+
+            // 7. 如果有贈禮，立即更新玩家庫存
+            if (proactiveChatResult.itemChanges && proactiveChatResult.itemChanges.length > 0) {
+                await updateInventory(userId, proactiveChatResult.itemChanges);
+            }
+
+            return {
+                npcName: npcProfile.name,
+                openingLine: proactiveChatResult.openingLine,
+                itemChanges: proactiveChatResult.itemChanges || [] // 確保回傳的是陣列
+            };
+        }
+    }
+
+    return null;
 };
 
 
@@ -74,7 +119,7 @@ const interactRouteHandler = async (req, res) => {
             getPlayerSkills(userId)
         ]);
         
-        const userProfile = userDoc.exists ? userDoc.data() : {};
+        let userProfile = userDoc.exists ? userDoc.data() : {};
         if (userProfile.isDeceased) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
@@ -153,7 +198,10 @@ const interactRouteHandler = async (req, res) => {
             updateSkills(userId, aiResponse.roundData.skillChanges),
             processNpcUpdates(userId, allNpcUpdates)
         ]);
-
+        
+        // 【核心修改】在更新數值後，重新獲取一次玩家資料，確保傳給引擎的是最新的
+        userProfile = (await userDocRef.get()).data();
+        
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
             getAISummary(modelName, longTermSummary, aiResponse.roundData),
             getAISuggestion('deepseek', aiResponse.roundData),
@@ -257,7 +305,18 @@ const interactRouteHandler = async (req, res) => {
             triggerBountyGeneration(userId, newSummary).catch(err => console.error("背景生成懸賞失敗:", err));
         }
 
-        aiResponse.locationData = locationContext;
+        aiResponse.locationData = await getMergedLocationData(userId, aiResponse.roundData.LOC?.[0]);
+
+        // 【核心新增】呼叫主動互動引擎
+        if (!aiResponse.roundData.enterCombat && aiResponse.roundData.playerState !== 'dead') {
+             aiResponse.proactiveChat = await proactiveChatEngine(userId, { ...userProfile, username }, aiResponse.roundData);
+             if(aiResponse.proactiveChat) {
+                // 如果觸發了互動，需要重新獲取一次庫存狀態，因為NPC可能給了你東西
+                 const finalInventoryState = await getInventoryState(userId);
+                 aiResponse.roundData.ITM = finalInventoryState.itemsString;
+                 aiResponse.roundData.money = finalInventoryState.money;
+             }
+        }
 
         res.json(aiResponse);
 
@@ -317,8 +376,8 @@ const combatActionRouteHandler = async (req, res) => {
             };
             await userDocRef.update(finalPowerUpdate);
             
-            if (combatResult.outcome.itemChanges) {
-                await updateInventory(userId, combatResult.outcome.itemChanges, lastRoundData);
+            if (playerChanges.itemChanges) { // 【核心修改】從combatResult.outcome改為playerChanges
+                await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
             }
 
             const updatedUserDoc = await userDocRef.get();
@@ -353,6 +412,9 @@ const combatActionRouteHandler = async (req, res) => {
             });
 
         } else {
+            // 如果戰鬥未結束，檢查並更新敵人和盟友的狀態
+            if(combatResult.enemies) combatState.enemies = combatResult.enemies;
+            if(combatResult.allies) combatState.allies = combatResult.allies;
             await combatDocRef.set(combatState);
             res.json({
                 status: 'COMBAT_ONGOING',
