@@ -506,7 +506,7 @@ body.dark-theme #npc-content > div {
     border-left-color: var(--dark-accent);
 }
 
-/* --- 【核心新增】隨身物品卡片樣式 --- */
+/* --- 隨身物品卡片樣式 --- */
 #itm-content > div {
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
@@ -523,4 +523,40 @@ body.dark-theme #npc-content > div {
 body.dark-theme #itm-content > div {
     background-color: var(--dark-surface-bg);
     border-color: var(--dark-border);
+}
+
+/* --- 【核心新增】懸賞按鈕發光提示 --- */
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
+}
+
+body.dark-theme @keyframes pulse-glow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 204, 102, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 204, 102, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 204, 102, 0);
+    }
+}
+
+#bounties-btn.has-new-bounty {
+    animation: pulse-glow 2s infinite;
+    border-color: #ffc107; /* 讓按鈕本身也亮一點來搭配光暈 */
+    color: #ffc107;
+}
+
+body.dark-theme #bounties-btn.has-new-bounty {
+    border-color: #ffca2c;
+    color: #ffca2c;
 }
