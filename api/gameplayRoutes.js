@@ -135,15 +135,18 @@ const interactRouteHandler = async (req, res) => {
 
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-                // 【核心修改】呼叫新的「戰鬥導演AI」來佈置場景
+            case 'COMBAT_SPARRING': { // 【核心修改】將切磋和攻擊都導向這裡
                 const combatSetupResult = await getAICombatSetup(playerAction, lastSave);
+                const isSparring = classification.actionType === 'COMBAT_SPARRING';
 
                 aiResponse = {
-                    story: `你決定向 ${classification.details.target || '對手'} 發起挑戰。`,
+                    story: isSparring
+                        ? `你向 ${classification.details.target || '對手'} 發起了一場友好的切磋。`
+                        : `你決定向 ${classification.details.target || '對手'} 發起挑戰。`,
                     roundData: {
                         ...lastSave,
-                        EVT: `遭遇戰：對決${classification.details.target}`,
-                        PC: `你決定與${classification.details.target}一決高下。`,
+                        EVT: isSparring ? `友好切磋：對決${classification.details.target}` : `遭遇戰：對決${classification.details.target}`,
+                        PC: isSparring ? `你提議與${classification.details.target}比試一番。` : `你決定與${classification.details.target}一決高下。`,
                         IMP: `觸發了與${classification.details.target}的戰鬥`,
                         powerChange: { internal: 0, external: 0, lightness: 0 },
                         moralityChange: 0,
@@ -151,14 +154,15 @@ const interactRouteHandler = async (req, res) => {
                         romanceChanges: [],
                         skillChanges: [],
                         enterCombat: true,
-                        // 使用新AI生成的豐富數據
                         combatants: combatSetupResult.combatants,
                         allies: combatSetupResult.allies,
                         bystanders: combatSetupResult.bystanders,
                         combatIntro: combatSetupResult.combatIntro,
+                        isSparring: isSparring // 【核心修改】在這裡打上標記
                     }
                 };
                 break;
+            }
             
             case 'GENERAL_STORY':
             default:
@@ -239,8 +243,9 @@ const interactRouteHandler = async (req, res) => {
                 }, 
                 enemies: aiResponse.roundData.combatants,
                 allies: aiResponse.roundData.allies || [],
-                bystanders: aiResponse.roundData.bystanders || [], // 將旁觀者也加入戰鬥狀態
-                log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
+                bystanders: aiResponse.roundData.bystanders || [], 
+                log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'],
+                isSparring: aiResponse.roundData.isSparring || false // 【核心修改】將標記存入戰鬥狀態
             };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
@@ -358,6 +363,7 @@ const combatActionRouteHandler = async (req, res) => {
 
             const postCombatSummary = combatResult.outcome.summary || '戰鬥結束';
             const playerChanges = combatResult.outcome.playerChanges || {};
+            const relationshipChanges = combatResult.outcome.relationshipChanges || [];
             
             const powerChange = playerChanges.powerChange || {};
             const finalPowerUpdate = {
@@ -366,13 +372,27 @@ const combatActionRouteHandler = async (req, res) => {
                 lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
                 morality: admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0)
             };
-            await userDocRef.update(finalPowerUpdate);
             
-            // 【核心修改】移除自動處理戰利品的程式碼
-            // if (playerChanges.itemChanges) {
-            //     await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
-            // }
+            // 【核心修改】在戰鬥結束後處理關係變化
+            const relationshipPromises = [];
+            if (relationshipChanges.length > 0) {
+                // 將友好度變化和心動值變化分開處理
+                const friendlinessChanges = relationshipChanges.map(c => ({ name: c.npcName, friendlinessChange: c.friendlinessChange })).filter(c => c.friendlinessChange);
+                const romanceChanges = relationshipChanges.map(c => ({ npcName: c.npcName, valueChange: c.romanceChange })).filter(c => c.valueChange);
 
+                if (friendlinessChanges.length > 0) {
+                    relationshipPromises.push(updateFriendlinessValues(userId, friendlinessChanges));
+                }
+                if (romanceChanges.length > 0) {
+                    relationshipPromises.push(updateRomanceValues(userId, romanceChanges));
+                }
+            }
+
+            await Promise.all([
+                userDocRef.update(finalPowerUpdate),
+                ...relationshipPromises
+            ]);
+            
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
