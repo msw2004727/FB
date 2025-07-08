@@ -1,6 +1,6 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
-const { v4: uuidv4 } = require('uuid'); // 【核心新增】引入UUID生成器
+const { v4: uuidv4 } = require('uuid');
 const { getAINpcProfile, getAIRomanceEvent } = require('../services/aiService');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 
@@ -102,7 +102,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// 【核心修改】重構整個 updateInventory 函式以支援物品實例化
 const updateInventory = async (userId, itemChanges) => {
     if (!itemChanges || itemChanges.length === 0) return;
 
@@ -118,29 +117,25 @@ const updateInventory = async (userId, itemChanges) => {
                 console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
                 continue;
             }
-
-            // 對於可堆疊的物品（如材料、金錢、普通道具），我們仍然採用舊的計數方式
+            
             if (['材料', '財寶', '道具'].includes(template.itemType)) {
                  const stackableItemRef = userInventoryRef.doc(itemName);
                  batch.set(stackableItemRef, { 
                     ...template,
                     quantity: admin.firestore.FieldValue.increment(quantity),
-                    // 確保即使是模板也要更新時間，表示最近的獲取/更新
                     lastAcquiredAt: admin.firestore.FieldValue.serverTimestamp()
                  }, { merge: true });
                  console.log(`[物品系統] 已為玩家 ${userId} 增加可堆疊物品: ${itemName} x${quantity}`);
 
             } else {
-                // 對於不可堆疊的物品（如武器、裝備），我們創建獨立的實例
                 for (let i = 0; i < quantity; i++) {
-                    const newItemId = uuidv4(); // 為每個實例生成一個獨一無二的ID
+                    const newItemId = uuidv4();
                     const newItemRef = userInventoryRef.doc(newItemId);
                     batch.set(newItemRef, {
                         ...template,
-                        instanceId: newItemId, // 保存實例ID
+                        instanceId: newItemId,
                         owner: userId,
                         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                        // 未來可擴充的欄位
                         durability: 100,
                         upgrades: {},
                         lore: ""
@@ -156,18 +151,15 @@ const updateInventory = async (userId, itemChanges) => {
                 continue;
             }
             querySnapshot.forEach(doc => {
-                // 如果是可堆疊物品，減少其數量
                 if (doc.data().quantity > 1) {
                     batch.update(doc.ref, { quantity: admin.firestore.FieldValue.increment(-1) });
                 } else {
-                // 如果是獨立實例或數量為1的物品，直接刪除
                     batch.delete(doc.ref);
                 }
             });
             console.log(`[物品系統] 已為玩家 ${userId} 移除物品: ${itemName} x${querySnapshot.size}`);
 
         } else if (action === 'remove_all' && itemType === '財寶') {
-            // 這個邏輯需要查詢所有財寶並刪除
             const treasuresSnapshot = await userInventoryRef.where('itemType', '==', '財寶').get();
             treasuresSnapshot.forEach(doc => {
                 batch.delete(doc.ref);
@@ -255,7 +247,6 @@ const checkAndTriggerRomanceEvent = async (userId) => {
     return null; 
 };
 
-// 【核心修改】重構 getInventoryState 以適應新的物品實例結構
 const getInventoryState = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const snapshot = await inventoryRef.get();
@@ -269,7 +260,6 @@ const getInventoryState = async (userId) => {
         if (item.itemName === '銀兩') {
             money += item.quantity || 0;
         } else {
-            // 處理可堆疊物品的數量和獨立物品的計數
             const count = item.quantity || 1;
             itemCounts[item.itemName] = (itemCounts[item.itemName] || 0) + count;
         }
@@ -280,7 +270,6 @@ const getInventoryState = async (userId) => {
 };
 
 
-// 【核心修改】重構 getRawInventory 以適應新的物品實例結構
 const getRawInventory = async (userId) => {
     const inventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const snapshot = await inventoryRef.get();
@@ -376,6 +365,48 @@ const getPlayerSkills = async (userId) => {
     return skills;
 };
 
+/**
+ * 【核心新增】處理來自AI的NPC檔案更新指令
+ * @param {string} userId - 玩家的ID
+ * @param {Array<Object>} updates - AI生成的更新指令陣列
+ */
+const processNpcUpdates = async (userId, updates) => {
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return;
+    }
+
+    console.log(`[NPC檔案更新系統] 收到為玩家 ${userId} 更新NPC檔案的指令...`);
+    const batch = db.batch();
+    const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+
+    for (const update of updates) {
+        const { npcName, fieldToUpdate, newValue, updateType } = update;
+
+        if (!npcName || !fieldToUpdate || newValue === undefined) continue;
+
+        const npcDocRef = userNpcsRef.doc(npcName);
+        let updatePayload = {};
+
+        if (updateType === 'arrayUnion') {
+            updatePayload[fieldToUpdate] = admin.firestore.FieldValue.arrayUnion(newValue);
+        } else if (updateType === 'arrayRemove') {
+            updatePayload[fieldToUpdate] = admin.firestore.FieldValue.arrayRemove(newValue);
+        } else { // 預設為 'set'
+            updatePayload[fieldToUpdate] = newValue;
+        }
+
+        batch.update(npcDocRef, updatePayload);
+        console.log(`[NPC檔案更新系統] 已將NPC「${npcName}」的欄位「${fieldToUpdate}」更新為：`, newValue);
+    }
+
+    try {
+        await batch.commit();
+        console.log(`[NPC檔案更新系統] NPC檔案批次更新已成功提交。`);
+    } catch (error) {
+        console.error(`[NPC檔案更新系統] 在為玩家 ${userId} 更新NPC檔案時發生錯誤:`, error);
+    }
+};
+
 module.exports = {
     TIME_SEQUENCE,
     getFriendlinessLevel,
@@ -390,5 +421,6 @@ module.exports = {
     getInventoryState,
     getRawInventory,
     updateSkills,
-    getPlayerSkills
+    getPlayerSkills,
+    processNpcUpdates // 【核心新增】匯出新函式
 };
