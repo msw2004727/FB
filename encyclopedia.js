@@ -1,17 +1,18 @@
+// scripts/encyclopedia.js
+import { api } from './api.js'; // 【核心新增】引入統一的API模組
+
 document.addEventListener('DOMContentLoaded', async () => {
     // --- 登入守衛 ---
     const token = localStorage.getItem('jwt_token');
     const username = localStorage.getItem('username');
 
     if (!token) {
-        // 如果沒有令牌，無法知道要讀取誰的資料，直接重定向到登入頁面
         window.location.href = 'login.html';
-        return; // 停止執行後續程式碼
+        return; 
     }
 
     const encyclopediaContent = document.getElementById('encyclopedia-content');
     const encyclopediaTitle = document.getElementById('encyclopedia-title');
-    const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 
     // 設定個人化標題
     if (username) {
@@ -19,18 +20,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-        // 【核心修改】將API路徑修正為後端真實存在的路徑
-        const response = await fetch(`${backendBaseUrl}/api/game/state/get-encyclopedia`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || '無法獲取百科內容。');
-        }
+        // 【核心修改】改為使用 api.js 中的 getEncyclopedia 函式發起請求
+        const data = await api.getEncyclopedia();
         
         // 清空載入中訊息，並將後端傳來的HTML內容直接渲染出來
         if (data.encyclopediaHtml) {
