@@ -184,7 +184,8 @@ const interactRouteHandler = async (req, res) => {
                     username: username,
                     skills: skills 
                 }, 
-                enemies: aiResponse.roundData.combatants, 
+                enemies: aiResponse.roundData.combatants,
+                allies: aiResponse.roundData.allies || [], // 【核心修改】新增此行
                 log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
             };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
@@ -202,7 +203,6 @@ const interactRouteHandler = async (req, res) => {
         
         const currentLocationForUpdate = aiResponse.roundData.LOC?.[0];
         if (locationUpdates && Array.isArray(locationUpdates) && currentLocationForUpdate) {
-            // 【核心修改】將 userId 傳遞給 processLocationUpdates
             processLocationUpdates(userId, currentLocationForUpdate, locationUpdates)
                 .catch(err => console.error(`[檔案管理員] 地點 ${currentLocationForUpdate} 的即時更新失敗:`, err));
         }
