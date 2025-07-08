@@ -368,9 +368,10 @@ const combatActionRouteHandler = async (req, res) => {
             };
             await userDocRef.update(finalPowerUpdate);
             
-            if (playerChanges.itemChanges) {
-                await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
-            }
+            // 【核心修改】移除自動處理戰利品的程式碼
+            // if (playerChanges.itemChanges) {
+            //     await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
+            // }
 
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
