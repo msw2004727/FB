@@ -4,6 +4,7 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
 const { getInventoryState, invalidateNovelCache, updateLibraryNovel, getRawInventory, getPlayerSkills } = require('./gameHelpers');
+const { generateAndCacheLocation } = require('./worldEngine'); // 【核心新增】引入世界引擎
 
 const db = admin.firestore();
 
@@ -97,13 +98,18 @@ router.get('/latest-game', async (req, res) => {
 
         let latestGameData = snapshot.docs[0].data();
         
-        // 【核心修改】獲取當前地點的詳細檔案
         let locationData = null;
         const currentLocationName = latestGameData.LOC?.[0];
         if (currentLocationName) {
             const locationDoc = await db.collection('locations').doc(currentLocationName).get();
             if (locationDoc.exists) {
                 locationData = locationDoc.data();
+            } else {
+                // 【核心修改】如果地點檔案不存在，立刻在背景觸發建檔程序
+                console.log(`[讀取系統] 偵測到未建檔的地點: ${currentLocationName}，將在背景生成...`);
+                // 我們不需要等待它完成，直接繼續執行
+                generateAndCacheLocation(currentLocationName, '未知', '初次抵達，資訊尚不明朗。')
+                    .catch(err => console.error(`[世界引擎] 初始地點 ${currentLocationName} 的背景生成失敗:`, err));
             }
         }
 
@@ -124,7 +130,7 @@ router.get('/latest-game', async (req, res) => {
             story: latestGameData.story || "你靜靜地站在原地，思索著下一步。",
             roundData: latestGameData,
             suggestion: suggestion,
-            locationData: locationData // 【核心修改】將地點檔案加入回傳的資料中
+            locationData: locationData 
         });
     } catch (error) {
         res.status(500).json({ message: "讀取最新進度失敗。" });
