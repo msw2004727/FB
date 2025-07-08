@@ -15,19 +15,17 @@ const {
     updateLibraryNovel,
     updateSkills,
     getPlayerSkills,
-    getFriendlinessLevel // 確保 getFriendlinessLevel 已從 gameHelpers 引入
+    getFriendlinessLevel
 } = require('./gameHelpers');
 const { triggerBountyGeneration } = require('./worldEngine');
 
 const db = admin.firestore();
 
-// 【***核心新增***】專門用來更新NPC友好度的函式
 const updateFriendlinessValues = async (userId, npcChanges) => {
     if (!npcChanges || npcChanges.length === 0) return;
     const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
 
     const promises = npcChanges.map(async (change) => {
-        // 確保有NPC名稱和一個非零的友好度變化值
         if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) {
             return;
         }
@@ -36,7 +34,6 @@ const updateFriendlinessValues = async (userId, npcChanges) => {
         try {
             await db.runTransaction(async (transaction) => {
                 const npcDoc = await transaction.get(npcDocRef);
-                // 只更新已存在的NPC，不在此處創建新NPC
                 if (!npcDoc.exists) {
                     console.warn(`[友好度系統] 嘗試更新一個不存在的NPC檔案: ${change.name}`);
                     return;
@@ -44,7 +41,6 @@ const updateFriendlinessValues = async (userId, npcChanges) => {
                 const currentFriendliness = npcDoc.data().friendlinessValue || 0;
                 const newFriendlinessValue = currentFriendliness + change.friendlinessChange;
                 
-                // 更新數值和對應的友好度等級描述
                 transaction.update(npcDocRef, { 
                     friendlinessValue: newFriendlinessValue,
                     friendliness: getFriendlinessLevel(newFriendlinessValue)
@@ -68,7 +64,6 @@ const interactRouteHandler = async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-        // --- 1. 並行獲取所有需要的資料 ---
         const [userDoc, summaryDoc, savesSnapshot, skills] = await Promise.all([
             userDocRef.get(),
             summaryDocRef.get(),
@@ -84,7 +79,6 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
 
-        // --- 2. 【新流程】呼叫「總導演AI」進行意圖分類 ---
         const contextForClassifier = {
             location: lastSave.LOC?.[0] || '未知之地',
             npcs: lastSave.NPC?.map(n => n.name) || [],
@@ -94,7 +88,6 @@ const interactRouteHandler = async (req, res) => {
         
         let aiResponse;
 
-        // --- 3. 【新流程】根據分類結果，執行不同的處理邏輯 ---
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
                 const combatIntroText = `你對 ${classification.details.target || '對手'} 發起了攻擊，一場惡鬥一觸即發！`;
@@ -133,7 +126,6 @@ const interactRouteHandler = async (req, res) => {
                 break;
         }
 
-        // --- 4. 統一處理AI回應後的遊戲狀態更新 ---
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
@@ -183,9 +175,13 @@ const interactRouteHandler = async (req, res) => {
 
         if (aiResponse.roundData.enterCombat) {
             console.log(`[戰鬥系統] 偵測到戰鬥觸發信號！`);
+            // 【核心修改】將玩家的武學資料(skills)也一起存入戰鬥狀態中
             const combatState = { 
                 turn: 1, 
-                player: { username: username }, 
+                player: { 
+                    username: username,
+                    skills: skills // <--- 新增此行
+                }, 
                 enemies: aiResponse.roundData.combatants, 
                 log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
             };
