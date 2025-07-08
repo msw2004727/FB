@@ -14,13 +14,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // 3. DeepSeek
 const deepseek = new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: "[https://api.deepseek.com/v1](https://api.deepseek.com/v1)",
+    baseURL: "https://api.deepseek.com/v1", // 【核心修正】移除多餘的Markdown格式
 });
 
 // 4. Grok
 const grok = new OpenAI({
     apiKey: process.env.GROK_API_KEY,
-    baseURL: "[https://api.x.ai/v1](https://api.x.ai/v1)",
+    baseURL: "https://api.x.ai/v1", // 【核心修正】移除多餘的Markdown格式
     timeout: 30 * 1000,
 });
 
