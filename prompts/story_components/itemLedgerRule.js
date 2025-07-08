@@ -36,6 +36,15 @@ const getItemLedgerRule = () => {
   "quantity": 1
 }
 \`\`\`
+
+### 【新增】操作三：全部移除 (Remove All by Type)
+當發生特殊事件（如被洗劫）導致某一類別的物品全部遺失時，使用此結構。
+\`\`\`json
+{
+  "action": "remove_all",
+  "itemType": "要移除的物品類別，例如：財寶"
+}
+\`\`\`
 `;
 };
 
