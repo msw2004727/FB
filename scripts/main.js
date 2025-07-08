@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const skillsBtn = document.getElementById('skills-btn');
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
-    const combatSurrenderBtn = document.getElementById('combat-surrender-btn'); // 【核心新增】
+    const combatSurrenderBtn = document.getElementById('combat-surrender-btn'); 
     const storyTextContainer = document.getElementById('story-text-wrapper');
     const chatInput = document.getElementById('chat-input');
     const chatActionBtn = document.getElementById('chat-action-btn');
@@ -39,6 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const giveItemBtn = document.getElementById('give-item-btn');
     const cancelGiveBtn = document.getElementById('cancel-give-btn');
     const closeSkillsBtn = document.getElementById('close-skills-btn');
+    // 【核心新增】獲取GM面板相關元素
+    const gmPanel = document.getElementById('gm-panel');
+    const gmCloseBtn = document.getElementById('gm-close-btn');
+    const gmMenu = document.getElementById('gm-menu');
+    const gmContent = document.getElementById('gm-content');
 
     // 動態設定遊戲容器高度
     function setGameContainerHeight() {
@@ -87,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.textContent = isLoading ? '撰寫中...' : '動作';
         combatInput.disabled = isLoading;
         combatActionButton.disabled = isLoading;
-        combatSurrenderBtn.disabled = isLoading; // 【核心新增】
+        combatSurrenderBtn.disabled = isLoading; 
         chatInput.disabled = isLoading;
         chatActionBtn.disabled = isLoading;
         endChatBtn.disabled = isLoading;
@@ -135,10 +140,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 事件處理函式 ---
     async function handlePlayerAction() {
-        const startTime = performance.now();
-
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
+
+        // 【核心修改】檢查是否為GM指令
+        if (actionText.toUpperCase() === '/GM') {
+            playerInput.value = '';
+            gmPanel.classList.add('visible');
+            return;
+        }
+
         playerInput.value = '';
 
         const prequelElement = storyTextContainer.querySelector('.prequel-summary');
@@ -160,7 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.roundData.suggestion = data.suggestion;
                 
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, data.randomEvent);
+                // 【核心修改】將地點資料傳遞給UI更新器
+                updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
                 
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
@@ -220,7 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 【核心新增】處理認輸的函式
     async function handleSurrender() {
         if (gameState.isRequesting) return;
         setLoadingState(true);
@@ -228,18 +239,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const data = await api.combatSurrender({ model: aiModelSelector.value });
-            modal.appendToCombatLog(data.narrative); // 顯示交涉過程
+            modal.appendToCombatLog(data.narrative); 
 
             if (data.status === 'SURRENDER_REJECTED') {
-                // 認輸被拒絕，戰鬥繼續
             } else if (data.status === 'SURRENDER_ACCEPTED') {
-                // 認輸被接受，延遲後結束戰鬥
                 setTimeout(() => endCombat(data.newRound), 3000);
             }
         } catch (error) {
             modal.appendToCombatLog(`[系統錯誤] ${error.message}`);
         } finally {
-            // 如果認輸被拒絕，確保輸入框可用
             if (gameState.isInCombat && !document.getElementById('deceased-overlay').classList.contains('visible')) {
                 setLoadingState(false);
             }
@@ -466,11 +474,34 @@ document.addEventListener('DOMContentLoaded', () => {
             closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
         }
 
+        // 【核心新增】GM面板的事件監聽
+        gmCloseBtn.addEventListener('click', () => gmPanel.classList.remove('visible'));
+        gmPanel.addEventListener('click', (e) => {
+            if (e.target === gmPanel) {
+                gmPanel.classList.remove('visible');
+            }
+        });
+        gmMenu.addEventListener('click', (e) => {
+            e.preventDefault();
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            // 處理菜單項的高亮狀態
+            gmMenu.querySelectorAll('a').forEach(a => a.classList.remove('active'));
+            link.classList.add('active');
+
+            // 顯示對應的內容頁面
+            const targetPageId = link.getAttribute('href').substring(1);
+            gmContent.querySelectorAll('.gm-page').forEach(page => page.classList.remove('active'));
+            document.getElementById(targetPageId).classList.add('active');
+        });
+
+
         submitButton.addEventListener('click', handlePlayerAction);
         playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
         combatActionButton.addEventListener('click', handleCombatAction);
         combatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handleCombatAction(); } });
-        combatSurrenderBtn.addEventListener('click', handleSurrender); // 【核心新增】
+        combatSurrenderBtn.addEventListener('click', handleSurrender); 
         storyTextContainer.addEventListener('click', handleNpcClick);
         chatActionBtn.addEventListener('click', sendChatMessage);
         chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendChatMessage(); } });
@@ -509,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.gameState === 'deceased') {
                 if(data.roundData) {
-                    updateUI('', data.roundData, null);
+                    updateUI('', data.roundData, null, data.locationData);
                 }
                 handlePlayerDeath();
 
@@ -527,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.roundData.suggestion = data.suggestion;
                 
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, null);
+                updateUI(data.story, data.roundData, null, data.locationData);
             }
         } catch (error) {
             if (error.message.includes('找不到存檔')) {
@@ -537,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 addRoundTitleToStory(roundZeroData.EVT);
                 appendMessageToStory(initialMessage, 'system-message');
-                updateUI(null, roundZeroData, null);
+                updateUI(null, roundZeroData, null, null);
 
             } else {
                 handleApiError(error);
