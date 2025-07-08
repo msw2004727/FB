@@ -59,4 +59,10 @@ export const api = {
     rebuildLocationForGM: (body) => fetchApi('/api/gm/rebuild-location', { method: 'POST', body: JSON.stringify(body) }),
     getItemTemplatesForGM: () => fetchApi('/api/gm/item-templates'),
     updatePlayerResourcesForGM: (body) => fetchApi('/api/gm/update-player-resources', { method: 'POST', body: JSON.stringify(body) }),
+    // 【核心新增】新增的GM功能API
+    getPlayerStateForGM: () => fetchApi('/api/gm/player-state'),
+    updatePlayerStateForGM: (body) => fetchApi('/api/gm/player-state', { method: 'POST', body: JSON.stringify(body) }),
+    teleportPlayer: (body) => fetchApi('/api/gm/teleport', { method: 'POST', body: JSON.stringify(body) }),
+    getCharactersForGM: () => fetchApi('/api/gm/characters'),
+    updateNpcRelationship: (body) => fetchApi('/api/gm/update-npc-relationship', { method: 'POST', body: JSON.stringify(body) }),
 };
