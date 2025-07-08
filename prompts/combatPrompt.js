@@ -6,12 +6,10 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
         ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
 
-    // 【核心新增】將盟友資訊格式化，如果沒有盟友則顯示'無'
     const alliesString = combatState.allies && combatState.allies.length > 0
         ? combatState.allies.map(a => `${a.name} (狀態: ${a.status || '良好'})`).join('、')
         : '無';
 
-    // 【核心新增】從戰鬥狀態中獲取 isSparring 標記
     const isSparring = combatState.isSparring || false;
 
     return `
@@ -69,7 +67,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 ### 1. 當戰鬥仍在進行中：
 - \`combatOver\` 必須為 \`false\`。
 - \`narrative\` (字串): 描述本回合的攻防過程。
-- \`damageDealt\` (物件陣列): **【核心新增】** 詳細記錄本回合中，**玩家對敵人**造成的每一次傷害。如果玩家的攻擊沒有命中或被格檔，可以回傳空陣列 `[]`。
+- \`damageDealt\` (物件陣列): **【核心新增】** 詳細記錄本回合中，對角色造成的每一次傷害。如果玩家的攻擊沒有命中或被格檔，可以回傳空陣列。
     - 格式: \`{"target": "受傷者姓名", "damage": 數字}\`
     - 範例: \`[{"target": "山賊頭目", "damage": 25}]\`
 - \`enemies\` (物件陣列): **【核心新增】** 回傳**更新後**的完整敵人列表，包含他們最新的 \`hp\` (生命值)。你必須根據本回合的攻防結果，準確計算並更新敵人的HP。
