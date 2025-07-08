@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 事件處理函式 ---
     async function handlePlayerAction() {
+        const startTime = performance.now();
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
 
@@ -200,9 +201,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
                  setLoadingState(false);
             }
-          const endTime = performance.now();
+            const endTime = performance.now();
             const durationInSeconds = ((endTime - startTime) / 1000).toFixed(2);
-            console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);    
+            console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);
         }
     }
 
@@ -641,6 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
 
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
