@@ -251,7 +251,9 @@ const interactRouteHandler = async (req, res) => {
         if (newRoundNumber > 5 && Math.random() < 0.2) { 
             triggerBountyGeneration(userId, newSummary).catch(err => console.error("背景生成懸賞失敗:", err));
         }
-
+        // 【核心修改】在最終回傳前，將地點的詳細資料附加到回應中
+        aiResponse.locationData = locationContext;
+        
         res.json(aiResponse);
 
     } catch (error) {
