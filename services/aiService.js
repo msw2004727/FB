@@ -4,7 +4,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 
-// 1. Google Gemini (保留以備未來可能重新啟用)
+// 1. Google Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 
@@ -24,6 +24,8 @@ const grok = new OpenAI({
     timeout: 30 * 1000,
 });
 
+// 【核心修改】引入新的AI中控設定檔
+const { aiConfig } = require('../api/aiConfig.js');
 
 // --- 從 prompts 資料夾導入腳本 ---
 const { getStoryPrompt } = require('../prompts/storyPrompt.js');
@@ -58,7 +60,6 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
             messages: [{ role: "user", content: prompt }],
         };
 
-        // 【核心修改】移除全局重定向，現在根據傳入的 modelName 進行選擇
         switch (modelName) {
             case 'openai':
                 options.model = "gpt-4.1-mini";
@@ -85,7 +86,6 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = grokResult.choices[0].message.content;
                 break;
             case 'gemini':
-                // 注意：這裡仍然保留了 gemini 的呼叫邏輯，但我們會在呼叫它的地方進行修改
                 const generationConfig = {};
                 if (isJsonExpected) {
                     generationConfig.response_mime_type = "application/json";
@@ -94,7 +94,6 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = (await geminiResult.response).text();
                 break;
             default:
-                // 如果傳入未知的模型名稱，預設使用 openai
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
                 options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
@@ -116,21 +115,23 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
+// 【核心修改】所有具體任務的函式，現在都從 aiConfig 讀取模型名稱
+// 並且移除了 'modelName' 參數
 
-async function getNarrative(modelName, roundData) {
+async function getNarrative(roundData) {
     const prompt = getNarrativePrompt(roundData);
     try {
-        return await callAI(modelName, prompt, false);
+        return await callAI(aiConfig.narrative, prompt, false);
     } catch (error) {
         console.error("[AI 任務失敗] 小說家任務:", error);
         return "在那一刻，時間的長河似乎出現了斷層...";
     }
 }
 
-async function getAISummary(modelName, oldSummary, newRoundData) {
+async function getAISummary(oldSummary, newRoundData) {
     const prompt = getSummaryPrompt(oldSummary, newRoundData);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const text = await callAI(aiConfig.summary, prompt, true);
         return parseJsonResponse(text).summary;
     } catch (error) {
         console.error("[AI 任務失敗] 檔案管理員任務:", error);
@@ -138,10 +139,12 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
     }
 }
 
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext) {
+async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext) {
     const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
     try {
-        const text = await callAI(modelName, prompt, true);
+        // 主故事線優先使用玩家在前端的選擇
+        const modelToUse = playerModelChoice || aiConfig.story;
+        const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 故事大師任務:", error);
@@ -149,10 +152,11 @@ async function getAIStory(modelName, longTermSummary, recentHistory, playerActio
     }
 }
 
-async function getAIPrequel(modelName, recentHistory) {
+async function getAIPrequel(playerModelChoice, recentHistory) {
     const prompt = getPrequelPrompt(recentHistory);
     try {
-        const text = await callAI(modelName, prompt, false);
+        const modelToUse = playerModelChoice || aiConfig.prequel;
+        const text = await callAI(modelToUse, prompt, false);
         return text;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖說書人任務:", error);
@@ -160,10 +164,10 @@ async function getAIPrequel(modelName, recentHistory) {
     }
 }
 
-async function getAISuggestion(modelName, roundData) {
+async function getAISuggestion(roundData) {
     const prompt = getSuggestionPrompt(roundData);
     try {
-        const text = await callAI(modelName, prompt, false);
+        const text = await callAI(aiConfig.suggestion, prompt, false);
         return text.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 機靈書僮任務:", error);
@@ -171,10 +175,10 @@ async function getAISuggestion(modelName, roundData) {
     }
 }
 
-async function getAIEncyclopedia(modelName, longTermSummary, username, npcDetails) {
+async function getAIEncyclopedia(longTermSummary, username, npcDetails) {
     const prompt = getEncyclopediaPrompt(longTermSummary, username, npcDetails);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const text = await callAI(aiConfig.encyclopedia, prompt, true);
         return parseJsonResponse(text).encyclopediaHtml;
     } catch (error) {
         console.error("[AI 任務失敗] 江湖史官任務:", error);
@@ -182,10 +186,10 @@ async function getAIEncyclopedia(modelName, longTermSummary, username, npcDetail
     }
 }
 
-async function getAIRandomEvent(modelName, eventType, playerProfile) {
+async function getAIRandomEvent(eventType, playerProfile) {
     const prompt = getRandomEventPrompt(eventType, playerProfile);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const text = await callAI(aiConfig.randomEvent, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 司命星君任務:", error);
@@ -193,10 +197,10 @@ async function getAIRandomEvent(modelName, eventType, playerProfile) {
     }
 }
 
-async function getAINpcProfile(modelName, username, npcName, roundData) {
+async function getAINpcProfile(username, npcName, roundData) {
     const prompt = getNpcCreatorPrompt(username, npcName, roundData);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const text = await callAI(aiConfig.npcProfile, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 人物設定師任務:", error);
@@ -204,10 +208,11 @@ async function getAINpcProfile(modelName, username, npcName, roundData) {
     }
 }
 
-async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext) {
+async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext) {
     const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
     try {
-        const reply = await callAI(modelName, prompt, false);
+        const modelToUse = playerModelChoice || aiConfig.npcChat;
+        const reply = await callAI(modelToUse, prompt, false);
         return reply.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 聊天大師任務:", error);
@@ -215,10 +220,11 @@ async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessa
     }
 }
 
-async function getAIChatSummary(modelName, username, npcName, fullChatHistory) {
+async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory) {
     const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory);
     try {
-        const summary = await callAI(modelName, prompt, false);
+        const modelToUse = playerModelChoice || aiConfig.npcChatSummary;
+        const summary = await callAI(modelToUse, prompt, false);
         return summary.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 摘要師任務:", error);
@@ -226,10 +232,11 @@ async function getAIChatSummary(modelName, username, npcName, fullChatHistory) {
     }
 }
 
-async function getAICombatAction(modelName, playerProfile, combatState, playerAction) {
+async function getAICombatAction(playerModelChoice, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const modelToUse = playerModelChoice || aiConfig.combat;
+        const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 戰鬥裁判任務:", error);
@@ -240,34 +247,36 @@ async function getAICombatAction(modelName, playerProfile, combatState, playerAc
     }
 }
 
-async function getAIGiveItemResponse(modelName, playerProfile, npcProfile, itemInfo) {
+async function getAIGiveItemResponse(playerModelChoice, playerProfile, npcProfile, itemInfo) {
     const prompt = getGiveItemPrompt(playerProfile, npcProfile, itemInfo);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const modelToUse = playerModelChoice || aiConfig.giveItem;
+        const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 江湖交際大師任務:", error);
         return {
             npc_response: "（他看著你送出的東西，一時語塞，不知該如何是好。）",
-            friendlinessChange: 0
+            friendlinessChange: 0,
+            itemChanges: []
         };
     }
 }
 
-async function getAINarrativeForGive(modelName, lastRoundData, playerName, npcName, itemName, npcResponse) {
+async function getAINarrativeForGive(lastRoundData, playerName, npcName, itemName, npcResponse) {
     const prompt = getGiveNarrativePrompt(lastRoundData, playerName, npcName, itemName, npcResponse);
     try {
-        return await callAI(modelName, prompt, false);
+        return await callAI(aiConfig.giveNarrative, prompt, false);
     } catch (error) {
         console.error("[AI 任務失敗] 贈予事件小說家任務:", error);
         return `你將${itemName}給了${npcName}。`;
     }
 }
 
-async function getRelationGraph(modelName, longTermSummary, username, npcDetails) {
+async function getRelationGraph(longTermSummary, username, npcDetails) {
     const prompt = getRelationGraphPrompt(longTermSummary, username, npcDetails);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const text = await callAI(aiConfig.relationGraph, prompt, true);
         return parseJsonResponse(text).mermaidSyntax;
     } catch (error) {
         console.error("[AI 任務失敗] 關係圖百曉生任務:", error);
@@ -275,11 +284,10 @@ async function getRelationGraph(modelName, longTermSummary, username, npcDetails
     }
 }
 
-async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType) {
+async function getAIRomanceEvent(playerProfile, npcProfile, eventType) {
     const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
     try {
-        // 【核心修改】將寫死的 'gemini' 改為 'openai'
-        const text = await callAI('openai', prompt, true);
+        const text = await callAI(aiConfig.romanceEvent, prompt, true);
         const jsonObj = parseJsonResponse(text);
         return JSON.stringify(jsonObj);
     } catch (error) {
@@ -288,10 +296,10 @@ async function getAIRomanceEvent(modelName, playerProfile, npcProfile, eventType
     }
 }
 
-async function getAIEpilogue(modelName, playerData) {
+async function getAIEpilogue(playerData) {
     const prompt = getEpiloguePrompt(playerData);
     try {
-        const story = await callAI(modelName, prompt, false);
+        const story = await callAI(aiConfig.epilogue, prompt, false);
         return story;
     } catch (error) {
         console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
@@ -299,10 +307,11 @@ async function getAIEpilogue(modelName, playerData) {
     }
 }
 
-async function getAIDeathCause(modelName, username, lastRoundData) {
+async function getAIDeathCause(playerModelChoice, username, lastRoundData) {
     const prompt = getDeathCausePrompt(username, lastRoundData);
     try {
-        const cause = await callAI(modelName, prompt, false);
+        const modelToUse = playerModelChoice || aiConfig.deathCause;
+        const cause = await callAI(modelToUse, prompt, false);
         return cause.replace(/["“”]/g, '');
     } catch (error) {
         console.error(`[AI 任務失敗] 司命星君任務 for ${username}:`, error);
@@ -310,10 +319,11 @@ async function getAIDeathCause(modelName, username, lastRoundData) {
     }
 }
 
-async function getAIActionClassification(modelName, playerAction, context) {
+async function getAIActionClassification(playerModelChoice, playerAction, context) {
     const prompt = getActionClassifierPrompt(playerAction, context);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const modelToUse = playerModelChoice || aiConfig.actionClassifier;
+        const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 總導演AI任務:", error);
@@ -321,10 +331,11 @@ async function getAIActionClassification(modelName, playerAction, context) {
     }
 }
 
-async function getAISurrenderResult(modelName, playerProfile, combatState) {
+async function getAISurrenderResult(playerModelChoice, playerProfile, combatState) {
     const prompt = getSurrenderPrompt(playerProfile, combatState);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const modelToUse = playerModelChoice || aiConfig.surrender;
+        const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 談判專家任務:", error);
@@ -336,10 +347,10 @@ async function getAISurrenderResult(modelName, playerProfile, combatState) {
     }
 }
 
-async function getAIProactiveChat(modelName, playerProfile, npcProfile, triggerEvent) {
+async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
     const prompt = getProactiveChatPrompt(playerProfile, npcProfile, triggerEvent);
     try {
-        const text = await callAI(modelName, prompt, true);
+        const text = await callAI(aiConfig.proactiveChat, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 首席編劇任務:", error);
