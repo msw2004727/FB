@@ -18,7 +18,6 @@ const {
     getFriendlinessLevel
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
-// 【核心新增】引入我們新建立的檔案管理員
 const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
@@ -81,9 +80,8 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
         
-        const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId, username, modelName);
+        const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId);
 
-        // 【核心修改】在呼叫AI前，先獲取當前地點的詳細情境
         const currentLocationName = lastSave.LOC?.[0];
         let locationContext = null;
         if (currentLocationName) {
@@ -135,7 +133,6 @@ const interactRouteHandler = async (req, res) => {
                 const preActionSkillChanges = req.body.skillChanges || [];
                 const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-                // 【核心修改】將地點情境(locationContext)也一起傳給主故事AI
                 aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
@@ -148,7 +145,7 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.story = aiResponse.story;
         
         await Promise.all([
-            updateInventory(userId, aiResponse.roundData.itemChanges),
+            updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
             updateFriendlinessValues(userId, aiResponse.roundData.NPC),
             updateSkills(userId, aiResponse.roundData.skillChanges)
@@ -199,10 +196,8 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
         
-        // 【核心修改】將「世界動態演化系統」接入主循環
         const { mentionedLocations, locationUpdates } = aiResponse.roundData;
 
-        // 1. 處理情報蒐集：如果有提及新地點，就在背景為其建檔
         if (mentionedLocations && Array.isArray(mentionedLocations)) {
             for (const locName of mentionedLocations) {
                 generateAndCacheLocation(locName, '未知', newSummary)
@@ -210,7 +205,6 @@ const interactRouteHandler = async (req, res) => {
             }
         }
         
-        // 2. 處理卷宗更新：如果有地點狀態變更，就立刻更新資料庫
         const currentLocationForUpdate = aiResponse.roundData.LOC?.[0];
         if (locationUpdates && Array.isArray(locationUpdates) && currentLocationForUpdate) {
             processLocationUpdates(currentLocationForUpdate, locationUpdates)
