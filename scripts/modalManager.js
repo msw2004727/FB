@@ -35,7 +35,6 @@ const skillsBodyContainer = document.getElementById('skills-body-container');
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
-    // 【核心修改】如果心動值為0或未定義，則不顯示任何愛心
     if (!value || value <= 0) {
         const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
         if (existingHearts) existingHearts.remove();
@@ -103,9 +102,18 @@ export function closeEpilogueModal() {
 }
 
 // --- 戰鬥彈窗 ---
+// 【核心修改】更新 openCombatModal 函式以顯示盟友
 export function openCombatModal(initialState) {
-    combatTitle.textContent = `遭遇強敵`;
-    combatEnemies.textContent = `對手: ${initialState.enemies.map(e => e.name).join('、')}`;
+    combatTitle.textContent = `遭遇戰`;
+
+    // 更新戰鬥陣容顯示
+    let rosterHTML = `<div><strong>敵方陣營：</strong> ${initialState.enemies.map(e => e.name).join('、')}</div>`;
+    if (initialState.allies && initialState.allies.length > 0) {
+        const playerUsername = initialState.player.username || '你';
+        rosterHTML = `<div><strong>我方陣營：</strong> ${playerUsername}、${initialState.allies.map(a => a.name).join('、')}</div>` + rosterHTML;
+    }
+    combatEnemies.innerHTML = rosterHTML;
+
     combatLog.innerHTML = '';
     if (initialState.log && initialState.log.length > 0) {
         appendToCombatLog(initialState.log[0], 'combat-intro-text');
