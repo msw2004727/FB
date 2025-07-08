@@ -24,7 +24,6 @@ const grok = new OpenAI({
     timeout: 30 * 1000,
 });
 
-// 【核心修改】引入新的AI中控設定檔
 const { aiConfig } = require('../api/aiConfig.js');
 
 // --- 從 prompts 資料夾導入腳本 ---
@@ -48,6 +47,7 @@ const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
 const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
 const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
 const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
+const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -115,9 +115,6 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// 【核心修改】所有具體任務的函式，現在都從 aiConfig 讀取模型名稱
-// 並且移除了 'modelName' 參數
-
 async function getNarrative(roundData) {
     const prompt = getNarrativePrompt(roundData);
     try {
@@ -142,7 +139,6 @@ async function getAISummary(oldSummary, newRoundData) {
 async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext) {
     const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
     try {
-        // 主故事線優先使用玩家在前端的選擇
         const modelToUse = playerModelChoice || aiConfig.story;
         const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
@@ -246,6 +242,27 @@ async function getAICombatAction(playerModelChoice, playerProfile, combatState, 
         };
     }
 }
+
+// 【核心新增】新的函式，專門處理戰鬥開始前的場景佈置
+async function getAICombatSetup(playerAction, lastRoundData) {
+    const prompt = getCombatSetupPrompt(playerAction, lastRoundData);
+    try {
+        // 這個任務對邏輯要求很高，我們從中控檔案裡指定一個可靠的模型
+        const modelToUse = aiConfig.combatSetup || 'openai';
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 戰鬥導演任務:", error);
+        // 返回一個安全的備用數據，防止遊戲崩潰
+        return {
+            combatants: [{ name: "未知敵人", status: "怒不可遏！" }],
+            allies: [],
+            bystanders: [],
+            combatIntro: "一場混亂的戰鬥爆發了，但場上局勢無人能看清！"
+        };
+    }
+}
+
 
 async function getAIGiveItemResponse(playerModelChoice, playerProfile, npcProfile, itemInfo) {
     const prompt = getGiveItemPrompt(playerProfile, npcProfile, itemInfo);
@@ -361,7 +378,6 @@ async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
     }
 }
 
-
 // 匯出所有服務函式
 module.exports = {
     callAI,
@@ -374,6 +390,7 @@ module.exports = {
     getAIRandomEvent,
     getAINpcProfile,
     getAICombatAction,
+    getAICombatSetup, // 【核心新增】
     getAIChatResponse,
     getAIChatSummary,
     getAIGiveItemResponse,
