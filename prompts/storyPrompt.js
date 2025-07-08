@@ -9,7 +9,8 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null) => {
+// 【核心修改】函式簽名新增 npcContext 參數
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -26,7 +27,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         ? `\n## 【最高優先級特殊劇情指令：戀愛場景編織】\n在本回合的故事中，你**必須**將以下指定的「戀愛互動場景」自然地、無縫地編織進你的敘述裡。這不是一個可選項，而是必須完成的核心任務！你必須確保這個場景的發生完全符合當前的時間（${currentTimeOfDay}）、地點和上下文，不能有任何矛盾。\n- **需編織的事件**: 與NPC「${romanceEventToWeave.npcName}」發生一次「${romanceEventToWeave.eventType}」類型的初次心動互動。這通常表現為一次不經意的偶遇、一個充滿深意的眼神交換、或是一句關切的問候。`
         : '';
     
-    // 【核心新增】瀕死狀態指令
     const dyingInstruction = userProfile.deathCountdown && userProfile.deathCountdown > 0
         ? `\n## 【最高優先級特殊劇情指令：瀕死狀態】
         你現在正處於瀕死狀態，只剩下 ${userProfile.deathCountdown} 個回合的生命！你的所有敘述都必須圍繞這個核心展開。
@@ -38,6 +38,11 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const locationContextInstruction = locationContext
         ? `\n## 【重要地點情境參考】\n你當前正處於「${locationContext.locationName}」，以下是關於此地的詳細情報，你在生成故事時必須嚴格參考這些設定，確保你的描述（如天氣、統治者、氛圍等）與之相符：\n\`\`\`json\n${JSON.stringify(locationContext, null, 2)}\n\`\`\``
         : `\n## 【重要地點情境參考】\n你目前身處一個未知之地，關於此地的詳細情報尚不明朗。`;
+
+    // 【核心新增】將 NPC 的完整檔案作為上下文傳遞給 AI
+    const npcContextInstruction = Object.keys(npcContext).length > 0
+        ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的**個性(personality)、秘密(secrets)和目標(goals)**，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！\n\`\`\`json\n${JSON.stringify(npcContext, null, 2)}\n\`\`\``
+        : '';
 
     const playerAttributeRules = getPlayerAttributeRule({
         currentDateString,
@@ -70,6 +75,7 @@ ${dyingInstruction}
 ${romanceInstruction}
 
 ${locationContextInstruction}
+${npcContextInstruction}
 
 ${systemInteractionRules}
 
@@ -111,7 +117,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是最新修訂的「瀕死狀態」規則）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「NPC情境參考」與「瀕死狀態」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
 `;
 };
 
