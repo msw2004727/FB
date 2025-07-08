@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-btn');
     const suicideButton = document.getElementById('suicide-btn');
     const skillsBtn = document.getElementById('skills-btn');
+    const bountiesBtn = document.getElementById('bounties-btn'); // 【核心新增】獲取懸賞按鈕
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
     const combatSurrenderBtn = document.getElementById('combat-surrender-btn'); 
@@ -112,6 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.setCombatLoading(isLoading && gameState.isInCombat);
         modal.setChatLoading(isLoading && gameState.isInChat);
     }
+
+    // 【核心新增】一個專門用來更新懸賞按鈕狀態的函式
+    function updateBountyButton(hasNew) {
+        if (bountiesBtn) {
+            bountiesBtn.classList.toggle('has-new-bounty', hasNew);
+        }
+    }
     
     async function handlePlayerDeath() {
         modal.showEpilogueModal('<div class="loading-placeholder"><p>史官正在為您的人生撰寫終章...</p><div class="loader-dots"><span></span><span></span><span></span></div></div>', () => {
@@ -181,6 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
+
+                // 【核心修改】在收到回應後，更新懸賞按鈕狀態
+                updateBountyButton(data.hasNewBounties);
 
                 if (data.roundData.playerState === 'dead') {
                     setLoadingState(false);
@@ -344,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
                 gameState.currentRound = data.roundData.R;
                 gameState.roundData = data.roundData;
+                updateBountyButton(data.hasNewBounties); //【核心修改】結束對話後也更新懸賞狀態
             } else {
                 throw new Error('從伺服器收到的回應格式不正確。');
             }
@@ -380,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUI(data.story, data.roundData, null, data.locationData); 
                 gameState.currentRound = data.roundData.R; 
                 gameState.roundData = data.roundData; 
+                updateBountyButton(data.hasNewBounties); //【核心修改】贈予物品後也更新懸賞狀態
             } else {
                 throw new Error("從伺服器收到的回應格式不正確。");
             }
@@ -725,6 +738,13 @@ document.addEventListener('DOMContentLoaded', () => {
             closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
         }
 
+        // 【核心新增】為懸賞按鈕添加點擊事件，點擊後立即移除光暈
+        if (bountiesBtn) {
+            bountiesBtn.addEventListener('click', () => {
+                updateBountyButton(false);
+            });
+        }
+
         gmCloseBtn.addEventListener('click', () => gmPanel.classList.remove('visible'));
         gmPanel.addEventListener('click', (e) => {
             if (e.target === gmPanel) {
@@ -811,6 +831,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
                 updateUI(data.story, data.roundData, null, data.locationData);
+
+                // 【核心修改】在初始載入時，更新懸賞按鈕狀態
+                updateBountyButton(data.hasNewBounties);
             }
         } catch (error) {
             if (error.message.includes('找不到存檔')) {
