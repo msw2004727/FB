@@ -312,13 +312,16 @@ body.dark-theme .combat-roster-group strong {
     gap: 0.75rem;
 }
 
-/* 【核心新增】戰鬥卡片樣式 */
+/* 【核心修改】戰鬥卡片樣式 */
 .combatant-card {
     background-color: var(--light-surface-bg);
     border: 1px solid var(--light-border);
     border-radius: 6px;
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem; /* 修改：減少垂直內邊距 */
     text-align: left;
+    display: flex; /* 新增：使用flex佈局 */
+    align-items: center; /* 新增：垂直居中對齊 */
+    gap: 0.75rem; /* 新增：名字和血條之間的間距 */
 }
 body.dark-theme .combatant-card {
     background-color: var(--dark-surface-bg);
@@ -334,24 +337,34 @@ body.dark-theme .combatant-card {
 .combatant-name {
     font-weight: bold;
     font-size: 1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0; /* 移除：flex佈局不再需要 */
+    flex-shrink: 0; /* 新增：防止名字被壓縮 */
+    white-space: nowrap; /* 新增：防止名字換行 */
 }
 
 .hp-bar-container {
-    height: 12px;
+    height: 18px; /* 修改：增加高度以容納文字 */
     background-color: var(--light-border);
-    border-radius: 6px;
+    border-radius: 9px; /* 修改：對應新高度 */
     overflow: hidden;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0; /* 移除 */
+    flex-grow: 1; /* 新增：讓血條容器佔滿剩餘空間 */
+    position: relative; /* 新增：為絕對定位的文字提供基準 */
+    display: flex; /* 新增：讓文字可以垂直居中 */
+    align-items: center; /* 新增：垂直居中 */
+    justify-content: center; /* 新增：水平居中 */
 }
 body.dark-theme .hp-bar-container {
     background-color: var(--dark-border);
 }
 
 .hp-bar-fill {
+    position: absolute; /* 新增：讓填充條在底層 */
+    left: 0;
+    top: 0;
     height: 100%;
     background-color: #dc3545;
-    border-radius: 6px;
+    border-radius: 9px; /* 修改：對應新高度 */
     transition: width 0.4s ease;
 }
 .combatant-card.type-player .hp-bar-fill,
@@ -361,11 +374,15 @@ body.dark-theme .hp-bar-container {
 .hp-text {
     font-family: monospace;
     font-size: 0.8rem;
-    text-align: right;
-    color: var(--light-text-secondary);
+    text-align: center; /* 修改 */
+    color: #fff; /* 修改：讓文字在深色血條上可見 */
+    text-shadow: 0 0 3px rgba(0,0,0,0.8); /* 新增：增加文字可讀性 */
+    position: relative; /* 新增：讓文字在填充條之上 */
+    z-index: 1; /* 新增：確保文字在最上層 */
+    width: 100%; /* 新增：確保文字容器佔滿父容器 */
 }
 body.dark-theme .hp-text {
-    color: var(--dark-text-secondary);
+    /* 移除特定於暗色主題的顏色，因為現在統一為白色 */
 }
 
 
