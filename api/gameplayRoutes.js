@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat } = require('../services/aiService');
+// 【核心修改】引入新的 getAICombatSetup 函式
+const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAICombatAction, getAISurrenderResult, getAIProactiveChat, getAICombatSetup } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -27,7 +28,7 @@ const db = admin.firestore();
 
 // NPC主動互動引擎
 const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
-    const PROACTIVE_CHAT_COOLDOWN = 5; // 觸發一次後，冷卻5個回合
+    const PROACTIVE_CHAT_COOLDOWN = 5;
 
     const gameStateRef = db.collection('users').doc(userId).collection('game_state').doc('engine_state');
     const gameStateDoc = await gameStateRef.get();
@@ -134,7 +135,9 @@ const interactRouteHandler = async (req, res) => {
 
         switch (classification.actionType) {
             case 'COMBAT_ATTACK':
-                const combatIntroText = `空氣中的氣氛陡然緊張，一場交鋒在所難免。你屏氣凝神，準備應對接下來的一切！`;
+                // 【核心修改】呼叫新的「戰鬥導演AI」來佈置場景
+                const combatSetupResult = await getAICombatSetup(playerAction, lastSave);
+
                 aiResponse = {
                     story: `你決定向 ${classification.details.target || '對手'} 發起挑戰。`,
                     roundData: {
@@ -148,8 +151,11 @@ const interactRouteHandler = async (req, res) => {
                         romanceChanges: [],
                         skillChanges: [],
                         enterCombat: true,
-                        combatants: [{ name: classification.details.target, status: '準備應戰' }],
-                        combatIntro: combatIntroText,
+                        // 使用新AI生成的豐富數據
+                        combatants: combatSetupResult.combatants,
+                        allies: combatSetupResult.allies,
+                        bystanders: combatSetupResult.bystanders,
+                        combatIntro: combatSetupResult.combatIntro,
                     }
                 };
                 break;
@@ -232,7 +238,8 @@ const interactRouteHandler = async (req, res) => {
                     skills: skills 
                 }, 
                 enemies: aiResponse.roundData.combatants,
-                allies: aiResponse.roundData.allies || [], 
+                allies: aiResponse.roundData.allies || [],
+                bystanders: aiResponse.roundData.bystanders || [], // 將旁觀者也加入戰鬥狀態
                 log: [aiResponse.roundData.combatIntro || '戰鬥開始了！'] 
             };
             await userDocRef.collection('game_state').doc('current_combat').set(combatState);
