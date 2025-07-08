@@ -311,7 +311,6 @@ body.dark-theme .combat-log-area p {
     border-bottom: none;
 }
 
-/* 【核心新增】戰鬥中的武學資訊欄樣式 */
 .combat-skills-area {
     flex-shrink: 0;
     padding: 0.75rem 1.5rem;
@@ -321,8 +320,8 @@ body.dark-theme .combat-log-area p {
     flex-wrap: wrap;
     gap: 0.5rem;
     justify-content: center;
-    max-height: 100px; /* 限制最大高度 */
-    overflow-y: auto; /* 超出時可滾動 */
+    max-height: 100px; 
+    overflow-y: auto; 
 }
 
 body.dark-theme .combat-skills-area {
@@ -338,7 +337,7 @@ body.dark-theme .combat-skills-area {
     border-radius: 15px;
     font-size: 0.85rem;
     font-family: var(--font-sans);
-    cursor: default; /* 預設是不可點擊的 */
+    cursor: default; 
 }
 
 body.dark-theme .combat-skill-tag {
@@ -381,25 +380,38 @@ body.dark-theme #combat-input {
     color: var(--dark-text-primary);
 }
 
-
-#combat-action-btn {
+/* 【核心修改】通用戰鬥按鈕樣式 */
+.combat-button {
     flex-shrink: 0;
-    min-width: 100px;
     border: none;
-    border-left: 1px solid var(--light-border);
-    background-color: var(--light-accent);
-    color: #fff;
     font-size: 1.1rem;
     font-weight: bold;
     cursor: pointer;
     transition: opacity 0.3s;
+    padding: 1rem;
+    min-width: 100px;
 }
-#combat-action-btn:hover {
+.combat-button:hover {
     opacity: 0.85;
 }
-body.dark-theme #combat-action-btn {
+.combat-button.action {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-left: 1px solid var(--light-border);
+}
+body.dark-theme .combat-button.action {
     border-left-color: var(--dark-border);
 }
+.combat-button.surrender {
+    background-color: var(--light-text-secondary);
+    color: #fff;
+    border-left: 1px solid var(--light-border);
+}
+body.dark-theme .combat-button.surrender {
+    background-color: var(--dark-text-secondary);
+    border-left-color: var(--dark-border);
+}
+
 
 .combat-loader-overlay {
     position: absolute;
@@ -700,7 +712,6 @@ body.dark-theme .romance-hearts .far.fa-heart {
 }
 
 
-/* 【***核心新增***】 */
 /* --- 友好度計量棒 --- */
 .friendliness-bar-container {
     width: 100%;
@@ -718,7 +729,7 @@ body.dark-theme .friendliness-bar-container {
     font-size: 0.8rem;
     color: var(--light-text-secondary);
     margin-bottom: 0.5rem;
-    padding: 0 5px; /* 微調使文字與計量棒邊緣對齊 */
+    padding: 0 5px; 
 }
 
 .friendliness-bar-background {
@@ -726,7 +737,7 @@ body.dark-theme .friendliness-bar-container {
     height: 12px;
     border-radius: 6px;
     border: 1px solid var(--light-border);
-    background: linear-gradient(to right, #dc3545, #868e96 50%, #198754); /* 預設漸層 */
+    background: linear-gradient(to right, #dc3545, #868e96 50%, #198754);
 }
 body.dark-theme .friendliness-bar-background {
     border-color: var(--dark-border);
@@ -734,13 +745,13 @@ body.dark-theme .friendliness-bar-background {
 
 .friendliness-bar-indicator {
     position: absolute;
-    top: -4px; /* 讓指標上下超出一些，更好看 */
+    top: -4px; 
     width: 6px;
     height: 20px;
     background-color: var(--light-surface-bg);
     border: 2px solid var(--light-text-primary);
     border-radius: 3px;
-    transform: translateX(-50%); /* 讓指標中心對準 left 的百分比位置 */
+    transform: translateX(-50%); 
     transition: left 0.5s ease-out;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
@@ -749,7 +760,7 @@ body.dark-theme .friendliness-bar-indicator {
     border-color: var(--dark-text-primary);
 }
 
-/* --- 【核心新增】結局彈窗樣式 --- */
+/* --- 結局彈窗樣式 --- */
 .epilogue-modal-overlay {
     position: fixed;
     top: 0;
@@ -757,7 +768,7 @@ body.dark-theme .friendliness-bar-indicator {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);
-    z-index: 1001; /* 比死亡畫面低一點，但比遊戲高 */
+    z-index: 1001; 
     display: flex;
     justify-content: center;
     align-items: center;
@@ -824,7 +835,7 @@ body.dark-theme .epilogue-modal-header h2 {
     font-size: 1.1rem;
     line-height: 2.2;
     text-align: justify;
-    white-space: pre-wrap; /* 讓AI生成的換行能夠顯示 */
+    white-space: pre-wrap; 
 }
 
 .epilogue-modal-footer {
