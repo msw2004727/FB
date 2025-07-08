@@ -14,13 +14,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // 3. DeepSeek
 const deepseek = new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: "https://api.deepseek.com/v1", // 【核心修正】移除多餘的Markdown格式
+    baseURL: "https://api.deepseek.com/v1",
 });
 
 // 4. Grok
 const grok = new OpenAI({
     apiKey: process.env.GROK_API_KEY,
-    baseURL: "https://api.x.ai/v1", // 【核心修正】移除多餘的Markdown格式
+    baseURL: "https://api.x.ai/v1",
     timeout: 30 * 1000,
 });
 
@@ -44,6 +44,7 @@ const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
 const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
 const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
 const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
+const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
 
 
 // 統一的AI調度中心
@@ -125,8 +126,8 @@ async function getAISummary(modelName, oldSummary, newRoundData) {
     }
 }
 
-async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents);
+async function getAIStory(modelName, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
     try {
         const text = await callAI(modelName, prompt, true);
         return parseJsonResponse(text);
@@ -191,8 +192,8 @@ async function getAINpcProfile(modelName, username, npcName, roundData) {
     }
 }
 
-async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage, longTermSummary) {
-    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary);
+async function getAIChatResponse(modelName, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext) {
+    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
     try {
         const reply = await callAI(modelName, prompt, false);
         return reply.replace(/["“”]/g, '');
@@ -298,11 +299,25 @@ async function getAIActionClassification(modelName, playerAction, context) {
     const prompt = getActionClassifierPrompt(playerAction, context);
     try {
         const text = await callAI(modelName, prompt, true);
-        // 【***核心修改***】在這裡使用 parseJsonResponse 輔助函式
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 總導演AI任務:", error);
         return { actionType: 'GENERAL_STORY', details: {} };
+    }
+}
+
+async function getAISurrenderResult(modelName, playerProfile, combatState) {
+    const prompt = getSurrenderPrompt(playerProfile, combatState);
+    try {
+        const text = await callAI(modelName, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 談判專家任務:", error);
+        return {
+            accepted: false,
+            narrative: "你試圖認輸，但對方殺氣騰騰，似乎沒有任何商量的餘地，系統暫時無法判斷其意圖，請你繼續戰鬥。",
+            outcome: null
+        };
     }
 }
 
@@ -327,4 +342,5 @@ module.exports = {
     getAIEpilogue,
     getAIDeathCause,
     getAIActionClassification,
+    getAISurrenderResult,
 };
