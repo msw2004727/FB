@@ -15,16 +15,15 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
 ### 1. 人物誌 (NPCs)
 - **目的**：記錄所有在摘要中出現過的重要人物。
 - **格式**：為每個人物建立一個條目。條目標題是人物姓名，內容應包含他/她的身份、與玩家的關係演變、以及目前的狀態。
-- **【核心新增規則】**: 在每個人物條目的內容下方，你**必須**根據我提供的「人物詳細情報」，為該NPC加上一段顯示「心動值」的HTML。
+- **【核心修改規則】**: 只有在NPC的 \`romanceValue\` **大於 0** 的情況下，你才**必須**根據我提供的「人物詳細情報」，為該NPC加上一段顯示「心動值」的HTML。如果 \`romanceValue\` 為0或不存在，則**完全不要**生成這段HTML。
     -   HTML結構為: \`<div class="romance-meter"><span class="romance-label">心動：</span> ...愛心... </div>\`
     -   根據NPC的 \`romanceValue\` 數值，決定顯示幾顆實心愛心(fas fa-heart)和幾顆空心愛心(far fa-heart)。規則如下：
-        -   0-9: 0顆實心
         -   10-29: 1顆實心
         -   30-49: 2顆實心
         -   50-69: 3顆實心
         -   70-89: 4顆實心
         -   90+: 5顆實心
-- **範例**：
+- **範例 (有心動值)**：
   \`\`\`html
   <div class="chapter">
     <h2 class="chapter-title">人物誌</h2>
@@ -45,6 +44,14 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
       <p class="entry-content">盤踞在村外山頭的惡匪，孔武有力。在一次衝突中被主角擊殺，主角從其身上搜得一枚虎頭令牌。</p>
     </div>
   </div>
+  \`\`\`
+  
+- **範例 (無心動值)**：
+  \`\`\`html
+  <div class="entry">
+    <h3 class="entry-title">山賊頭目</h3>
+    <p class="entry-content">盤踞在村外山頭的惡匪...</p>
+    </div>
   \`\`\`
 
 ### 2. 神兵錄 (Items)
