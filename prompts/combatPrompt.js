@@ -5,10 +5,10 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const skillsString = playerProfile.skills && playerProfile.skills.length > 0
         ? playerProfile.skills.map(s => `${s.name} (${s.level}成 / ${s.power_type}加成)`).join('、')
         : '無';
-    
+
     // 【核心新增】將盟友資訊格式化，如果沒有盟友則顯示'無'
     const alliesString = combatState.allies && combatState.allies.length > 0
-        ? combatState.allies.map(a => a.name).join('、')
+        ? combatState.allies.map(a => `${a.name} (狀態: ${a.status || '良好'})`).join('、')
         : '無';
 
     return `
@@ -28,11 +28,13 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     * **敘述體現**: 你必須在敘述中體現出等級和功體的差距。例如，你可以使用「你運起三成功力的『羅漢拳』...」或「...他深厚的內力催動掌風，威力更增三分...」等詞彙。
     * **等級為0的武學**: 在戰鬥中使用等級為0的武學，效果應該非常微弱，甚至可能失敗。
 
-3.  **【核心修改】情境判斷 (包含盟友)**: 需考慮敵我雙方的陣容。
-    * **我方陣容**: ${playerProfile.username}、${alliesString}
-    * **敵方陣容**: ${combatState.enemies.map(e => e.name).join('、')}
-    * **盟友行動**: 在描述回合結果時，你**必須**根據盟友的身份與狀態，合理地描述他們的輔助行動。他們不應該只是站著不動。例如，一個忠誠的盟友可能會在你攻擊時，主動牽制另一個敵人。
-    * **戰鬥紀錄**: ${combatLog}。以一敵多時，玩家的行動會更加困難，但有盟友協助時，壓力會減輕。
+3.  **【***盟友行動AI鐵律***】**: 你在描述每一回合的戰鬥時，**絕對禁止**忽略盟友的存在。你**必須**根據盟友的**身份、個性、技能和當前狀態**，為他們生成**具體、合理且有意義的輔助行動**。
+    * **行動邏輯**:
+        * 如果盟友是**醫者或藥師**（例如「王大夫」），當玩家受傷時，他應該優先**嘗試治療**玩家，而不是上前攻擊。
+        * 如果盟友是**武林高手**，他應該會根據戰況，選擇**攻擊威脅最大的敵人**，或**牽制其他敵人**，為玩家創造機會。
+        * 如果盟友是**普通人或弱者**，他的行動可能是**扔石頭、大聲呼救製造混亂**，或者因為恐懼而**躲在玩家身後**。
+        * 如果盟友與玩家的關係是**「信賴(trusted)」或「崇拜(devoted)」**，他甚至可能捨身為玩家擋下致命一擊。
+    * **敘事整合**: 盟友的行動**必須**自然地融入你的戰鬥敘述中，與玩家的行動和敵人的反擊，共同構成一個完整、連貫的回合。
 
 4.  **創意與合理性**: 玩家可能會下達富有想像力的指令。你需要判斷其合理性。例如，「一招擊敗所有人」在初期是不合理的，但「攻擊A的同時，側身躲避B的攻擊」則是合理的。
 
