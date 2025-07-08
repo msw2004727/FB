@@ -45,13 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const gmMenu = document.getElementById('gm-menu');
     const gmContent = document.getElementById('gm-content');
 
-    // 動態設定遊戲容器高度
     function setGameContainerHeight() {
         if (gameContainer) {
             gameContainer.style.height = `${window.innerHeight}px`;
         }
     }
-
 
     // --- 遊戲狀態變數 ---
     let gameState = {
@@ -438,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 【核心修改】GM面板功能函式 ---
+    // --- GM面板功能函式 ---
     async function loadPlayerStatsData() {
         const page = document.getElementById('player-stats');
         page.innerHTML = '<h3>玩家屬性編輯</h3><p>正在載入數據...</p>';
@@ -532,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="gm-note">注意：瞬移後，遊戲將會自動存檔，建議您在操作後重新載入遊戲頁面以同步最新狀態。</p>
                 </div>
                 <div class="gm-grid-container" id="gm-location-grid">
-                    </div>
+                </div>
             `;
             
             const gridContainer = document.getElementById('gm-location-grid');
@@ -563,9 +561,96 @@ document.addEventListener('DOMContentLoaded', () => {
             page.innerHTML = `<h3>地區編輯</h3><p>獲取資料失敗: ${error.message}</p>`;
         }
     }
+    
+    // 【核心修改】重構 NPC 管理面板的生成邏輯
+    async function loadNpcManagementData() {
+        const page = document.getElementById('npc-management');
+        page.innerHTML = '<h3>NPC關係管理</h3><p>正在獲取人物數據...</p>';
+        try {
+            const [npcList, characterList] = await Promise.all([
+                api.getNpcsForGM(),
+                api.getCharactersForGM()
+            ]);
+
+            const container = document.createElement('div');
+            container.className = 'gm-grid-container';
+
+            if (npcList.length === 0) {
+                page.innerHTML = '<h3>NPC關係管理</h3><p>資料庫中尚無任何NPC檔案。</p>';
+                return;
+            }
+
+            const characterOptionsHtml = characterList.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+
+            npcList.forEach(npc => {
+                const card = document.createElement('div');
+                card.className = 'gm-control-card';
+                let cardBody;
+
+                if (npc.isGhost) {
+                    cardBody = `<div class="gm-card-header"><h4>${npc.name}</h4><span class="gm-status-tag ghost"><i class="fa-solid fa-ghost"></i> 黑戶檔案</span></div><div class="gm-card-body"><p class="gm-note">此NPC存在於存檔中，但沒有詳細檔案。</p><button class="gm-button rebuild" data-npc-name="${npc.name}"><i class="fa-solid fa-user-check"></i> 重建檔案</button></div>`;
+                } else {
+                    const relationships = npc.relationships || {};
+                    cardBody = `
+                        <div class="gm-card-header"><h4>${npc.name}</h4></div>
+                        <div class="gm-card-body">
+                            <div class="gm-control-group"><label><span>友好度</span><span class="value-display" id="friend-val-${npc.id}">${npc.friendlinessValue}</span></label><input type="range" class="gm-slider" id="friend-slider-${npc.id}" min="-100" max="100" value="${npc.friendlinessValue}"></div>
+                            <div class="gm-control-group"><label><span>心動值</span><span class="value-display" id="romance-val-${npc.id}">${npc.romanceValue}</span></label><input type="range" class="gm-slider" id="romance-slider-${npc.id}" min="0" max="100" value="${npc.romanceValue}"></div>
+                            <div class="gm-control-group relationship-group">
+                                <label><span>設定關係</span></label>
+                                <div class="relationship-inputs">
+                                    <select class="gm-select rel-type" id="rel-type-${npc.id}">
+                                        <option value="lover">戀人</option>
+                                        <option value="spouse">夫妻</option>
+                                        <option value="parent">父母</option>
+                                        <option value="child">子女</option>
+                                        <option value="sibling">兄弟姊妹</option>
+                                        <option value="master">師父</option>
+                                        <option value="apprentice">徒弟</option>
+                                    </select>
+                                    <select class="gm-select rel-target" id="rel-target-${npc.id}">
+                                        <option value="">-- 解除關係 --</option>
+                                        ${characterOptionsHtml}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="gm-button save" data-npc-id="${npc.id}"><i class="fa-solid fa-floppy-disk"></i> 儲存所有變更</button>
+                    `;
+                }
+                card.innerHTML = cardBody;
+                
+                // 動態設定關係下拉選單的預設值
+                setTimeout(() => {
+                    if (!npc.isGhost && npc.relationships) {
+                        const relTypeSelect = card.querySelector(`#rel-type-${npc.id}`);
+                        const relTargetSelect = card.querySelector(`#rel-target-${npc.id}`);
+                        
+                        // 這裡只簡單處理第一個找到的關係，您可以擴展為更複雜的UI
+                        const relType = Object.keys(npc.relationships)[0];
+                        if (relType) {
+                            const targetName = npc.relationships[relType];
+                            relTypeSelect.value = relType;
+                            relTargetSelect.value = targetName;
+                        }
+                    }
+                }, 0);
+
+                container.appendChild(card);
+            });
+
+            page.innerHTML = '<h3>NPC關係管理</h3>';
+            page.appendChild(container);
+            
+            bindGmCardEvents(container);
+
+        } catch (error) {
+            page.innerHTML = `<h3>NPC關係管理</h3><p>獲取資料失敗: ${error.message}</p>`;
+        }
+    }
 
     async function gmSavePlayerStats(e) {
-        const button = e.target;
+        const button = e.target.closest('button');
         button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
         button.disabled = true;
         try {
@@ -588,7 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function gmSavePlayerMoney(e) {
-        const button = e.target;
+        const button = e.target.closest('button');
         const money = document.getElementById('gm-money').value;
         if (money === '' || isNaN(money)) { alert('請輸入有效的數字'); return; }
 
@@ -631,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     async function gmTeleport(e) {
-        const button = e.target;
+        const button = e.target.closest('button');
         const locationName = document.getElementById('gm-new-location-name').value.trim() || document.getElementById('gm-location-select').value;
         if (!locationName) {
             alert('請選擇或輸入一個目標地點！');
@@ -657,77 +742,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 3000);
         }
     }
-    
-    async function loadNpcManagementData() {
-        const page = document.getElementById('npc-management');
-        page.innerHTML = '<h3>NPC關係管理</h3><p>正在從後端獲取NPC列表...</p>';
-        try {
-            const npcList = await api.getNpcsForGM();
-            const container = document.createElement('div');
-            container.className = 'gm-grid-container';
-
-            if (npcList.length === 0) {
-                page.innerHTML = '<h3>NPC關係管理</h3><p>資料庫中尚無任何NPC檔案。</p>';
-                return;
-            }
-
-            npcList.forEach(npc => {
-                const card = document.createElement('div');
-                card.className = 'gm-control-card';
-                let cardBody;
-
-                if (npc.isGhost) {
-                    cardBody = `
-                        <div class="gm-card-header"><h4>${npc.name}</h4><span class="gm-status-tag ghost"><i class="fa-solid fa-ghost"></i> 黑戶檔案</span></div>
-                        <div class="gm-card-body"><p style="font-size: 0.9rem; color: #a0a0c0; text-align: center; flex-grow: 1;">此NPC存在於存檔中，但沒有詳細檔案。請重建檔案以進行管理。</p><button class="gm-button rebuild" data-npc-name="${npc.name}"><i class="fa-solid fa-user-check"></i> 重建檔案</button></div>
-                    `;
-                } else {
-                    cardBody = `
-                        <div class="gm-card-header"><h4>${npc.name}</h4></div>
-                        <div class="gm-card-body">
-                            <div class="gm-control-group"><label><span>友好度</span><span class="value-display" id="friend-val-${npc.id}">${npc.friendlinessValue}</span></label><input type="range" class="gm-slider" id="friend-slider-${npc.id}" min="-100" max="100" value="${npc.friendlinessValue}"></div>
-                            <div class="gm-control-group"><label><span>心動值</span><span class="value-display" id="romance-val-${npc.id}">${npc.romanceValue}</span></label><input type="range" class="gm-slider" id="romance-slider-${npc.id}" min="0" max="100" value="${npc.romanceValue}"></div>
-                        </div>
-                        <button class="gm-button save" data-npc-id="${npc.id}"><i class="fa-solid fa-floppy-disk"></i> 儲存變更</button>
-                    `;
-                }
-                card.innerHTML = cardBody;
-                container.appendChild(card);
-            });
-
-            page.innerHTML = '<h3>NPC關係管理</h3>';
-            page.appendChild(container);
-            
-            bindGmCardEvents(container);
-
-        } catch (error) {
-            page.innerHTML = `<h3>NPC關係管理</h3><p>獲取資料失敗: ${error.message}</p>`;
-        }
-    }
 
     function bindGmCardEvents(container) {
-        container.querySelectorAll('.gm-slider').forEach(slider => {
-            slider.addEventListener('input', (e) => {
-                document.getElementById(e.target.id.replace('slider', 'val')).textContent = e.target.value;
-            });
-        });
-
         container.querySelectorAll('.gm-button.save').forEach(button => {
             button.addEventListener('click', async (e) => {
-                const npcId = e.target.dataset.npcId;
-                const friendliness = document.getElementById(`friend-slider-${npcId}`).value;
-                const romance = document.getElementById(`romance-slider-${npcId}`).value;
-                e.target.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
-                e.target.disabled = true;
+                const button = e.target.closest('button');
+                const npcId = button.dataset.npcId;
+                if (!npcId) return;
+
+                button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
+                button.disabled = true;
+                
                 try {
-                    const result = await api.updateNpcForGM({ npcId, friendlinessValue: friendliness, romanceValue: romance });
-                    e.target.innerHTML = `<i class="fa-solid fa-check"></i> ${result.message}`;
+                    // 並行處理所有更新
+                    const promises = [];
+                    
+                    // 1. 更新好感度與心動值
+                    const friendliness = document.getElementById(`friend-slider-${npcId}`).value;
+                    const romance = document.getElementById(`romance-slider-${npcId}`).value;
+                    promises.push(api.updateNpcForGM({ npcId, friendlinessValue: friendliness, romanceValue: romance }));
+
+                    // 2. 更新關係
+                    const relType = document.getElementById(`rel-type-${npcId}`).value;
+                    const relTarget = document.getElementById(`rel-target-${npcId}`).value;
+                    promises.push(api.updateNpcRelationship({ npcId, relationshipType: relType, targetName: relTarget }));
+                    
+                    await Promise.all(promises);
+                    button.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功`;
+
                 } catch (error) {
-                    e.target.innerHTML = `<i class="fa-solid fa-xmark"></i> 錯誤`;
+                    button.innerHTML = `<i class="fa-solid fa-xmark"></i> 儲存失敗`;
                 } finally {
                     setTimeout(() => {
-                       e.target.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存變更`;
-                       e.target.disabled = false;
+                       button.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存所有變更`;
+                       button.disabled = false;
                     }, 2000);
                 }
             });
