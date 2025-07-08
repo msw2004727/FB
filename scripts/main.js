@@ -266,17 +266,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await api.combatAction({ action: actionText, model: aiModelSelector.value });
             if (data.status === 'COMBAT_ONGOING') {
                 modal.appendToCombatLog(data.narrative);
-                // 【核心修改】新增：如果戰鬥持續中，則呼叫UI更新函式
                 if (data.updatedState) {
                     modal.updateCombatUI(data.updatedState);
                 }
             } else if (data.status === 'COMBAT_END') {
+                data.newRound.roundData.suggestion = data.newRound.suggestion;
                 modal.appendToCombatLog(data.newRound.story, 'combat-summary');
                 setTimeout(() => endCombat(data.newRound), 2000);
             }
         } catch (error) {
-            modal.appendToCombatLog(`[系統錯誤] ${error.message}`);
-            setTimeout(() => endCombat(null), 2000);
+            // 【核心修改】優化錯誤處理，不再直接結束戰鬥
+            modal.appendToCombatLog(`[系統] 你的招式似乎沒有生效，江湖的氣息有些不穩，請再試一次。(${error.message})`, 'system-message');
+            // 只需解除載入狀態，讓玩家可以重試
         } finally {
             if (gameState.isInCombat) setLoadingState(false);
         }
@@ -308,6 +309,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function endCombat(newRoundData) {
         gameState.isInCombat = false;
         modal.closeCombatModal();
+        
+        // 【核心修改】在結束戰鬥時檢查玩家是否已死亡
+        if (newRoundData && newRoundData.roundData && newRoundData.roundData.playerState === 'dead') {
+            updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
+            handlePlayerDeath();
+            return;
+        }
+
         if (newRoundData && newRoundData.roundData && newRoundData.story) {
             gameState.currentRound = newRoundData.roundData.R;
             gameState.roundData = newRoundData.roundData;
