@@ -145,10 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (actionText.toUpperCase() === '/GM') {
             playerInput.value = '';
             gmPanel.classList.add('visible');
-            // 當打開GM面板時，自動加載當前選中菜單的數據
             const activeMenu = gmMenu.querySelector('a.active');
             if (activeMenu) {
                 const targetPageId = activeMenu.getAttribute('href').substring(1);
+                if (targetPageId === 'player-stats') loadPlayerStatsData();
                 if (targetPageId === 'npc-management') loadNpcManagementData();
                 if (targetPageId === 'location-editor') loadLocationManagementData();
             }
@@ -200,9 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
                  setLoadingState(false);
             }
-            const endTime = performance.now();
+          const endTime = performance.now();
             const durationInSeconds = ((endTime - startTime) / 1000).toFixed(2);
-            console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);
+            console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);    
         }
     }
 
@@ -392,6 +392,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- GM面板功能函式 ---
+    async function loadPlayerStatsData() {
+        const page = document.getElementById('player-stats');
+        page.innerHTML = '<h3>玩家屬性編輯</h3><p>正在載入數據...</p>';
+        try {
+            const itemTemplates = await api.getItemTemplatesForGM();
+            
+            let optionsHtml = '<option value="">-- 請選擇物品 --</option>';
+            itemTemplates.forEach(item => {
+                optionsHtml += `<option value="${item.name}">${item.name}</option>`;
+            });
+
+            page.innerHTML = `
+                <h3>玩家屬性編輯</h3>
+                <div class="gm-form-section">
+                    <h4><i class="fa-solid fa-coins"></i> 金錢修改</h4>
+                    <div class="gm-input-group">
+                        <label for="gm-money">持有金錢</label>
+                        <input type="number" id="gm-money" class="gm-input" placeholder="請輸入數量">
+                        <button id="gm-save-money" class="gm-button save">設定</button>
+                    </div>
+                </div>
+                <div class="gm-form-section">
+                    <h4><i class="fa-solid fa-box-archive"></i> 物品增減</h4>
+                    <div class="gm-input-group">
+                        <label for="gm-item-select">選擇物品</label>
+                        <select id="gm-item-select" class="gm-select">${optionsHtml}</select>
+                        <input type="number" id="gm-item-quantity" class="gm-input" value="1">
+                        <div class="gm-button-group">
+                            <button id="gm-add-item" class="gm-button save">增加</button>
+                            <button id="gm-remove-item" class="gm-button" style="background-color:#e03131;">移除</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 綁定新按鈕的事件
+            document.getElementById('gm-save-money').addEventListener('click', async (e) => {
+                const money = document.getElementById('gm-money').value;
+                if (money === '' || isNaN(money)) { alert('請輸入有效的數字'); return; }
+                
+                e.target.textContent = '設定中...';
+                e.target.disabled = true;
+                try {
+                    await api.updatePlayerResourcesForGM({ money: Number(money) });
+                    e.target.textContent = '設定成功!';
+                } catch (error) {
+                    e.target.textContent = '錯誤';
+                } finally {
+                    setTimeout(() => { e.target.textContent = '設定'; e.target.disabled = false; }, 2000);
+                }
+            });
+
+            const handleItemChange = async (action) => {
+                const itemName = document.getElementById('gm-item-select').value;
+                const quantity = document.getElementById('gm-item-quantity').value;
+                if (!itemName) { alert('請選擇一個物品'); return; }
+                if (!quantity || isNaN(quantity) || Number(quantity) <= 0) { alert('請輸入有效的數量'); return; }
+
+                const buttonId = action === 'add' ? 'gm-add-item' : 'gm-remove-item';
+                const button = document.getElementById(buttonId);
+                button.textContent = '處理中...';
+                button.disabled = true;
+
+                try {
+                    await api.updatePlayerResourcesForGM({
+                        itemChange: { action, itemName, quantity: Number(quantity) }
+                    });
+                    button.textContent = '操作成功!';
+                } catch (error) {
+                    button.textContent = '錯誤';
+                } finally {
+                    setTimeout(() => { button.textContent = action === 'add' ? '增加' : '移除'; button.disabled = false; }, 2000);
+                }
+            };
+
+            document.getElementById('gm-add-item').addEventListener('click', () => handleItemChange('add'));
+            document.getElementById('gm-remove-item').addEventListener('click', () => handleItemChange('remove'));
+
+        } catch (error) {
+             page.innerHTML = `<h3>玩家屬性編輯</h3><p>載入數據失敗: ${error.message}</p>`;
+        }
+    }
+    
     async function loadNpcManagementData() {
         const page = document.getElementById('npc-management');
         page.innerHTML = '<h3>NPC關係管理</h3><p>正在從後端獲取NPC列表...</p>';
@@ -559,7 +642,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
         
@@ -579,19 +661,14 @@ document.addEventListener('DOMContentLoaded', () => {
         aiModelSelector.addEventListener('change', () => {
             const selectedModel = aiModelSelector.value;
             localStorage.setItem('preferred_ai_model', selectedModel);
-            
             const notification = document.createElement('p');
             notification.className = 'system-message ai-switch-notification';
             notification.textContent = `系統：AI 核心已切換為 ${selectedModel.toUpperCase()}。`;
             storyTextContainer.appendChild(notification);
-            
             storyTextContainer.parentElement.scrollTop = storyTextContainer.parentElement.scrollHeight;
-
             setTimeout(() => {
                 notification.classList.add('fading-out');
-                setTimeout(() => {
-                    notification.remove();
-                }, 500);
+                setTimeout(() => notification.remove(), 500);
             }, 5000);
         });
         
@@ -664,6 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gmContent.querySelectorAll('.gm-page').forEach(page => page.classList.remove('active'));
             document.getElementById(targetPageId).classList.add('active');
             
+            if (targetPageId === 'player-stats') loadPlayerStatsData();
             if (targetPageId === 'npc-management') loadNpcManagementData();
             if (targetPageId === 'location-editor') loadLocationManagementData();
         });
