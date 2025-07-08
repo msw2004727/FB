@@ -140,14 +140,18 @@ router.get('/latest-game', async (req, res) => {
             return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
         }
 
-        const snapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        // 【核心修改】將查詢新懸賞的動作加入到並行處理中
+        const [snapshot, newBountiesSnapshot] = await Promise.all([
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
+            userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get()
+        ]);
+        
         if (snapshot.empty) {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
 
         let latestGameData = snapshot.docs[0].data();
         
-        // 【核心修改】使用新的輔助函式來獲取合併後的地點資料
         const currentLocationName = latestGameData.LOC?.[0];
         const locationData = await getMergedLocationData(userId, currentLocationName);
 
@@ -168,7 +172,8 @@ router.get('/latest-game', async (req, res) => {
             story: latestGameData.story || "你靜靜地站在原地，思索著下一步。",
             roundData: latestGameData,
             suggestion: suggestion,
-            locationData: locationData 
+            locationData: locationData,
+            hasNewBounties: !newBountiesSnapshot.empty // 【核心新增】回傳是否有新懸賞的標記
         });
     } catch (error) {
         res.status(500).json({ message: "讀取最新進度失敗。" });
@@ -210,7 +215,6 @@ router.post('/restart', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
         
-        // 【核心修改】刪除舊的個人化資料，現在還包括 location_states
         const collections = ['game_saves', 'npcs', 'game_state', 'skills', 'location_states', 'bounties'];
         for (const col of collections) {
             try {
