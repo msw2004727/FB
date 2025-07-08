@@ -47,7 +47,7 @@ const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
 const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
 const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
 const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
-const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js'); // 【核心新增】
+const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 
 
 // 統一的AI調度中心
@@ -247,7 +247,7 @@ async function getAICombatAction(playerModelChoice, playerProfile, combatState, 
 async function getAICombatSetup(playerAction, lastRoundData) {
     const prompt = getCombatSetupPrompt(playerAction, lastRoundData);
     try {
-        // 這個任務對邏輯要求很高，我們從中控檔案裡指定一個可靠的模型
+        // 【核心修改】讓這個任務也從 aiConfig 讀取設定
         const modelToUse = aiConfig.combatSetup || 'openai';
         const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
@@ -316,7 +316,9 @@ async function getAIRomanceEvent(playerProfile, npcProfile, eventType) {
 async function getAIEpilogue(playerData) {
     const prompt = getEpiloguePrompt(playerData);
     try {
-        const story = await callAI(aiConfig.epilogue, prompt, false);
+        // 【核心修改】讓結局生成也從 aiConfig 讀取設定
+        const modelToUse = aiConfig.epilogue || 'openai';
+        const story = await callAI(modelToUse, prompt, false);
         return story;
     } catch (error) {
         console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
@@ -390,7 +392,7 @@ module.exports = {
     getAIRandomEvent,
     getAINpcProfile,
     getAICombatAction,
-    getAICombatSetup, // 【核心新增】
+    getAICombatSetup,
     getAIChatResponse,
     getAIChatSummary,
     getAIGiveItemResponse,
