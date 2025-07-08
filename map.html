@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>江湖輿圖</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="styles/base.css">
+    <link rel="stylesheet" href="styles/novel.css">
+    <style>
+        /* 地圖頁面專用樣式 */
+        .map-container {
+            max-width: 1400px; /* 讓地圖有更寬的顯示區域 */
+            margin: 0 auto;
+            padding: 2rem;
+            text-align: center;
+        }
+        .mermaid-map-chart {
+            margin-top: 2rem;
+            padding: 2rem;
+            background-color: var(--light-surface-bg);
+            border: 1px solid var(--light-border);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 70vh;
+            overflow: auto; /* 允許地圖內容超出時可以滾動 */
+        }
+        body.dark-theme .mermaid-map-chart {
+            background-color: var(--dark-surface-bg);
+            border-color: var(--dark-border);
+        }
+        .loading-text {
+            font-family: var(--font-serif);
+            color: var(--light-text-secondary);
+        }
+        body.dark-theme .loading-text {
+            color: var(--dark-text-secondary);
+        }
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="light-theme">
+
+    <div class="map-container">
+        <header class="novel-header">
+            <h1 id="map-title">江湖輿圖</h1>
+            <p>記載著天下英雄豪傑所踏足的每一寸土地</p>
+            <a href="index.html" class="back-to-game-btn">
+                <i class="fas fa-arrow-left"></i> 返回遊戲
+            </a>
+        </header>
+
+        <main id="map-content" class="mermaid-map-chart">
+            <p class="loading-text">
+                <i class="fas fa-spinner fa-spin"></i>
+                正在向輿圖司請求最新的山川地圖...
+            </p>
+        </main>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: false,
+            theme: 'base',
+            themeVariables: {
+                background: '#FFFFFF',
+                primaryColor: '#f5f1ea',
+                primaryBorderColor: '#e0d8cd',
+                lineColor: '#8c6f54',
+                textColor: '#3a2d21',
+                secondaryColor: '#f5f1ea',
+            }
+        });
+        window.mermaid = mermaid;
+    </script>
+    
+    <script type="module" src="scripts/map.js"></script>
+</body>
+</html>
