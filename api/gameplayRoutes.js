@@ -17,8 +17,9 @@ const {
     getPlayerSkills,
     getFriendlinessLevel
 } = require('./gameHelpers');
-// 【核心修改】從世界引擎中，引入我們新的地點生成器
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
+// 【核心新增】引入我們新建立的檔案管理員
+const { processLocationUpdates } = require('./locationManager');
 
 const db = admin.firestore();
 
@@ -79,9 +80,18 @@ const interactRouteHandler = async (req, res) => {
         
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
-
+        
         const romanceEventToWeave = await checkAndTriggerRomanceEvent(userId, username, modelName);
 
+        // 【核心修改】在呼叫AI前，先獲取當前地點的詳細情境
+        const currentLocationName = lastSave.LOC?.[0];
+        let locationContext = null;
+        if (currentLocationName) {
+            const locationDoc = await db.collection('locations').doc(currentLocationName).get();
+            if (locationDoc.exists) {
+                locationContext = locationDoc.data();
+            }
+        }
 
         const contextForClassifier = {
             location: lastSave.LOC?.[0] || '未知之地',
@@ -125,7 +135,8 @@ const interactRouteHandler = async (req, res) => {
                 const preActionSkillChanges = req.body.skillChanges || [];
                 const levelUpEvents = await updateSkills(userId, preActionSkillChanges);
 
-                aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave);
+                // 【核心修改】將地點情境(locationContext)也一起傳給主故事AI
+                aiResponse = await getAIStory(modelName, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
         }
@@ -188,21 +199,22 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.combatInfo = { status: 'COMBAT_START', initialState: combatState };
         }
         
-        // 【核心修改】在所有資料處理完畢後，觸發地點生成器
-        if (aiResponse.roundData.LOC && aiResponse.roundData.LOC[0]) {
-            const newLocationName = aiResponse.roundData.LOC[0];
-            const newLocationDescription = aiResponse.roundData.LOC[1]?.description || '';
-            // 從描述中簡單推斷地點類型，以供AI參考
-            let locationType = '未知';
-            if (newLocationDescription.includes('村')) locationType = '村莊';
-            else if (newLocationDescription.includes('鎮')) locationType = '城鎮';
-            else if (newLocationDescription.includes('城')) locationType = '城市';
-            else if (newLocationDescription.includes('寨') || newLocationDescription.includes('山')) locationType = '山寨';
-            else if (newLocationDescription.includes('派') || newLocationDescription.includes('門') || newLocationDescription.includes('寺')) locationType = '門派';
+        // 【核心修改】將「世界動態演化系統」接入主循環
+        const { mentionedLocations, locationUpdates } = aiResponse.roundData;
 
-            // 執行背景生成，不需要等待它完成
-            generateAndCacheLocation(newLocationName, locationType, newSummary)
-                .catch(err => console.error(`[世界引擎] 地點 ${newLocationName} 的背景生成失敗:`, err));
+        // 1. 處理情報蒐集：如果有提及新地點，就在背景為其建檔
+        if (mentionedLocations && Array.isArray(mentionedLocations)) {
+            for (const locName of mentionedLocations) {
+                generateAndCacheLocation(locName, '未知', newSummary)
+                    .catch(err => console.error(`[世界引擎] 地點 ${locName} 的背景生成失敗:`, err));
+            }
+        }
+        
+        // 2. 處理卷宗更新：如果有地點狀態變更，就立刻更新資料庫
+        const currentLocationForUpdate = aiResponse.roundData.LOC?.[0];
+        if (locationUpdates && Array.isArray(locationUpdates) && currentLocationForUpdate) {
+            processLocationUpdates(currentLocationForUpdate, locationUpdates)
+                .catch(err => console.error(`[檔案管理員] 地點 ${currentLocationForUpdate} 的即時更新失敗:`, err));
         }
 
 
