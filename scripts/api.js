@@ -1,7 +1,6 @@
 // scripts/api.js
 import { backendBaseUrl } from './config.js';
 
-// 集中管理 API 的 fetch 呼叫
 async function fetchApi(endpoint, options = {}) {
     const token = localStorage.getItem('jwt_token');
     const headers = {
@@ -55,4 +54,7 @@ export const api = {
     // 【核心新增】GM Panel Routes
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
     updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
+    rebuildNpcForGM: (body) => fetchApi('/api/gm/rebuild-npc', { method: 'POST', body: JSON.stringify(body) }),
+    getLocationsForGM: () => fetchApi('/api/gm/locations'),
+    rebuildLocationForGM: (body) => fetchApi('/api/gm/rebuild-location', { method: 'POST', body: JSON.stringify(body) }),
 };
