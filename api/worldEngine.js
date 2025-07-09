@@ -44,7 +44,7 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
                 locationType: newLocationData.locationType,
                 description: newLocationData.description,
                 geography: newLocationData.geography,
-                "lore.history": newLocationData.lore.history // 只儲存靜態的歷史
+                "lore.history": (newLocationData.lore && newLocationData.lore.history) || '此地歷史已淹沒在歲月的長河中。'
             };
             
             const dynamicData = {
@@ -53,7 +53,7 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
                 demographics: newLocationData.demographics,
                 resources: newLocationData.resources,
                 infrastructure: newLocationData.infrastructure,
-                "lore.currentIssues": newLocationData.lore.currentIssues // 只儲存動態的當前問題
+                "lore.currentIssues": (newLocationData.lore && newLocationData.lore.currentIssues) || ['暫無江湖傳聞']
             };
 
             // 使用一個 "batch" 寫入，確保兩個檔案要嘛都成功，要嘛都失敗，保證資料一致性
