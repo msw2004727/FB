@@ -146,27 +146,6 @@ const interactRouteHandler = async (req, res) => {
         let romanceEventData = null;
 
         switch (classification.actionType) {
-            case 'ANACHRONISM':
-                const anachronismStory = await getAIAnachronismResponse(playerModelChoice, playerAction, classification.details.itemName);
-                aiResponse = {
-                    story: anachronismStory,
-                    roundData: {
-                        ...lastSave,
-                        R: lastSave.R, 
-                        story: anachronismStory,
-                        PC: "你從幻想中回過神來。",
-                        IMP: "你的思緒飄到了不屬於這個時代的地方。",
-                        EVT: "一陣恍神",
-                        powerChange: { internal: 0, external: 0, lightness: 0 },
-                        moralityChange: 0,
-                        itemChanges: [],
-                        romanceChanges: [],
-                        skillChanges: [],
-                        isAnachronism: true
-                    }
-                };
-                break;
-
             case 'COMBAT_ATTACK':
             case 'COMBAT_SPARRING': { 
                 const combatSetupResult = await getAICombatSetup(playerAction, lastSave);
@@ -207,7 +186,7 @@ const interactRouteHandler = async (req, res) => {
                 let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
                 const currentTimeOfDay = userProfile.timeOfDay || '上午';
                 const levelUpEvents = await updateSkills(userId, req.body.skillChanges || []);
-                const locationContext = await getMergedLocationData(userId, lastSave.LOC?.[0]);
+                const locationContext = await getMergedLocationData(userId, lastSave.LOC);
                 const npcContext = {};
                 if (lastSave.NPC && lastSave.NPC.length > 0) {
                     const npcPromises = lastSave.NPC.map(npcInScene => 
@@ -223,18 +202,6 @@ const interactRouteHandler = async (req, res) => {
                 aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
-        }
-
-        if (aiResponse.roundData.isAnachronism) {
-            const suggestion = await getAISuggestion(aiResponse.roundData);
-            const inventoryState = await getInventoryState(userId);
-            Object.assign(aiResponse.roundData, { ...inventoryState, ...userProfile, skills: skills });
-            return res.json({
-                story: aiResponse.story,
-                roundData: aiResponse.roundData,
-                suggestion: suggestion,
-                isAnachronism: true 
-            });
         }
         
         const newRoundNumber = (currentRound || 0) + 1;
@@ -363,7 +330,7 @@ const interactRouteHandler = async (req, res) => {
              userDocRef.update({
                 timeOfDay: aiResponse.roundData.timeOfDay,
                 internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness,
-                morality: newMorality, preferredModel: playerModelChoice
+                morality: newMorality
             }),
             summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
             userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData)
@@ -376,7 +343,7 @@ const interactRouteHandler = async (req, res) => {
             triggerBountyGeneration(userId, newSummary).catch(err => console.error("背景生成懸賞失敗:", err));
         }
 
-        aiResponse.locationData = await getMergedLocationData(userId, aiResponse.roundData.LOC?.[0]);
+        aiResponse.locationData = await getMergedLocationData(userId, aiResponse.roundData.LOC);
 
         if (!aiResponse.roundData.enterCombat && aiResponse.roundData.playerState !== 'dead') {
              aiResponse.proactiveChat = await proactiveChatEngine(userId, { ...userProfile, username }, aiResponse.roundData);
@@ -397,7 +364,6 @@ const interactRouteHandler = async (req, res) => {
     }
 };
 
-// 【核心修改】重構整個 combatActionRouteHandler 函式
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const { action, model: playerModelChoice } = req.body;
@@ -423,21 +389,18 @@ const combatActionRouteHandler = async (req, res) => {
         playerProfile.hp = combatState.player.hp;
         playerProfile.maxHp = combatState.player.maxHp;
 
-        // --- 武學使用驗證 ---
         const knownSkill = skills.find(s => action.includes(s.name) && s.level > 0);
         let combatResult;
 
         if (knownSkill) {
-            // 如果玩家使用了已知的、等級大於0的武學，正常呼叫AI
             combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, action);
         } else {
-            // 如果找不到對應武學或等級為0，伺服器直接生成失敗結果，繞過AI
             console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 試圖使用未知或未掌握的招式。`);
             combatResult = {
                 narrative: `你憑著記憶，試圖施展「${action}」，卻只覺劍招散亂，不成章法，破綻百出。`,
-                damageDealt: [], // 沒有造成傷害
-                enemies: combatState.enemies, // 敵人狀態不變
-                allies: combatState.allies, // 盟友狀態不變
+                damageDealt: [],
+                enemies: combatState.enemies,
+                allies: combatState.allies,
                 combatOver: false
             };
         }
