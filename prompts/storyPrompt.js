@@ -9,8 +9,8 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-// 【核心修改】函式簽名新增 npcContext 參數
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}) => {
+// 函式簽名新增 npcContext 和 playerBulkScore 參數
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -42,6 +42,19 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const npcContextInstruction = Object.keys(npcContext).length > 0
         ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的**個性(personality)、秘密(secrets)和目標(goals)**，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！\n\`\`\`json\n${JSON.stringify(npcContext, null, 2)}\n\`\`\``
         : '';
+
+    // 敘事負重系統的規則
+    const encumbranceInstruction = `
+## 【核心新增】敘事負重系統 (Narrative Encumbrance System)
+你的描述必須考慮玩家的負重程度。玩家當前的「份量分數」為: **${playerBulkScore}**。
+
+* **輕裝上陣 (0-5分)**：當玩家負重很低時，你的描述應體現其**輕盈與敏捷**。例如在描述輕功或追逐時，可以加入「你身輕如燕，幾個起落便消失在林間」之類的文字。
+* **略有份量 (6-15分)**：這是正常狀態，無需特別描述。
+* **重物纏身 (16-30分)**：當玩家負重較高時，你的描述必須隱晦地體現其**遲緩與不便**。例如：「你背著沉重的行囊，感覺體力消耗得更快了，腳步也有些踉蹌。」或是在需要敏捷的場合描述「身上的重物讓你有些施展不開」。
+* **不堪重負 (>30分)**：當玩家負重極高時，你的描述必須**強烈地**表現出負面效果。例如：「你每走一步都感到氣喘吁吁，身上沉重的負擔讓你幾乎抬不起頭。」在戰鬥或需要快速反應時，這應該成為一個**巨大的劣勢**。
+
+**此規則是為了增加遊戲的真實感，你不需要直接告訴玩家他的負重分數，而是要將其影響巧妙地融入到故事敘述之中。**
+`;
 
     const playerAttributeRules = getPlayerAttributeRule({
         currentDateString,
@@ -95,6 +108,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
 ${dyingInstruction}
 ${romanceInstruction}
+${encumbranceInstruction}
 ${locationContextInstruction}
 ${npcContextInstruction}
 ${systemInteractionRules}
@@ -137,7 +151,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是「現代回想與NPC反應系統」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「現代回想與NPC反應系統」和「敘事負重系統」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
 `;
 };
 
