@@ -24,20 +24,18 @@
 }
 
 .combat-modal-content {
-    position: relative;
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 12px;
     width: 90%;
-    max-width: 900px; /* 加寬以容納新佈局 */
-    height: 85%;
-    max-height: 700px;
-    display: flex; /* 改為 flex 佈局 */
-    flex-direction: row; /* 水平排列 */
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    max-width: 950px;
+    height: 700px;
+    display: flex;
+    flex-direction: row; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    overflow: hidden;
     transform: scale(0.95);
     transition: transform 0.3s ease;
-    overflow: hidden; /* 防止內部元素溢出 */
 }
 
 .combat-modal-overlay.visible .combat-modal-content {
@@ -49,7 +47,8 @@ body.dark-theme .combat-modal-content {
     border-color: var(--dark-border);
 }
 
-/* 左側儀表板 */
+
+/* --- 左側儀表板 (陣營名單) --- */
 .combat-dashboard {
     width: 240px;
     flex-shrink: 0;
@@ -59,71 +58,102 @@ body.dark-theme .combat-modal-content {
     padding: 1rem;
     gap: 1rem;
     overflow-y: auto;
+    background-color: var(--light-surface-bg);
 }
 body.dark-theme .combat-dashboard {
+    background-color: var(--dark-surface-bg);
     border-right-color: var(--dark-border);
 }
 
-.roster-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
 .roster-panel h4 {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.75rem 0;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--light-border);
     color: var(--light-accent);
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
 }
 body.dark-theme .roster-panel h4 {
     border-bottom-color: var(--dark-border);
     color: var(--dark-accent);
 }
 
+/* 角色卡片樣式 */
 .character-card {
-    background: var(--light-surface-bg);
+    background: var(--light-bg);
     border: 1px solid var(--light-border);
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 body.dark-theme .character-card {
-    background: var(--dark-surface-bg);
+    background-color: var(--dark-bg);
     border-color: var(--dark-border);
 }
-#allies-roster .character-card {
-    border-left: 3px solid #28a745;
-}
-#enemies-roster .character-card {
-    border-left: 3px solid #dc3545;
-}
-.character-name {
+
+.character-info { flex-grow: 1; }
+.character-name { font-weight: bold; font-size: 1rem; margin-bottom: 0.25rem; }
+
+.tags-container { display: flex; gap: 0.25rem; }
+.trait-tag {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: white;
     font-weight: bold;
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
 }
+.tag-attack { background-color: #c92a2a; }
+.tag-defend { background-color: #0d6efd; }
+.tag-support { background-color: #fd7e14; }
+.tag-heal { background-color: #20c997; }
+
+.stats-bars-container { flex-shrink: 0; width: 100px; }
 .hp-bar-container, .mp-bar-container {
-    height: 10px;
+    position: relative;
+    height: 16px;
     background-color: var(--light-border);
-    border-radius: 5px;
+    border-radius: 4px;
     overflow: hidden;
     margin-bottom: 0.25rem;
 }
+body.dark-theme .hp-bar-container, body.dark-theme .mp-bar-container {
+    background-color: var(--dark-border);
+}
+
 .hp-bar-fill, .mp-bar-fill {
     height: 100%;
     width: 100%;
-    border-radius: 5px;
-    transition: width 0.4s ease;
+    border-radius: 4px;
+    transition: width 0.5s ease;
 }
 .hp-bar-fill { background-color: #28a745; }
-.mp-bar-fill { background-color: #0d6efd; }
 #enemies-roster .hp-bar-fill { background-color: #dc3545; }
+.mp-bar-fill { background-color: #0d6efd; }
 
+.bar-value-text {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.6);
+}
 
-/* 右側主面板 */
+/* --- 右側主面板 (戰鬥日誌 + 操作區) --- */
 .combat-main-panel {
     flex-grow: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: column; 
+    background-color: var(--light-bg);
+}
+body.dark-theme .combat-main-panel {
+    background-color: var(--dark-bg);
 }
 
 .combat-log-area {
@@ -132,129 +162,133 @@ body.dark-theme .character-card {
     overflow-y: auto;
     font-family: var(--font-serif);
     line-height: 1.8;
+    font-size: 1.05rem;
 }
 
-.combat-log-area p {
-    margin: 0 0 1rem 0;
+.combat-log-area p { margin: 0 0 1rem 0; }
+
+.combat-actions-container {
+    flex-shrink: 0;
+    background: var(--light-surface-bg);
+    border-top: 1px solid var(--light-border);
+}
+body.dark-theme .combat-actions-container {
+    background: var(--dark-surface-bg);
+    border-top-color: var(--dark-border);
 }
 
 .combat-turn-counter {
     text-align: center;
-    padding: 0.5rem;
+    padding: 0.4rem;
     font-family: var(--font-serif);
     font-weight: bold;
+    font-size: 0.9rem;
     color: var(--light-text-secondary);
-    border-top: 1px solid var(--light-border);
     border-bottom: 1px solid var(--light-border);
 }
 body.dark-theme .combat-turn-counter {
     color: var(--dark-text-secondary);
-    border-color: var(--dark-border);
+    border-bottom-color: var(--dark-border);
 }
 
 .combat-actions-panel {
     display: flex;
-    background: var(--light-surface-bg);
-    padding: 1rem;
-    gap: 1rem;
-}
-body.dark-theme .combat-actions-panel {
-    background: var(--dark-surface-bg);
+    padding: 0.75rem;
+    gap: 0.75rem;
+    align-items: stretch;
 }
 
-/* 策略按鈕區 */
-.strategy-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
+.strategy-buttons { display: flex; flex-direction: column; gap: 0.25rem; }
 .strategy-btn {
-    padding: 1rem 1.5rem;
-    font-size: 1.1rem;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.9rem;
     font-weight: bold;
-    border: 1px solid var(--light-border);
+    border: 2px solid var(--light-border);
     background: transparent;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--light-text-primary);
 }
 body.dark-theme .strategy-btn {
     color: var(--dark-text-primary);
     border-color: var(--dark-border);
 }
-.strategy-btn.selected, .strategy-btn:hover {
-    background: var(--light-accent);
-    color: #fff;
-    border-color: var(--light-accent);
-}
-body.dark-theme .strategy-btn.selected, body.dark-theme .strategy-btn:hover {
-    background: var(--dark-accent);
-    color: var(--dark-bg);
-    border-color: var(--dark-accent);
-}
+.strategy-btn:hover { border-color: var(--light-accent); background-color: var(--light-bg); }
+body.dark-theme .strategy-btn:hover { background-color: var(--dark-bg); border-color: var(--dark-accent); }
+.strategy-btn.selected { background: var(--light-accent); color: #fff; border-color: var(--light-accent); }
+body.dark-theme .strategy-btn.selected { background-color: var(--dark-accent); color: var(--dark-bg); }
 
-/* 武學列表區 */
 .skill-selection {
     flex-grow: 1;
-    border: 1px solid var(--light-border);
-    border-radius: 6px;
-    padding: 0.5rem;
+    border: 2px dashed var(--light-border);
+    border-radius: 8px;
+    padding: 0.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.25rem;
     overflow-y: auto;
-    max-height: 150px;
+    min-height: 100px;
+    max-width: 400px;
 }
 body.dark-theme .skill-selection {
     border-color: var(--dark-border);
 }
+
 .skill-btn {
     display: flex;
     justify-content: space-between;
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.7rem;
     text-align: left;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--light-text-primary);
 }
 body.dark-theme .skill-btn {
     color: var(--dark-text-primary);
 }
-.skill-btn .skill-name { font-weight: bold; }
-.skill-btn .skill-cost { color: var(--light-text-secondary); }
+.skill-btn:hover { background-color: var(--light-bg); border-color: var(--light-border); }
+body.dark-theme .skill-btn:hover { background-color: var(--dark-bg); border-color: var(--dark-border); }
+.skill-btn.selected { background-color: var(--light-accent); color: #fff; border-color: var(--light-accent); }
+body.dark-theme .skill-btn.selected { background-color: var(--dark-accent); color: var(--dark-bg); }
+.skill-btn .skill-name { font-weight: bold; font-size: 0.85rem; }
+.skill-btn .skill-cost { color: var(--light-text-secondary); font-size: 0.75rem; }
 body.dark-theme .skill-btn .skill-cost { color: var(--dark-text-secondary); }
-.skill-btn.selected, .skill-btn:hover {
-    background-color: var(--light-bg);
-    border-color: var(--light-border);
+.skill-btn.selected .skill-cost { color: #fff; opacity: 0.8; }
+
+.skill-selection .system-message {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    color: var(--light-text-secondary);
+    font-style: italic;
 }
-body.dark-theme .skill-btn.selected, body.dark-theme .skill-btn:hover {
-    background-color: var(--dark-bg);
-    border-color: var(--dark-border);
+body.dark-theme .skill-selection .system-message {
+    color: var(--dark-text-secondary);
 }
 
-/* 確認按鈕區 */
-.confirm-action {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+.confirm-action { display: flex; align-items: stretch; justify-content: center; }
 .confirm-btn {
-    padding: 1rem 2rem;
-    height: 100%;
-    background: #198754;
+    padding: 0.5rem 1.2rem;
+    background: #28a745;
     color: #fff;
     border: none;
-    border-radius: 6px;
-    font-size: 1.2rem;
+    border-radius: 8px;
+    font-size: 1rem;
     font-weight: bold;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
-.confirm-btn:disabled {
-    background: var(--light-text-secondary);
-    cursor: not-allowed;
-}
+.confirm-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(1.02); }
+.confirm-btn:disabled { background: var(--light-text-secondary); cursor: not-allowed; opacity: 0.5; }
 
 /* 戰鬥讀取動畫 */
 .combat-loader-overlay {
@@ -280,6 +314,7 @@ body.dark-theme .skill-btn.selected, body.dark-theme .skill-btn:hover {
 .combat-loader-overlay .loader-dots span {
     background-color: #fff;
 }
+
 
 /* --- 對話彈窗樣式 (保留不變) --- */
 .chat-modal-overlay {
@@ -604,4 +639,31 @@ body.dark-theme .friendliness-bar-background {
 body.dark-theme .friendliness-bar-indicator {
     background-color: var(--dark-surface-bg);
     border-color: var(--dark-text-primary);
+}
+
+/* 窄視窗響應式設計 */
+@media (max-width: 768px) {
+    .combat-modal-content {
+        flex-direction: column; 
+    }
+    .combat-dashboard { 
+        width: 100%; 
+        border-right: none; 
+        border-bottom: 1px solid var(--light-border); 
+        flex-shrink: 0; 
+        max-height: 40%;
+    }
+    .combat-actions-panel { 
+        flex-direction: column; 
+    }
+    .strategy-buttons { 
+        flex-direction: row; 
+    }
+    .strategy-btn { 
+        flex-grow: 1; 
+        justify-content: center; 
+    }
+    .skill-selection { 
+        max-width: 100%; 
+    }
 }
