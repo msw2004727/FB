@@ -1,0 +1,211 @@
+/* styles/trade.css */
+
+/* --- 交易彈窗主樣式 --- */
+.modal-content.extra-wide {
+    max-width: 1200px; /* 讓交易視窗更寬敞 */
+    height: 85%;
+    max-height: 800px;
+}
+
+#trade-header {
+    text-align: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+    position: relative;
+}
+
+body.dark-theme #trade-header {
+    border-bottom-color: var(--dark-border);
+}
+
+#trade-header h2 {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    margin: 0;
+    color: var(--light-accent);
+}
+
+#trade-main {
+    display: flex;
+    flex-grow: 1;
+    padding: 1rem;
+    gap: 1rem;
+    overflow: hidden; /* 防止子元素溢出 */
+}
+
+/* --- 左右交易面板 (玩家/NPC) --- */
+.trade-panel {
+    width: 35%;
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+body.dark-theme .trade-panel {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+}
+
+.trade-party-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--light-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+}
+
+body.dark-theme .trade-party-header {
+    border-bottom-color: var(--dark-border);
+}
+
+.trade-party-header .money-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    color: var(--light-accent);
+}
+
+body.dark-theme .trade-party-header .money-display {
+    color: var(--dark-accent);
+}
+
+.trade-inventory-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.trade-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.trade-item:hover {
+    background-color: var(--light-surface-bg);
+}
+body.dark-theme .trade-item:hover {
+    background-color: var(--dark-surface-bg);
+}
+
+.trade-item-name {
+    font-weight: bold;
+}
+
+.trade-item-quantity {
+    color: var(--light-text-secondary);
+    font-size: 0.9rem;
+}
+
+.empty-inventory {
+    text-align: center;
+    color: var(--light-text-secondary);
+    padding-top: 2rem;
+    font-style: italic;
+}
+
+/* --- 中央交易操作區 --- */
+.trade-center-panel {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.trade-offer-area {
+    height: 40%;
+    border: 1px dashed var(--light-border);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+body.dark-theme .trade-offer-area {
+    border-color: var(--dark-border);
+}
+
+.trade-offer-area h4 {
+    margin: 0 0 1rem 0;
+    text-align: center;
+    color: var(--light-text-secondary);
+    font-family: var(--font-serif);
+}
+
+.offer-items-list {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.offer-money-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--light-border);
+}
+
+body.dark-theme .offer-money-input {
+    border-top-color: var(--dark-border);
+}
+
+.offer-money-input input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--light-text-primary);
+    font-size: 1rem;
+    padding: 0.25rem;
+    text-align: right;
+}
+.offer-money-input input:focus {
+    outline: none;
+}
+body.dark-theme .offer-money-input input {
+    color: var(--dark-text-primary);
+}
+
+
+.trade-summary {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+}
+
+#trade-value-diff {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--light-text-secondary);
+    padding: 0.5rem 1rem;
+    background-color: var(--light-bg);
+    border-radius: 6px;
+}
+body.dark-theme #trade-value-diff {
+    background-color: var(--dark-bg);
+    color: var(--dark-text-secondary);
+}
+
+#trade-value-diff.positive {
+    color: #28a745; /* 綠色 */
+}
+#trade-value-diff.negative {
+    color: #dc3545; /* 紅色 */
+}
+
+#confirm-trade-btn {
+    width: 80%;
+    padding: 0.8rem;
+    font-size: 1.1rem;
+}
