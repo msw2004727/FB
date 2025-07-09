@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (showGlobalLoader) {
             rotateTip();
-            tipInterval = setInterval(rotateTip, 15000);
+            tipInterval = setInterval(rotateTip, 10000);
         } else {
             clearInterval(tipInterval);
         }
