@@ -1,7 +1,8 @@
 // api/itemManager.js
 const admin = require('firebase-admin');
 const { getItemGeneratorPrompt } = require('../prompts/itemGeneratorPrompt.js');
-const { callAI } = require('../services/aiService');
+// 【核心修改】從 aiService 引入 aiConfig
+const { callAI, aiConfig } = require('../services/aiService');
 
 const db = admin.firestore();
 
@@ -14,12 +15,11 @@ const db = admin.firestore();
 async function getOrGenerateItemTemplate(itemName) {
     if (!itemName) return null;
 
-    // 將物品名稱轉換為安全的文檔ID（例如："金瘡藥" -> "item_jin_chuang_yao"）
-    const docId = `item_${itemName.replace(/\s/g, '_')}`;
-    const templateRef = db.collection('items').doc(docId);
+    // 【核心修改】直接使用物品名稱作為文檔ID，更清晰
+    const templateRef = db.collection('items').doc(itemName);
 
     try {
-        let doc = await templateRef.get();
+        const doc = await templateRef.get();
 
         // 如果設計圖已存在，直接回傳
         if (doc.exists) {
@@ -29,12 +29,19 @@ async function getOrGenerateItemTemplate(itemName) {
         // 如果不存在，呼叫「神級工匠AI」進行設計
         console.log(`[神兵閣] 物品「${itemName}」的設計圖不存在，啟動AI生成...`);
         const prompt = getItemGeneratorPrompt(itemName);
-        // 我們可以使用一個穩定且富有創造力的模型來設計物品
-        const itemJsonString = await callAI('deepseek', prompt, true); 
+        
+        // 【核心修改】使用中央設定檔來決定AI模型
+        const modelToUse = aiConfig.itemTemplate || 'openai';
+        const itemJsonString = await callAI(modelToUse, prompt, true); 
         const newTemplateData = JSON.parse(itemJsonString);
 
         if (!newTemplateData.itemName) {
             throw new Error('AI生成的物品模板缺少必要的itemName欄位。');
+        }
+
+        // 【核心新增】處理 createdAt 時間戳
+        if (newTemplateData.createdAt === "CURRENT_TIMESTAMP") {
+            newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         }
 
         // 將新的設計圖存入'items'集合中
@@ -42,8 +49,8 @@ async function getOrGenerateItemTemplate(itemName) {
         console.log(`[神兵閣] 成功為「${itemName}」建立並儲存了設計圖。`);
         
         // 再次獲取以確保返回的是資料庫中的最新版本
-        doc = await templateRef.get();
-        return doc.data();
+        const newDoc = await templateRef.get();
+        return newDoc.data();
 
     } catch (error) {
         console.error(`[神兵閣] 在處理物品「${itemName}」的設計圖時發生錯誤:`, error);
