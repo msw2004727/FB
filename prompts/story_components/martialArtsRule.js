@@ -10,6 +10,13 @@ const getMartialArtsRule = () => {
 ### 情況一：初學乍練 (Newly Acquired)
 當玩家透過奇遇、閱讀秘笈、高人指點、自行頓悟或拼湊招式等方式，**首次學會**一門新的武學時，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 **\`skillChanges\`** 的**陣列**。
 
+**【分類鐵律】**: 你必須根據武學的名稱和描述，為其指定一個 \`combatCategory\`。
+-   **攻擊**: 直接造成傷害的招式 (如：劍法、拳法、掌法)。
+-   **防禦**: 用於格檔、減傷、提升防禦能力的招式 (如：金鐘罩、鐵布衫、格檔架式)。
+-   **迴避**: 用於閃躲、提升速度或拉開距離的招式 (如：凌波微步、草上飛)。
+-   **輔助**: 提供增益效果(Buff)或對敵人施加減益效果(Debuff)的招式 (如：提升攻擊力的心法、降低敵人速度的陣法)。
+-   **治癒**: 用於恢復自身或隊友氣血、療癒內傷的招式 (如：回春術、療傷心法)。
+
 **【初始等級判斷鐵律】**: 你必須根據**學會方式**，決定一個合理的初始等級 \`level\`。
 -   **自創武學**：初始等級**必須**為 \`level: 0\`。
 -   **閱讀普通秘笈**：初始等級應為 \`level: 1\`。
@@ -23,6 +30,7 @@ const getMartialArtsRule = () => {
   "isNewlyAcquired": true,
   "skillName": "武學的準確名稱",
   "skillType": "內功 | 外功 | 輕功 | 拳腳 | 兵器 | 暗器 | 醫術 | 毒術 | 雜學",
+  "combatCategory": "攻擊 | 防禦 | 迴避 | 輔助 | 治癒",
   "power_type": "internal | external | lightness | none",
   "max_level": <這門武學的潛力上限等級，例如 5 或 10>,
   "level": <你判斷出的初始等級>,
@@ -31,7 +39,7 @@ const getMartialArtsRule = () => {
 }
 \`\`\`
 **範例：**
-\`"skillChanges": [{"isNewlyAcquired": true, "skillName": "羅漢拳", "skillType": "拳腳", "power_type": "external", "max_level": 10, "level": 1, "exp": 0, "description": "少林寺入門拳法，招式大開大闔。"}]\`
+\`"skillChanges": [{"isNewlyAcquired": true, "skillName": "羅漢拳", "skillType": "拳腳", "combatCategory": "攻擊", "power_type": "external", "max_level": 10, "level": 1, "exp": 0, "description": "少林寺入門拳法，招式大開大闔。"}]\`
 
 ### 情況二：勤學苦練 (Practice)
 當玩家對一門**已經學會**的武學進行修練時（例如「我閉關打坐」、「在瀑布下苦練劍法」），你的 \`skillChanges\` 陣列中的物件結構應改為如下：
