@@ -585,7 +585,7 @@ body.dark-theme @keyframes pulse-glow {
 
 #bounties-btn.has-new-bounty {
     animation: pulse-glow 2s infinite;
-    border-color: #ffc107; /* 讓按鈕本身也亮一點來搭配光暈 */
+    border-color: #ffc107;
     color: #ffc107;
 }
 
@@ -672,4 +672,22 @@ body.dark-theme .npc-interaction-btn.attack {
 body.dark-theme .npc-interaction-btn.attack:hover {
     background-color: #4d2b33;
     border-color: #ff6b6b;
+}
+
+/* 【核心新增】針對窄視窗的互動選單樣式 */
+@media (max-width: 768px) {
+    .npc-interaction-menu {
+        position: fixed; /* 固定在視窗上 */
+        bottom: 80px; /* 放在輸入框上方 */
+        left: 50%;
+        transform: translateX(-50%);
+        top: auto; /* 取消 JS 計算的 top */
+        padding: 0.75rem;
+        gap: 0.75rem;
+    }
+
+    .npc-interaction-btn {
+        padding: 0.8rem 1.2rem;
+        font-size: 1rem;
+    }
 }
