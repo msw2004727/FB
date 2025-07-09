@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const combatInput = document.getElementById('combat-input');
     const combatActionButton = document.getElementById('combat-action-btn');
     const combatSurrenderBtn = document.getElementById('combat-surrender-btn'); 
+    const storyPanel = document.getElementById('story-panel');
     const storyTextContainer = document.getElementById('story-text-wrapper');
+    const npcInteractionMenu = document.getElementById('npc-interaction-menu');
     const chatInput = document.getElementById('chat-input');
     const chatActionBtn = document.getElementById('chat-action-btn');
     const closeChatBtn = document.getElementById('close-chat-btn');
@@ -175,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 事件處理函式 ---
     async function handlePlayerAction() {
+        hideNpcInteractionMenu(); // 任何玩家主動輸入都關閉選單
         const startTime = performance.now();
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
@@ -182,12 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (actionText.toUpperCase() === '/*GM') {
             playerInput.value = '';
             gmPanel.classList.add('visible');
-            const activeMenu = gmMenu.querySelector('a.active');
-            if (activeMenu) {
-                const targetPageId = activeMenu.getAttribute('href').substring(1);
-                // The loading functions are now inside gmManager, so we trigger them from there.
-                // This logic is now handled by the click listener on the gmMenu itself.
-            }
             return;
         }
 
@@ -327,28 +324,84 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoadingState(false);
     }
 
-    async function handleNpcClick(event) {
-        const target = event.target.closest('.npc-name');
-        if (target && !gameState.isRequesting) {
-            const npcName = target.dataset.npcName || target.textContent;
-            setLoadingState(true, '正在查找此人檔案...');
-            try {
-                const profile = await api.getNpcProfile(npcName);
-                gameState.isInChat = true;
-                gameState.currentChatNpc = profile.name;
-                gameState.chatHistory = [];
-                modal.openChatModalUI(profile);
-                chatInput.focus();
-            } catch (error) {
-                if (error.message && error.message.includes('並未見到')) {
-                    appendMessageToStory(error.message, 'system-message');
-                } else {
-                    handleApiError(error);
-                }
-            } finally {
-                setLoadingState(false);
+    // --- 重構NPC點擊相關的所有邏輯 ---
+    function hideNpcInteractionMenu() {
+        npcInteractionMenu.classList.remove('visible');
+    }
+
+    function showNpcInteractionMenu(targetElement, npcName) {
+        const rect = targetElement.getBoundingClientRect();
+        const panelRect = storyPanel.getBoundingClientRect();
+        
+        npcInteractionMenu.style.top = `${rect.bottom - panelRect.top + storyPanel.scrollTop + 5}px`;
+        npcInteractionMenu.style.left = `${rect.left - panelRect.left}px`;
+
+        npcInteractionMenu.innerHTML = `
+            <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
+            <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
+        `;
+        
+        npcInteractionMenu.classList.add('visible');
+
+        npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
+        npcInteractionMenu.querySelector('.attack').addEventListener('click', handleAttackButtonClick);
+    }
+
+    async function handleChatButtonClick(event) {
+        const npcName = event.currentTarget.dataset.npcName;
+        hideNpcInteractionMenu();
+        if (gameState.isRequesting) return;
+        setLoadingState(true, '正在查找此人檔案...');
+        try {
+            const profile = await api.getNpcProfile(npcName);
+            gameState.isInChat = true;
+            gameState.currentChatNpc = profile.name;
+            gameState.chatHistory = [];
+            modal.openChatModalUI(profile);
+            chatInput.focus();
+        } catch (error) {
+            if (error.message && error.message.includes('並未見到')) {
+                appendMessageToStory(error.message, 'system-message');
+            } else {
+                handleApiError(error);
+            }
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+    async function handleAttackButtonClick(event) {
+        const npcName = event.currentTarget.dataset.npcName;
+        hideNpcInteractionMenu();
+        if (gameState.isRequesting) return;
+        
+        setLoadingState(true, `準備與 ${npcName} 對決...`);
+        try {
+            const data = await api.initiateCombat({ targetNpcName: npcName, isSparring: false });
+            if (data.status === 'COMBAT_START') {
+                startCombat(data.initialState);
+            }
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            if (!gameState.isInCombat) {
+                 setLoadingState(false);
             }
         }
+    }
+
+    function handleNpcClick(event) {
+        const target = event.target.closest('.npc-name');
+        
+        if (!target || npcInteractionMenu.contains(event.target)) {
+            if (!event.target.closest('.npc-interaction-menu')) {
+                 hideNpcInteractionMenu();
+            }
+            return;
+        }
+
+        const npcName = target.dataset.npcName || target.textContent;
+        showNpcInteractionMenu(target, npcName);
     }
 
     async function sendChatMessage() {
@@ -492,6 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         suicideButton.addEventListener('click', async () => {
+            hideNpcInteractionMenu();
             if (gameState.isRequesting) return;
             if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) { 
                 setLoadingState(true, '英雄末路，傳奇落幕...');
@@ -508,6 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (skillsBtn) {
             skillsBtn.addEventListener('click', async () => {
+                hideNpcInteractionMenu();
                 if (gameState.isRequesting) return;
                 setLoadingState(true, '獲取武學資料...');
                 try {
@@ -527,19 +582,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (bountiesBtn) {
             bountiesBtn.addEventListener('click', () => {
+                hideNpcInteractionMenu();
                 updateBountyButton(false);
             });
         }
 
         initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent);
 
-
         submitButton.addEventListener('click', handlePlayerAction);
         playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
         combatActionButton.addEventListener('click', handleCombatAction);
         combatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handleCombatAction(); } });
         combatSurrenderBtn.addEventListener('click', handleSurrender); 
-        storyTextContainer.addEventListener('click', handleNpcClick);
+        storyPanel.addEventListener('click', handleNpcClick);
         chatActionBtn.addEventListener('click', sendChatMessage);
         chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendChatMessage(); } });
         closeChatBtn.addEventListener('click', () => {
