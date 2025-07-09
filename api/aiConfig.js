@@ -21,14 +21,14 @@ const aiConfig = {
     // --- 核心故事與敘事 ---
     story: 'openai',          // 主線故事生成器
     narrative: 'openai',      // 將數據轉換為小說旁白
-    prequel: 'openai',        // 前情提要生成器
-    epilogue: 'openai',     // 角色結局（身後事）生成器
-    deathCause: 'openai',   // 為自殺角色生成一個合理的死因
+    prequel: 'grok',        // 前情提要生成器
+    epilogue: 'deepseek',     // 角色結局（身後事）生成器
+    deathCause: 'deepseek',   // 為自殺角色生成一個合理的死因
 
     // --- 遊戲邏輯與數據處理 ---
     summary: 'openai',        // 將回合數據總結為長期記憶
     actionClassifier: 'openai',// 玩家行動意圖分類器
-    suggestion: 'openai',   // 書僮的行動建議
+    suggestion: 'grok',   // 書僮的行動建議
     
     // --- 戰鬥相關 ---
     combat: 'openai',       // 戰鬥過程裁決
