@@ -62,7 +62,7 @@ body.dark-theme .info-card h4 {
     line-height: 1.7; 
 }
 
-/* 【核心新增】瀕死倒數計時器樣式 */
+/* 瀕死倒數計時器樣式 */
 @keyframes pulse-red {
     0% {
         transform: scale(1);
@@ -95,7 +95,7 @@ body.dark-theme .death-countdown {
 }
 
 
-/* 【核心新增】地點資訊欄的專屬樣式 */
+/* 地點資訊欄的專屬樣式 */
 #location-info .location-ruler {
     font-weight: bold;
     color: var(--light-text-primary);
@@ -558,7 +558,7 @@ body.dark-theme #itm-content > div {
     border-color: var(--dark-border);
 }
 
-/* --- 【核心新增】懸賞按鈕發光提示 --- */
+/* --- 懸賞按鈕發光提示 --- */
 @keyframes pulse-glow {
     0% {
         box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
@@ -592,4 +592,84 @@ body.dark-theme @keyframes pulse-glow {
 body.dark-theme #bounties-btn.has-new-bounty {
     border-color: #ffca2c;
     color: #ffca2c;
+}
+
+/* --- NPC 互動選單樣式 --- */
+.npc-interaction-menu {
+    position: absolute;
+    background-color: var(--light-surface-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 50; /* 確保在故事文字之上 */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+}
+
+.npc-interaction-menu.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+body.dark-theme .npc-interaction-menu {
+    background-color: #31313a;
+    border-color: var(--dark-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.npc-interaction-btn {
+    background: none;
+    border: 1px solid var(--light-border);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+body.dark-theme .npc-interaction-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn:hover {
+    background-color: var(--light-bg);
+}
+
+body.dark-theme .npc-interaction-btn:hover {
+    background-color: var(--dark-surface-bg);
+}
+
+.npc-interaction-btn.chat {
+    color: var(--light-text-primary);
+}
+body.dark-theme .npc-interaction-btn.chat {
+    color: var(--dark-text-primary);
+}
+
+.npc-interaction-btn.attack {
+    color: #c92a2a;
+}
+body.dark-theme .npc-interaction-btn.attack {
+    color: #ff6b6b;
+}
+
+.npc-interaction-btn.attack:hover {
+    background-color: #fff5f5;
+    border-color: #c92a2a;
+}
+body.dark-theme .npc-interaction-btn.attack:hover {
+    background-color: #4d2b33;
+    border-color: #ff6b6b;
 }
