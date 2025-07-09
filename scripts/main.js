@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const actionText = playerInput.value.trim();
         if (!actionText || gameState.isRequesting) return;
 
-        if (actionText.toUpperCase() === '/GM') {
+        if (actionText.toUpperCase() === '/*GM') {
             playerInput.value = '';
             gmPanel.classList.add('visible');
             const activeMenu = gmMenu.querySelector('a.active');
