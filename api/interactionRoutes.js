@@ -41,31 +41,33 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
     const playerLocation = finalRoundData.LOC[0];
     if (!playerLocation) return null;
 
-    const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs')
+    const npcsSnapshot = await db.collection('users').doc(userId).collection('npc_states')
         .where('currentLocation', '==', playerLocation)
         .get();
 
     if (npcsSnapshot.empty) return null;
     
     for (const npcDoc of npcsSnapshot.docs) {
-        const npcProfile = npcDoc.data();
-        const npcId = npcDoc.id;
+        const npcState = npcDoc.data();
+        const npcName = npcDoc.id;
+        const npcProfile = await getMergedNpcProfile(userId, npcName);
+        if (!npcProfile) continue;
         
-        if (!npcProfile.triggeredProactiveEvents) {
-            npcProfile.triggeredProactiveEvents = [];
+        if (!npcState.triggeredProactiveEvents) {
+            npcState.triggeredProactiveEvents = [];
         }
 
         let triggerEvent = null;
 
-        const trustEventId = `trust_${npcId}`;
-        if (npcProfile.friendlinessValue >= 70 && !npcProfile.triggeredProactiveEvents.includes(trustEventId)) {
+        const trustEventId = `trust_${npcName}`;
+        if (npcState.friendlinessValue >= 70 && !npcState.triggeredProactiveEvents.includes(trustEventId)) {
             triggerEvent = { type: 'TRUST_BREAKTHROUGH', details: '友好度達到信賴' };
-            npcProfile.triggeredProactiveEvents.push(trustEventId);
+            npcState.triggeredProactiveEvents.push(trustEventId);
         }
-        const romanceEventId = `romance_${npcId}`;
-        if (!triggerEvent && npcProfile.romanceValue >= 50 && !npcProfile.triggeredProactiveEvents.includes(romanceEventId)) {
+        const romanceEventId = `romance_${npcName}`;
+        if (!triggerEvent && npcState.romanceValue >= 50 && !npcState.triggeredProactiveEvents.includes(romanceEventId)) {
             triggerEvent = { type: 'ROMANCE_BREAKTHROUGH', details: '心動值達到曖昧' };
-            npcProfile.triggeredProactiveEvents.push(romanceEventId);
+            npcState.triggeredProactiveEvents.push(romanceEventId);
         }
 
         if (triggerEvent) {
@@ -73,7 +75,7 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
             
             const proactiveChatResult = await getAIProactiveChat(playerProfile, npcProfile, triggerEvent);
 
-            await npcDoc.ref.update({ triggeredProactiveEvents: npcProfile.triggeredProactiveEvents });
+            await npcDoc.ref.update({ triggeredProactiveEvents: npcState.triggeredProactiveEvents });
             
             await gameStateRef.set({ proactiveChatCooldown: PROACTIVE_CHAT_COOLDOWN }, { merge: true });
 
@@ -169,13 +171,11 @@ const interactRouteHandler = async (req, res) => {
         const locationContext = await getMergedLocationData(userId, lastSave.LOC);
         const npcContext = {};
         if (lastSave.NPC && lastSave.NPC.length > 0) {
-            const npcPromises = lastSave.NPC.map(npcInScene => 
-                db.collection('users').doc(userId).collection('npcs').doc(npcInScene.name).get()
-            );
-            const npcDocs = await Promise.all(npcPromises);
-            npcDocs.forEach(doc => {
-                if (doc.exists) {
-                    npcContext[doc.id] = doc.data();
+            const npcPromises = lastSave.NPC.map(npcInScene => getMergedNpcProfile(userId, npcInScene.name));
+            const npcProfiles = await Promise.all(npcPromises);
+            npcProfiles.forEach(profile => {
+                if (profile) {
+                    npcContext[profile.name] = profile;
                 }
             });
         }
@@ -226,17 +226,23 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.money = inventoryState.money;
         aiResponse.roundData.skills = updatedSkills;
 
+        // 【核心修改】修正NPC狀態更新邏輯
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
-                const npcDocRef = userDocRef.collection('npcs').doc(npc.name);
-                if (npc.isDeceased) return npcDocRef.set({ isDeceased: true }, { merge: true });
+                const npcStateDocRef = userDocRef.collection('npc_states').doc(npc.name);
+                
+                if (npc.isDeceased) {
+                    return npcStateDocRef.set({ isDeceased: true }, { merge: true });
+                }
+
                 if (npc.isNew) {
                     delete npc.isNew;
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
                 } else {
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
-                        return npcDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
+                        // 正確地更新玩家與NPC的關係狀態檔案中的位置
+                        return npcStateDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
                     }
                 }
                 return Promise.resolve();
