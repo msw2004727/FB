@@ -34,6 +34,7 @@ router.post('/register', async (req, res) => {
             externalPower: 5,
             lightness: 5,
             morality: 0,
+            stamina: 100, // 【核心新增】為新玩家設定初始精力值
             timeOfDay: '上午',
             yearName: '元祐',
             year: 1,
@@ -85,6 +86,7 @@ router.post('/register', async (req, res) => {
             internalPower: 5,
             externalPower: 5,
             lightness: 5,
+            stamina: 100, // 【核心新增】在初始存檔中也記錄精力值
             morality: 0,
             yearName: '元祐',
             year: 1,
