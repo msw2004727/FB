@@ -78,7 +78,7 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
                 demographics: staticData.demographics || { population: 100, populationComposition: '成分不明' },
                 resources: staticData.resources || { manpower: 20, food: '足夠', materials: '普通' },
                 infrastructure: staticData.infrastructure || { buildings: ['民居', '農田'] },
-                "lore.currentIssues": staticData.lore.currentIssues || ['暫無江湖傳聞']
+                "lore.currentIssues": (staticData.lore && staticData.lore.currentIssues) || ['暫無江湖傳聞']
             };
             await dynamicLocationRef.set(initialDynamicData);
             console.log(`[世界引擎-混合模式] 成功為玩家 ${userId} 初始化了「${locationName}」的動態狀態。`);
