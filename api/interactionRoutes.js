@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIActionClassification, getAIProactiveChat, getAICombatSetup, getAIChatSummary } = require('../services/aiService');
+const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAICombatSetup, getAIChatSummary } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -151,7 +151,6 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
         
-        // 【核心修改】由於不再需要判斷戰鬥，此處邏輯大幅簡化
         const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
         const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
         const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
