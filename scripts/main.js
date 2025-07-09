@@ -44,8 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gmMenu = document.getElementById('gm-menu');
     const gmContent = document.getElementById('gm-content');
 
-    // 【核心新增】
-    let combatSurrenderBtn = null; // 先宣告，稍後在戰鬥開啟時再獲取
+    // 【核心修改】將其移出 startCombat，使其在 handleCombatSurrender 中也可訪問
+    let combatSurrenderBtn = null; 
 
     function setGameContainerHeight() {
         if (gameContainer) {
@@ -258,24 +258,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function startCombat(initialState) {
         gameState.isInCombat = true;
         gameState.combat.state = initialState;
-        modal.openCombatModal(initialState);
+        
+        // 【核心修改】將取消戰鬥的回調函式傳入
+        modal.openCombatModal(initialState, () => {
+            if (window.confirm("確定要逃離這次戰鬥嗎？這可能會對你的江湖聲望造成影響。")) {
+                gameState.isInCombat = false;
+                setLoadingState(false); 
+                appendMessageToStory("[系統] 你決定不戰而退，迅速離開了現場。", 'system-message');
+            }
+        });
         
         const strategyButtons = document.querySelectorAll('.strategy-btn');
         strategyButtons.forEach(btn => {
             btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
         });
         
-        // 【核心修改】在戰鬥開始後，獲取並綁定投降按鈕的事件
         const confirmActionContainer = document.getElementById('confirm-action');
-        confirmActionContainer.innerHTML = `
-            <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
-            <button id="combat-surrender-btn" class="surrender-btn">投降</button>
-        `;
-        combatSurrenderBtn = document.getElementById('combat-surrender-btn');
-        combatSurrenderBtn.addEventListener('click', handleCombatSurrender);
+        if (confirmActionContainer) {
+            confirmActionContainer.innerHTML = `
+                <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
+                <button id="combat-surrender-btn" class="surrender-btn">投降</button>
+            `;
+            combatSurrenderBtn = document.getElementById('combat-surrender-btn');
+            combatSurrenderBtn.addEventListener('click', handleCombatSurrender);
+        }
     }
 
-    // 【核心新增】處理投降的函式
     async function handleCombatSurrender() {
         if (!gameState.isInCombat || gameState.isRequesting) return;
         if (!window.confirm("你確定要在此刻認輸嗎？")) return;
@@ -298,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     function handleStrategySelection(strategy) {
         gameState.combat.selectedStrategy = strategy;
         gameState.combat.selectedSkill = null; 
@@ -313,16 +320,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirmBtn) confirmBtn.disabled = true;
 
         const playerSkills = gameState.combat.state?.player?.skills || [];
-        const relevantSkills = playerSkills.filter(skill => {
-            if (strategy === 'attack' && (skill.skillType === '拳腳' || skill.skillType === '兵器')) return true;
-            if (strategy === 'defend' && skill.skillType === '內功') return true; 
-            return false;
-        });
+        
+        // 【核心修改】根據新的 combatCategory 進行篩選
+        const categoryMap = {
+            'attack': '攻擊',
+            'defend': '防禦',
+            'evade': '迴避'
+        };
+        const targetCategory = categoryMap[strategy];
 
-        if (strategy === 'evade') {
-            skillSelectionContainer.innerHTML = '<p class="system-message">你凝神專注，準備尋找時機進行迴避。</p>';
-            if (confirmBtn) confirmBtn.disabled = false;
-        } else if (relevantSkills.length > 0) {
+        const relevantSkills = playerSkills.filter(skill => skill.combatCategory === targetCategory);
+
+        if (relevantSkills.length > 0) {
             relevantSkills.forEach(skill => {
                 const skillBtn = document.createElement('button');
                 skillBtn.className = 'skill-btn';
@@ -335,7 +344,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 skillSelectionContainer.appendChild(skillBtn);
             });
         } else {
-            skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
+             skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
+        }
+        
+        // 對於迴避策略，即使沒有對應武學，也應該可以直接確認
+        if (strategy === 'evade') {
+             if (confirmBtn) confirmBtn.disabled = false;
         }
     }
 
@@ -353,7 +367,10 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('請選擇一個策略！');
             return;
         }
-        if (gameState.combat.selectedStrategy !== 'evade' && !gameState.combat.selectedSkill) {
+        
+        const hasRelevantSkills = (gameState.combat.state?.player?.skills || []).some(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避'}[gameState.combat.selectedStrategy]);
+
+        if (gameState.combat.selectedStrategy !== 'evade' && hasRelevantSkills && !gameState.combat.selectedSkill) {
             alert('請選擇一門武學！');
             return;
         }
