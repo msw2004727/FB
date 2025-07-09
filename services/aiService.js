@@ -210,8 +210,8 @@ async function getAIRandomEvent(eventType, playerProfile) {
     }
 }
 
-async function getAINpcProfile(username, npcName, roundData) {
-    const prompt = getNpcCreatorPrompt(username, npcName, roundData);
+async function getAINpcProfile(username, npcName, roundData, playerProfile) {
+    const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
     try {
         const text = await callAI(aiConfig.npcProfile, prompt, true);
         return parseJsonResponse(text);
