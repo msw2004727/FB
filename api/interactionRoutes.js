@@ -206,8 +206,37 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
 
-        const staminaChange = aiResponse.roundData.staminaChange || 0;
-        let newStamina = Math.max(0, Math.min(100, userProfile.stamina + staminaChange));
+        // --- 【核心修改】精力結算邏輯 ---
+        const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
+        let newStamina = userProfile.stamina;
+
+        const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇'];
+        const isResting = restKeywords.some(kw => playerAction.includes(kw));
+
+        const timeDidAdvance = (aiDaysToAdvance && aiDaysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== currentTimeOfDay);
+        
+        if (isResting && timeDidAdvance) {
+            const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
+            const newTimeIndex = TIME_SEQUENCE.indexOf(aiNextTimeOfDay);
+            let slotsPassed = 0;
+
+            if (aiDaysToAdvance > 0) {
+                slotsPassed = aiDaysToAdvance * TIME_SEQUENCE.length;
+            } else {
+                slotsPassed = newTimeIndex > oldTimeIndex ? newTimeIndex - oldTimeIndex : (TIME_SEQUENCE.length - oldTimeIndex) + newTimeIndex;
+            }
+
+            if (slotsPassed >= 4) {
+                newStamina = 100;
+                console.log(`[精力系統] 玩家長時間休息(${slotsPassed}個時辰)，精力完全恢復。`);
+            } else {
+                newStamina = Math.min(100, newStamina + (25 * slotsPassed));
+                console.log(`[精力系統] 玩家短暫休息(${slotsPassed}個時辰)，精力恢復 ${25 * slotsPassed}。`);
+            }
+        } else {
+            newStamina += staminaChange;
+        }
+        newStamina = Math.max(0, Math.min(100, newStamina));
         
         if (newStamina <= 0) {
             console.log(`[精力系統] 玩家 ${username} 精力耗盡，觸發昏迷事件！`);
@@ -216,7 +245,7 @@ const interactRouteHandler = async (req, res) => {
                 story: "你感到一陣天旋地轉，眼前的景象逐漸模糊，最終眼前一黑，徹底失去了知覺。",
                 PC: "你因體力不支而昏倒在地。",
                 EVT: "力竭昏迷",
-                stamina: 50,
+                stamina: 50, 
                 itemChanges: [],
                 powerChange: {},
                 moralityChange: 0,
@@ -230,6 +259,7 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.roundData.moralityChange = passOutEvent.moralityChange;
             newStamina = passOutEvent.stamina; 
         }
+        // --- 精力結算結束 ---
         
         if (aiResponse.roundData.removeDeathCountdown) {
             await userDocRef.update({ deathCountdown: admin.firestore.FieldValue.delete() });
