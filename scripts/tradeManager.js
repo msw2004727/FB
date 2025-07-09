@@ -1,197 +1,198 @@
 // scripts/tradeManager.js
 import { api } from './api.js';
+import { closeModal } from './modalManager.js';
 
-// 用於儲存當前交易狀態的全域變數
-let tradeState = {};
+// 全域變數，用於儲存當前交易的狀態
+let state = {};
+let onTradeCompleteCallback = null;
 let currentNpcName = '';
-let onTradeSuccessCallback = null;
+
+// DOM 元素快取
+const DOMElements = {};
 
 /**
- * 更新交易匯總區域，計算價值差異並更新按鈕狀態
+ * 首次獲取或更新DOM元素引用
  */
-function updateTradeSummary() {
-    const playerTotalValue = tradeState.player.offer.items.reduce((sum, item) => sum + (item.value * item.quantity), 0) + tradeState.player.offer.money;
-    const npcTotalValue = tradeState.npc.offer.items.reduce((sum, item) => sum + (item.value * item.quantity), 0) + tradeState.npc.offer.money;
-
-    const valueDiff = playerTotalValue - npcTotalValue;
-
-    const tradeValueDiff = document.getElementById('trade-value-diff');
-    const confirmTradeBtn = document.getElementById('confirm-trade-btn');
-
-    tradeValueDiff.textContent = `價值差: ${valueDiff}`;
-    tradeValueDiff.className = 'trade-value-display'; // Reset class
-
-    if (valueDiff > 0) {
-        tradeValueDiff.classList.add('positive'); // 玩家有利
-    } else if (valueDiff < 0) {
-        tradeValueDiff.classList.add('negative'); // 玩家不利
-    }
-
-    const isTradeSubstantial = tradeState.player.offer.items.length > 0 || tradeState.npc.offer.items.length > 0 || tradeState.player.offer.money > 0 || tradeState.npc.offer.money > 0;
-    // 設置一個平衡閾值，例如價值差距在500文以內都算可交易
-    const isBalanced = Math.abs(valueDiff) <= 500; 
-
-    confirmTradeBtn.disabled = !(isTradeSubstantial && isBalanced);
-}
-
-
-/**
- * 將物品從一個列表移動到另一個列表
- * @param {string} itemId - 物品的唯一ID
- * @param {'player' | 'npc'} owner - 物品的當前擁有者
- * @param {'inventory' | 'offer'} from - 來源區域
- * @param {'inventory' | 'offer'} to - 目標區域
- */
-function moveItem(itemId, owner, from, to) {
-    const fromList = tradeState[owner][from].items;
-    const toList = tradeState[owner][to].items;
-
-    const itemIndex = fromList.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) return;
-
-    const [itemToMove] = fromList.splice(itemIndex, 1);
-    toList.push(itemToMove);
-
-    renderInventory(owner);
-    renderOffer(owner);
-    updateTradeSummary();
-}
-
-
-/**
- * 渲染指定所有者的背包UI
- * @param {'player' | 'npc'} owner - 'player' 或 'npc'
- */
-function renderInventory(owner) {
-    const inventoryContainer = document.getElementById(`${owner}-trade-inventory`);
-    inventoryContainer.innerHTML = '';
-
-    if (tradeState[owner].inventory.items.length === 0) {
-        inventoryContainer.innerHTML = `<p class="empty-inventory">${owner === 'player' ? '你的行囊空空如也' : '對方身無長物'}</p>`;
-    } else {
-        tradeState[owner].inventory.items.forEach(item => {
-            const itemEl = createTradeItemElement(item.id, item, () => moveItem(item.id, owner, 'inventory', 'offer'));
-            inventoryContainer.appendChild(itemEl);
-        });
-    }
+function cacheDOMElements() {
+    DOMElements.playerInventory = document.querySelector('#trade-player-inventory');
+    DOMElements.playerOffer = document.querySelector('#trade-player-offer');
+    DOMElements.npcInventory = document.querySelector('#trade-npc-inventory');
+    DOMElements.npcOffer = document.querySelector('#trade-npc-offer');
+    DOMElements.playerMoney = document.getElementById('trade-player-money');
+    DOMElements.npcMoney = document.getElementById('trade-npc-money');
+    DOMElements.npcHeaderName = document.getElementById('trade-npc-header-name');
+    DOMElements.npcNameDisplay = document.getElementById('trade-npc-name');
+    DOMElements.valueDiff = document.getElementById('trade-value-diff');
+    DOMElements.confirmBtn = document.getElementById('confirm-trade-btn');
+    DOMElements.playerPanel = document.getElementById('trade-player-panel');
+    DOMElements.npcPanel = document.getElementById('trade-npc-panel');
+    DOMElements.playerOfferPanel = document.getElementById('trade-player-offer-panel');
+    DOMElements.npcOfferPanel = document.getElementById('trade-npc-offer-panel');
 }
 
 /**
- * 渲染指定所有者的出價區域UI
- * @param {'player' | 'npc'} owner - 'player' 或 'npc'
+ * 渲染整個交易介面
  */
-function renderOffer(owner) {
-    const offerContainer = document.getElementById(`${owner}-offer-area`).querySelector('.offer-items-list');
-    offerContainer.innerHTML = '';
+function render() {
+    if (!DOMElements.playerInventory) return; // 如果元素不存在則不執行
 
-    tradeState[owner].offer.items.forEach(item => {
-        const itemEl = createTradeItemElement(item.id, item, () => moveItem(item.id, owner, 'offer', 'inventory'));
-        offerContainer.appendChild(itemEl);
+    // 渲染玩家和NPC的背包與出價區
+    ['player', 'npc'].forEach(owner => {
+        const inventoryEl = DOMElements[`${owner}Inventory`];
+        const offerEl = DOMElements[`${owner}Offer`];
+        inventoryEl.innerHTML = '';
+        offerEl.innerHTML = '';
+        state[owner].inventory.forEach(item => inventoryEl.appendChild(createItemElement(item, owner, 'inventory')));
+        state[owner].offer.items.forEach(item => offerEl.appendChild(createItemElement(item, owner, 'offer')));
     });
-}
 
-/**
- * 建立一個可交易物品的DOM元素，並為其附加點擊事件
- * @param {string} itemId - 物品的唯一ID
- * @param {object} itemData - 物品的詳細資料
- * @param {function} onClickCallback - 點擊後的回調函式
- * @returns {HTMLElement}
- */
-function createTradeItemElement(itemId, itemData, onClickCallback) {
-    const itemEl = document.createElement('div');
-    itemEl.className = 'trade-item';
-    itemEl.dataset.itemId = itemId;
-    itemEl.title = `${itemData.itemName}\n類型: ${itemData.itemType}\n價值: ${itemData.value || 0}文\n${itemData.baseDescription || ''}`;
+    // 更新介面上的文字資訊
+    DOMElements.playerMoney.textContent = state.player.money;
+    DOMElements.npcMoney.textContent = state.npc.money;
+    DOMElements.npcHeaderName.textContent = currentNpcName;
+    DOMElements.npcNameDisplay.textContent = `${currentNpcName} 的出價`;
     
-    itemEl.innerHTML = `
-        <span class="trade-item-name">${itemData.itemName}</span>
-        <span class="trade-item-quantity">x${itemData.quantity || 1}</span>
-    `;
-    itemEl.addEventListener('click', onClickCallback);
-    return itemEl;
+    calculateSummary();
 }
 
 /**
- * 執行交易確認的邏輯
+ * 創建單個物品的HTML元素
+ * @param {object} item - 物品資料
+ * @param {string} owner - 擁有者 ('player' or 'npc')
+ * @param {string} area - 當前區域 ('inventory' or 'offer')
+ * @returns {HTMLLIElement}
+ */
+function createItemElement(item, owner, area) {
+    const li = document.createElement('li');
+    li.className = 'bg-amber-50/50 border border-amber-200 p-1.5 rounded-md cursor-pointer flex justify-between items-center text-sm hover:border-amber-400 hover:bg-amber-50 transform hover:-translate-y-px transition-all';
+    li.title = item.description || item.baseDescription || '一個神秘的物品';
+    li.innerHTML = `<span class="font-semibold text-amber-900">${item.itemName}</span> <span class="text-xs text-amber-700">價:${item.value || 0}</span>`;
+    li.addEventListener('click', () => moveItem(item.instanceId || item.templateId, owner, area));
+    return li;
+}
+
+/**
+ * 移動物品的邏輯
+ * @param {string} itemId - 物品的唯一ID
+ * @param {string} owner - 擁有者
+ * @param {string} currentArea - 當前區域
+ */
+function moveItem(itemId, owner, currentArea) {
+    const sourceList = currentArea === 'inventory' ? state[owner].inventory : state[owner].offer.items;
+    const targetList = currentArea === 'inventory' ? state[owner].offer.items : state[owner].inventory;
+    
+    const itemIndex = sourceList.findIndex(i => (i.instanceId || i.templateId) === itemId);
+    
+    if (itemIndex > -1) {
+        const [item] = sourceList.splice(itemIndex, 1);
+        targetList.push(item);
+        render();
+    }
+}
+
+/**
+ * 計算價值差並更新UI
+ */
+function calculateSummary() {
+    const playerOfferValue = state.player.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
+    const npcOfferValue = state.npc.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
+    const diff = playerOfferValue - npcOfferValue;
+
+    DOMElements.valueDiff.textContent = diff;
+    
+    // 重置樣式和光暈
+    DOMElements.valueDiff.classList.remove('text-green-400', 'text-red-400');
+    DOMElements.playerPanel.classList.remove('glow-negative');
+    DOMElements.npcPanel.classList.remove('glow-positive');
+    DOMElements.playerOfferPanel.classList.remove('glow-negative');
+    DOMElements.npcOfferPanel.classList.remove('glow-positive');
+
+    if (diff < 0) { // 玩家虧了 (需補償的價值為正)
+        DOMElements.valueDiff.classList.add('text-red-400');
+        DOMElements.playerPanel.classList.add('glow-negative');
+        DOMElements.playerOfferPanel.classList.add('glow-negative');
+    } else if (diff > 0) { // 玩家賺了
+        DOMElements.valueDiff.classList.add('text-green-400');
+        DOMElements.npcPanel.classList.add('glow-positive');
+        DOMElements.npcOfferPanel.classList.add('glow-positive');
+    }
+    
+    const isTradeable = state.player.offer.items.length > 0 || state.npc.offer.items.length > 0;
+    DOMElements.confirmBtn.disabled = !isTradeable;
+}
+
+/**
+ * 處理最終交易確認
  */
 async function handleConfirmTrade() {
-    const confirmTradeBtn = document.getElementById('confirm-trade-btn');
-    confirmTradeBtn.disabled = true;
-    confirmTradeBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交易中...`;
+    DOMElements.confirmBtn.disabled = true;
+    DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
 
     try {
+        const finalTradeState = {
+            player: {
+                offer: {
+                    items: state.player.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
+                    money: 0 // 當前模型不處理金錢，設為0
+                }
+            },
+            npc: {
+                offer: {
+                    items: state.npc.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
+                    money: 0
+                }
+            }
+        };
+
         const result = await api.confirmTrade({
-            tradeState,
+            tradeState: finalTradeState,
             npcName: currentNpcName
         });
         
-        if (result.newRound && typeof onTradeSuccessCallback === 'function') {
-            onTradeSuccessCallback(result.newRound);
+        if (result.newRound && typeof onTradeCompleteCallback === 'function') {
+            onTradeCompleteCallback(result.newRound);
         }
+        // 成功後關閉視窗
+        closeModal();
 
     } catch (error) {
         alert(`交易失敗: ${error.message}`);
-        confirmTradeBtn.disabled = false;
+        DOMElements.confirmBtn.disabled = false;
     } finally {
-        confirmTradeBtn.innerHTML = `確認交易`;
+        DOMElements.confirmBtn.innerHTML = `成交`;
     }
 }
 
-
 /**
- * 初始化交易管理器
- * @param {object} tradeData - 從後端獲取的完整交易數據
- * @param {string} npcName - 正在交易的NPC名稱
- * @param {function} onTradeComplete - 交易成功後的回調函式
+ * 交易系統的總入口和初始化函式
+ * @param {object} tradeData - 從API獲取的初始交易數據
+ * @param {string} npcName - NPC的名稱
+ * @param {function} onTradeComplete - 交易成功後的回調
  */
 export function initializeTrade(tradeData, npcName, onTradeComplete) {
-    console.log("交易管理器已初始化，收到的數據：", tradeData);
+    // 首次初始化時快取所有DOM元素
+    cacheDOMElements();
+    
     currentNpcName = npcName;
-    onTradeSuccessCallback = onTradeComplete;
-
-    tradeState = {
+    onTradeCompleteCallback = onTradeComplete;
+    
+    // 重置交易狀態
+    state = {
         player: {
-            inventory: { items: Object.entries(tradeData.player.items).map(([id, data]) => ({ id, ...data })) },
-            offer: { items: [], money: 0 }
+            inventory: Object.values(tradeData.player.items),
+            offer: { items: [], money: 0 },
+            money: tradeData.player.money
         },
         npc: {
-            inventory: { items: Object.entries(tradeData.npc.items).map(([id, data]) => ({ id, ...data })) },
-            offer: { items: [], money: 0 }
+            inventory: Object.values(tradeData.npc.items),
+            offer: { items: [], money: 0 },
+            money: tradeData.npc.money
         }
     };
-
-    renderInventory('player');
-    renderInventory('npc');
-    renderOffer('player');
-    renderOffer('npc');
-
-    const playerOfferMoneyInput = document.getElementById('player-offer-money');
-    const npcOfferMoneyInput = document.getElementById('npc-offer-money');
     
-    playerOfferMoneyInput.addEventListener('input', (e) => {
-        let amount = parseInt(e.target.value) || 0;
-        const maxAmount = tradeData.player.money;
-        if (amount > maxAmount || amount < 0) {
-            amount = Math.max(0, Math.min(amount, maxAmount));
-            e.target.value = amount;
-        }
-        tradeState.player.offer.money = amount;
-        updateTradeSummary();
-    });
-
-    npcOfferMoneyInput.addEventListener('input', (e) => {
-        let amount = parseInt(e.target.value) || 0;
-        const maxAmount = tradeData.npc.money;
-        if (amount > maxAmount || amount < 0) {
-            amount = Math.max(0, Math.min(amount, maxAmount));
-            e.target.value = amount;
-        }
-        tradeState.npc.offer.money = amount;
-        updateTradeSummary();
-    });
-
-    const confirmTradeBtn = document.getElementById('confirm-trade-btn');
-    confirmTradeBtn.onclick = handleConfirmTrade;
-
-    updateTradeSummary();
+    // 綁定事件監聽器
+    DOMElements.confirmBtn.onclick = handleConfirmTrade;
+    
+    // 初始渲染
+    render();
 }
