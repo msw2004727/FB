@@ -19,7 +19,7 @@ const {
     getPlayerSkills,
     processNpcUpdates,
     getMergedLocationData,
-    getMergedNpcProfile // 【核心修正】引入 getMergedNpcProfile
+    getMergedNpcProfile
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
@@ -227,24 +227,31 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.money = inventoryState.money;
         aiResponse.roundData.skills = updatedSkills;
 
+        // 【核心修正】採用更主動、更可靠的NPC建檔邏輯
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
+            const npcUpdatePromises = aiResponse.roundData.NPC.map(async (npc) => {
+                if (!npc.name) return; // 跳過沒有名字的NPC
+
+                const npcTemplateRef = db.collection('npcs').doc(npc.name);
                 const npcStateDocRef = userDocRef.collection('npc_states').doc(npc.name);
-                
+
                 if (npc.isDeceased) {
                     return npcStateDocRef.set({ isDeceased: true }, { merge: true });
                 }
 
-                if (npc.isNew) {
-                    delete npc.isNew;
+                const templateDoc = await npcTemplateRef.get();
+
+                // 關鍵邏輯：不管AI有沒有給isNew標記，只要模板不存在，就強制創建！
+                if (!templateDoc.exists) {
+                    console.log(`[互動路由] 偵測到「${npc.name}」的模板不存在，強制執行建檔...`);
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
                 } else {
+                    // 如果模板已存在，只更新其狀態
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
                         return npcStateDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
                     }
                 }
-                return Promise.resolve();
             });
             await Promise.all(npcUpdatePromises);
         }
