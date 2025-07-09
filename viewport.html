@@ -99,7 +99,6 @@
             }
         }
 
-        /* 【核心修改】讓特色功能在窄視窗時也能單獨顯示 */
         .features-section-mobile {
             display: block;
         }
@@ -301,25 +300,41 @@
                         <div class="accordion-item"><div class="accordion-header">遊戲會自動存檔嗎？</div><div class="accordion-content"><p class="answer">是的，你的每一個回合都會被安全地記錄在雲端。你可以隨時關閉遊戲，下次登入時會從最新的進度繼續。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何交易？有商店嗎？</div><div class="accordion-content"><p class="answer">遊戲沒有固定的商店介面。你需要找到對應的商人NPC，然後用指令與其交易。例如找到鐵匠後，輸入「我想買一把劍」或「把我這柄舊刀賣給你」。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">遊戲有沒有終點？</div><div class="accordion-content"><p class="answer">本遊戲沒有固定的終點。你的目標，由你自己定義。你可以成為一代宗師，開宗立派；可以成為富甲一方的商賈；也可以成為獨行的俠客。一切皆有可能。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">如何打開GM面板？</div><div class="accordion-content"><p class="answer">在主遊戲介面的輸入框中，輸入指令 <code>/GM</code> 即可打開創世神控制台，讓你修改遊戲的各項數據。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">遊戲的後端是如何運作的？</div><div class="accordion-content"><p class="answer">遊戲後端部署在Render平台上，使用Node.js和Express構建，並以Firebase Firestore作為數據庫，確保你的江湖傳奇被安全地儲存。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">有快捷鍵嗎？</div><div class="accordion-content"><p class="answer">在主遊戲畫面的輸入框中按「Enter」鍵可以直接提交動作。未來可能會加入更多快捷操作。</p></div></div>
-                    </div>
-
-                    <h3><i class="fa-solid fa-user-shield"></i> 角色與屬性</h3>
-                     <div class="accordion">
+                        <div class="accordion-item"><div class="accordion-header">儀表板上的資訊太多了，可以收起來嗎？</div><div class="accordion-content"><p class="answer">可以。在遊戲主介面頂部的狀態欄右側，有一個向上的箭頭按鈕，點擊即可收起/展開詳細的狀態資訊。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何查看我的所有狀態？</div><div class="accordion-content"><p class="answer">遊戲介面右側的「儀表板」會即時顯示你的角色狀態(PC)、武功修為(內功/外功/輕功)、立場傾向、金錢、物品等所有資訊。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">三項武功屬性有什麼用？</div><div class="accordion-content"><p class="answer"><code>內功</code>影響招式威力和內傷防禦；<code>外功</code>影響命中、外傷防禦和招式技巧；<code>輕功</code>影響閃避、速度和特殊行動的成功率。它們是所有行動判定的基礎。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">如何提升三項武功屬性？</div><div class="accordion-content"><p class="answer">主要透過修練對應「功體屬性」的武學來提升。例如，修練內功型心法會增加你的<code>內功</code>。此外，完成特定任務或獲得奇遇也可能直接提升屬性。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">立場值會如何影響遊戲？</div><div class="accordion-content"><p class="answer">影響極大。高正義值可能讓正派人士主動結交你，邪派則視你為眼中釘；高邪惡值反之。它還會影響特定任務的觸發和NPC的反應。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">我的背包有容量限制嗎？</div><div class="accordion-content"><p class="answer">遊戲目前沒有嚴格的容量限制，但AI在生成故事時，會考量你攜帶過多物品的合理性，並可能在劇情中有所體現。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">如何獲得物品和金錢？</div><div class="accordion-content"><p class="answer">完成NPC的委託、探索未知區域、搜查敵人屍體，或是...採取一些不那麼光彩的手段，例如「偷竊」。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">遊戲中的貨幣體系是怎樣的？</div><div class="accordion-content"><p class="answer">主要貨幣是「文錢」。你可以透過交易、任務獎勵或探索獲得。錢可以用於購買物品、賄賂NPC或觸發特定事件。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">我受傷了怎麼辦？</div><div class="accordion-content"><p class="answer">儀表板的「角色狀態(PC)」會顯示你的傷勢。你可以嘗試使用「金瘡藥」等藥品，或透過「打坐療傷」等指令來恢復。嚴重的傷勢需要尋找醫師或特殊的藥材。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">時間會如何流逝？</div><div class="accordion-content"><p class="answer">遊戲中的時間會根據你的行動（如長途跋涉、練功）而自動推移。時辰順序為：<code>清晨 -> 上午 -> 中午 -> 下午 -> 黃昏 -> 夜晚 -> 深夜</code>。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">什麼是新手保護機制？</div><div class="accordion-content"><p class="answer">在你三項武功總和低於100時，你遇到的只會是凡人與地痞流氓，地點也將限制在新手村周邊。隨著你的實力增長，更廣闊、更危險的江湖才會逐漸對你開放。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何快速提升初期實力？</div><div class="accordion-content"><p class="answer">在新手村，嘗試幫助村民解決一些小麻煩，如找東西、送信。這些簡單任務通常會獎勵一些經驗或基礎屬性，是前期成長的關鍵。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">儀表板上的資訊太多了，可以收起來嗎？</div><div class="accordion-content"><p class="answer">可以。在遊戲主介面頂部的狀態欄右側，有一個向上的箭頭按鈕，點擊即可收起/展開詳細的狀態資訊。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何獲得物品和金錢？</div><div class="accordion-content"><p class="answer">完成NPC的委託、探索未知區域、搜查敵人屍體，或是...採取一些不那麼光彩的手段，例如「偷竊」。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">遊戲中的貨幣體系是怎樣的？</div><div class="accordion-content"><p class="answer">主要貨幣是「文錢」。你可以透過交易、任務獎勵或探索獲得。錢可以用於購買物品、賄賂NPC或觸發特定事件。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我的背包有容量限制嗎？</div><div class="accordion-content"><p class="answer">遊戲目前沒有嚴格的容量限制，但AI在生成故事時，會考量你攜帶過多物品的合理性，並可能在劇情中有所體現。</p></div></div>
+                    </div>
+
+                    <h3><i class="fa-solid fa-user-shield"></i> 角色與屬性</h3>
+                     <div class="accordion">
+                        <div class="accordion-item"><div class="accordion-header">三項武功屬性有什麼用？</div><div class="accordion-content"><p class="answer"><code>內功</code>影響招式威力和內傷防禦；<code>外功</code>影響命中、外傷防禦和招式技巧；<code>輕功</code>影響閃避、速度和特殊行動的成功率。它們是所有行動判定的基礎。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何提升三項武功屬性？</div><div class="accordion-content"><p class="answer">主要透過修練對應「功體屬性」的武學來提升。例如，修練內功型心法會增加你的<code>內功</code>。此外，完成特定任務或獲得奇遇也可能直接提升屬性。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">立場值會如何影響遊戲？</div><div class="accordion-content"><p class="answer">影響極大。高正義值可能讓正派人士主動結交你，邪派則視你為眼中釘；高邪惡值反之。它還會影響特定任務的觸發和NPC的反應。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我的初始武學「現代搏擊」是什麼？</div><div class="accordion-content"><p class="answer">這是你從現代世界帶來的唯一記憶。它是一門1級的拳腳功夫，講求效率，但在這個世界因為沒有內力法門，所以潛力極低，無法再提升。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">為什麼我的道德值會下降？</div><div class="accordion-content"><p class="answer">偷竊、搶劫、攻擊無辜或正派人士，都會導致你的立場傾向邪惡。反之，行俠仗義則會增加你的正義值。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何查看我的詳細屬性？</div><div class="accordion-content"><p class="answer">儀表板右側的屬性條會以視覺化的方式展示你的內功、外功、輕功和立場傾向。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">生命值或內力值是怎麼計算的？</div><div class="accordion-content"><p class="answer">遊戲沒有直接的HP/MP數值條。你的健康狀況會透過「角色狀態(PC)」的文字描述來體現，例如「氣息平穩」、「面色蒼白」、「身受重傷」。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以改變我的性別嗎？</div><div class="accordion-content"><p class="answer">一旦角色創建完成，性別便無法更改。這將影響NPC對你的戀愛傾向判斷。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">角色會衰老嗎？</div><div class="accordion-content"><p class="answer">會的。隨著遊戲內時間的流逝，你的角色會逐漸衰老，這可能會對你的體能產生細微的影響，但也會增加你的江湖閱歷。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">什麼是「內心獨白(PSY)」？</div><div class="accordion-content"><p class="answer">這是AI根據當前情境，為你生成的角色內心想法。它可以為你提供關於下一步行動的靈感。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以自定義我的外觀嗎？</div><div class="accordion-content"><p class="answer">遊戲目前不支持詳細的外觀自定義。你的樣貌將由AI根據你的性別和經歷在故事中進行描述。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">死亡後會發生什麼？</div><div class="accordion-content"><p class="answer">你的這段江湖人生將會結束，AI會為你生成一段「結局」故事。之後你可以選擇「回顧生平」，或是在主選單「註冊新名號」，開啟一段全新的輪迴。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以繼承上一世的武功或財產嗎？</div><div class="accordion-content"><p class="answer">不可以。每一次輪迴都是一個全新的開始，你將以一個全新的身份，重新體驗這個江湖。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何「了卻此生」？</div><div class="accordion-content"><p class="answer">如果你對當前的江湖人生不滿，可以隨時在儀表板點擊「骷髏頭」圖示了卻此生，AI會為你生成一個合理的死因與結局，然後你可以開啟新的輪迴。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以有多個存檔嗎？</div><div class="accordion-content"><p class="answer">一個名號對應一個存檔。如果你想體驗不同的人生，可以「了卻此生」後，用新的名號註冊。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">什麼是「關鍵線索(CLS)」？</div><div class="accordion-content"><p class="answer">這是你在冒險中獲得的重要資訊，通常與推動主線劇情或解開謎團有關。務必時常查看。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">角色狀態(PC)中的負面效果會自動消失嗎？</div><div class="accordion-content"><p class="answer">輕微的負面狀態（如「疲勞」）可能會隨時間休息而消失。但嚴重的狀態（如「中毒」、「內傷」）則需要你採取特定的行動（如服藥、運功療傷）來解決。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以學習生活技能嗎？</div><div class="accordion-content"><p class="answer">當然可以。你可以嘗試向NPC學習如「採藥」、「挖礦」、「釣魚」、「烹飪」等技能，這些技能不僅能豐富你的遊戲體驗，也可能帶來額外的收入來源。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">遊戲中有沒有「天賦」或「特質」系統？</div><div class="accordion-content"><p class="answer">你的「靈魂來自現代」就是你最大的天賦。這讓你擁有與這個世界完全不同的思維方式，AI在判斷你的行動時，會將此作為一個重要的隱藏屬性。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何查看NPC的詳細資料？</div><div class="accordion-content"><p class="answer">遊戲的核心是探索。你無法直接查看NPC的屬性面板。你需要透過與他們「密談」，從他們的言談舉止、背景故事中，來推斷他們的個性、目標與秘密。</p></div></div>
                     </div>
 
                     <h3><i class="fa-solid fa-khanda"></i> 武學與戰鬥</h3>
@@ -331,12 +346,19 @@
                         <div class="accordion-item"><div class="accordion-header">什麼是「功體屬性」和「潛力上限」？</div><div class="accordion-content"><p class="answer">每門武學都有其核心的「功體屬性」(power_type)，決定了它主要受你的內功、外功還是輕功加成。「潛力上限」(max_level)則代表了這門武學的品階，決定了它最高能練到幾成。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">我可以自創武功嗎？</div><div class="accordion-content"><p class="answer">完全可以。你可以嘗試描述自創的招式名稱和效果，AI会根據合理性進行判定。如果你的對應功體修為夠高，成功的機率會更大。自創的武學將從0級開始。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何查看我學會的所有武學？</div><div class="accordion-content"><p class="answer">在儀表板點擊武學圖示 <i class="fa-solid fa-khanda"></i>，即可打開「武學總覽」彈窗，裡面會詳細列出你所有武學的等級、熟練度和詳細資訊。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">我的初始武學「現代搏擊」是什麼？</div><div class="accordion-content"><p class="answer">這是你從現代世界帶來的唯一記憶。它是一門1級的拳腳功夫，講求效率，但在這個世界因為沒有內力法門，所以潛力極低，無法再提升。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">戰鬥是如何觸發的？</div><div class="accordion-content"><p class="answer">當你或NPC明確表達攻擊意圖時（例如你輸入「拔劍攻擊他」，或NPC大喊「拿命來」），便會進入「遭遇戰」彈窗。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何才能在戰鬥中以弱勝強？</div><div class="accordion-content"><p class="answer">策略至上。硬碰硬並非唯一選擇。嘗試<code>格檔</code>、<code>閃避</code>、<code>虛晃一招</code>、<code>攻擊下盤</code>、<code>利用環境</code>等更具策略性的指令，往往能收到奇效。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">戰鬥時可以和盟友一起上嗎？</div><div class="accordion-content"><p class="answer">可以。使用「我和(盟友名)一起攻擊敵人」這樣的指令，AI就會判定盟友與你一同作戰，並在戰鬥中提供援助。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">戰鬥中可以逃跑或認輸嗎？</div><div class="accordion-content"><p class="answer">可以。在戰鬥彈窗中，點擊「認輸」按鈕，AI會根據對手的性格和當時的情勢，裁定一個交涉結果。結果可能是對方放你一馬，也可能是搜刮你的財物。</p></div></div>
                          <div class="accordion-item"><div class="accordion-header">擊敗敵人有什麼好處？</div><div class="accordion-content"><p class="answer">擊敗敵人後，AI會根據敵人類型，在戰利品系統中生成合理的掉落物，例如金錢、裝備或材料。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">為什麼戰鬥時，敵人不只打我？</div><div class="accordion-content"><p class="answer">敵人AI具備基本的戰術思考。他們會評估場上威脅，可能會優先攻擊看起來較弱或能治療的盟友，也會集火攻擊血量較低的目標。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">戰鬥指令越複雜越好嗎？</div><div class="accordion-content"><p class="answer">不一定。指令的關鍵在於「合理」與「符合情境」。一個簡單但時機恰當的指令，如「趁他轉身時攻擊其背後」，可能比一段華而不實的描述更有效。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">我可以學習敵人的武功嗎？</div><div class="accordion-content"><p class="answer">有可能。如果你有超凡的悟性，或是在戰鬥中多次觀察同一招式，你可以嘗試下達「模仿並學習對方的招式」之類的指令。AI會根據你的天賦和情境，決定你是否能成功「偷師」。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">我可以用暗器嗎？</div><div class="accordion-content"><p class="answer">可以。如果你身上有「飛鏢」、「銀針」等暗器類物品，就可以在戰鬥中下達「射出飛鏢」等指令。命中率和威力會受你的「輕功」和相關武學等級影響。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">什麼是友好切磋？</div><div class="accordion-content"><p class="answer">如果你對一位友善的NPC下達「切磋」或「比試」等指令，將會進入非致命的戰鬥模式。這種模式下，即使輸了也不會死亡，有時還能增進雙方的友好度。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">中毒了在戰鬥中會有什麼影響？</div><div class="accordion-content"><p class="answer">中毒後，在戰鬥中你的屬性可能會被持續削弱，或是在每回合自動損失生命力。你需要盡快使用解毒藥或尋求治療。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">戰鬥中可以使用道具嗎？</div><div class="accordion-content"><p class="answer">可以。你可以下達指令如「我吞下一顆療傷丹」或「我向敵人撒出石灰粉」。AI會根據道具的效果，在戰鬥中產生對應的結果。</p></div></div>
+                         <div class="accordion-item"><div class="accordion-header">我可以裝備武器和防具嗎？</div><div class="accordion-content"><p class="answer">可以。獲得武器或防具後，你可以透過「我裝備上這把鐵劍」之類的指令來使用它。裝備會對你的攻防能力產生直接影響。</p></div></div>
                     </div>
                     
                     <h3><i class="fa-solid fa-comments"></i> 江湖互動與人際關係</h3>
@@ -348,11 +370,19 @@
                         <div class="accordion-item"><div class="accordion-header">友好度和心動值有什麼區別？</div><div class="accordion-content"><p class="answer">友好度是一般的人際關係，代表信賴和親近程度。心動值則是獨立的戀愛指標。一個NPC可能很信任你（高友好度），但未必對你有戀愛的情感（低心動值）。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何攻略一個NPC？</div><div class="accordion-content"><p class="answer">提升心動值是關鍵。你需要透過「密談」深入了解對方的個性和喜好，說出能觸動他/她內心的話，贈送有特殊意義的禮物，並在劇情中做出符合其價值觀的選擇。當心動值達到一定門檻，就會觸發特殊的戀愛事件。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">我可以攻略有家室的NPC嗎？</div><div class="accordion-content"><p class="answer">可以。遊戲鼓勵探索各種複雜的關係，但難度會非常高。你需要付出極大的努力，甚至可能需要經歷特殊的劇情事件（例如其伴侶背叛或身故），才有可能打動對方。</p></div></div>
-                        <div class="accordion-item"><div class="accordion-header">為什麼NPC有時候不在我以為的地方？</div><div class="accordion-content"><p class="answer">NPC是「活」的。AI會根據故事發展更新他們的位置。如果你想與某人互動，需要透過探索或打聽，確保你們在同一地點。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">為什麼NPC有時候不在我以為的地方？</div><div class="accordion-content"><p class="answer">NPC是「活」的。AI会根據故事發展更新他們的位置。如果你想與某人互動，需要透過探索或打聽，確保你們在同一地點。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">NPC會死嗎？</div><div class="accordion-content"><p class="answer">會。NPC可能會因為劇情、你的行動、或是與其他NPC的衝突而死亡。他們的死亡可能會對世界產生深遠的影響。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何查看我與所有人的關係？</div><div class="accordion-content"><p class="answer">點擊儀表板上的「關係圖」圖示 <i class="fa-solid fa-diagram-project"></i>，AI會為你自動繪製一張人物關係圖，讓你清晰地看到你與所有NPC之間的恩怨情仇。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">NPC會主動找我互動嗎？</div><div class="accordion-content"><p class="answer">會。當你與某位NPC的友好度或心動值達到一定門檻時，他們可能會主動上前與你交談、贈送禮物，甚至觸發特殊事件。這是遊戲「主動互動引擎」的一部分。</p></div></div>
                         <div class="accordion-item"><div class="accordion-header">如何觸發成人內容或更深入的互動？</div><div class="accordion-content"><p class="answer">遊戲世界觀是開放的。你可以嘗試更大尺度的對話，但請使用符合武俠背景的「隱喻」而非現代「直述」，更容易獲得理想的回應。例如，比起「我想和你睡覺」，「願與姑娘共度春宵」會有更好的效果。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以同時攻略多個NPC嗎？</div><div class="accordion-content"><p class="answer">可以。但你的行為會被記錄下來，這可能會影響你與其他NPC的關係。某些性格「專一」的NPC，在發現你與他人有染後，友好度和心動值可能會急劇下降。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何知道NPC喜歡什麼禮物？</div><div class="accordion-content"><p class="answer">透過「密談」！在對話中仔細傾聽他們的煩惱和願望。一個抱怨兵器鈍了的劍客，會喜歡一塊好的「磨刀石」；一個為母親病情發愁的孝子，會對珍稀的「藥材」感激不盡。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">NPC對我的初印象重要嗎？</div><div class="accordion-content"><p class="answer">至關重要。你與NPC的「初見」會直接影響AI為他創造出的「個性」。如果你初見時彬彬有禮，他可能就是個正人君子；如果你初見時就惡言相向，他可能就會成為你的宿敵。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以跟NPC結拜或拜師嗎？</div><div class="accordion-content"><p class="answer">當然可以。當友好度達到一定程度後，你可以嘗試下達「我想與你結為異姓兄弟」或「晚輩想拜您為師」等指令。能否成功，取決於你的誠意和對方的個性。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如何結束與NPC的對話？</div><div class="accordion-content"><p class="answer">在「密談」視窗中，你可以點擊右下角的「結束交談」按鈕，AI會為你的這次對話生成一個簡短的事件摘要，並將其記錄到你的江湖經歷中。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">如果我得罪了NPC，還有機會挽回嗎？</div><div class="accordion-content"><p class="answer">有。江湖沒有永遠的敵人。你可以嘗試透過一些重大的補償行為來挽回關係，例如贈送極其貴重的禮物，或是在他危難之時捨命相救。但這通常非常困難。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以向NPC打聽情報嗎？</div><div class="accordion-content"><p class="answer">這是獲取資訊的主要方式。你可以向NPC打聽關於其他人、其他地方、或是最近發生的江湖傳聞。NPC知道多少，取決於他的身份和閱歷。</p></div></div>
+                        <div class="accordion-item"><div class="accordion-header">我可以組建自己的隊伍或門派嗎？</div><div class="accordion-content"><p class="answer">這是遊戲的長遠目標之一。當你的實力和聲望達到頂峰時，你可以嘗試招募志同道合的夥伴，甚至開宗立派，建立屬於你自己的勢力。</p></div></div>
                     </div>
                 </section>
             </main>
