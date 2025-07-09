@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary } = require('../services/aiService');
+const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary, getAIPassOutEvent } = require('../services/aiService'); 
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -154,10 +154,26 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
         
+        if (userProfile.stamina === undefined) {
+            userProfile.stamina = 100;
+        }
+
         const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
         const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
         const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
         const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
+        
+        if (userProfile.stamina < 60) {
+            playerPower.internal *= 0.8;
+            playerPower.external *= 0.8;
+            playerPower.lightness *= 0.8;
+        }
+        if (userProfile.stamina < 40) {
+            playerPower.internal *= 0.5;
+            playerPower.external *= 0.5;
+            playerPower.lightness *= 0.5;
+        }
+        
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
         
         const currentDate = {
@@ -189,6 +205,31 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
+
+        const staminaChange = aiResponse.roundData.staminaChange || 0;
+        let newStamina = Math.max(0, Math.min(100, userProfile.stamina + staminaChange));
+        
+        if (newStamina <= 0) {
+            console.log(`[精力系統] 玩家 ${username} 精力耗盡，觸發昏迷事件！`);
+            // const passOutEvent = await getAIPassOutEvent(playerProfile, lastSave);
+            const passOutEvent = { 
+                story: "你感到一陣天旋地轉，眼前的景象逐漸模糊，最終眼前一黑，徹底失去了知覺。",
+                PC: "你因體力不支而昏倒在地。",
+                EVT: "力竭昏迷",
+                stamina: 50,
+                itemChanges: [],
+                powerChange: {},
+                moralityChange: 0,
+            };
+
+            aiResponse.story = passOutEvent.story;
+            aiResponse.roundData.PC = passOutEvent.PC;
+            aiResponse.roundData.EVT = passOutEvent.EVT;
+            aiResponse.roundData.itemChanges = passOutEvent.itemChanges;
+            aiResponse.roundData.powerChange = passOutEvent.powerChange;
+            aiResponse.roundData.moralityChange = passOutEvent.moralityChange;
+            newStamina = passOutEvent.stamina; 
+        }
         
         if (aiResponse.roundData.removeDeathCountdown) {
             await userDocRef.update({ deathCountdown: admin.firestore.FieldValue.delete() });
@@ -203,7 +244,6 @@ const interactRouteHandler = async (req, res) => {
             ...(romanceEventData ? romanceEventData.npcUpdates : [])
         ];
         
-        // --- 核心修改：修練成長限制 ---
         const practiceKeywords = ['修練', '練習', '打坐', '閉關', '領悟'];
         const durationKeywords = ['天', '時辰', '日', '夜', '時'];
         const isShortPractice = practiceKeywords.some(kw => playerAction.includes(kw)) && !durationKeywords.some(kw => playerAction.includes(kw));
@@ -223,11 +263,8 @@ const interactRouteHandler = async (req, res) => {
                 });
             }
         }
-        // --- 核心修改結束 ---
-
-        // 在處理完限制後，才更新技能和獲取升級事件
+        
         levelUpEvents = await updateSkills(userId, aiResponse.roundData.skillChanges);
-        // 如果有升級事件，需要將其添加回aiResponse中，以便後續的摘要AI可以看到
         if (levelUpEvents.length > 0) {
             aiResponse.roundData.levelUpEvents = levelUpEvents;
         }
@@ -316,7 +353,6 @@ const interactRouteHandler = async (req, res) => {
 
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
         
-        // --- 核心修改：固定時間推進 ---
         let finalDate = { ...currentDate };
         let finalTimeOfDay = nextTimeOfDay || userProfile.timeOfDay;
         let shortActionCounter = userProfile.shortActionCounter || 0;
@@ -324,7 +360,7 @@ const interactRouteHandler = async (req, res) => {
         const timeDidChange = (daysToAdvance && daysToAdvance > 0) || (finalTimeOfDay !== userProfile.timeOfDay);
 
         if (timeDidChange) {
-            shortActionCounter = 0; // 重置計數器
+            shortActionCounter = 0; 
             if (daysToAdvance > 0) {
                  for (let i = 0; i < daysToAdvance; i++) { finalDate = advanceDate(finalDate); }
             } else {
@@ -339,20 +375,19 @@ const interactRouteHandler = async (req, res) => {
                 const currentTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
                 const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
                 finalTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
-                if (nextTimeIndex === 0) { // 如果從深夜到清晨，則推進一天
+                if (nextTimeIndex === 0) { 
                     finalDate = advanceDate(finalDate);
                 }
-                shortActionCounter = 0; // 重置計數器
+                shortActionCounter = 0;
             }
         }
-        // --- 核心修改結束 ---
-
+        
         const newInternalPower = Math.max(0, Math.min(999, (userProfile.internalPower || 0) + (powerChange.internal || 0)));
         const newExternalPower = Math.max(0, Math.min(999, (userProfile.externalPower || 0) + (powerChange.external || 0)));
         const newLightness = Math.max(0, Math.min(999, (userProfile.lightness || 0) + (powerChange.lightness || 0)));
         let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
 
-        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: finalTimeOfDay, ...finalDate });
+        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, stamina: newStamina, timeOfDay: finalTimeOfDay, ...finalDate });
         
         if (aiResponse.roundData.playerState === 'dead') {
              await userDocRef.update({ isDeceased: true });
@@ -369,7 +404,8 @@ const interactRouteHandler = async (req, res) => {
             externalPower: newExternalPower,
             lightness: newLightness,
             morality: newMorality,
-            shortActionCounter: shortActionCounter, // 保存計數器
+            stamina: newStamina, 
+            shortActionCounter: shortActionCounter,
             ...finalDate
         };
 
