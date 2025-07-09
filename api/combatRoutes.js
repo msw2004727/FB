@@ -2,9 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAICombatAction, getAISurrenderResult } = require('../services/aiService');
+const { getAICombatSetup, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
 const { 
-    updateInventory, 
     updateFriendlinessValues, 
     updateRomanceValues, 
     getInventoryState, 
@@ -15,7 +14,52 @@ const {
 
 const db = admin.firestore();
 
-// 處理玩家戰鬥指令的核心函式
+// 【核心新增】處理戰鬥發起的核心函式
+const initiateCombatHandler = async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { targetNpcName, isSparring } = req.body;
+
+    if (!targetNpcName) {
+        return res.status(400).json({ message: "未指定對決目標。" });
+    }
+
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        if (savesSnapshot.empty) {
+            return res.status(404).json({ message: "找不到玩家存檔。" });
+        }
+        const lastSave = savesSnapshot.docs[0].data();
+
+        const simulatedPlayerAction = isSparring ? `我想與 ${targetNpcName} 切磋一番。` : `我決定對 ${targetNpcName} 動手。`;
+        const combatSetupResult = await getAICombatSetup(simulatedPlayerAction, lastSave);
+
+        const skills = await getPlayerSkills(userId);
+        const userProfile = (await userDocRef.get()).data();
+        const maxHp = (userProfile.externalPower || 5) * 10 + 50;
+
+        const combatState = { 
+            turn: 1, 
+            player: { username, skills, hp: maxHp, maxHp }, 
+            enemies: combatSetupResult.combatants,
+            allies: combatSetupResult.allies || [], 
+            bystanders: combatSetupResult.bystanders || [], 
+            log: [combatSetupResult.combatIntro || '戰鬥開始了！'],
+            isSparring: isSparring || false 
+        };
+
+        await userDocRef.collection('game_state').doc('current_combat').set(combatState);
+        
+        console.log(`[戰鬥系統] 由玩家 ${username} 主動對 ${targetNpcName} 發起戰鬥。`);
+        res.json({ status: 'COMBAT_START', initialState: combatState });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /initiate-combat 錯誤:`, error);
+        res.status(500).json({ message: error.message || "發起戰鬥時發生未知錯誤" });
+    }
+};
+
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const { action, model: playerModelChoice } = req.body;
@@ -174,7 +218,6 @@ const combatActionRouteHandler = async (req, res) => {
     }
 };
 
-// 處理玩家認輸指令的核心函式
 const surrenderRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const { model: playerModelChoice } = req.body;
@@ -265,7 +308,8 @@ const surrenderRouteHandler = async (req, res) => {
 };
 
 // 將路由綁定到對應的處理函式
-router.post('/combat-action', combatActionRouteHandler);
-router.post('/combat-surrender', surrenderRouteHandler);
+router.post('/combat/initiate', initiateCombatHandler);
+router.post('/combat/action', combatActionRouteHandler);
+router.post('/combat/surrender', surrenderRouteHandler);
 
 module.exports = router;
