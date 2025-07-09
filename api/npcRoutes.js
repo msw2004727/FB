@@ -44,14 +44,12 @@ router.get('/npc-profile/:npcName', async (req, res) => {
     }
 });
 
-// --- 新增的程式碼開始 ---
 // 獲取交易初始化數據的路由
 router.get('/start-trade/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
 
     try {
-        // 並行獲取玩家背包和NPC資料
         const [playerInventory, npcProfile] = await Promise.all([
             getRawInventory(userId),
             getMergedNpcProfile(userId, npcName)
@@ -61,7 +59,6 @@ router.get('/start-trade/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到交易對象。' });
         }
 
-        // 從玩家背包中分離出銀兩
         let playerMoney = 0;
         const playerItems = {};
         for (const [key, item] of Object.entries(playerInventory)) {
@@ -72,21 +69,18 @@ router.get('/start-trade/:npcName', async (req, res) => {
             }
         }
 
-        // 從NPC背包中分離出銀兩
         let npcMoney = 0;
         const npcItems = {};
         if (npcProfile.inventory) {
-            for (const [key, item] of Object.entries(npcProfile.inventory)) {
-                if (key === '銀兩') {
-                    npcMoney = item || 0;
+            for (const [key, itemData] of Object.entries(npcProfile.inventory)) {
+                 if (key === '銀兩') {
+                    npcMoney = itemData || 0;
                 } else {
-                    // 這裡假設NPC庫存中儲存的是物品名稱和數量
-                    // 我們需要獲取物品的完整模板資訊
                     const itemTemplate = await db.collection('items').doc(key).get();
                     if(itemTemplate.exists) {
                         npcItems[key] = {
                             ...itemTemplate.data(),
-                            quantity: item
+                            quantity: itemData
                         };
                     }
                 }
@@ -102,8 +96,8 @@ router.get('/start-trade/:npcName', async (req, res) => {
                 name: npcProfile.name,
                 money: npcMoney,
                 items: npcItems,
-                personality: npcProfile.personality, // 為動態定價做準備
-                goals: npcProfile.goals // 為動態定價做準備
+                personality: npcProfile.personality,
+                goals: npcProfile.goals
             }
         };
 
@@ -114,8 +108,6 @@ router.get('/start-trade/:npcName', async (req, res) => {
         res.status(500).json({ message: '開啟交易時發生內部錯誤。' });
     }
 });
-// --- 新增的程式碼結束 ---
-
 
 // 處理NPC聊天的路由
 router.post('/npc-chat', async (req, res) => {
@@ -210,19 +202,19 @@ router.post('/give-item', async (req, res) => {
                 itemName: itemKey,
                 quantity: quantityToAdd
             };
-            updatePromises.push(updateInventory(userId, [itemToRemove]));
+            updatePromises.push(updateInventory(userId, [itemToRemove], lastRoundData));
         }
         
         if(friendlinessChange) {
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
-            updatePromises.push(npcStateRef.set({ 
+             updatePromises.push(npcStateRef.set({ 
                 friendlinessValue: admin.firestore.FieldValue.increment(friendlinessChange) 
             }, { merge: true }));
         }
         
         let giftNarrative = "";
         if (itemChanges && itemChanges.length > 0) {
-            updatePromises.push(updateInventory(userId, itemChanges));
+            updatePromises.push(updateInventory(userId, itemChanges, lastRoundData));
 
             itemChanges.forEach(gift => {
                 giftNarrative += ` 你收到了來自${npcName}的回禮：${gift.itemName}。`;
@@ -278,5 +270,87 @@ router.post('/give-item', async (req, res) => {
     }
 });
 
+// --- 新增的程式碼開始 ---
+// 確認並執行交易的路由
+router.post('/confirm-trade', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { tradeState, npcName } = req.body;
+
+    if (!tradeState || !npcName) {
+        return res.status(400).json({ message: '交易數據不完整。' });
+    }
+
+    const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
+    const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+    
+    try {
+        await db.runTransaction(async (transaction) => {
+            // 處理玩家給出的物品和金錢
+            for (const item of tradeState.player.offer.items) {
+                const itemRef = playerInventoryRef.doc(item.id);
+                transaction.delete(itemRef); // 假設交易的都是非堆疊物品
+                const npcItemField = `inventory.${item.itemName}`;
+                transaction.set(npcStateRef, { [npcItemField]: admin.firestore.FieldValue.increment(item.quantity || 1) }, { merge: true });
+            }
+            if (tradeState.player.offer.money > 0) {
+                const playerMoneyRef = playerInventoryRef.doc('銀兩');
+                const npcMoneyField = `inventory.銀兩`;
+                transaction.update(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(-tradeState.player.offer.money) });
+                transaction.set(npcStateRef, { [npcMoneyField]: admin.firestore.FieldValue.increment(tradeState.player.offer.money) }, { merge: true });
+            }
+
+            // 處理NPC給出的物品和金錢
+            for (const item of tradeState.npc.offer.items) {
+                const npcItemField = `inventory.${item.itemName}`;
+                transaction.set(npcStateRef, { [npcItemField]: admin.firestore.FieldValue.increment(-(item.quantity || 1)) }, { merge: true });
+                // 直接為玩家新增物品
+                await updateInventory(userId, [{ action: 'add', itemName: item.itemName, quantity: item.quantity || 1 }]);
+            }
+            if (tradeState.npc.offer.money > 0) {
+                const playerMoneyRef = playerInventoryRef.doc('銀兩');
+                const npcMoneyField = `inventory.銀兩`;
+                transaction.set(npcStateRef, { [npcMoneyField]: admin.firestore.FieldValue.increment(-tradeState.npc.offer.money) }, { merge: true });
+                transaction.update(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(tradeState.npc.offer.money) });
+            }
+        });
+
+        console.log(`[交易系統] 玩家 ${username} 與 ${npcName} 的交易成功完成。`);
+
+        // 交易成功後，產生新的回合數據
+        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const lastRoundData = lastSaveSnapshot.docs[0].data();
+        const newRoundNumber = lastRoundData.R + 1;
+
+        const inventoryState = await getInventoryState(userId);
+
+        const finalRoundData = {
+            ...lastRoundData,
+            R: newRoundNumber,
+            story: `你與${npcName}完成了一筆公平的交易，雙方各取所需，皆大歡喜。`,
+            PC: '完成了一筆交易。',
+            EVT: `與${npcName}交易`,
+            ITM: inventoryState.itemsString,
+            money: inventoryState.money,
+        };
+
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
+        await invalidateNovelCache(userId);
+
+        res.json({
+            message: '交易成功！',
+            newRound: {
+                story: finalRoundData.story,
+                roundData: finalRoundData,
+                suggestion: "江湖之大，何處不可去得？"
+            }
+        });
+
+    } catch (error) {
+        console.error(`[交易系統] /confirm-trade 錯誤:`, error);
+        res.status(500).json({ message: '交易過程中發生意外，交換失敗。' });
+    }
+});
+// --- 新增的程式碼結束 ---
 
 module.exports = router;
