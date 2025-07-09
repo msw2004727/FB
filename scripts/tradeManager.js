@@ -28,6 +28,7 @@ function updateTradeSummary() {
     }
 
     const isTradeSubstantial = tradeState.player.offer.items.length > 0 || tradeState.npc.offer.items.length > 0 || tradeState.player.offer.money > 0 || tradeState.npc.offer.money > 0;
+    // 設置一個平衡閾值，例如價值差距在500文以內都算可交易
     const isBalanced = Math.abs(valueDiff) <= 500; 
 
     confirmTradeBtn.disabled = !(isTradeSubstantial && isBalanced);
