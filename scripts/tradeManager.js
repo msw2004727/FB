@@ -1,7 +1,10 @@
 // scripts/tradeManager.js
+import { api } from './api.js';
 
 // 用於儲存當前交易狀態的全域變數
 let tradeState = {};
+let currentNpcName = '';
+let onTradeSuccessCallback = null;
 
 /**
  * 更新交易匯總區域，計算價值差異並更新按鈕狀態
@@ -24,9 +27,7 @@ function updateTradeSummary() {
         tradeValueDiff.classList.add('negative'); // 玩家不利
     }
 
-    // 只有在雙方出價都不為零，且價值差距在可接受範圍內時，才啟用確認按鈕
-    const isTradeSubstantial = playerTotalValue > 0 || npcTotalValue > 0;
-    // 允許一定程度的不等價交換，例如價值差距在500以內
+    const isTradeSubstantial = tradeState.player.offer.items.length > 0 || tradeState.npc.offer.items.length > 0 || tradeState.player.offer.money > 0 || tradeState.npc.offer.money > 0;
     const isBalanced = Math.abs(valueDiff) <= 500; 
 
     confirmTradeBtn.disabled = !(isTradeSubstantial && isBalanced);
@@ -50,7 +51,6 @@ function moveItem(itemId, owner, from, to) {
     const [itemToMove] = fromList.splice(itemIndex, 1);
     toList.push(itemToMove);
 
-    // 重新渲染UI
     renderInventory(owner);
     renderOffer(owner);
     updateTradeSummary();
@@ -111,13 +111,43 @@ function createTradeItemElement(itemId, itemData, onClickCallback) {
 }
 
 /**
+ * 執行交易確認的邏輯
+ */
+async function handleConfirmTrade() {
+    const confirmTradeBtn = document.getElementById('confirm-trade-btn');
+    confirmTradeBtn.disabled = true;
+    confirmTradeBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交易中...`;
+
+    try {
+        const result = await api.confirmTrade({
+            tradeState,
+            npcName: currentNpcName
+        });
+        
+        if (result.newRound && typeof onTradeSuccessCallback === 'function') {
+            onTradeSuccessCallback(result.newRound);
+        }
+
+    } catch (error) {
+        alert(`交易失敗: ${error.message}`);
+        confirmTradeBtn.disabled = false;
+    } finally {
+        confirmTradeBtn.innerHTML = `確認交易`;
+    }
+}
+
+
+/**
  * 初始化交易管理器
  * @param {object} tradeData - 從後端獲取的完整交易數據
+ * @param {string} npcName - 正在交易的NPC名稱
+ * @param {function} onTradeComplete - 交易成功後的回調函式
  */
-export function initializeTrade(tradeData) {
+export function initializeTrade(tradeData, npcName, onTradeComplete) {
     console.log("交易管理器已初始化，收到的數據：", tradeData);
+    currentNpcName = npcName;
+    onTradeSuccessCallback = onTradeComplete;
 
-    // 1. 初始化內部狀態
     tradeState = {
         player: {
             inventory: { items: Object.entries(tradeData.player.items).map(([id, data]) => ({ id, ...data })) },
@@ -129,21 +159,19 @@ export function initializeTrade(tradeData) {
         }
     };
 
-    // 2. 渲染初始UI
     renderInventory('player');
     renderInventory('npc');
     renderOffer('player');
     renderOffer('npc');
 
-    // 3. 綁定金錢輸入事件
     const playerOfferMoneyInput = document.getElementById('player-offer-money');
     const npcOfferMoneyInput = document.getElementById('npc-offer-money');
     
     playerOfferMoneyInput.addEventListener('input', (e) => {
         let amount = parseInt(e.target.value) || 0;
         const maxAmount = tradeData.player.money;
-        if (amount > maxAmount) {
-            amount = maxAmount;
+        if (amount > maxAmount || amount < 0) {
+            amount = Math.max(0, Math.min(amount, maxAmount));
             e.target.value = amount;
         }
         tradeState.player.offer.money = amount;
@@ -153,22 +181,16 @@ export function initializeTrade(tradeData) {
     npcOfferMoneyInput.addEventListener('input', (e) => {
         let amount = parseInt(e.target.value) || 0;
         const maxAmount = tradeData.npc.money;
-        if (amount > maxAmount) {
-            amount = maxAmount;
+        if (amount > maxAmount || amount < 0) {
+            amount = Math.max(0, Math.min(amount, maxAmount));
             e.target.value = amount;
         }
         tradeState.npc.offer.money = amount;
         updateTradeSummary();
     });
 
-    // 4. 為確認按鈕綁定事件 (目前僅為框架)
     const confirmTradeBtn = document.getElementById('confirm-trade-btn');
-    confirmTradeBtn.onclick = () => {
-        // TODO: 在下一步中，我們將在這裡呼叫後端API來完成交易
-        alert('交易已鎖定！下一步將實作與後端的最終數據交換。');
-        console.log("最終交易方案:", tradeState);
-    };
+    confirmTradeBtn.onclick = handleConfirmTrade;
 
-    // 5. 初始更新一次匯總
     updateTradeSummary();
 }
