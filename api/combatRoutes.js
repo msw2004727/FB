@@ -38,10 +38,11 @@ const initiateCombatHandler = async (req, res) => {
         const skills = await getPlayerSkills(userId);
         const userProfile = (await userDocRef.get()).data();
         const maxHp = (userProfile.externalPower || 5) * 10 + 50;
+        const maxMp = (userProfile.internalPower || 5) * 5 + 20;
 
         const combatState = { 
             turn: 1, 
-            player: { username, skills, hp: maxHp, maxHp }, 
+            player: { username, skills, hp: maxHp, maxHp, mp: maxMp, maxMp }, 
             enemies: combatSetupResult.combatants,
             allies: combatSetupResult.allies || [], 
             bystanders: combatSetupResult.bystanders || [], 
@@ -62,7 +63,8 @@ const initiateCombatHandler = async (req, res) => {
 
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
-    const { action, model: playerModelChoice } = req.body;
+    // 【核心修改】從 req.body 解構出新的策略指令，而不是舊的 action
+    const { strategy, skill, model: playerModelChoice } = req.body;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -74,71 +76,39 @@ const combatActionRouteHandler = async (req, res) => {
         }
 
         let combatState = combatDoc.data();
-        combatState.log.push(`> ${action}`);
-
+        
         const [userDoc, skills] = await Promise.all([
             userDocRef.get(),
             getPlayerSkills(userId)
         ]);
+        
         let playerProfile = userDoc.exists ? userDoc.data() : {};
         playerProfile.skills = skills;
         playerProfile.hp = combatState.player.hp;
         playerProfile.maxHp = combatState.player.maxHp;
+        playerProfile.mp = combatState.player.mp;
+        playerProfile.maxMp = combatState.player.maxMp;
 
-        const knownSkill = skills.find(s => action.includes(s.name) && s.level > 0);
-        let combatResult;
-
-        if (knownSkill) {
-            combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, action);
-        } else {
-            console.log(`[戰鬥系統] 玩家 ${playerProfile.username} 試圖使用未知或未掌握的招式。`);
-            combatResult = {
-                narrative: `你憑著記憶，試圖施展「${action}」，卻只覺劍招散亂，不成章法，破綻百出。`,
-                damageDealt: [],
-                enemies: combatState.enemies,
-                allies: combatState.allies,
-                combatOver: false
-            };
-        }
+        // 【核心修改】將新的策略指令傳遞給AI
+        const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, { strategy, skill });
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
-        combatState.log.push(combatResult.narrative);
-        combatState.turn++;
-        
-        if (combatResult.damageDealt && combatResult.damageDealt.length > 0) {
-            combatResult.damageDealt.forEach(deal => {
-                if (deal.target === "玩家" || deal.target === playerProfile.username) {
-                    combatState.player.hp -= deal.damage;
-                }
-            });
-        }
-        if (combatResult.enemies) combatState.enemies = combatResult.enemies;
-        if (combatResult.allies) combatState.allies = combatResult.allies;
+        // 更新戰鬥狀態
+        const updatedState = combatResult.updatedState;
+        updatedState.log = combatState.log;
+        updatedState.log.push(combatResult.narrative);
 
-        if (combatState.player.hp <= 0) {
-            combatResult.combatOver = true;
-            combatResult.narrative += `\n你眼前一黑，失去了所有知覺...`;
-            combatResult.outcome = {
-                summary: '你不敵對手，身受重傷，倒在血泊之中。',
-                playerChanges: {
-                    PC: `你被${combatState.enemies.map(e => e.name).join('、')}擊敗，身受致命傷。`,
-                    powerChange: { internal: 0, external: 0, lightness: 0 },
-                    moralityChange: 0,
-                },
-                relationshipChanges: []
-            };
-        }
-
-        if (combatResult.combatOver) {
+        // 如果戰鬥結束
+        if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
             const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
             const lastRoundData = lastSaveSnapshot.docs[0].data();
 
-            const postCombatSummary = combatResult.outcome.summary || '戰鬥結束';
-            const playerChanges = combatResult.outcome.playerChanges || {};
-            const relationshipChanges = combatResult.outcome.relationshipChanges || [];
+            const postCombatSummary = combatResult.newRound.summary || '戰鬥結束';
+            const playerChanges = combatResult.newRound.playerChanges || {};
+            const relationshipChanges = combatResult.newRound.relationshipChanges || [];
             
             const powerChange = playerChanges.powerChange || {};
             const finalPowerUpdate = {
@@ -153,16 +123,12 @@ const combatActionRouteHandler = async (req, res) => {
                 const friendlinessChanges = relationshipChanges.map(c => ({ name: c.npcName, friendlinessChange: c.friendlinessChange })).filter(c => c.friendlinessChange);
                 const romanceChanges = relationshipChanges.map(c => ({ npcName: c.npcName, valueChange: c.romanceChange })).filter(c => c.valueChange);
 
-                if (friendlinessChanges.length > 0) {
-                    relationshipPromises.push(updateFriendlinessValues(userId, friendlinessChanges));
-                }
-                if (romanceChanges.length > 0) {
-                    relationshipPromises.push(updateRomanceValues(userId, romanceChanges));
-                }
+                if (friendlinessChanges.length > 0) relationshipPromises.push(updateFriendlinessValues(userId, friendlinessChanges));
+                if (romanceChanges.length > 0) relationshipPromises.push(updateRomanceValues(userId, romanceChanges));
             }
 
             const playerUpdatePayload = { ...finalPowerUpdate };
-            if (combatState.player.hp <= 0) {
+            if (updatedState.player.hp <= 0) {
                 playerUpdatePayload.deathCountdown = 10;
             }
             await Promise.all([
@@ -180,7 +146,7 @@ const combatActionRouteHandler = async (req, res) => {
                  story: combatResult.narrative,
                  PC: playerChanges.PC || postCombatSummary,
                  EVT: postCombatSummary,
-                 playerState: combatState.player.hp <= 0 ? 'dying' : 'alive',
+                 playerState: updatedState.player.hp <= 0 ? 'dying' : 'alive',
                  causeOfDeath: null, 
                  internalPower: updatedUserProfile.internalPower,
                  externalPower: updatedUserProfile.externalPower,
@@ -197,19 +163,21 @@ const combatActionRouteHandler = async (req, res) => {
 
             res.json({
                 status: 'COMBAT_END',
-                newRound: {
+                narrative: combatResult.narrative, // 回傳最後的旁白
+                updatedState: updatedState, // 回傳最後的狀態
+                newRound: { // 回傳用於更新主遊戲循環的資料
                     story: newRoundData.story,
                     roundData: newRoundData,
-                    suggestion: combatState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
+                    suggestion: updatedState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
                 }
             });
 
-        } else {
-            await combatDocRef.set(combatState);
+        } else { // 戰鬥仍在繼續
+            await combatDocRef.set(updatedState);
             res.json({
                 status: 'COMBAT_ONGOING',
                 narrative: combatResult.narrative,
-                updatedState: combatState 
+                updatedState: updatedState,
             });
         }
     } catch (error) {
@@ -217,6 +185,7 @@ const combatActionRouteHandler = async (req, res) => {
         res.status(500).json({ message: error.message || "戰鬥中發生未知錯誤" });
     }
 };
+
 
 const surrenderRouteHandler = async (req, res) => {
     const userId = req.user.id;
@@ -308,8 +277,8 @@ const surrenderRouteHandler = async (req, res) => {
 };
 
 // 將路由綁定到對應的處理函式
-router.post('/combat/initiate', initiateCombatHandler);
-router.post('/combat/action', combatActionRouteHandler);
-router.post('/combat/surrender', surrenderRouteHandler);
+router.post('/initiate', initiateCombatHandler);
+router.post('/action', combatActionRouteHandler);
+router.post('/surrender', surrenderRouteHandler);
 
 module.exports = router;
