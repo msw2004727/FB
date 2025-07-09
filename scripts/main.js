@@ -4,6 +4,9 @@ import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } 
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 import { initializeGmPanel } from './gmManager.js';
+// --- 新增引入 ---
+import { initializeTrade } from './tradeManager.js';
+
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- 登入驗證 ---
@@ -437,7 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 核心修改開始 ---
     function showNpcInteractionMenu(targetElement, npcName) {
         npcInteractionMenu.innerHTML = `
             <button class="npc-interaction-btn trade" data-npc-name="${npcName}"><i class="fas fa-exchange-alt"></i> 交易</button>
@@ -472,8 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
         npcInteractionMenu.style.left = `${left}px`;
         npcInteractionMenu.classList.add('visible');
     }
-    
-    // 新增交易按鈕的處理函式
+
     async function handleTradeButtonClick(event) {
         const npcName = event.currentTarget.dataset.npcName;
         hideNpcInteractionMenu();
@@ -481,16 +482,21 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoadingState(true, `正在與 ${npcName} 準備交易...`);
         try {
             const tradeData = await api.startTrade(npcName);
-            console.log("交易數據已獲取:", tradeData);
-            // TODO: 下一步在這裡呼叫 modal.openTradeModal(tradeData);
-            alert(`已成功獲取與 ${npcName} 的交易數據，下一步將實作UI。`);
+            modal.openTradeModal(tradeData, npcName, (newRound) => {
+                modal.closeTradeModal();
+                if (newRound && newRound.roundData) {
+                    addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
+                    updateUI(newRound.story, newRound.roundData, null, null); 
+                    gameState.currentRound = newRound.roundData.R;
+                    gameState.roundData = newRound.roundData;
+                }
+            });
         } catch (error) {
             handleApiError(error);
         } finally {
             setLoadingState(false);
         }
     }
-    // --- 核心修改結束 ---
 
     async function handleChatButtonClick(event) {
         const npcName = event.currentTarget.dataset.npcName;
