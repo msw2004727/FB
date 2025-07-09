@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.closeTradeModal();
                 if (newRound && newRound.roundData) {
                     addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
-                    updateUI(newRound.story, newRound.roundData, null, null); 
+                    updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
                     gameState.currentRound = newRound.roundData.R;
                     gameState.roundData = newRound.roundData;
                 }
@@ -825,7 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error.message.includes('找不到存檔')) {
                 storyTextContainer.innerHTML = '';
                 const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
-                const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, suggestion: '先檢查一下自己的身體狀況吧。' };
+                const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, stamina: 100, suggestion: '先檢查一下自己的身體狀況吧。' };
                 
                 addRoundTitleToStory(roundZeroData.EVT);
                 appendMessageToStory(initialMessage, 'system-message');
