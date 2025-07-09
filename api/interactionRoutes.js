@@ -156,7 +156,14 @@ const interactRouteHandler = async (req, res) => {
         const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
         const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
         const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
-        let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
+        
+        const currentDate = {
+            yearName: userProfile.yearName || lastSave.yearName || '元祐',
+            year: userProfile.year || lastSave.year || 1,
+            month: userProfile.month || lastSave.month || 1,
+            day: userProfile.day || lastSave.day || 1,
+        };
+
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
         const levelUpEvents = await updateSkills(userId, req.body.skillChanges || []);
         const locationContext = await getMergedLocationData(userId, lastSave.LOC);
@@ -274,13 +281,14 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
-        let currentDate = { yearName: userProfile.yearName, year: userProfile.year, month: userProfile.month, day: userProfile.day };
+        
+        let finalDate = { ...currentDate };
         if (daysToAdvance > 0) {
-            for (let i = 0; i < daysToAdvance; i++) { currentDate = advanceDate(currentDate); }
+            for (let i = 0; i < daysToAdvance; i++) { finalDate = advanceDate(finalDate); }
         } else if (nextTimeOfDay) {
             const oldTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
             const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
-            if (newTimeIndex < oldTimeIndex) { currentDate = advanceDate(currentDate); }
+            if (newTimeIndex < oldTimeIndex) { finalDate = advanceDate(finalDate); }
         }
 
         const newInternalPower = Math.max(0, Math.min(999, (userProfile.internalPower || 0) + (powerChange.internal || 0)));
@@ -288,7 +296,7 @@ const interactRouteHandler = async (req, res) => {
         const newLightness = Math.max(0, Math.min(999, (userProfile.lightness || 0) + (powerChange.lightness || 0)));
         let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
 
-        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...currentDate });
+        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...finalDate });
         
         if (aiResponse.roundData.playerState === 'dead') {
              await userDocRef.update({ isDeceased: true });
@@ -299,12 +307,17 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.roundData.deathCountdown = userProfile.deathCountdown;
         }
 
+        const playerUpdatesForDb = {
+            timeOfDay: aiResponse.roundData.timeOfDay,
+            internalPower: newInternalPower,
+            externalPower: newExternalPower,
+            lightness: newLightness,
+            morality: newMorality,
+            ...finalDate
+        };
+
         await Promise.all([
-             userDocRef.update({
-                timeOfDay: aiResponse.roundData.timeOfDay,
-                internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness,
-                morality: newMorality
-            }),
+             userDocRef.update(playerUpdatesForDb),
             summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
             userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData)
         ]);
