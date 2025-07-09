@@ -24,6 +24,7 @@
 }
 
 .combat-modal-content {
+    position: relative; /* 【核心新增】為關閉按鈕提供定位基準 */
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 12px;
@@ -45,6 +46,27 @@
 body.dark-theme .combat-modal-content {
     background-color: #2c2c34;
     border-color: var(--dark-border);
+}
+
+/* 【核心新增】戰鬥彈窗關閉按鈕 */
+.combat-close-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--light-text-secondary);
+    font-size: 1.8rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+    z-index: 10;
+}
+.combat-close-btn:hover {
+    color: var(--light-text-primary);
+}
+body.dark-theme .combat-close-btn:hover {
+    color: var(--dark-text-primary);
 }
 
 
@@ -275,13 +297,12 @@ body.dark-theme .skill-selection .system-message {
     color: var(--dark-text-secondary);
 }
 
-/* 【核心修改】確認與投降按鈕容器 */
 .confirm-action { 
     display: flex; 
-    flex-direction: column; /* 讓按鈕垂直排列 */
+    flex-direction: column;
     align-items: stretch; 
     justify-content: center; 
-    gap: 0.5rem; /* 按鈕間距 */
+    gap: 0.5rem;
 }
 .confirm-btn, .surrender-btn {
     padding: 0.5rem 1.2rem;
@@ -405,7 +426,7 @@ body.dark-theme .friendliness-bar-background { border-color: var(--dark-border);
 .friendliness-bar-indicator { position: absolute; top: -4px; width: 6px; height: 20px; background-color: var(--light-surface-bg); border: 2px solid var(--light-text-primary); border-radius: 3px; transform: translateX(-50%); transition: left 0.5s ease-out; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 body.dark-theme .friendliness-bar-indicator { background-color: var(--dark-surface-bg); border-color: var(--dark-text-primary); }
 
-/* 【核心修改】窄視窗響應式設計 */
+/* 窄視窗響應式設計 */
 @media (max-width: 768px) {
     .combat-modal-content {
         flex-direction: column; 
@@ -417,9 +438,16 @@ body.dark-theme .friendliness-bar-indicator { background-color: var(--dark-surfa
         border-bottom: 1px solid var(--light-border); 
         flex-shrink: 0; 
         max-height: 40%;
-        box-sizing: border-box; /* 確保 padding 不會撐大寬度 */
-        padding-left: 10%; /* 增加左右內邊距 */
+        box-sizing: border-box; 
+        padding-left: 10%; /* 向內集中 */
         padding-right: 10%;
+    }
+    .combat-main-panel { 
+        flex-grow: 1; 
+        min-height: 0; /* 解決 flex 佈局的溢出問題 */
+    }
+    .combat-actions-container {
+        flex-shrink: 0;
     }
     .combat-actions-panel { 
         flex-direction: column; 
