@@ -29,9 +29,9 @@ export const api = {
     endChat: (body) => fetchApi('/api/game/play/end-chat', { method: 'POST', body: JSON.stringify(body) }),
 
     // Combat Routes
-    initiateCombat: (body) => fetchApi('/api/game/combat/initiate', { method: 'POST', body: JSON.stringify(body) }),
-    combatAction: (body) => fetchApi('/api/game/combat/action', { method: 'POST', body: JSON.stringify(body) }),
-    combatSurrender: (body) => fetchApi('/api/game/combat/surrender', { method: 'POST', body: JSON.stringify(body) }),
+    initiateCombat: (body) => fetchApi('/api/game/play/initiate', { method: 'POST', body: JSON.stringify(body) }),
+    combatAction: (body) => fetchApi('/api/game/play/action', { method: 'POST', body: JSON.stringify(body) }),
+    combatSurrender: (body) => fetchApi('/api/game/play/surrender', { method: 'POST', body: JSON.stringify(body) }),
 
     // NPC Routes
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc/npc-profile/${npcName}`),
