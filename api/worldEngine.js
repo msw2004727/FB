@@ -2,7 +2,7 @@
 const admin = require('firebase-admin');
 const { getBountyGeneratorPrompt } = require('../prompts/bountyGeneratorPrompt.js');
 const { getLocationGeneratorPrompt } = require('../prompts/locationGeneratorPrompt.js'); 
-const { callAI } = require('../services/aiService');
+const { callAI, aiConfig } = require('../services/aiService');
 
 const db = admin.firestore();
 
@@ -30,7 +30,7 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
             // 只有在共享模板不存在時，才呼叫AI進行創造
             console.log(`[世界引擎-混合模式] 為「${locationName}」啟動共享模板生成程序...`);
             const prompt = getLocationGeneratorPrompt(locationName, locationType, worldSummary);
-            const locationJsonString = await callAI('deepseek', prompt, true);
+            const locationJsonString = await callAI(aiConfig.location, prompt, true);
             const newLocationData = JSON.parse(locationJsonString);
 
             if (!newLocationData.locationId || !newLocationData.description) {
