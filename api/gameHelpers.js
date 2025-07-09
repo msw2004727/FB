@@ -188,7 +188,12 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
         if (!templateDoc.exists) {
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
             const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
-            const newTemplateData = JSON.parse(npcJsonString);
+            
+            // --- 新增的程式碼 ---
+            // 清理AI回傳的字串，移除可能的markdown標記
+            const cleanedJsonString = npcJsonString.replace(/^```json\s*|```\s*$/g, '');
+            const newTemplateData = JSON.parse(cleanedJsonString);
+            // --- 程式碼修改結束 ---
             
             if (newTemplateData.createdAt === "CURRENT_TIMESTAMP") {
                 newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
