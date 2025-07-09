@@ -86,3 +86,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ---
 
 現在，請根據以上所有資訊，為「${locationName}」生成一份詳細的、包含巢狀設施結構的JSON檔案。
+`;
+};
+
+module.exports = { getLocationGeneratorPrompt };
