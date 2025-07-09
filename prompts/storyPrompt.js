@@ -17,6 +17,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
     const currentDateString = `${userProfile.yearName || '元祐'}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`;
     const playerGender = userProfile.gender || 'male';
+    const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina; // 【核心新增】讀取玩家精力
 
     const levelUpText = levelUpEvents.length > 0
         ? `\n## 【武學突破】\n在本回合中，玩家的武學境界發生了突破！你必須在你的故事敘述中，為以下事件生成一段充滿意境的描述，來體現玩家的成長，而不是簡單地告知。事件如下：\n${levelUpEvents.map(e => `- 「${e.skillName}」已突破至【${e.levelUpTo}成】境界。`).join('\n')}`
@@ -53,6 +54,26 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
 **此規則是為了增加遊戲的真實感，你不需要直接告訴玩家他的負重分數，而是要將其影響巧妙地融入到故事敘述之中。**
 `;
+
+    // 【核心新增】體力系統規則
+    const staminaSystemRule = `
+## 【核心新增】體力系統 (Stamina System)
+你的首要新職責是根據玩家的行動，判斷其體力消耗。
+
+1.  **玩家當前體力約為**: ${playerStamina} / 100
+2.  **體力判定**: 你必須分析玩家的行動，並在回傳的 \`roundData\` 物件中，包含一個名為 \`staminaChange\` 的**數字**欄位，代表本回合體力的變化。
+3.  **判定準則**:
+    * **精力恢復 (正值)**：
+        * 休息、睡覺、打坐、進食、喝水等。(**範例: \`+20\` 至 \`+50\`**)
+    * **無消耗 (0)**：
+        * 進行簡單的對話、觀察、思考、閱讀等靜態活動。(**範例: \`0\`**)
+    * **微量消耗 (負值)**：
+        * 在城鎮或村莊內短距離行走、搜查一個房間、進行簡單的交易或手工。(**範例: \`-2\` 至 \`-5\`**)
+    * **中等消耗 (負值)**：
+        * 在野外進行長途跋涉、進行常規的武學修練、參與一場普通的戰鬥。(**範例: \`-10\` 至 \`-20\`**)
+    * **大量消耗 (負值)**：
+        * 施展威力強大的武學、全力奔跑以逃離危險、進行高強度的體力勞動（如挖礦）、身受重傷。(**範例: \`-25\` 至 \`-40\`**)
+4.  **敘述整合**: 你需要在你的 \`story\` 敘述中，巧妙地反映出體力的變化。例如，體力下降時可以描述「你感到有些氣喘吁吁」；體力恢復時可以描述「你感覺精神好了許多」。`;
 
     const playerAttributeRules = getPlayerAttributeRule({
         currentDateString,
@@ -107,6 +128,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
 ---
 
+${staminaSystemRule}
 ${dyingInstruction}
 ${romanceInstruction}
 ${encumbranceInstruction}
