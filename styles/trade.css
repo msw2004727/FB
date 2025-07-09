@@ -1,28 +1,6 @@
 /* styles/trade.css */
 
-/* --- 新增的核心彈出層樣式 --- */
-#trade-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    z-index: 1015; /* 比一般彈窗高一點 */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-    backdrop-filter: blur(4px);
-}
-
-#trade-modal.visible {
-    opacity: 1;
-    visibility: visible;
-}
-
+/* --- 【保留的舊版樣式】 --- */
 #trade-modal .modal-content {
     transform: scale(0.95);
     transition: transform 0.3s ease;
@@ -31,12 +9,9 @@
 #trade-modal.visible .modal-content {
     transform: scale(1);
 }
-/* --- 彈出層樣式結束 --- */
 
-
-/* --- 交易彈窗主樣式 --- */
 .modal-content.extra-wide {
-    max-width: 1200px; /* 讓交易視窗更寬敞 */
+    max-width: 1200px;
     height: 85%;
     max-height: 800px;
 }
@@ -62,17 +37,14 @@ body.dark-theme #trade-header {
 #trade-main {
     display: flex;
     flex-grow: 1;
-    padding: 1rem; /* 【修正】此處 padding 已被移除 */
     gap: 1rem;
-    overflow: hidden; /* 防止子元素溢出 */
+    overflow: hidden;
+    padding: 1rem;
 }
 
-/* --- 左右交易面板 (玩家/NPC) --- */
 .trade-panel {
-    /* 【優化】使用 flex 屬性進行佈局 */
     flex: 1 1 35%;
-    min-width: 0; /* 防止 flex item 溢出 */
-
+    min-width: 0;
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 8px;
@@ -149,11 +121,8 @@ body.dark-theme .trade-item:hover {
     font-style: italic;
 }
 
-/* --- 中央交易操作區 --- */
 .trade-center-panel {
-    /* 【優化】使用 flex 屬性進行佈局，且不允許壓縮 */
     flex: 0 0 30%;
-    
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -223,19 +192,6 @@ body.dark-theme .offer-money-input input {
     gap: 1rem;
 }
 
-#trade-value-diff {
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: var(--light-text-secondary);
-    padding: 0.5rem 1rem;
-    background-color: var(--light-bg);
-    border-radius: 6px;
-}
-body.dark-theme #trade-value-diff {
-    background-color: var(--dark-bg);
-    color: var(--dark-text-secondary);
-}
-
 #trade-value-diff.positive {
     color: #28a745; /* 綠色 */
 }
@@ -247,4 +203,54 @@ body.dark-theme #trade-value-diff {
     width: 80%;
     padding: 0.8rem;
     font-size: 1.1rem;
+}
+
+
+/* --- 【新增】全新交易彈窗樣式 (江湖貨棧版) --- */
+
+#trade-modal {
+    /* 預設隱藏，使用 .visible class 來控制顯示 */
+    display: none; 
+}
+
+#trade-modal.visible {
+    /* 當被賦予 .visible class 時，以 flex 佈局顯示 */
+    display: flex;
+}
+
+/* 注意：新版型的絕大部分樣式，如背景、邊框、字體等，
+   已由 Tailwind CSS 在 index.html 中透過 class 直接定義。
+   此處我們只保留最核心的顯示/隱藏控制和自定義動畫。
+*/
+
+/* 發光動畫 (Glow Animation) */
+@keyframes glow-positive-anim {
+    0%, 100% { box-shadow: 0 0 15px 3px rgba(40, 167, 69, 0.7); } /* 綠色光暈 */
+    50% { box-shadow: 0 0 25px 6px rgba(40, 167, 69, 0.7); }
+}
+
+@keyframes glow-negative-anim {
+    0%, 100% { box-shadow: 0 0 15px 3px rgba(220, 53, 69, 0.7); } /* 紅色光暈 */
+    50% { box-shadow: 0 0 25px 6px rgba(220, 53, 69, 0.7); }
+}
+
+.glow-positive {
+    animation: glow-positive-anim 2s infinite ease-in-out;
+}
+
+.glow-negative {
+    animation: glow-negative-anim 2s infinite ease-in-out;
+}
+
+/* 自定義滾動條樣式 */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.1);
+    border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #8c6f54; /* 主題色 */
+    border-radius: 3px;
 }
