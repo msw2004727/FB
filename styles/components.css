@@ -414,6 +414,14 @@ body.dark-theme #internal-power-bar {
 body.dark-theme #external-power-bar {
     background-color: var(--external-power-color-dark);
 }
+/* 【核心新增】精力條樣式 */
+#stamina-bar {
+    background-color: var(--stamina-color-light);
+}
+body.dark-theme #stamina-bar {
+    background-color: var(--stamina-color-dark);
+}
+
 .power-value {
     font-size: 0.8rem;
     font-family: monospace;
