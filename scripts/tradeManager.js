@@ -1,7 +1,5 @@
 // scripts/tradeManager.js
 import { api } from './api.js';
-// 【核心修正】引入正確的函式名稱
-import { closeTradeModal } from './modalManager.js';
 
 // 全域變數，用於儲存當前交易的狀態
 let state = {};
@@ -165,7 +163,7 @@ async function handleConfirmTrade() {
 /**
  * 交易系統的總入口和初始化函式
  * @param {object} tradeData - 從API獲取的初始交易數據
- * @param {string} npcName - NPC的名稱
+ * @param {string} npcName - 正在交易的NPC名稱
  * @param {function} onTradeComplete - 交易成功後的回調
  */
 export function initializeTrade(tradeData, npcName, onTradeComplete) {
