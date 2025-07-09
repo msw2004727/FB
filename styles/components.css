@@ -678,10 +678,12 @@ body.dark-theme .npc-interaction-btn.attack:hover {
 @media (max-width: 768px) {
     .npc-interaction-menu {
         position: fixed; /* 固定在視窗上 */
-        bottom: 80px; /* 放在輸入框上方 */
         left: 50%;
-        transform: translateX(-50%);
-        top: auto; /* 取消 JS 計算的 top */
+        bottom: 15vh; /* 將位置設定為距離視窗底部 15% 的高度，確保足夠的間距 */
+        top: auto; /* 取消繼承的 top 定位 */
+        transform: translateX(-50%); /* 水平置中 */
+        width: auto; /* 讓寬度由內容決定，避免背景拉伸 */
+        display: inline-flex; /* 使用 inline-flex 來包裹按鈕，防止錯位 */
         padding: 0.75rem;
         gap: 0.75rem;
     }
@@ -689,5 +691,6 @@ body.dark-theme .npc-interaction-btn.attack:hover {
     .npc-interaction-btn {
         padding: 0.8rem 1.2rem;
         font-size: 1rem;
+        flex-shrink: 0; /* 防止按鈕被壓縮 */
     }
 }
