@@ -372,7 +372,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 為新生成的按鈕加上事件監聽
         npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
-        npcInteractionMenu.querySelector('.attack').addEventListener('click', handleAttackButtonClick);
+        // 【核心修改】將「動手」按鈕的事件監聽，改為呼叫新的確認函式
+        npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackConfirmation);
     }
 
     async function handleChatButtonClick(event) {
@@ -398,7 +399,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleAttackButtonClick(event) {
+    // 【核心新增】處理「動手」按鈕第一次點擊的函式，用於顯示確認介面
+    function showAttackConfirmation(event) {
+        const npcName = event.currentTarget.dataset.npcName;
+        // 修改互動選單的內容，顯示確認和取消按鈕
+        npcInteractionMenu.innerHTML = `
+            <span class="confirm-prompt-text">確定要動手？</span>
+            <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}"><i class="fas fa-times"></i></button>
+            <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}"><i class="fas fa-check"></i></button>
+        `;
+        // 為新的按鈕綁定事件
+        npcInteractionMenu.querySelector('.cancel-attack').addEventListener('click', hideNpcInteractionMenu);
+        npcInteractionMenu.querySelector('.confirm-attack').addEventListener('click', confirmAndInitiateAttack);
+    }
+
+    // 【核心新增】處理「確定」按鈕點擊的函式，包含原來的攻擊邏輯
+    async function confirmAndInitiateAttack(event) {
         const npcName = event.currentTarget.dataset.npcName;
         hideNpcInteractionMenu();
         if (gameState.isRequesting) return;
