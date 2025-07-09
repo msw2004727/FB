@@ -1,0 +1,355 @@
+/* styles/modals_feedback.css */
+
+/* --- 統一的 AI 回應等待動畫 --- */
+.ai-thinking-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    background: rgba(255, 255, 255, 0.85); 
+    z-index: 20;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    pointer-events: none;
+    padding: 2rem;
+    box-sizing: border-box;
+}
+
+.loader-disclaimer {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    color: var(--light-text-secondary);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-family: var(--font-sans);
+    max-width: 80%;
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+}
+
+body.dark-theme .loader-disclaimer {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+.ai-thinking-loader.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+body.dark-theme .ai-thinking-loader {
+    background: rgba(26, 26, 29, 0.85);
+}
+
+.ai-thinking-loader .loader-text {
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .ai-thinking-loader .loader-text {
+    color: var(--dark-text-secondary);
+}
+
+.ai-thinking-loader .loader-dots span,
+.combat-loader-overlay .loader-dots span,
+.chat-loader-overlay .loader-dots span {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin: 0 5px;
+    animation: prequel-bounce 1.4s infinite ease-in-out both;
+}
+
+.ai-thinking-loader .loader-dots span {
+    background-color: var(--light-accent);
+}
+body.dark-theme .ai-thinking-loader .loader-dots span {
+    background-color: var(--dark-accent);
+}
+.combat-loader-overlay .loader-dots span,
+.chat-loader-overlay .loader-dots span {
+    background-color: #fff;
+}
+
+
+.ai-thinking-loader .loader-dots span:nth-of-type(1),
+.combat-loader-overlay .loader-dots span:nth-of-type(1),
+.chat-loader-overlay .loader-dots span:nth-of-type(1) {
+    animation-delay: -0.32s;
+}
+
+.ai-thinking-loader .loader-dots span:nth-of-type(2),
+.combat-loader-overlay .loader-dots span:nth-of-type(2),
+.chat-loader-overlay .loader-dots span:nth-of-type(2) {
+    animation-delay: -0.16s;
+}
+
+.loader-tip {
+    margin-top: 2rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--light-text-secondary);
+    max-width: 450px;
+    text-align: center;
+    line-height: 1.6;
+    font-style: italic;
+}
+
+body.dark-theme .loader-tip {
+    color: var(--dark-text-secondary);
+}
+
+
+/* --- 死亡畫面樣式 --- */
+.deceased-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 1002;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+    backdrop-filter: blur(5px);
+}
+
+.deceased-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.deceased-content {
+    background-color: var(--light-surface-bg);
+    padding: 3rem;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 480px;
+    width: 90%;
+    font-family: var(--font-serif);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+body.dark-theme .deceased-content {
+    background-color: var(--dark-surface-bg);
+}
+
+.deceased-content .fa-book-dead {
+    font-size: 4rem;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .deceased-content .fa-book-dead {
+    color: var(--dark-text-secondary);
+}
+
+.deceased-content h2 {
+    font-size: 2.2rem;
+    margin: 0;
+    color: var(--light-text-primary);
+}
+body.dark-theme .deceased-content h2 {
+    color: var(--dark-text-primary);
+}
+
+.deceased-content p {
+    font-size: 1.1rem;
+    color: var(--light-text-secondary);
+    margin: 0;
+    line-height: 1.8;
+}
+body.dark-theme .deceased-content p {
+    color: var(--dark-text-secondary);
+}
+
+.deceased-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+
+.deceased-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.deceased-btn.review-btn {
+    background-color: transparent;
+    border-color: var(--light-border);
+    color: var(--light-text-secondary);
+}
+body.dark-theme .deceased-btn.review-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+.deceased-btn.review-btn:hover {
+    background-color: var(--light-bg);
+    color: var(--light-text-primary);
+}
+body.dark-theme .deceased-btn.review-btn:hover {
+    background-color: var(--dark-bg);
+    color: var(--dark-text-primary);
+}
+
+.deceased-btn.restart-btn {
+    background-color: var(--light-accent);
+    color: #fff;
+}
+body.dark-theme .deceased-btn.restart-btn {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+}
+.deceased-btn.restart-btn:hover {
+    opacity: 0.85;
+}
+
+/* --- 結局彈窗樣式 --- */
+.epilogue-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1001; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease;
+    backdrop-filter: blur(5px);
+}
+
+.epilogue-modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.epilogue-modal-content {
+    background-color: var(--light-surface-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 700px;
+    height: 80%;
+    max-height: 800px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 50px rgba(0,0,0,0.4);
+    transform: scale(0.95);
+    transition: transform 0.4s ease;
+}
+
+.epilogue-modal-overlay.visible .epilogue-modal-content {
+    transform: scale(1);
+}
+
+body.dark-theme .epilogue-modal-content {
+    background-color: var(--dark-bg);
+    border: 1px solid var(--dark-border);
+}
+
+.epilogue-modal-header {
+    text-align: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+}
+
+body.dark-theme .epilogue-modal-header {
+    border-bottom-color: var(--dark-border);
+}
+
+.epilogue-modal-header h2 {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    margin: 0;
+    color: var(--light-accent);
+}
+
+body.dark-theme .epilogue-modal-header h2 {
+    color: var(--dark-accent);
+}
+
+.epilogue-modal-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 2rem 2.5rem;
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 2.2;
+    text-align: justify;
+    white-space: pre-wrap; 
+}
+
+.epilogue-modal-footer {
+    padding: 1rem;
+    text-align: center;
+    border-top: 1px solid var(--light-border);
+}
+
+body.dark-theme .epilogue-modal-footer {
+    border-top-color: var(--dark-border);
+}
+
+.epilogue-btn {
+    padding: 0.8rem 2.5rem;
+    font-family: var(--font-sans);
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 30px;
+    cursor: pointer;
+    background-color: var(--light-accent);
+    color: #fff;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.epilogue-btn:hover {
+    opacity: 0.85;
+    transform: scale(1.05);
+}
+
+.epilogue-modal-body .loading-placeholder {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    color: var(--light-text-secondary);
+}
+
+.epilogue-modal-body .loading-placeholder .loader-dots span {
+    background-color: var(--light-accent);
+}
