@@ -1,6 +1,7 @@
 // scripts/tradeManager.js
 import { api } from './api.js';
-import { closeModal } from './modalManager.js';
+// 【核心修正】引入正確的函式名稱
+import { closeTradeModal } from './modalManager.js';
 
 // 全域變數，用於儲存當前交易的狀態
 let state = {};
@@ -152,8 +153,8 @@ async function handleConfirmTrade() {
         if (result.newRound && typeof onTradeCompleteCallback === 'function') {
             onTradeCompleteCallback(result.newRound);
         }
-        // 成功後關閉視窗
-        closeModal();
+        // 【核心修正】成功後呼叫正確的關閉函式
+        closeTradeModal();
 
     } catch (error) {
         alert(`交易失敗: ${error.message}`);
