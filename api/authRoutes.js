@@ -52,7 +52,7 @@ router.post('/register', async (req, res) => {
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // 【核心修改】在儲存第0回合前，主動為新玩家生成並快取好「無名村」這個初始地點
+        // 在儲存第0回合前，主動為新玩家生成並快取好「無名村」這個初始地點
         console.log(`[註冊流程] 正在為新玩家 ${username} 主動建立初始地點「無名村」...`);
         await generateAndCacheLocation(newUserRef.id, '無名村', '村莊', '玩家初入江湖，身在無名村。');
         console.log(`[註冊流程] 「無名村」建立完畢。`);
