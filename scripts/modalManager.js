@@ -6,7 +6,7 @@ const deceasedOverlay = document.getElementById('deceased-overlay');
 const deceasedTitle = document.getElementById('deceased-title');
 
 const combatModal = document.getElementById('combat-modal');
-const closeCombatBtn = document.getElementById('close-combat-btn'); // 【核心新增】
+const closeCombatBtn = document.getElementById('close-combat-btn');
 const combatLog = document.getElementById('combat-log');
 const combatLoader = document.getElementById('combat-loader');
 const combatTurnCounter = document.getElementById('combat-turn-counter');
@@ -149,8 +149,6 @@ export function closeEpilogueModal() {
 }
 
 // --- 戰鬥彈窗 ---
-
-// 【核心修改】為 openCombatModal 新增 onCombatCancel 回調函式
 export function openCombatModal(initialState, onCombatCancel) {
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
     enemiesRoster.innerHTML = '<h4><i class="fas fa-skull-crossbones"></i> 敵方陣營</h4>';
@@ -182,14 +180,12 @@ export function openCombatModal(initialState, onCombatCancel) {
     
     confirmActionContainer.innerHTML = `<button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>`;
     
-    // 【核心修改】為關閉按鈕綁定事件
     if (closeCombatBtn) {
         const closeHandler = () => {
             closeCombatModal();
             if (typeof onCombatCancel === 'function') {
                 onCombatCancel();
             }
-            // 移除監聽器以避免重複綁定
             closeCombatBtn.removeEventListener('click', closeHandler);
         };
         closeCombatBtn.addEventListener('click', closeHandler);
@@ -316,7 +312,7 @@ export function openSkillsModal(skillsData) {
     }
 
     const skillsByType = skillsData.reduce((acc, skill) => {
-        const type = skill.type || '雜學';
+        const type = skill.skillType || '雜學';
         if (!acc[type]) {
             acc[type] = [];
         }
@@ -342,12 +338,13 @@ export function openSkillsModal(skillsData) {
             
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
+            // --- 核心修改開始 ---
             skillEntry.innerHTML = `
                 <div class="skill-entry-header">
-                    <h4>${skill.name}</h4>
+                    <h4>${skill.skillName}</h4>
                     <span class="skill-type">${skill.power_type || '無'}</span>
                 </div>
-                <p class="skill-description">${skill.description || '暫無描述。'}</p>
+                <p class="skill-description">${skill.base_description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
                     <span class="level-label">等級 ${skill.level}</span>
                     <div class="exp-bar-background">
@@ -356,6 +353,7 @@ export function openSkillsModal(skillsData) {
                     <span class="exp-text">${skill.exp} / ${expToNextLevel}</span>
                 </div>
             `;
+            // --- 核心修改結束 ---
             tabContent.appendChild(skillEntry);
         });
         
