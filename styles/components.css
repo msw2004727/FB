@@ -31,35 +31,35 @@ body.dark-theme .prequel-summary h3 {
 }
 
 /* --- 儀表板元件 --- */
-.info-card { 
-    font-family: var(--font-sans); 
-    font-size: 0.9rem; 
+.info-card {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
 }
-.welcome-card { 
-    text-align: center; 
-    color: var(--light-text-secondary); 
-    font-style: italic; 
-    padding-bottom: 1rem; 
-    border-bottom: 1px dashed var(--light-border); 
+.welcome-card {
+    text-align: center;
+    color: var(--light-text-secondary);
+    font-style: italic;
+    padding-bottom: 1rem;
+    border-bottom: 1px dashed var(--light-border);
 }
-body.dark-theme .welcome-card { 
-    border-bottom-color: var(--dark-border); 
+body.dark-theme .welcome-card {
+    border-bottom-color: var(--dark-border);
 }
-.info-card h4 { 
-    margin: 0 0 0.75rem 0; 
-    color: var(--light-accent); 
-    border-bottom: 1px solid var(--light-border); 
-    padding-bottom: 0.5rem; 
+.info-card h4 {
+    margin: 0 0 0.75rem 0;
+    color: var(--light-accent);
+    border-bottom: 1px solid var(--light-border);
+    padding-bottom: 0.5rem;
 }
-body.dark-theme .info-card h4 { 
-    color: var(--dark-accent); 
-    border-bottom: 1px solid var(--dark-border); 
+body.dark-theme .info-card h4 {
+    color: var(--dark-accent);
+    border-bottom: 1px solid var(--dark-border);
 }
-.info-card i { 
-    margin-right: 0.5rem; 
+.info-card i {
+    margin-right: 0.5rem;
 }
-.info-card div { 
-    line-height: 1.7; 
+.info-card div {
+    line-height: 1.7;
 }
 
 /* 瀕死倒數計時器樣式 */
@@ -110,7 +110,7 @@ body.dark-theme #location-info .location-ruler {
     margin-top: 0.5rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;  
+    -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -139,26 +139,26 @@ body.dark-theme .card-header-flex {
 }
 
 /* --- 按鈕 --- */
-.theme-switcher, .header-link-btn { 
-    background: none; 
-    border: none; 
-    color: var(--light-text-secondary); 
-    font-size: 1.2rem; 
-    cursor: pointer; 
-    padding: 0.5rem; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    text-decoration: none; 
+.theme-switcher, .header-link-btn {
+    background: none;
+    border: none;
+    color: var(--light-text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
 }
-body.dark-theme .theme-switcher, body.dark-theme .header-link-btn { 
-    color: var(--dark-text-secondary); 
+body.dark-theme .theme-switcher, body.dark-theme .header-link-btn {
+    color: var(--dark-text-secondary);
 }
-.header-link-btn:hover, .theme-switcher:hover { 
-    color: var(--light-accent); 
+.header-link-btn:hover, .theme-switcher:hover {
+    color: var(--light-accent);
 }
-body.dark-theme .header-link-btn:hover, body.dark-theme .theme-switcher:hover { 
-    color: var(--dark-accent); 
+body.dark-theme .header-link-btn:hover, body.dark-theme .theme-switcher:hover {
+    color: var(--dark-accent);
 }
 .header-toggle-btn {
     position: absolute;
@@ -203,7 +203,7 @@ body.dark-theme .header-toggle-btn:hover {
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
-    flex-shrink: 0; 
+    flex-shrink: 0;
 }
 .header-icon-btn:hover {
     background-color: var(--light-accent);
@@ -221,55 +221,55 @@ body.dark-theme .header-icon-btn:hover {
     border-color: var(--dark-accent);
 }
 .header-icon-btn .fas {
-    margin: 0; 
+    margin: 0;
 }
 
 
 /* --- AI 模型選擇器 --- */
-.select-wrapper { 
-    position: relative; 
+.select-wrapper {
+    position: relative;
 }
-#ai-model-selector { 
-    width: 100%; 
-    padding: 0.75rem; 
-    border-radius: 6px; 
-    border: 1px solid var(--light-border); 
-    background-color: var(--light-surface-bg); 
-    color: var(--light-text-primary); 
-    font-family: var(--font-sans); 
-    font-size: 0.9rem; 
-    -webkit-appearance: none; 
-    -moz-appearance: none; 
-    appearance: none; 
-    cursor: pointer; 
+#ai-model-selector {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--light-border);
+    background-color: var(--light-surface-bg);
+    color: var(--light-text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
 }
-body.dark-theme #ai-model-selector { 
-    border-color: var(--dark-border); 
-    background-color: var(--dark-surface-bg); 
-    color: var(--dark-text-primary); 
+body.dark-theme #ai-model-selector {
+    border-color: var(--dark-border);
+    background-color: var(--dark-surface-bg);
+    color: var(--dark-text-primary);
 }
-.select-wrapper::after { 
-    content: '\f078'; 
-    font-family: 'Font Awesome 6 Free'; 
-    font-weight: 900; 
-    position: absolute; 
-    top: 50%; 
-    right: 1rem; 
-    transform: translateY(-50%); 
-    pointer-events: none; 
-    color: var(--light-text-secondary); 
+.select-wrapper::after {
+    content: '\f078';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--light-text-secondary);
 }
-body.dark-theme .select-wrapper::after { 
-    color: var(--dark-text-secondary); 
+body.dark-theme .select-wrapper::after {
+    color: var(--dark-text-secondary);
 }
-#ai-model-selector:focus { 
-    outline: none; 
-    border-color: var(--light-accent); 
-    box-shadow: 0 0 0 2px rgba(140, 111, 84, 0.2); 
+#ai-model-selector:focus {
+    outline: none;
+    border-color: var(--light-accent);
+    box-shadow: 0 0 0 2px rgba(140, 111, 84, 0.2);
 }
-body.dark-theme #ai-model-selector:focus { 
-    border-color: var(--dark-accent); 
-    box-shadow: 0 0 0 2px rgba(195, 169, 138, 0.2); 
+body.dark-theme #ai-model-selector:focus {
+    border-color: var(--dark-accent);
+    box-shadow: 0 0 0 2px rgba(195, 169, 138, 0.2);
 }
 
 /* --- 動作建議 --- */
@@ -300,7 +300,7 @@ body.dark-theme .action-suggestion {
 .npc-name {
     font-weight: bold;
     transition: color 0.3s ease;
-    cursor: pointer; 
+    cursor: pointer;
 }
 .npc-name:hover {
     text-decoration: underline;
@@ -449,8 +449,8 @@ body.dark-theme .random-event-message {
 
 /* --- AI 核心切換提示樣式 --- */
 .ai-switch-notification {
-    color: #155724; 
-    background-color: #d4edda; 
+    color: #155724;
+    background-color: #d4edda;
     border: 1px solid #c3e6cb;
     border-radius: 4px;
     padding: 0.75rem 1.25rem;
@@ -473,11 +473,11 @@ body.dark-theme .ai-switch-notification {
 
 /* --- 戀愛事件特殊樣式 --- */
 .romance-event {
-    border-style: solid; 
-    border-color: #e54865; 
-    background-color: #fff0f3; 
-    color: #a6324a; 
-    font-weight: 600; 
+    border-style: solid;
+    border-color: #e54865;
+    background-color: #fff0f3;
+    color: #a6324a;
+    font-weight: 600;
 }
 
 body.dark-theme .romance-event {
@@ -509,9 +509,9 @@ body.dark-theme .dashboard-header {
 }
 
 .header-prompt-text {
-    font-size: 0.75rem; 
+    font-size: 0.75rem;
     color: var(--light-text-secondary);
-    margin-right: 0.5rem; 
+    margin-right: 0.5rem;
 }
 
 body.dark-theme .header-prompt-text {
@@ -674,23 +674,4 @@ body.dark-theme .npc-interaction-btn.attack:hover {
     border-color: #ff6b6b;
 }
 
-/* 【核心新增】針對窄視窗的互動選單樣式 */
-@media (max-width: 768px) {
-    .npc-interaction-menu {
-        position: fixed; /* 固定在視窗上 */
-        left: 50%;
-        bottom: 15vh; /* 將位置設定為距離視窗底部 15% 的高度，確保足夠的間距 */
-        top: auto; /* 取消繼承的 top 定位 */
-        transform: translateX(-50%); /* 水平置中 */
-        width: auto; /* 讓寬度由內容決定，避免背景拉伸 */
-        display: inline-flex; /* 使用 inline-flex 來包裹按鈕，防止錯位 */
-        padding: 0.75rem;
-        gap: 0.75rem;
-    }
-
-    .npc-interaction-btn {
-        padding: 0.8rem 1.2rem;
-        font-size: 1rem;
-        flex-shrink: 0; /* 防止按鈕被壓縮 */
-    }
-}
+/* 【核心修改】刪除了之前為 mobile 添加的固定定位規則 */
