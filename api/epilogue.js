@@ -77,7 +77,8 @@ router.get('/', async (req, res) => {
             username: username,
             longTermSummary: summaryDoc.exists ? summaryDoc.data().text : '此人一生如謎，未有記載。',
             finalStats: {
-                gender: userData.gender,
+                // 【核心修改】如果找不到性別，預設為 'male'，避免程式崩潰
+                gender: userData.gender || 'male',
                 power: {
                     internal: userData.internalPower,
                     external: userData.externalPower,
@@ -88,7 +89,6 @@ router.get('/', async (req, res) => {
             finalRelationships: finalRelationships,
             finalInventory: finalInventory,
             deathInfo: {
-                // 【核心修改】優先使用 causeOfDeath，如果沒有，再使用PC，最後才是通用描述
                 cause: lastSaveData.causeOfDeath || lastSaveData.PC || '江湖險惡，不幸殞命。',
                 time: `${lastSaveData.yearName}${lastSaveData.year}年${lastSaveData.month}月${lastSaveData.day}日`,
                 location: lastSaveData.LOC[0]
@@ -97,8 +97,7 @@ router.get('/', async (req, res) => {
 
         // --- 4. 呼叫AI服務生成結局 ---
         console.log(`[結局系統] 資料準備完畢，正在為 ${username} 請求AI生成結局...`);
-        // 我們將使用 'deepseek' 模型來生成需要較強創造力的長篇故事
-        const epilogueStory = await getAIEpilogue('deepseek', playerDataForAI);
+        const epilogueStory = await getAIEpilogue(playerDataForAI);
 
         // --- 5. 回傳結果 ---
         res.json({ epilogue: epilogueStory });
