@@ -12,6 +12,8 @@ const externalPowerBar = document.getElementById('external-power-bar');
 const externalPowerValue = document.getElementById('external-power-value');
 const lightnessPowerBar = document.getElementById('lightness-power-bar');
 const lightnessPowerValue = document.getElementById('lightness-power-value');
+const staminaBar = document.getElementById('stamina-bar'); // 【核心新增】
+const staminaValue = document.getElementById('stamina-value'); // 【核心新增】
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
@@ -84,11 +86,11 @@ function updateMoralityBar(moralityValue) {
     }
 }
 
-function updatePowerBar(barElement, valueElement, currentValue) {
+function updatePowerBar(barElement, valueElement, currentValue, maxValue) {
     if (barElement && valueElement) {
-        const percentage = Math.min(((currentValue || 0) / MAX_POWER) * 100, 100);
+        const percentage = Math.min(((currentValue || 0) / maxValue) * 100, 100);
         barElement.style.width = `${percentage}%`;
-        valueElement.textContent = `${currentValue || 0}/${MAX_POWER}`;
+        valueElement.textContent = `${currentValue || 0}/${maxValue}`;
     }
 }
 
@@ -143,12 +145,12 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
 
     pcContent.textContent = roundData.PC || '狀態穩定';
 
-    // 【核心修改】呼叫新的UI更新函式
     updateDeathCountdownUI(roundData.deathCountdown);
 
-    updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower);
-    updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower);
-    updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness);
+    updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
+    updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
+    updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
+    updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100); // 【核心新增】更新精力條
 
     updateMoralityBar(roundData.morality);
 
