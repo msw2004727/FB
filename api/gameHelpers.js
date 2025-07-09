@@ -12,7 +12,9 @@ const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 const getMergedLocationData = async (userId, locationArray) => {
     // 【核心修改】現在接收的是一個陣列，例如 ["無名村"] 或 ["無名村", "藥鋪"]
-    if (!locationArray || locationArray.length === 0) return null;
+    if (!locationArray || locationArray.length === 0 || locationArray[0] === '無') {
+        return null;
+    }
 
     const mainLocationName = locationArray[0];
     const subLocationName = locationArray.length > 1 ? locationArray[1] : null;
