@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const gmMenu = document.getElementById('gm-menu');
     const gmContent = document.getElementById('gm-content');
 
-    // 【核心修改】將其移出 startCombat，使其在 handleCombatSurrender 中也可訪問
     let combatSurrenderBtn = null; 
 
     function setGameContainerHeight() {
@@ -259,7 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.isInCombat = true;
         gameState.combat.state = initialState;
         
-        // 【核心修改】將取消戰鬥的回調函式傳入
         modal.openCombatModal(initialState, () => {
             if (window.confirm("確定要逃離這次戰鬥嗎？這可能會對你的江湖聲望造成影響。")) {
                 gameState.isInCombat = false;
@@ -321,7 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playerSkills = gameState.combat.state?.player?.skills || [];
         
-        // 【核心修改】根據新的 combatCategory 進行篩選
         const categoryMap = {
             'attack': '攻擊',
             'defend': '防禦',
@@ -347,7 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
              skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
         }
         
-        // 對於迴避策略，即使沒有對應武學，也應該可以直接確認
         if (strategy === 'evade') {
              if (confirmBtn) confirmBtn.disabled = false;
         }
@@ -441,12 +437,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- 核心修改開始 ---
     function showNpcInteractionMenu(targetElement, npcName) {
         npcInteractionMenu.innerHTML = `
+            <button class="npc-interaction-btn trade" data-npc-name="${npcName}"><i class="fas fa-exchange-alt"></i> 交易</button>
             <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
             <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
         `;
         
+        npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
         npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
         npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackConfirmation);
 
@@ -473,6 +472,25 @@ document.addEventListener('DOMContentLoaded', () => {
         npcInteractionMenu.style.left = `${left}px`;
         npcInteractionMenu.classList.add('visible');
     }
+    
+    // 新增交易按鈕的處理函式
+    async function handleTradeButtonClick(event) {
+        const npcName = event.currentTarget.dataset.npcName;
+        hideNpcInteractionMenu();
+        if (gameState.isRequesting) return;
+        setLoadingState(true, `正在與 ${npcName} 準備交易...`);
+        try {
+            const tradeData = await api.startTrade(npcName);
+            console.log("交易數據已獲取:", tradeData);
+            // TODO: 下一步在這裡呼叫 modal.openTradeModal(tradeData);
+            alert(`已成功獲取與 ${npcName} 的交易數據，下一步將實作UI。`);
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            setLoadingState(false);
+        }
+    }
+    // --- 核心修改結束 ---
 
     async function handleChatButtonClick(event) {
         const npcName = event.currentTarget.dataset.npcName;
