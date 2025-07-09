@@ -62,23 +62,23 @@ body.dark-theme #trade-header {
 #trade-main {
     display: flex;
     flex-grow: 1;
+    padding: 1rem; /* 【修正】此處 padding 已被移除 */
     gap: 1rem;
     overflow: hidden; /* 防止子元素溢出 */
-    padding: 1rem; /* 【移除】移除此內邊距，改由子元素控制 */
 }
 
 /* --- 左右交易面板 (玩家/NPC) --- */
 .trade-panel {
-    width: 35%;
+    /* 【優化】使用 flex 屬性進行佈局 */
+    flex: 1 1 35%;
+    min-width: 0; /* 防止 flex item 溢出 */
+
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* 【新增】允許面板彈性增長 */
-    min-width: 0; /* 【新增】防止 flex item 溢出 */
 }
-
 
 body.dark-theme .trade-panel {
     background-color: var(--dark-bg);
@@ -151,13 +151,13 @@ body.dark-theme .trade-item:hover {
 
 /* --- 中央交易操作區 --- */
 .trade-center-panel {
-    width: 30%;
+    /* 【優化】使用 flex 屬性進行佈局，且不允許壓縮 */
+    flex: 0 0 30%;
+    
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    flex-shrink: 0; /* 【新增】防止此面板被壓縮 */
 }
-
 
 .trade-offer-area {
     height: 40%;
