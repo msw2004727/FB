@@ -289,7 +289,7 @@ const interactRouteHandler = async (req, res) => {
                 } else {
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
-                        return npcDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
+                        return npcDocRef.update({ currentLocation: newSceneLocation });
                     }
                 }
                 return Promise.resolve();
