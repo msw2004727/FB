@@ -6,6 +6,7 @@ const deceasedOverlay = document.getElementById('deceased-overlay');
 const deceasedTitle = document.getElementById('deceased-title');
 
 const combatModal = document.getElementById('combat-modal');
+const closeCombatBtn = document.getElementById('close-combat-btn'); // 【核心新增】
 const combatLog = document.getElementById('combat-log');
 const combatLoader = document.getElementById('combat-loader');
 const combatTurnCounter = document.getElementById('combat-turn-counter');
@@ -81,13 +82,11 @@ function displayFriendlinessBar(value) {
     chatNpcInfo.appendChild(barContainer);
 }
 
-// 【核心修改】全新的角色卡片生成函式
 function createCharacterCard(character) {
     const card = document.createElement('div');
     card.className = 'character-card';
     card.dataset.name = character.name || character.username;
 
-    // 處理特性標籤
     let tagsHtml = '';
     if (character.tags && Array.isArray(character.tags)) {
         tagsHtml = `<div class="tags-container">
@@ -95,7 +94,6 @@ function createCharacterCard(character) {
         </div>`;
     }
 
-    // 處理內力條
     let mpBarHtml = '';
     if (character.mp !== undefined && character.maxMp !== undefined) {
         const mpPercentage = (character.mp / character.maxMp) * 100;
@@ -150,44 +148,52 @@ export function closeEpilogueModal() {
     if (epilogueModal) epilogueModal.classList.remove('visible');
 }
 
-// --- 戰鬥彈窗 (全新重構) ---
+// --- 戰鬥彈窗 ---
 
-export function openCombatModal(initialState) {
+// 【核心修改】為 openCombatModal 新增 onCombatCancel 回調函式
+export function openCombatModal(initialState, onCombatCancel) {
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
     enemiesRoster.innerHTML = '<h4><i class="fas fa-skull-crossbones"></i> 敵方陣營</h4>';
     strategyButtonsContainer.innerHTML = '';
     skillSelectionContainer.innerHTML = '<div class="system-message">請先選擇一個策略</div>';
     confirmActionContainer.innerHTML = '';
 
-    // 填充我方陣營 (玩家 + 盟友)
     if (initialState.player) {
         alliesRoster.appendChild(createCharacterCard(initialState.player));
     }
     if (initialState.allies && initialState.allies.length > 0) {
         initialState.allies.forEach(ally => alliesRoster.appendChild(createCharacterCard(ally)));
     }
-
-    // 填充敵方陣營
     if (initialState.enemies && initialState.enemies.length > 0) {
         initialState.enemies.forEach(enemy => enemiesRoster.appendChild(createCharacterCard(enemy)));
     }
 
-    // 設置初始戰鬥日誌和回合數
     combatLog.innerHTML = '';
     if (initialState.log && initialState.log.length > 0) {
-        updateCombatLog(`<p>${initialState.log[0]}</p>`, 'system-message');
+        updateCombatLog(`<p>${initialState.log[0]}</p>`);
     }
     setTurnCounter(initialState.turn || 1);
     
-    // 建立策略按鈕
     strategyButtonsContainer.innerHTML = `
         <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
         <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
         <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
     `;
     
-    // 建立確認按鈕（預設禁用）
     confirmActionContainer.innerHTML = `<button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>`;
+    
+    // 【核心修改】為關閉按鈕綁定事件
+    if (closeCombatBtn) {
+        const closeHandler = () => {
+            closeCombatModal();
+            if (typeof onCombatCancel === 'function') {
+                onCombatCancel();
+            }
+            // 移除監聽器以避免重複綁定
+            closeCombatBtn.removeEventListener('click', closeHandler);
+        };
+        closeCombatBtn.addEventListener('click', closeHandler);
+    }
 
     combatModal.classList.add('visible');
 }
@@ -212,10 +218,10 @@ export function updateCombatUI(updatedState) {
             
             const mpBar = card.querySelector('.mp-bar-fill');
             const mpValueText = card.querySelector('.mp-bar-container .bar-value-text');
-            if (mpBar && character.mp !== undefined) {
+            if (mpBar && mpValueText && character.mp !== undefined) {
                 const mpPercentage = (character.mp / character.maxMp) * 100;
                 mpBar.style.width = `${mpPercentage}%`;
-                 if (mpValueText) mpValueText.textContent = character.mp;
+                mpValueText.textContent = character.mp;
             }
         }
     });
@@ -233,7 +239,9 @@ export function setTurnCounter(turn) {
     combatTurnCounter.textContent = `第 ${turn} 回合`;
 }
 
-export function closeCombatModal() { combatModal.classList.remove('visible'); }
+export function closeCombatModal() { 
+    if(combatModal) combatModal.classList.remove('visible'); 
+}
 export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.classList.toggle('visible', isLoading); }
 
 
@@ -249,7 +257,7 @@ export function openChatModalUI(profile) {
 export function closeChatModal() { chatModal.classList.remove('visible'); }
 export function appendChatMessage(speaker, message) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `${speaker}-message`; // CSS class is player-message or npc-message
+    messageDiv.className = `${speaker}-message`;
     messageDiv.innerHTML = message;
     chatLog.appendChild(messageDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
@@ -268,7 +276,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
             if (itemData.quantity > 0) {
                 hasItems = true;
                 const itemDiv = document.createElement('div');
-                itemDiv.className = 'give-item'; // This needs a corresponding CSS class
+                itemDiv.className = 'give-item';
                 itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
                 itemDiv.addEventListener('click', () => {
                     if (itemName === '銀兩') {
