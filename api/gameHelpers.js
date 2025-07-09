@@ -145,14 +145,19 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// 【核心修改】重構整個函式以使用 Firestore Transaction
 const updateInventory = async (userId, itemChanges) => {
     if (!itemChanges || itemChanges.length === 0) return;
 
     const userInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
 
     for (const change of itemChanges) {
-        const { action, itemName, quantity = 1 } = change;
+        let { action, itemName, quantity = 1 } = change;
+
+        // 【核心新增】物品名稱清洗邏輯
+        const nameRegex = / x\d+$/; // 匹配 " x" + 數字結尾的模式
+        if (nameRegex.test(itemName)) {
+            itemName = itemName.replace(nameRegex, '').trim();
+        }
 
         try {
             if (action === 'add') {
