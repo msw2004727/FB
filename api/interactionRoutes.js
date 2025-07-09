@@ -18,7 +18,8 @@ const {
     updateSkills,
     getPlayerSkills,
     processNpcUpdates,
-    getMergedLocationData
+    getMergedLocationData,
+    getMergedNpcProfile // 【核心修正】引入 getMergedNpcProfile
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
@@ -226,7 +227,6 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.money = inventoryState.money;
         aiResponse.roundData.skills = updatedSkills;
 
-        // 【核心修改】修正NPC狀態更新邏輯
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                 const npcStateDocRef = userDocRef.collection('npc_states').doc(npc.name);
@@ -241,7 +241,6 @@ const interactRouteHandler = async (req, res) => {
                 } else {
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
-                        // 正確地更新玩家與NPC的關係狀態檔案中的位置
                         return npcStateDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
                     }
                 }
