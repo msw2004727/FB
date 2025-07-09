@@ -50,6 +50,7 @@ body.dark-theme .welcome-card {
     color: var(--light-accent);
     border-bottom: 1px solid var(--light-border);
     padding-bottom: 0.5rem;
+    font-weight: bold; /* 【核心修正】重新將粗體樣式加回來 */
 }
 body.dark-theme .info-card h4 {
     color: var(--dark-accent);
