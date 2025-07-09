@@ -9,7 +9,6 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-// 【核心修改】函式簽名新增 npcContext 和 playerBulkScore 參數
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
@@ -89,13 +88,19 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **NPC的「情境反應」**: 根據在場NPC對玩家的友好度，生成符合邏輯的反應（友好則好奇、中立則困惑、敵對則嘲笑）。
     * **劇情融合**: 最後，將上述的「主角回想」與「NPC反應」自然地融合到你的 "story" 敘述中。
 
-2.  **【核心新增】語言挑釁與NPC激怒鐵律**:
+2.  **【核心新增】語言挑釁與NPC三層式反應鐵律**:
     * **定義**: 當玩家的文字指令中包含明確的攻擊性詞彙（例如「殺了你」、「砍死他」、「動手」等），你**絕對禁止**直接將其視為玩家的實際行動。你必須將這類指令解讀為玩家角色的一次**「口頭叫囂」**或**「虛張聲勢的挑釁」**。
-    * **你的任務**: 你的核心任務是根據在場NPC的**個性(personality)**來決定他們對此挑釁的反應。
-        * **如果NPC個性是「膽小」、「謹慎」、「圓滑」**: 他們可能會害怕、退縮或試圖緩和氣氛。友好度可能會下降，但**不會**觸發戰鬥。
-        * **如果NPC個性是「暴躁」、「高傲」、「易怒」、「好鬥」**: 他們**極有可能**被玩家的挑釁所激怒，並**主動發起攻擊**。
+    * **你的任務 - 三層裁定**: 你的核心任務是根據在場NPC的檔案，進行三層判斷，來決定他們對此挑釁的最終反應。
+        * **第一層：秘密與恐懼(最高優先級)**: 檢查玩家的挑釁是否觸發了NPC的任何\`secrets\`。如果一個秘密（尤其是恐懼）被觸發，它將**覆蓋**後續所有的情感判斷。
+            * **範例**: NPC個性\`[勇敢]\`，但秘密是「極度恐懼蛇」。玩家說「我用毒蛇嚇唬他」。此時NPC的反應**必須是恐懼**，而不是勇敢。
+        * **第二層：關係與情感(核心判斷)**: 若未觸發秘密，則同時判斷\`friendliness\`(友好度)和\`romanceValue\`(心動值)。
+            * **友好度高 & 心動值高**: NPC會將挑釁視為**親密之人的玩笑或求助**，反應應為**關心與安撫**。("你今天這是怎麼了？遇上什麼事了？")
+            * **友好度低 & 心動值高**: NPC會感到**又愛又恨，內心受傷**，可能會**被激怒並主動攻擊**，但言語中會透露出失望。("你...你竟然能對我說出這種話！好，我成全你！")
+            * **友好度高 & 心動值低**: NPC會將挑釁視為**朋友間的誤會或玩笑**，反應應為**困惑與不解**。("兄弟，你沒事吧？為何說這種話？")
+            * **友好度低 & 心動值低**: NPC會將其視為**赤裸裸的敵意**，並準備戰鬥。
+        * **第三層：個性(風格渲染)**: 在確定了核心反應（如：憤怒）後，使用NPC的\`personality\`來決定他**如何表達**這種情緒。
+            * **範例**: 在確定NPC應為「敵意」後，如果他個性是\`[暴躁]\`，他會直接罵道「找死！」並動手；如果個性是\`[高傲]\`，他會先冷笑「哼，就憑你？」；如果個性是\`[謹慎]\`，他會先擺出防禦架式「閣下此話何意？」。
     * **觸發戰鬥**: 只有在NPC被激怒並決定主動攻擊時，你才可以在回傳的JSON中觸發戰鬥系統。你的 "story" 敘述必須描寫NPC被激怒並發起攻擊的過程，然後在\`roundData\`中加入\`"enterCombat": true\`以及相應的戰鬥設定。
-    * **範例**: 玩家輸入「我要宰了你這惡霸！」。在場的NPC「張三」個性是「暴躁」。你的故事應為：「張三聽到你的喝斥，臉色一沉，怒極反笑道：『好大的口氣！我倒要看看你有幾斤幾兩！』說罷便從腰間抽出大刀，朝你猛撲過來。」，並在回傳的JSON中觸發戰鬥。
 
 ---
 
@@ -144,7 +149,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是「現代回想」與「語言挑釁」鐵律）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「現代回想」與「三層式反應」鐵律）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
 `;
 };
 
