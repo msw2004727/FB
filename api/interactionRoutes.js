@@ -11,6 +11,7 @@ const {
     updateFriendlinessValues,
     checkAndTriggerRomanceEvent,
     getInventoryState,
+    getRawInventory, // 引入 getRawInventory
     createNpcProfileInBackground,
     invalidateNovelCache,
     updateLibraryNovel,
@@ -91,6 +92,7 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
     return null;
 };
 
+
 // 處理玩家主要動作的核心函式
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
@@ -101,12 +103,28 @@ const interactRouteHandler = async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-        const [userDoc, summaryDoc, savesSnapshot, skills] = await Promise.all([
+        const [userDoc, summaryDoc, savesSnapshot, skills, rawInventory] = await Promise.all([
             userDocRef.get(),
             summaryDocRef.get(),
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get(),
-            getPlayerSkills(userId)
+            getPlayerSkills(userId),
+            getRawInventory(userId) // 獲取原始背包數據
         ]);
+        
+        // 計算敘事負重分數
+        let totalBulkScore = 0;
+        if (rawInventory) {
+            Object.values(rawInventory).forEach(item => {
+                const quantity = item.quantity || 1;
+                switch (item.bulk) {
+                    case '中': totalBulkScore += 1 * quantity; break;
+                    case '重': totalBulkScore += 3 * quantity; break;
+                    case '極重': totalBulkScore += 10 * quantity; break;
+                    default: break;
+                }
+            });
+        }
+        console.log(`[敘事負重系統] 玩家 ${username} 的當前份量分數為: ${totalBulkScore}`);
         
         let userProfile = userDoc.exists ? userDoc.data() : {};
         if (userProfile.isDeceased) {
@@ -199,7 +217,8 @@ const interactRouteHandler = async (req, res) => {
                         }
                     });
                 }
-                aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext);
+                // 將 totalBulkScore 傳遞給故事AI
+                aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, totalBulkScore);
                 if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
                 break;
         }
@@ -386,7 +405,6 @@ router.post('/end-chat', async (req, res) => {
         req.body.round = currentRound;
         req.body.model = playerModelChoice;
         
-        // 直接呼叫在本檔案中定義的 interactRouteHandler
         interactRouteHandler(req, res);
 
     } catch (error) {
