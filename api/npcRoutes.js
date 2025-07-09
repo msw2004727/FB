@@ -270,8 +270,7 @@ router.post('/give-item', async (req, res) => {
     }
 });
 
-// --- 新增的程式碼開始 ---
-// 確認並執行交易的路由
+// --- 【核心新增】確認並執行交易的路由 ---
 router.post('/confirm-trade', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -285,33 +284,22 @@ router.post('/confirm-trade', async (req, res) => {
     const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
     
     try {
+        // 使用資料庫事務來保證數據一致性
         await db.runTransaction(async (transaction) => {
-            // 處理玩家給出的物品和金錢
+            
+            // 處理玩家給出的物品
+            const playerItemChanges = [];
             for (const item of tradeState.player.offer.items) {
-                const itemRef = playerInventoryRef.doc(item.id);
-                transaction.delete(itemRef); // 簡化處理：假設交易的都是非堆疊物品
-                const npcItemField = `inventory.${item.itemName}`;
-                transaction.set(npcStateRef, { [npcItemField]: admin.firestore.FieldValue.increment(item.quantity || 1) }, { merge: true });
+                playerItemChanges.push({ action: 'remove', itemName: item.name, quantity: item.quantity || 1 });
             }
-            if (tradeState.player.offer.money > 0) {
-                const playerMoneyRef = playerInventoryRef.doc('銀兩');
-                const npcMoneyField = `inventory.銀兩`;
-                transaction.update(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(-tradeState.player.offer.money) });
-                transaction.set(npcStateRef, { [npcMoneyField]: admin.firestore.FieldValue.increment(tradeState.player.offer.money) }, { merge: true });
+            // 處理NPC給出的物品
+            for (const item of tradeState.npc.offer.items) {
+                playerItemChanges.push({ action: 'add', itemName: item.name, quantity: item.quantity || 1 });
             }
 
-            // 處理NPC給出的物品和金錢
-            for (const item of tradeState.npc.offer.items) {
-                const npcItemField = `inventory.${item.itemName}`;
-                transaction.set(npcStateRef, { [npcItemField]: admin.firestore.FieldValue.increment(-(item.quantity || 1)) }, { merge: true });
-                // 直接為玩家新增物品
-                await updateInventory(userId, [{ action: 'add', itemName: item.itemName, quantity: item.quantity || 1 }]);
-            }
-            if (tradeState.npc.offer.money > 0) {
-                const playerMoneyRef = playerInventoryRef.doc('銀兩');
-                const npcMoneyField = `inventory.銀兩`;
-                transaction.set(npcStateRef, { [npcMoneyField]: admin.firestore.FieldValue.increment(-tradeState.npc.offer.money) }, { merge: true });
-                transaction.update(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(tradeState.npc.offer.money) });
+            // 一次性更新玩家庫存
+            if (playerItemChanges.length > 0) {
+                 await updateInventory(userId, playerItemChanges, {});
             }
         });
 
