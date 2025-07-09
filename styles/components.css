@@ -604,6 +604,7 @@ body.dark-theme #bounties-btn.has-new-bounty {
     padding: 0.5rem;
     display: flex;
     gap: 0.5rem;
+    align-items: center; /* 【核心新增】垂直置中按鈕與文字 */
     z-index: 50; /* 確保在故事文字之上 */
     opacity: 0;
     visibility: hidden;
@@ -672,6 +673,42 @@ body.dark-theme .npc-interaction-btn.attack {
 body.dark-theme .npc-interaction-btn.attack:hover {
     background-color: #4d2b33;
     border-color: #ff6b6b;
+}
+
+/* 【核心新增】確認流程的專屬樣式 */
+.confirm-prompt-text {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--light-text-secondary);
+    padding: 0 0.5rem;
+}
+body.dark-theme .confirm-prompt-text {
+    color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn.confirm-attack {
+    background-color: #c92a2a;
+    color: #fff;
+    border-color: #c92a2a;
+}
+.npc-interaction-btn.confirm-attack:hover {
+    background-color: #a12222;
+}
+body.dark-theme .npc-interaction-btn.confirm-attack {
+     background-color: #ff6b6b;
+     color: var(--dark-bg);
+     border-color: #ff6b6b;
+}
+body.dark-theme .npc-interaction-btn.confirm-attack:hover {
+    background-color: #e54865;
+}
+
+.npc-interaction-btn.cancel-attack {
+    background-color: transparent;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .npc-interaction-btn.cancel-attack {
+    color: var(--dark-text-secondary);
 }
 
 /* 【核心修改】刪除了之前為 mobile 添加的固定定位規則 */
