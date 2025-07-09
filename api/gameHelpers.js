@@ -6,9 +6,7 @@ const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
-// --- 新增的程式碼 ---
 const { processNpcRelationships } = require('./relationshipManager');
-// --- 程式碼修改結束 ---
 
 const db = admin.firestore();
 
@@ -201,12 +199,9 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             await npcTemplateRef.set(newTemplateData);
             console.log(`[NPC系統] 成功為「${npcName}」建立並儲存了通用模板。`);
 
-            // --- 新增的程式碼 ---
-            // 在模板建立成功後，立即觸發關係更新器
             if (newTemplateData.relationships) {
                 await processNpcRelationships(userId, npcName, newTemplateData.relationships);
             }
-            // --- 程式碼修改結束 ---
         }
 
         const stateDoc = await playerNpcStateRef.get();
@@ -233,14 +228,18 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-const updateInventory = async (userId, itemChanges) => {
+// --- 核心修改開始 ---
+const updateInventory = async (userId, itemChanges, roundData = {}) => {
     if (!itemChanges || itemChanges.length === 0) return;
     const userInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const batch = db.batch();
     for (const change of itemChanges) {
         const { action, itemName, quantity = 1 } = change;
         if (!itemName) continue;
-        const template = await getOrGenerateItemTemplate(itemName);
+        
+        // 將 roundData 傳遞給物品模板生成器
+        const template = await getOrGenerateItemTemplate(itemName, roundData);
+        
         if (!template) {
             console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
             continue;
@@ -288,6 +287,7 @@ const updateInventory = async (userId, itemChanges) => {
     await batch.commit();
     console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 };
+// --- 核心修改結束 ---
 
 const updateFriendlinessValues = async (userId, npcChanges) => {
     if (!npcChanges || npcChanges.length === 0) return;
