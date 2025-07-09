@@ -4,8 +4,8 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-// 【核心修改】引入世界引擎的函式
-const { generateAndCacheLocation } = require('../worldEngine');
+// 【核心修改】修正引用路徑
+const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
