@@ -1,9 +1,13 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
-// 【核心修正】將 getSkillGeneratorPrompt 的引用指向正確的檔案
-const { getAINpcProfile, getAIRomanceEvent, callAI, aiConfig, getNpcCreatorPrompt } = require('../services/aiService');
-const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js'); 
+// --- 核心修改開始 ---
+// 移除了不該從這裡引用的 getNpcCreatorPrompt
+const { getAINpcProfile, getAIRomanceEvent, callAI, aiConfig } = require('../services/aiService');
+// 新增了對 getNpcCreatorPrompt 的正確引用
+const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
+// --- 核心修改結束 ---
+const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
 
@@ -189,11 +193,8 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
             const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
             
-            // --- 新增的程式碼 ---
-            // 清理AI回傳的字串，移除可能的markdown標記
             const cleanedJsonString = npcJsonString.replace(/^```json\s*|```\s*$/g, '');
             const newTemplateData = JSON.parse(cleanedJsonString);
-            // --- 程式碼修改結束 ---
             
             if (newTemplateData.createdAt === "CURRENT_TIMESTAMP") {
                 newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
