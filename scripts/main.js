@@ -44,6 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const gmMenu = document.getElementById('gm-menu');
     const gmContent = document.getElementById('gm-content');
 
+    // 【核心新增】
+    let combatSurrenderBtn = null; // 先宣告，稍後在戰鬥開啟時再獲取
+
     function setGameContainerHeight() {
         if (gameContainer) {
             gameContainer.style.height = `${window.innerHeight}px`;
@@ -97,6 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInput.disabled = isLoading;
         chatActionBtn.disabled = isLoading;
         endChatBtn.disabled = isLoading;
+
+        if (combatSurrenderBtn) {
+            combatSurrenderBtn.disabled = isLoading;
+        }
 
         const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
         if(loaderTextElement) loaderTextElement.textContent = text;
@@ -257,7 +264,40 @@ document.addEventListener('DOMContentLoaded', () => {
         strategyButtons.forEach(btn => {
             btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
         });
+        
+        // 【核心修改】在戰鬥開始後，獲取並綁定投降按鈕的事件
+        const confirmActionContainer = document.getElementById('confirm-action');
+        confirmActionContainer.innerHTML = `
+            <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
+            <button id="combat-surrender-btn" class="surrender-btn">投降</button>
+        `;
+        combatSurrenderBtn = document.getElementById('combat-surrender-btn');
+        combatSurrenderBtn.addEventListener('click', handleCombatSurrender);
     }
+
+    // 【核心新增】處理投降的函式
+    async function handleCombatSurrender() {
+        if (!gameState.isInCombat || gameState.isRequesting) return;
+        if (!window.confirm("你確定要在此刻認輸嗎？")) return;
+        
+        setLoadingState(true, "正在與對方交涉...");
+
+        try {
+            const data = await api.combatSurrender({ model: aiModelSelector.value });
+
+            if (data.status === 'SURRENDER_ACCEPTED') {
+                modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
+                setTimeout(() => endCombat(data.newRound), 2000);
+            } else { // SURRENDER_REJECTED
+                modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
+                setLoadingState(false);
+            }
+        } catch (error) {
+            modal.updateCombatLog(`[系統] 你的認輸請求似乎被對方無視了。(${error.message})`, 'system-message');
+            setLoadingState(false);
+        }
+    }
+
 
     function handleStrategySelection(strategy) {
         gameState.combat.selectedStrategy = strategy;
@@ -270,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const skillSelectionContainer = document.getElementById('skill-selection');
         const confirmBtn = document.getElementById('combat-confirm-btn');
         skillSelectionContainer.innerHTML = '';
-        confirmBtn.disabled = true;
+        if (confirmBtn) confirmBtn.disabled = true;
 
         const playerSkills = gameState.combat.state?.player?.skills || [];
         const relevantSkills = playerSkills.filter(skill => {
@@ -281,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (strategy === 'evade') {
             skillSelectionContainer.innerHTML = '<p class="system-message">你凝神專注，準備尋找時機進行迴避。</p>';
-            confirmBtn.disabled = false;
+            if (confirmBtn) confirmBtn.disabled = false;
         } else if (relevantSkills.length > 0) {
             relevantSkills.forEach(skill => {
                 const skillBtn = document.createElement('button');
@@ -304,7 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.skill-btn').forEach(btn => {
             btn.classList.toggle('selected', btn.dataset.skillName === skillName);
         });
-        document.getElementById('combat-confirm-btn').disabled = false;
+        const confirmBtn = document.getElementById('combat-confirm-btn');
+        if (confirmBtn) confirmBtn.disabled = false;
     }
 
     async function handleConfirmCombatAction() {
@@ -339,7 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 document.querySelectorAll('.strategy-btn.selected, .skill-btn.selected').forEach(el => el.classList.remove('selected'));
                 document.getElementById('skill-selection').innerHTML = '<p class="system-message">請先選擇一個策略</p>';
-                document.getElementById('combat-confirm-btn').disabled = true;
+                const confirmBtn = document.getElementById('combat-confirm-btn');
+                if (confirmBtn) confirmBtn.disabled = true;
                 gameState.combat.selectedStrategy = null;
                 gameState.combat.selectedSkill = null;
             }
@@ -378,13 +420,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideNpcInteractionMenu() {
         if (npcInteractionMenu) {
             npcInteractionMenu.classList.remove('visible');
-            // 【核心修改】在隱藏時，清空選單內容，恢復初始狀態
             npcInteractionMenu.innerHTML = '';
         }
     }
 
     function showNpcInteractionMenu(targetElement, npcName) {
-        // 每次顯示時都重新生成初始按鈕
         npcInteractionMenu.innerHTML = `
             <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
             <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
@@ -439,36 +479,25 @@ document.addEventListener('DOMContentLoaded', () => {
             setLoadingState(false);
         }
     }
-
-    // 【核心修改】使用附加節點的方式，而不是 innerHTML
+    
     function showAttackConfirmation(event) {
         const npcName = event.currentTarget.dataset.npcName;
-        
-        // 隱藏舊按鈕
         const existingButtons = npcInteractionMenu.querySelectorAll('.npc-interaction-btn');
         existingButtons.forEach(btn => btn.style.display = 'none');
-        
-        // 創建新的確認元素
         const promptText = document.createElement('span');
         promptText.className = 'confirm-prompt-text';
         promptText.textContent = '確定要動手？';
-        
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'npc-interaction-btn cancel-attack';
         cancelBtn.dataset.npcName = npcName;
         cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
-        
         const confirmBtn = document.createElement('button');
         confirmBtn.className = 'npc-interaction-btn confirm-attack';
         confirmBtn.dataset.npcName = npcName;
         confirmBtn.innerHTML = '<i class="fas fa-check"></i>';
-        
-        // 附加新元素到選單
         npcInteractionMenu.appendChild(promptText);
         npcInteractionMenu.appendChild(cancelBtn);
         npcInteractionMenu.appendChild(confirmBtn);
-
-        // 為新按鈕綁定事件
         cancelBtn.addEventListener('click', hideNpcInteractionMenu);
         confirmBtn.addEventListener('click', confirmAndInitiateAttack);
     }
