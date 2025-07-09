@@ -333,7 +333,63 @@
             </div>
         </div>
 
-    </div>
+        <div id="trade-modal" class="modal-overlay">
+            <div class="modal-content extra-wide" id="trade-content">
+                <div id="trade-header">
+                    <h2><i class="fas fa-exchange-alt"></i> 交易</h2>
+                    <button id="close-trade-btn" class="modal-close-btn">&times;</button>
+                </div>
+                <div id="trade-main">
+                    <div class="trade-panel" id="player-trade-panel">
+                        <div class="trade-party-header">
+                            <span id="player-trade-name">你</span>
+                            <div class="money-display">
+                                <i class="fas fa-coins"></i>
+                                <span id="player-trade-money">0</span>
+                            </div>
+                        </div>
+                        <div class="trade-inventory-list" id="player-trade-inventory">
+                            </div>
+                    </div>
+
+                    <div class="trade-center-panel">
+                        <div class="trade-offer-area" id="player-offer-area">
+                            <h4>你的出價</h4>
+                            <div class="offer-items-list"></div>
+                            <div class="offer-money-input">
+                                <i class="fas fa-coins"></i>
+                                <input type="number" id="player-offer-money" value="0" min="0">
+                            </div>
+                        </div>
+                        <div class="trade-summary">
+                            <div id="trade-value-diff">價值平衡</div>
+                            <button id="confirm-trade-btn" class="confirm-btn" disabled>確認交易</button>
+                        </div>
+                        <div class="trade-offer-area" id="npc-offer-area">
+                            <h4>對方的出價</h4>
+                            <div class="offer-items-list"></div>
+                            <div class="offer-money-input">
+                                <i class="fas fa-coins"></i>
+                                <input type="number" id="npc-offer-money" value="0" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="trade-panel" id="npc-trade-panel">
+                        <div class="trade-party-header">
+                            <span id="npc-trade-name">對方</span>
+                            <div class="money-display">
+                                <i class="fas fa-coins"></i>
+                                <span id="npc-trade-money">0</span>
+                            </div>
+                        </div>
+                        <div class="trade-inventory-list" id="npc-trade-inventory">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
 
     <script type="module" src="scripts/main.js"></script>
 </body>
