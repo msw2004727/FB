@@ -1,5 +1,6 @@
 // scripts/modalManager.js
 import { api } from './api.js';
+import { initializeTrade } from './tradeManager.js'; // 【核心新增】引入新的交易邏輯管理器
 
 // --- 獲取所有彈窗相關的 DOM 元素 ---
 const deceasedOverlay = document.getElementById('deceased-overlay');
@@ -37,25 +38,41 @@ const closeSkillsBtn = document.getElementById('close-skills-btn');
 const skillsTabsContainer = document.getElementById('skills-tabs-container');
 const skillsBodyContainer = document.getElementById('skills-body-container');
 
-// --- 新增的程式碼開始 (交易系統) ---
-const tradeModal = document.getElementById('trade-modal');
-const closeTradeBtn = document.getElementById('close-trade-btn');
-const playerTradeName = document.getElementById('player-trade-name');
-const playerTradeMoney = document.getElementById('player-trade-money');
-const playerTradeInventory = document.getElementById('player-trade-inventory');
-const npcTradeName = document.getElementById('npc-trade-name');
-const npcTradeMoney = document.getElementById('npc-trade-money');
-const npcTradeInventory = document.getElementById('npc-trade-inventory');
-const playerOfferArea = document.getElementById('player-offer-area').querySelector('.offer-items-list');
-const npcOfferArea = document.getElementById('npc-offer-area').querySelector('.offer-items-list');
-const playerOfferMoneyInput = document.getElementById('player-offer-money');
-const npcOfferMoneyInput = document.getElementById('npc-offer-money');
-const tradeValueDiff = document.getElementById('trade-value-diff');
-const confirmTradeBtn = document.getElementById('confirm-trade-btn');
-// --- 新增的程式碼結束 ---
+
+// --- 【核心修改】交易系統函式 ---
+
+/**
+ * 開啟新版「江湖貨棧」交易彈窗並初始化
+ * @param {object} tradeData - 從後端API獲取的交易初始化數據
+ * @param {string} npcName - 正在交易的NPC名稱
+ * @param {function} onTradeComplete - 交易成功後的回調函式
+ */
+export function openTradeModal(tradeData, npcName, onTradeComplete) {
+    const tradeModalEl = document.getElementById('trade-modal');
+    if (!tradeModalEl || !tradeData) return;
+
+    // 呼叫新的交易管理器來處理所有複雜邏輯
+    initializeTrade(tradeData, npcName, onTradeComplete);
+    
+    // 顯示彈窗
+    tradeModalEl.classList.remove('hidden');
+    tradeModalEl.classList.add('flex'); // 使用 flex 顯示
+}
+
+/**
+ * 關閉新版「江湖貨棧」交易彈窗
+ */
+export function closeTradeModal() {
+    const tradeModalEl = document.getElementById('trade-modal');
+    if (tradeModalEl) {
+        tradeModalEl.classList.add('hidden');
+        tradeModalEl.classList.remove('flex');
+    }
+}
+// --- 交易系統修改結束 ---
 
 
-// --- Helper Functions ---
+// --- Helper Functions (無變動) ---
 function displayRomanceValue(value) {
     if (!value || value <= 0) {
         const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
@@ -141,7 +158,7 @@ function createCharacterCard(character) {
 }
 
 
-// --- 死亡與結局 ---
+// --- 死亡與結局 (無變動) ---
 export function showDeceasedScreen() {
     const username = localStorage.getItem('username');
     deceasedTitle.textContent = `${username || '你'}的江湖路已到盡頭`;
@@ -165,7 +182,7 @@ export function closeEpilogueModal() {
     if (epilogueModal) epilogueModal.classList.remove('visible');
 }
 
-// --- 戰鬥彈窗 ---
+// --- 戰鬥彈窗 (無變動) ---
 
 export function openCombatModal(initialState, onCombatCancel) {
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
@@ -259,7 +276,7 @@ export function closeCombatModal() {
 export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.classList.toggle('visible', isLoading); }
 
 
-// --- 對話彈窗 ---
+// --- 對話彈窗 (無變動) ---
 export function openChatModalUI(profile) {
     chatNpcName.textContent = `與 ${profile.name} 交談`;
     chatNpcInfo.innerHTML = profile.appearance || '';
@@ -278,7 +295,7 @@ export function appendChatMessage(speaker, message) {
 }
 export function setChatLoading(isLoading) { if (chatLoader) chatLoader.classList.toggle('visible', isLoading); }
 
-// --- 贈予物品彈窗 ---
+// --- 贈予物品彈窗 (無變動) ---
 export async function openGiveItemModal(currentNpcName, giveItemCallback) {
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
@@ -316,7 +333,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
 export function closeGiveItemModal() { giveItemModal.classList.remove('visible'); }
 
 
-// --- 武學總覽彈窗 ---
+// --- 武學總覽彈窗 (無變動) ---
 export function openSkillsModal(skillsData) {
     if (!skillsModal || !skillsTabsContainer || !skillsBodyContainer) return;
 
@@ -403,14 +420,24 @@ export function closeSkillsModal() {
     }
 }
 
-// --- 新增的程式碼開始 (交易系統) ---
-/**
- * 建立一個可交易物品的DOM元素
- * @param {string} itemId - 物品的唯一ID
- * @param {object} itemData - 物品的詳細資料
- * @returns {HTMLElement}
- */
-function createTradeItemElement(itemId, itemData) {
+
+/* --- 【舊版程式碼，已註解保留】 ---
+const oldTradeModal = document.getElementById('trade-modal');
+const oldCloseTradeBtn = document.getElementById('close-trade-btn');
+const oldPlayerTradeName = document.getElementById('player-trade-name');
+const oldPlayerTradeMoney = document.getElementById('player-trade-money');
+const oldPlayerTradeInventory = document.getElementById('player-trade-inventory');
+const oldNpcTradeName = document.getElementById('npc-trade-name');
+const oldNpcTradeMoney = document.getElementById('npc-trade-money');
+const oldNpcTradeInventory = document.getElementById('npc-trade-inventory');
+const oldPlayerOfferArea = document.getElementById('player-offer-area')?.querySelector('.offer-items-list');
+const oldNpcOfferArea = document.getElementById('npc-offer-area')?.querySelector('.offer-items-list');
+const oldPlayerOfferMoneyInput = document.getElementById('player-offer-money');
+const oldNpcOfferMoneyInput = document.getElementById('npc-offer-money');
+const oldTradeValueDiff = document.getElementById('trade-value-diff');
+const oldConfirmTradeBtn = document.getElementById('confirm-trade-btn');
+
+function oldCreateTradeItemElement(itemId, itemData) {
     const itemEl = document.createElement('div');
     itemEl.className = 'trade-item';
     itemEl.dataset.itemId = itemId;
@@ -422,62 +449,6 @@ function createTradeItemElement(itemId, itemData) {
         <span class="trade-item-name">${itemData.itemName}</span>
         <span class="trade-item-quantity">x${itemData.quantity || 1}</span>
     `;
-    // TODO: 在下一步中為其綁定點擊事件
     return itemEl;
 }
-
-/**
- * 開啟交易彈出視窗並填充數據
- * @param {object} tradeData - 從後端API獲取的交易初始化數據
- */
-export function openTradeModal(tradeData) {
-    if (!tradeModal || !tradeData) return;
-
-    // 1. 清空舊數據
-    playerTradeInventory.innerHTML = '';
-    npcTradeInventory.innerHTML = '';
-    playerOfferArea.innerHTML = '';
-    npcOfferArea.innerHTML = '';
-    playerOfferMoneyInput.value = 0;
-    npcOfferMoneyInput.value = 0;
-    tradeValueDiff.textContent = '價值平衡';
-    confirmTradeBtn.disabled = true;
-
-    // 2. 填充玩家資訊
-    playerTradeName.textContent = localStorage.getItem('username') || '你';
-    playerTradeMoney.textContent = tradeData.player.money;
-    playerOfferMoneyInput.max = tradeData.player.money;
-    if (Object.keys(tradeData.player.items).length > 0) {
-        for (const [itemId, itemData] of Object.entries(tradeData.player.items)) {
-            playerTradeInventory.appendChild(createTradeItemElement(itemId, itemData));
-        }
-    } else {
-        playerTradeInventory.innerHTML = '<p class="empty-inventory">你的行囊空空如也</p>';
-    }
-    
-    // 3. 填充NPC資訊
-    npcTradeName.textContent = tradeData.npc.name;
-    npcTradeMoney.textContent = tradeData.npc.money;
-    npcOfferMoneyInput.max = tradeData.npc.money;
-     if (Object.keys(tradeData.npc.items).length > 0) {
-        for (const [itemId, itemData] of Object.entries(tradeData.npc.items)) {
-            npcTradeInventory.appendChild(createTradeItemElement(itemId, itemData));
-        }
-    } else {
-        npcTradeInventory.innerHTML = '<p class="empty-inventory">對方身無長物</p>';
-    }
-
-    // 4. 綁定關閉事件並顯示視窗
-    closeTradeBtn.addEventListener('click', closeTradeModal, { once: true });
-    tradeModal.classList.add('visible');
-}
-
-/**
- * 關閉交易彈出視窗
- */
-export function closeTradeModal() {
-    if (tradeModal) {
-        tradeModal.classList.remove('visible');
-    }
-}
-// --- 新增的程式碼結束 ---
+--- */
