@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAICombatSetup, getAIChatSummary } = require('../services/aiService');
+const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary } = require('../services/aiService');
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -168,7 +168,8 @@ const interactRouteHandler = async (req, res) => {
         };
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        const levelUpEvents = await updateSkills(userId, req.body.skillChanges || []);
+        let levelUpEvents = [];
+        
         const locationContext = await getMergedLocationData(userId, lastSave.LOC);
         const npcContext = {};
         if (lastSave.NPC && lastSave.NPC.length > 0) {
@@ -202,11 +203,39 @@ const interactRouteHandler = async (req, res) => {
             ...(romanceEventData ? romanceEventData.npcUpdates : [])
         ];
         
+        // --- 核心修改：修練成長限制 ---
+        const practiceKeywords = ['修練', '練習', '打坐', '閉關', '領悟'];
+        const durationKeywords = ['天', '時辰', '日', '夜', '時'];
+        const isShortPractice = practiceKeywords.some(kw => playerAction.includes(kw)) && !durationKeywords.some(kw => playerAction.includes(kw));
+
+        if (isShortPractice) {
+            console.log(`[遊戲機制] 偵測到無時長修練，將限制屬性成長。`);
+            if (aiResponse.roundData.powerChange) {
+                aiResponse.roundData.powerChange.internal = Math.min(aiResponse.roundData.powerChange.internal || 0, 10);
+                aiResponse.roundData.powerChange.external = Math.min(aiResponse.roundData.powerChange.external || 0, 10);
+                aiResponse.roundData.powerChange.lightness = Math.min(aiResponse.roundData.powerChange.lightness || 0, 10);
+            }
+            if (aiResponse.roundData.skillChanges) {
+                aiResponse.roundData.skillChanges.forEach(sc => {
+                    if (sc.expChange) {
+                        sc.expChange = Math.min(sc.expChange, 10);
+                    }
+                });
+            }
+        }
+        // --- 核心修改結束 ---
+
+        // 在處理完限制後，才更新技能和獲取升級事件
+        levelUpEvents = await updateSkills(userId, aiResponse.roundData.skillChanges);
+        // 如果有升級事件，需要將其添加回aiResponse中，以便後續的摘要AI可以看到
+        if (levelUpEvents.length > 0) {
+            aiResponse.roundData.levelUpEvents = levelUpEvents;
+        }
+
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
             updateFriendlinessValues(userId, aiResponse.roundData.NPC),
-            updateSkills(userId, aiResponse.roundData.skillChanges),
             processNpcUpdates(userId, allNpcUpdates)
         ]);
         
@@ -227,26 +256,19 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.money = inventoryState.money;
         aiResponse.roundData.skills = updatedSkills;
 
-        // 【核心修正】採用更主動、更可靠的NPC建檔邏輯
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(async (npc) => {
-                if (!npc.name) return; // 跳過沒有名字的NPC
-
+                if (!npc.name) return;
                 const npcTemplateRef = db.collection('npcs').doc(npc.name);
                 const npcStateDocRef = userDocRef.collection('npc_states').doc(npc.name);
-
                 if (npc.isDeceased) {
                     return npcStateDocRef.set({ isDeceased: true }, { merge: true });
                 }
-
                 const templateDoc = await npcTemplateRef.get();
-
-                // 關鍵邏輯：不管AI有沒有給isNew標記，只要模板不存在，就強制創建！
                 if (!templateDoc.exists) {
                     console.log(`[互動路由] 偵測到「${npc.name}」的模板不存在，強制執行建檔...`);
                     return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
                 } else {
-                    // 如果模板已存在，只更新其狀態
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
                         return npcStateDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
@@ -294,21 +316,43 @@ const interactRouteHandler = async (req, res) => {
 
         const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
         
+        // --- 核心修改：固定時間推進 ---
         let finalDate = { ...currentDate };
-        if (daysToAdvance > 0) {
-            for (let i = 0; i < daysToAdvance; i++) { finalDate = advanceDate(finalDate); }
-        } else if (nextTimeOfDay) {
-            const oldTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
-            const newTimeIndex = TIME_SEQUENCE.indexOf(nextTimeOfDay);
-            if (newTimeIndex < oldTimeIndex) { finalDate = advanceDate(finalDate); }
+        let finalTimeOfDay = nextTimeOfDay || userProfile.timeOfDay;
+        let shortActionCounter = userProfile.shortActionCounter || 0;
+
+        const timeDidChange = (daysToAdvance && daysToAdvance > 0) || (finalTimeOfDay !== userProfile.timeOfDay);
+
+        if (timeDidChange) {
+            shortActionCounter = 0; // 重置計數器
+            if (daysToAdvance > 0) {
+                 for (let i = 0; i < daysToAdvance; i++) { finalDate = advanceDate(finalDate); }
+            } else {
+                 const oldTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
+                 const newTimeIndex = TIME_SEQUENCE.indexOf(finalTimeOfDay);
+                 if (newTimeIndex < oldTimeIndex) { finalDate = advanceDate(finalDate); }
+            }
+        } else {
+            shortActionCounter++;
+            if (shortActionCounter >= 3) {
+                console.log(`[遊戲機制] 短時行動計數器達到3，強制推進時間。`);
+                const currentTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
+                const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
+                finalTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
+                if (nextTimeIndex === 0) { // 如果從深夜到清晨，則推進一天
+                    finalDate = advanceDate(finalDate);
+                }
+                shortActionCounter = 0; // 重置計數器
+            }
         }
+        // --- 核心修改結束 ---
 
         const newInternalPower = Math.max(0, Math.min(999, (userProfile.internalPower || 0) + (powerChange.internal || 0)));
         const newExternalPower = Math.max(0, Math.min(999, (userProfile.externalPower || 0) + (powerChange.external || 0)));
         const newLightness = Math.max(0, Math.min(999, (userProfile.lightness || 0) + (powerChange.lightness || 0)));
         let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
 
-        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: nextTimeOfDay || userProfile.timeOfDay, ...finalDate });
+        Object.assign(aiResponse.roundData, { internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, timeOfDay: finalTimeOfDay, ...finalDate });
         
         if (aiResponse.roundData.playerState === 'dead') {
              await userDocRef.update({ isDeceased: true });
@@ -320,11 +364,12 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const playerUpdatesForDb = {
-            timeOfDay: aiResponse.roundData.timeOfDay,
+            timeOfDay: finalTimeOfDay,
             internalPower: newInternalPower,
             externalPower: newExternalPower,
             lightness: newLightness,
             morality: newMorality,
+            shortActionCounter: shortActionCounter, // 保存計數器
             ...finalDate
         };
 
