@@ -37,6 +37,23 @@ const closeSkillsBtn = document.getElementById('close-skills-btn');
 const skillsTabsContainer = document.getElementById('skills-tabs-container');
 const skillsBodyContainer = document.getElementById('skills-body-container');
 
+// --- 新增的程式碼開始 (交易系統) ---
+const tradeModal = document.getElementById('trade-modal');
+const closeTradeBtn = document.getElementById('close-trade-btn');
+const playerTradeName = document.getElementById('player-trade-name');
+const playerTradeMoney = document.getElementById('player-trade-money');
+const playerTradeInventory = document.getElementById('player-trade-inventory');
+const npcTradeName = document.getElementById('npc-trade-name');
+const npcTradeMoney = document.getElementById('npc-trade-money');
+const npcTradeInventory = document.getElementById('npc-trade-inventory');
+const playerOfferArea = document.getElementById('player-offer-area').querySelector('.offer-items-list');
+const npcOfferArea = document.getElementById('npc-offer-area').querySelector('.offer-items-list');
+const playerOfferMoneyInput = document.getElementById('player-offer-money');
+const npcOfferMoneyInput = document.getElementById('npc-offer-money');
+const tradeValueDiff = document.getElementById('trade-value-diff');
+const confirmTradeBtn = document.getElementById('confirm-trade-btn');
+// --- 新增的程式碼結束 ---
+
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
@@ -149,6 +166,7 @@ export function closeEpilogueModal() {
 }
 
 // --- 戰鬥彈窗 ---
+
 export function openCombatModal(initialState, onCombatCancel) {
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
     enemiesRoster.innerHTML = '<h4><i class="fas fa-skull-crossbones"></i> 敵方陣營</h4>';
@@ -338,7 +356,6 @@ export function openSkillsModal(skillsData) {
             
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
-            // --- 核心修改開始 ---
             skillEntry.innerHTML = `
                 <div class="skill-entry-header">
                     <h4>${skill.skillName}</h4>
@@ -353,7 +370,6 @@ export function openSkillsModal(skillsData) {
                     <span class="exp-text">${skill.exp} / ${expToNextLevel}</span>
                 </div>
             `;
-            // --- 核心修改結束 ---
             tabContent.appendChild(skillEntry);
         });
         
@@ -386,3 +402,82 @@ export function closeSkillsModal() {
         skillsModal.classList.remove('visible');
     }
 }
+
+// --- 新增的程式碼開始 (交易系統) ---
+/**
+ * 建立一個可交易物品的DOM元素
+ * @param {string} itemId - 物品的唯一ID
+ * @param {object} itemData - 物品的詳細資料
+ * @returns {HTMLElement}
+ */
+function createTradeItemElement(itemId, itemData) {
+    const itemEl = document.createElement('div');
+    itemEl.className = 'trade-item';
+    itemEl.dataset.itemId = itemId;
+    itemEl.dataset.itemName = itemData.itemName;
+    itemEl.dataset.itemValue = itemData.value || 0;
+    itemEl.title = `${itemData.itemName}\n類型: ${itemData.itemType}\n價值: ${itemData.value || 0}文\n${itemData.baseDescription || ''}`;
+    
+    itemEl.innerHTML = `
+        <span class="trade-item-name">${itemData.itemName}</span>
+        <span class="trade-item-quantity">x${itemData.quantity || 1}</span>
+    `;
+    // TODO: 在下一步中為其綁定點擊事件
+    return itemEl;
+}
+
+/**
+ * 開啟交易彈出視窗並填充數據
+ * @param {object} tradeData - 從後端API獲取的交易初始化數據
+ */
+export function openTradeModal(tradeData) {
+    if (!tradeModal || !tradeData) return;
+
+    // 1. 清空舊數據
+    playerTradeInventory.innerHTML = '';
+    npcTradeInventory.innerHTML = '';
+    playerOfferArea.innerHTML = '';
+    npcOfferArea.innerHTML = '';
+    playerOfferMoneyInput.value = 0;
+    npcOfferMoneyInput.value = 0;
+    tradeValueDiff.textContent = '價值平衡';
+    confirmTradeBtn.disabled = true;
+
+    // 2. 填充玩家資訊
+    playerTradeName.textContent = localStorage.getItem('username') || '你';
+    playerTradeMoney.textContent = tradeData.player.money;
+    playerOfferMoneyInput.max = tradeData.player.money;
+    if (Object.keys(tradeData.player.items).length > 0) {
+        for (const [itemId, itemData] of Object.entries(tradeData.player.items)) {
+            playerTradeInventory.appendChild(createTradeItemElement(itemId, itemData));
+        }
+    } else {
+        playerTradeInventory.innerHTML = '<p class="empty-inventory">你的行囊空空如也</p>';
+    }
+    
+    // 3. 填充NPC資訊
+    npcTradeName.textContent = tradeData.npc.name;
+    npcTradeMoney.textContent = tradeData.npc.money;
+    npcOfferMoneyInput.max = tradeData.npc.money;
+     if (Object.keys(tradeData.npc.items).length > 0) {
+        for (const [itemId, itemData] of Object.entries(tradeData.npc.items)) {
+            npcTradeInventory.appendChild(createTradeItemElement(itemId, itemData));
+        }
+    } else {
+        npcTradeInventory.innerHTML = '<p class="empty-inventory">對方身無長物</p>';
+    }
+
+    // 4. 綁定關閉事件並顯示視窗
+    closeTradeBtn.addEventListener('click', closeTradeModal, { once: true });
+    tradeModal.classList.add('visible');
+}
+
+/**
+ * 關閉交易彈出視窗
+ */
+export function closeTradeModal() {
+    if (tradeModal) {
+        tradeModal.classList.remove('visible');
+    }
+}
+// --- 新增的程式碼結束 ---
