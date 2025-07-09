@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
-import { initializeGmPanel } from './gmManager.js'; // 【核心新增】
+import { initializeGmPanel } from './gmManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- 登入驗證 ---
@@ -68,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiThinkingLoader = document.createElement('div');
     aiThinkingLoader.className = 'ai-thinking-loader';
     aiThinkingLoader.innerHTML = `
+        <div class="loader-disclaimer">說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。</div>
         <div class="loader-text"></div>
         <div class="loader-dots"><span></span><span></span><span></span></div>
         <div class="loader-tip"></div>
@@ -445,8 +446,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- GM面板功能函式 (已被移至 gmManager.js) ---
-
     function initialize() {
         if (welcomeMessage) welcomeMessage.textContent = `${username}，歡迎回來。`;
         
@@ -460,12 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
             themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         });
 
-        // 【核心修改】讓AI核心選擇的預設值永遠是 openai
         aiModelSelector.value = 'openai';
 
         aiModelSelector.addEventListener('change', () => {
             const selectedModel = aiModelSelector.value;
-            //【核心修改】不再將選擇存入 localStorage
             const notification = document.createElement('p');
             notification.className = 'system-message ai-switch-notification';
             notification.textContent = `系統：AI 核心已切換為 ${selectedModel.toUpperCase()}。`;
@@ -534,7 +531,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // 【核心修改】初始化 GM 面板
         initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent);
 
 
@@ -571,8 +567,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoadingState(true, '正在連接你的世界，讀取記憶中...');
         try {
             const data = await api.getLatestGame();
-            
-            // 【核心修改】移除從後端讀取 preferredModel 的邏輯
             
             storyTextContainer.innerHTML = ''; 
 
