@@ -260,17 +260,14 @@ async function getAICombatAction(playerModelChoice, playerProfile, combatState, 
     }
 }
 
-// 【核心新增】新的函式，專門處理戰鬥開始前的場景佈置
 async function getAICombatSetup(playerAction, lastRoundData) {
     const prompt = getCombatSetupPrompt(playerAction, lastRoundData);
     try {
-        // 【核心修改】讓這個任務也從 aiConfig 讀取設定
         const modelToUse = aiConfig.combatSetup || 'openai';
         const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 戰鬥導演任務:", error);
-        // 返回一個安全的備用數據，防止遊戲崩潰
         return {
             combatants: [{ name: "未知敵人", status: "怒不可遏！" }],
             allies: [],
@@ -333,7 +330,6 @@ async function getAIRomanceEvent(playerProfile, npcProfile, eventType) {
 async function getAIEpilogue(playerData) {
     const prompt = getEpiloguePrompt(playerData);
     try {
-        // 【核心修改】讓結局生成也從 aiConfig 讀取設定
         const modelToUse = aiConfig.epilogue || 'openai';
         const story = await callAI(modelToUse, prompt, false);
         return story;
@@ -397,9 +393,10 @@ async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
     }
 }
 
-// 匯出所有服務函式
+// 【核心修改】匯出所有服務函式，並加上 aiConfig
 module.exports = {
     callAI,
+    aiConfig, // <--- 新增這一行
     getNarrative,
     getAISummary,
     getAIStory,
