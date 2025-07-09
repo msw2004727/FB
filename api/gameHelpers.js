@@ -1,12 +1,8 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
-// --- 核心修改開始 ---
-// 移除了不該從這裡引用的 getNpcCreatorPrompt
 const { getAINpcProfile, getAIRomanceEvent, callAI, aiConfig } = require('../services/aiService');
-// 新增了對 getNpcCreatorPrompt 的正確引用
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
-// --- 核心修改結束 ---
 const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
@@ -215,7 +211,8 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
                     location: roundData.LOC[0],
                     event: roundData.EVT
                 },
-                isDeceased: false
+                isDeceased: false,
+                inventory: {} // --- 新增的欄位 ---
             };
             await playerNpcStateRef.set(initialState);
             console.log(`[NPC系統] 成功為玩家 ${userId} 初始化了與「${npcName}」的關係檔案。`);
