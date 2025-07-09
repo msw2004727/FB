@@ -11,7 +11,7 @@ const {
     updateFriendlinessValues,
     checkAndTriggerRomanceEvent,
     getInventoryState,
-    getRawInventory, // 引入 getRawInventory
+    getRawInventory,
     createNpcProfileInBackground,
     invalidateNovelCache,
     updateLibraryNovel,
@@ -108,10 +108,9 @@ const interactRouteHandler = async (req, res) => {
             summaryDocRef.get(),
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get(),
             getPlayerSkills(userId),
-            getRawInventory(userId) // 獲取原始背包數據
+            getRawInventory(userId)
         ]);
         
-        // 計算敘事負重分數
         let totalBulkScore = 0;
         if (rawInventory) {
             Object.values(rawInventory).forEach(item => {
@@ -124,7 +123,6 @@ const interactRouteHandler = async (req, res) => {
                 }
             });
         }
-        console.log(`[敘事負重系統] 玩家 ${username} 的當前份量分數為: ${totalBulkScore}`);
         
         let userProfile = userDoc.exists ? userDoc.data() : {};
         if (userProfile.isDeceased) {
@@ -153,75 +151,32 @@ const interactRouteHandler = async (req, res) => {
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
         const lastSave = savesSnapshot.docs[0]?.data() || {};
         
-        const contextForClassifier = {
-            location: lastSave.LOC?.[0] || '未知之地',
-            npcs: lastSave.NPC?.map(n => n.name) || [],
-            skills: skills?.map(s => s.name) || []
-        };
-        const classification = await getAIActionClassification(playerModelChoice, playerAction, contextForClassifier);
-        
-        let aiResponse = {};
-        let romanceEventData = null;
-
-        switch (classification.actionType) {
-            case 'COMBAT_ATTACK':
-            case 'COMBAT_SPARRING': { 
-                const combatSetupResult = await getAICombatSetup(playerAction, lastSave);
-                const isSparring = classification.actionType === 'COMBAT_SPARRING';
-
-                aiResponse = {
-                    story: isSparring
-                        ? `你向 ${classification.details.target || '對手'} 發起了一場友好的切磋。`
-                        : `你決定向 ${classification.details.target || '對手'} 發起挑戰。`,
-                    roundData: {
-                        ...lastSave,
-                        EVT: isSparring ? `友好切磋：對決${classification.details.target}` : `遭遇戰：對決${classification.details.target}`,
-                        PC: isSparring ? `你提議與${classification.details.target}比試一番。` : `你決定與${classification.details.target}一決高下。`,
-                        IMP: `觸發了與${classification.details.target}的戰鬥`,
-                        powerChange: { internal: 0, external: 0, lightness: 0 },
-                        moralityChange: 0,
-                        itemChanges: [],
-                        romanceChanges: [],
-                        skillChanges: [],
-                        enterCombat: true,
-                        combatants: combatSetupResult.combatants,
-                        allies: combatSetupResult.allies,
-                        bystanders: combatSetupResult.bystanders,
-                        combatIntro: combatSetupResult.combatIntro,
-                        isSparring: isSparring 
-                    }
-                };
-                break;
-            }
-            
-            case 'GENERAL_STORY':
-            default:
-                romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
-                const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
-                const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
-                const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
-                const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
-                let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
-                const currentTimeOfDay = userProfile.timeOfDay || '上午';
-                const levelUpEvents = await updateSkills(userId, req.body.skillChanges || []);
-                const locationContext = await getMergedLocationData(userId, lastSave.LOC);
-                const npcContext = {};
-                if (lastSave.NPC && lastSave.NPC.length > 0) {
-                    const npcPromises = lastSave.NPC.map(npcInScene => 
-                        db.collection('users').doc(userId).collection('npcs').doc(npcInScene.name).get()
-                    );
-                    const npcDocs = await Promise.all(npcPromises);
-                    npcDocs.forEach(doc => {
-                        if (doc.exists) {
-                            npcContext[doc.id] = doc.data();
-                        }
-                    });
+        // 【核心修改】由於不再需要判斷戰鬥，此處邏輯大幅簡化
+        const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
+        const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
+        const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
+        const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
+        const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
+        let currentDate = { yearName: userProfile.yearName || '元祐', year: userProfile.year || 1, month: userProfile.month || 1, day: userProfile.day || 1 };
+        const currentTimeOfDay = userProfile.timeOfDay || '上午';
+        const levelUpEvents = await updateSkills(userId, req.body.skillChanges || []);
+        const locationContext = await getMergedLocationData(userId, lastSave.LOC);
+        const npcContext = {};
+        if (lastSave.NPC && lastSave.NPC.length > 0) {
+            const npcPromises = lastSave.NPC.map(npcInScene => 
+                db.collection('users').doc(userId).collection('npcs').doc(npcInScene.name).get()
+            );
+            const npcDocs = await Promise.all(npcPromises);
+            npcDocs.forEach(doc => {
+                if (doc.exists) {
+                    npcContext[doc.id] = doc.data();
                 }
-                // 將 totalBulkScore 傳遞給故事AI
-                aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, totalBulkScore);
-                if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
-                break;
+            });
         }
+        
+        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, totalBulkScore);
+        if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
+
         
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
