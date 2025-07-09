@@ -35,6 +35,8 @@ export const api = {
 
     // NPC Routes
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc/npc-profile/${npcName}`),
+    startTrade: (npcName) => fetchApi(`/api/game/npc/start-trade/${npcName}`), // 新增: 開始交易
+    confirmTrade: (body) => fetchApi('/api/game/npc/confirm-trade', { method: 'POST', body: JSON.stringify(body) }), // 新增: 確認交易
     npcChat: (body) => fetchApi('/api/game/npc/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
     giveItemToNpc: (body) => fetchApi('/api/game/npc/give-item', { method: 'POST', body: JSON.stringify(body) }),
 
