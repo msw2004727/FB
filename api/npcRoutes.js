@@ -289,7 +289,7 @@ router.post('/confirm-trade', async (req, res) => {
             // 處理玩家給出的物品和金錢
             for (const item of tradeState.player.offer.items) {
                 const itemRef = playerInventoryRef.doc(item.id);
-                transaction.delete(itemRef); // 假設交易的都是非堆疊物品
+                transaction.delete(itemRef); // 簡化處理：假設交易的都是非堆疊物品
                 const npcItemField = `inventory.${item.itemName}`;
                 transaction.set(npcStateRef, { [npcItemField]: admin.firestore.FieldValue.increment(item.quantity || 1) }, { merge: true });
             }
