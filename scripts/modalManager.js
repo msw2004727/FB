@@ -6,12 +6,14 @@ const deceasedOverlay = document.getElementById('deceased-overlay');
 const deceasedTitle = document.getElementById('deceased-title');
 
 const combatModal = document.getElementById('combat-modal');
-const combatTitle = document.getElementById('combat-title');
 const combatLog = document.getElementById('combat-log');
 const combatLoader = document.getElementById('combat-loader');
-const combatSkillsInfo = document.getElementById('combat-skills-info');
-const combatAlliesContainer = document.querySelector('#combat-allies .roster-names');
-const combatEnemiesContainer = document.querySelector('#combat-enemies .roster-names');
+const combatTurnCounter = document.getElementById('combat-turn-counter');
+const alliesRoster = document.getElementById('allies-roster');
+const enemiesRoster = document.getElementById('enemies-roster');
+const strategyButtonsContainer = document.getElementById('strategy-buttons');
+const skillSelectionContainer = document.getElementById('skill-selection');
+const confirmActionContainer = document.getElementById('confirm-action');
 
 
 const chatModal = document.getElementById('chat-modal');
@@ -79,26 +81,28 @@ function displayFriendlinessBar(value) {
     chatNpcInfo.appendChild(barContainer);
 }
 
-/**
- * 【核心修改】創建或更新戰鬥中單個角色的UI元素（包含血條）
- * @param {object} character - 角色數據
- * @param {string} type - 'player', 'ally', 'enemy'
- * @returns {HTMLElement} - 創建好的角色卡片元素
- */
-function createCharacterCard(character, type) {
+function createCharacterCard(character) {
     const card = document.createElement('div');
-    card.className = `combatant-card type-${type}`;
-    card.dataset.name = character.name || character.username; // 使用data屬性來唯一標識
+    card.className = 'character-card';
+    card.dataset.name = character.name || character.username;
 
     const hpPercentage = (character.hp / character.maxHp) * 100;
+    let mpBarHtml = '';
+    if (character.mp !== undefined) {
+        const mpPercentage = (character.mp / character.maxMp) * 100;
+        mpBarHtml = `
+            <div class="mp-bar-container" title="內力: ${character.mp}/${character.maxMp}">
+                <div class="mp-bar-fill" style="width: ${mpPercentage}%;"></div>
+            </div>
+        `;
+    }
 
-    // 【核心修改】將血量顯示從 "130 / 130" 改為只顯示 "130"
     card.innerHTML = `
-        <div class="combatant-name">${character.name || character.username}</div>
-        <div class="hp-bar-container" title="${character.hp} / ${character.maxHp}">
+        <div class="character-name">${character.name || character.username}</div>
+        <div class="hp-bar-container" title="氣血: ${character.hp}/${character.maxHp}">
             <div class="hp-bar-fill" style="width: ${hpPercentage}%;"></div>
-            <div class="hp-text">${character.hp}</div>
         </div>
+        ${mpBarHtml}
     `;
     return card;
 }
@@ -128,68 +132,48 @@ export function closeEpilogueModal() {
     if (epilogueModal) epilogueModal.classList.remove('visible');
 }
 
-// --- 戰鬥彈窗 ---
+// --- 戰鬥彈窗 (全新重構) ---
 
-/**
- * 【核心修改】重寫開啟戰鬥彈窗的函式，以支援HP顯示
- * @param {object} initialState - 包含玩家、盟友、敵人HP的初始戰鬥狀態
- */
 export function openCombatModal(initialState) {
-    combatTitle.textContent = `遭遇戰`;
-    if (combatAlliesContainer) combatAlliesContainer.innerHTML = '';
-    if (combatEnemiesContainer) combatEnemiesContainer.innerHTML = '';
+    alliesRoster.innerHTML = '<h4>我方陣營</h4>';
+    enemiesRoster.innerHTML = '<h4>敵方陣營</h4>';
+    strategyButtonsContainer.innerHTML = '';
+    skillSelectionContainer.innerHTML = '<p class="system-message">請先選擇一個策略</p>';
+    confirmActionContainer.innerHTML = '';
 
-    // 填充我方陣營 (包含玩家)
-    if (combatAlliesContainer && initialState.player) {
-        const playerCard = createCharacterCard(initialState.player, 'player');
-        combatAlliesContainer.appendChild(playerCard);
-
-        if (initialState.allies && initialState.allies.length > 0) {
-            initialState.allies.forEach(ally => {
-                const allyCard = createCharacterCard(ally, 'ally');
-                combatAlliesContainer.appendChild(allyCard);
-            });
-        }
+    // 填充我方陣營 (玩家 + 盟友)
+    if (initialState.player) {
+        alliesRoster.appendChild(createCharacterCard(initialState.player));
+    }
+    if (initialState.allies && initialState.allies.length > 0) {
+        initialState.allies.forEach(ally => alliesRoster.appendChild(createCharacterCard(ally)));
     }
 
     // 填充敵方陣營
-    if (combatEnemiesContainer && initialState.enemies && initialState.enemies.length > 0) {
-        initialState.enemies.forEach(enemy => {
-            const enemyCard = createCharacterCard(enemy, 'enemy');
-            combatEnemiesContainer.appendChild(enemyCard);
-        });
+    if (initialState.enemies && initialState.enemies.length > 0) {
+        initialState.enemies.forEach(enemy => enemiesRoster.appendChild(createCharacterCard(enemy)));
     }
 
+    // 設置初始戰鬥日誌和回合數
     combatLog.innerHTML = '';
     if (initialState.log && initialState.log.length > 0) {
-        appendToCombatLog(initialState.log[0], 'combat-intro-text');
+        updateCombatLog(`<p>${initialState.log[0]}</p>`, 'system-message');
     }
-
-    if (combatSkillsInfo) {
-        combatSkillsInfo.innerHTML = '';
-        const playerSkills = initialState.player?.skills || [];
-        if (playerSkills.length > 0) {
-            playerSkills.forEach(skill => {
-                if(skill.level > 0) {
-                    const skillTag = document.createElement('span');
-                    skillTag.className = 'combat-skill-tag';
-                    skillTag.innerHTML = `${skill.name} <span class="skill-level">${skill.level}成</span>`;
-                    skillTag.title = `類型: ${skill.type}\n描述: ${skill.description}`;
-                    combatSkillsInfo.appendChild(skillTag);
-                }
-            });
-        } else {
-            combatSkillsInfo.innerHTML = '<span class="combat-skill-tag">你尚未習得任何可用於戰鬥的武學。</span>';
-        }
-    }
+    setTurnCounter(initialState.turn || 1);
+    
+    // 建立策略按鈕
+    strategyButtonsContainer.innerHTML = `
+        <button class="strategy-btn" data-strategy="attack">攻擊</button>
+        <button class="strategy-btn" data-strategy="defend">防禦</button>
+        <button class="strategy-btn" data-strategy="evade">迴避</button>
+    `;
+    
+    // 建立確認按鈕（預設禁用）
+    confirmActionContainer.innerHTML = `<button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>`;
 
     combatModal.classList.add('visible');
 }
 
-/**
- * 【核心新增】戰鬥中更新UI的函式
- * @param {object} updatedState - 後端回傳的最新戰鬥狀態
- */
 export function updateCombatUI(updatedState) {
     const allCombatants = [
         updatedState.player,
@@ -200,31 +184,36 @@ export function updateCombatUI(updatedState) {
     allCombatants.forEach(character => {
         if (!character) return;
         const characterName = character.name || character.username;
-        const card = combatModal.querySelector(`.combatant-card[data-name="${characterName}"]`);
+        const card = combatModal.querySelector(`.character-card[data-name="${characterName}"]`);
         if (card) {
             const hpBar = card.querySelector('.hp-bar-fill');
-            const hpText = card.querySelector('.hp-text');
-            const hpBarContainer = card.querySelector('.hp-bar-container');
             const hpPercentage = (character.hp / character.maxHp) * 100;
+            if (hpBar) hpBar.style.width = `${hpPercentage}%`;
             
-            hpBar.style.width = `${hpPercentage}%`;
-            // 【核心修改】將血量顯示從 "130 / 130" 改為只顯示 "130"
-            hpText.textContent = character.hp;
-            hpBarContainer.title = `${character.hp} / ${character.maxHp}`;
+            const mpBar = card.querySelector('.mp-bar-fill');
+            if (mpBar && character.mp !== undefined) {
+                const mpPercentage = (character.mp / character.maxMp) * 100;
+                mpBar.style.width = `${mpPercentage}%`;
+            }
         }
     });
 }
 
-
-export function closeCombatModal() { combatModal.classList.remove('visible'); }
-export function appendToCombatLog(text, className = '') {
-    const p = document.createElement('p');
-    p.className = className;
-    p.innerHTML = text.replace(/\n/g, '<br>');
+export function updateCombatLog(htmlContent, className = '') {
+    const p = document.createElement('div');
+    if (className) p.className = className;
+    p.innerHTML = htmlContent.replace(/\n/g, '<br>');
     combatLog.appendChild(p);
     combatLog.scrollTop = combatLog.scrollHeight;
 }
+
+export function setTurnCounter(turn) {
+    combatTurnCounter.textContent = `第 ${turn} 回合`;
+}
+
+export function closeCombatModal() { combatModal.classList.remove('visible'); }
 export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.classList.toggle('visible', isLoading); }
+
 
 // --- 對話彈窗 ---
 export function openChatModalUI(profile) {
@@ -238,7 +227,7 @@ export function openChatModalUI(profile) {
 export function closeChatModal() { chatModal.classList.remove('visible'); }
 export function appendChatMessage(speaker, message) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-log-area ${speaker}-message`;
+    messageDiv.className = `${speaker}-message`; // CSS class is player-message or npc-message
     messageDiv.innerHTML = message;
     chatLog.appendChild(messageDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
@@ -257,7 +246,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
             if (itemData.quantity > 0) {
                 hasItems = true;
                 const itemDiv = document.createElement('div');
-                itemDiv.className = 'give-item';
+                itemDiv.className = 'give-item'; // This needs a corresponding CSS class
                 itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
                 itemDiv.addEventListener('click', () => {
                     if (itemName === '銀兩') {
@@ -326,7 +315,7 @@ export function openSkillsModal(skillsData) {
             skillEntry.innerHTML = `
                 <div class="skill-entry-header">
                     <h4>${skill.name}</h4>
-                    <span class="skill-type">${skill.type}</span>
+                    <span class="skill-type">${skill.power_type || '無'}</span>
                 </div>
                 <p class="skill-description">${skill.description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
