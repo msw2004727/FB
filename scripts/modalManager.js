@@ -81,28 +81,46 @@ function displayFriendlinessBar(value) {
     chatNpcInfo.appendChild(barContainer);
 }
 
+// 【核心修改】全新的角色卡片生成函式
 function createCharacterCard(character) {
     const card = document.createElement('div');
     card.className = 'character-card';
     card.dataset.name = character.name || character.username;
 
-    const hpPercentage = (character.hp / character.maxHp) * 100;
+    // 處理特性標籤
+    let tagsHtml = '';
+    if (character.tags && Array.isArray(character.tags)) {
+        tagsHtml = `<div class="tags-container">
+            ${character.tags.map(tag => `<span class="trait-tag tag-${tag.type}">${tag.name}</span>`).join('')}
+        </div>`;
+    }
+
+    // 處理內力條
     let mpBarHtml = '';
-    if (character.mp !== undefined) {
+    if (character.mp !== undefined && character.maxMp !== undefined) {
         const mpPercentage = (character.mp / character.maxMp) * 100;
         mpBarHtml = `
-            <div class="mp-bar-container" title="內力: ${character.mp}/${character.maxMp}">
+            <div class="mp-bar-container" title="內力">
                 <div class="mp-bar-fill" style="width: ${mpPercentage}%;"></div>
+                <span class="bar-value-text">${character.mp}</span>
             </div>
         `;
     }
 
+    const hpPercentage = (character.hp / character.maxHp) * 100;
+
     card.innerHTML = `
-        <div class="character-name">${character.name || character.username}</div>
-        <div class="hp-bar-container" title="氣血: ${character.hp}/${character.maxHp}">
-            <div class="hp-bar-fill" style="width: ${hpPercentage}%;"></div>
+        <div class="character-info">
+            <div class="character-name">${character.name || character.username}</div>
+            ${tagsHtml}
         </div>
-        ${mpBarHtml}
+        <div class="stats-bars-container">
+            <div class="hp-bar-container" title="氣血">
+                <div class="hp-bar-fill" style="width: ${hpPercentage}%;"></div>
+                <span class="bar-value-text">${character.hp}</span>
+            </div>
+            ${mpBarHtml}
+        </div>
     `;
     return card;
 }
@@ -135,10 +153,10 @@ export function closeEpilogueModal() {
 // --- 戰鬥彈窗 (全新重構) ---
 
 export function openCombatModal(initialState) {
-    alliesRoster.innerHTML = '<h4>我方陣營</h4>';
-    enemiesRoster.innerHTML = '<h4>敵方陣營</h4>';
+    alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
+    enemiesRoster.innerHTML = '<h4><i class="fas fa-skull-crossbones"></i> 敵方陣營</h4>';
     strategyButtonsContainer.innerHTML = '';
-    skillSelectionContainer.innerHTML = '<p class="system-message">請先選擇一個策略</p>';
+    skillSelectionContainer.innerHTML = '<div class="system-message">請先選擇一個策略</div>';
     confirmActionContainer.innerHTML = '';
 
     // 填充我方陣營 (玩家 + 盟友)
@@ -163,9 +181,9 @@ export function openCombatModal(initialState) {
     
     // 建立策略按鈕
     strategyButtonsContainer.innerHTML = `
-        <button class="strategy-btn" data-strategy="attack">攻擊</button>
-        <button class="strategy-btn" data-strategy="defend">防禦</button>
-        <button class="strategy-btn" data-strategy="evade">迴避</button>
+        <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
+        <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
+        <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
     `;
     
     // 建立確認按鈕（預設禁用）
@@ -187,13 +205,17 @@ export function updateCombatUI(updatedState) {
         const card = combatModal.querySelector(`.character-card[data-name="${characterName}"]`);
         if (card) {
             const hpBar = card.querySelector('.hp-bar-fill');
+            const hpValueText = card.querySelector('.hp-bar-container .bar-value-text');
             const hpPercentage = (character.hp / character.maxHp) * 100;
             if (hpBar) hpBar.style.width = `${hpPercentage}%`;
+            if (hpValueText) hpValueText.textContent = character.hp;
             
             const mpBar = card.querySelector('.mp-bar-fill');
+            const mpValueText = card.querySelector('.mp-bar-container .bar-value-text');
             if (mpBar && character.mp !== undefined) {
                 const mpPercentage = (character.mp / character.maxMp) * 100;
                 mpBar.style.width = `${mpPercentage}%`;
+                 if (mpValueText) mpValueText.textContent = character.mp;
             }
         }
     });
