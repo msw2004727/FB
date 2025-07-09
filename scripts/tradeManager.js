@@ -153,8 +153,6 @@ async function handleConfirmTrade() {
         if (result.newRound && typeof onTradeCompleteCallback === 'function') {
             onTradeCompleteCallback(result.newRound);
         }
-        // 【核心修正】成功後呼叫正確的關閉函式
-        closeTradeModal();
 
     } catch (error) {
         alert(`交易失敗: ${error.message}`);
