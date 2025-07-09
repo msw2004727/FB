@@ -10,12 +10,16 @@ const db = admin.firestore();
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-const getMergedLocationData = async (userId, locationName) => {
-    if (!locationName) return null;
+const getMergedLocationData = async (userId, locationArray) => {
+    // 【核心修改】現在接收的是一個陣列，例如 ["無名村"] 或 ["無名村", "藥鋪"]
+    if (!locationArray || locationArray.length === 0) return null;
+
+    const mainLocationName = locationArray[0];
+    const subLocationName = locationArray.length > 1 ? locationArray[1] : null;
 
     try {
-        const staticDocRef = db.collection('locations').doc(locationName);
-        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
+        const staticDocRef = db.collection('locations').doc(mainLocationName);
+        const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(mainLocationName);
 
         const [staticDoc, dynamicDoc] = await Promise.all([
             staticDocRef.get(),
@@ -23,34 +27,39 @@ const getMergedLocationData = async (userId, locationName) => {
         ]);
 
         if (!staticDoc.exists) {
-            console.log(`[讀取系統] 偵測到玩家 ${userId} 的全新地點: ${locationName}，將在背景生成...`);
-            generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
-                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
-            return {
-                locationId: locationName,
-                locationName: locationName,
-                description: "此地詳情尚在傳聞之中...",
-            };
+            console.log(`[讀取系統] 偵測到玩家 ${userId} 的全新地點: ${mainLocationName}，將在背景生成...`);
+            generateAndCacheLocation(userId, mainLocationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${mainLocationName} 的背景生成失敗:`, err));
+            return { locationId: mainLocationName, locationName: mainLocationName, description: "此地詳情尚在傳聞之中..." };
         }
         
         if (staticDoc.exists && !dynamicDoc.exists) {
-             console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${locationName}，將在背景初始化...`);
-             generateAndCacheLocation(userId, locationName, '未知', '初次抵達，資訊尚不明朗。')
-                .catch(err => console.error(`[世界引擎] 地點 ${locationName} 的背景生成失敗:`, err));
+             console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${mainLocationName}，將在背景初始化...`);
+             generateAndCacheLocation(userId, mainLocationName, '未知', '初次抵達，資訊尚不明朗。')
+                .catch(err => console.error(`[世界引擎] 地點 ${mainLocationName} 的背景生成失敗:`, err));
         }
 
         const staticData = staticDoc.data() || {};
         const dynamicData = dynamicDoc.data() || {};
+        
+        // 先合併出基礎地點的資料
+        let mergedData = { ...staticData, ...dynamicData };
 
-        return { ...staticData, ...dynamicData };
+        // 如果玩家在子場景（設施）內，則進一步合併設施的資料
+        if (subLocationName && mergedData.facilities && Array.isArray(mergedData.facilities)) {
+            const facilityData = mergedData.facilities.find(f => f.facilityName === subLocationName);
+            if (facilityData) {
+                // 將設施的特定資訊（如描述）覆蓋到主地點資訊上，營造出當前場景的氛圍
+                mergedData.description = facilityData.description || mergedData.description;
+                mergedData.currentFacility = facilityData; // 將當前設施的完整資料也放入，以供AI參考
+            }
+        }
+        
+        return mergedData;
 
     } catch (error) {
-        console.error(`[讀取系統] 合併地點 ${locationName} 的資料時出錯:`, error);
-        return {
-            locationId: locationName,
-            locationName: locationName,
-            description: "讀取此地詳情時發生錯誤...",
-        };
+        console.error(`[讀取系統] 合併地點 ${mainLocationName} 的資料時出錯:`, error);
+        return { locationId: mainLocationName, locationName: mainLocationName, description: "讀取此地詳情時發生錯誤..." };
     }
 };
 
@@ -153,8 +162,7 @@ const updateInventory = async (userId, itemChanges) => {
     for (const change of itemChanges) {
         let { action, itemName, quantity = 1 } = change;
 
-        // 【核心新增】物品名稱清洗邏輯
-        const nameRegex = / x\d+$/; // 匹配 " x" + 數字結尾的模式
+        const nameRegex = / x\d+$/; 
         if (nameRegex.test(itemName)) {
             itemName = itemName.replace(nameRegex, '').trim();
         }
