@@ -1,7 +1,7 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
-// 【核心修改】從正確的路徑引入 getSkillGeneratorPrompt
+// 【核心修正】將 getSkillGeneratorPrompt 的引用指向正確的檔案
 const { getAINpcProfile, getAIRomanceEvent, callAI, aiConfig, getNpcCreatorPrompt } = require('../services/aiService');
 const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js'); 
 const { getOrGenerateItemTemplate } = require('./itemManager');
