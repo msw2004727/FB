@@ -1,5 +1,39 @@
 /* styles/trade.css */
 
+/* --- 新增的核心彈出層樣式 --- */
+#trade-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1015; /* 比一般彈窗高一點 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    backdrop-filter: blur(4px);
+}
+
+#trade-modal.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+#trade-modal .modal-content {
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+#trade-modal.visible .modal-content {
+    transform: scale(1);
+}
+/* --- 彈出層樣式結束 --- */
+
+
 /* --- 交易彈窗主樣式 --- */
 .modal-content.extra-wide {
     max-width: 1200px; /* 讓交易視窗更寬敞 */
