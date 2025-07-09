@@ -17,7 +17,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 - **設施 (Facility)**: 指的是地點內部的具體建築，如「藥鋪」、「酒館」、「城門」。
 
 你生成的JSON檔案，其核心是一個「地點」，而其內部的 \`facilities\` 陣列則定義了該地點擁有的所有「設施」。
-
+**【語言鐵律】**: 你的所有回應文字都必須只包含「繁體中文」。絕對禁止使用任何簡體中文、英文或表情符號。
 ---
 
 ## 【JSON 檔案結構範本】
