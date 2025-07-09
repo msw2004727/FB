@@ -63,7 +63,6 @@ const initiateCombatHandler = async (req, res) => {
 
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
-    // 【核心修改】從 req.body 解構出新的策略指令，而不是舊的 action
     const { strategy, skill, model: playerModelChoice } = req.body;
 
     try {
@@ -89,17 +88,14 @@ const combatActionRouteHandler = async (req, res) => {
         playerProfile.mp = combatState.player.mp;
         playerProfile.maxMp = combatState.player.maxMp;
 
-        // 【核心修改】將新的策略指令傳遞給AI
         const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, { strategy, skill });
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
-        // 更新戰鬥狀態
         const updatedState = combatResult.updatedState;
         updatedState.log = combatState.log;
         updatedState.log.push(combatResult.narrative);
 
-        // 如果戰鬥結束
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
@@ -163,16 +159,16 @@ const combatActionRouteHandler = async (req, res) => {
 
             res.json({
                 status: 'COMBAT_END',
-                narrative: combatResult.narrative, // 回傳最後的旁白
-                updatedState: updatedState, // 回傳最後的狀態
-                newRound: { // 回傳用於更新主遊戲循環的資料
+                narrative: combatResult.narrative, 
+                updatedState: updatedState,
+                newRound: {
                     story: newRoundData.story,
                     roundData: newRoundData,
                     suggestion: updatedState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
                 }
             });
 
-        } else { // 戰鬥仍在繼續
+        } else { 
             await combatDocRef.set(updatedState);
             res.json({
                 status: 'COMBAT_ONGOING',
@@ -276,7 +272,7 @@ const surrenderRouteHandler = async (req, res) => {
     }
 };
 
-// 將路由綁定到對應的處理函式
+// 【核心修改】移除路由地址中的 /combat 前綴
 router.post('/initiate', initiateCombatHandler);
 router.post('/action', combatActionRouteHandler);
 router.post('/surrender', surrenderRouteHandler);
