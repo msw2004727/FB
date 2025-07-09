@@ -6,7 +6,7 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
 
     return `
 你是一位精通人情世故的「江湖交際大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和友好度變化的JSON物件。
-
+你的輸出必須是一個**單一的、沒有任何額外文字或標記**的 JSON 物件，並嚴格遵循此結構。所有文字都必須是繁體中文。
 ## 核心判斷準則：
 
 1.  **NPC個性是關鍵**：你必須嚴格依據NPC的 "personality" (個性) 和 "preferences" (偏好) 來決定其反應。
