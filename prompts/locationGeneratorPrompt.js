@@ -2,20 +2,21 @@
 
 const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) => {
     return `
-你是一位學識貫通古今的「輿圖司大總管」，同時也是一位精通社會學與經濟學的「世界建築師」。你的唯一任務是為一個全新的、從未被探索過的地點，生成一份極度詳盡、結構化的設定檔案。這份檔案將成為遊戲世界運作的基石，並為未來的「地區經營」玩法提供所有必要的數據支持。
+你是一位學識貫通古今的「輿圖司大總管」，同時也是一位精通社會學與經濟學的「世界建築師」。你的唯一任務是為一個全新的、從未被探索過的地點，生成一份極度詳盡、結構化的設定檔案。這份檔案將成為遊戲世界運作的基石。
 
 你的創作必須基於以下的世界觀和已有的故事摘要，確保新地點能無縫融入現有世界。
 
-## 核心世界觀：
+## 【核心世界觀】
 - **時代背景**: 架空的宋朝，名為「元祐」年間。天下並不太平，朝廷對地方的掌控力有限，江湖門派、地方豪族、山賊流寇等勢力盤根錯節。
 - **技術水平**: 處於中國古代封建社會，農業為本，商業正在萌芽，不同地區的富裕程度差異巨大。
 
-## 生成準則：
+## 【全新三級地區架構】
+你現在必須使用全新的「地點-設施」巢狀結構來生成地點。一個「地點 (Location)」內部可以包含多個「設施 (Facility)」。
 
-1.  **邏輯自洽**: 地點的所有屬性必須相互關聯。一個「貧瘠」的山村，其「稅收」必然很低，「人口」也不會太多。一個「交通要道」上的城鎮，其「商業」活動應該會更頻繁。
-2.  **數據化與故事性結合**: 你不僅要提供冰冷的數據，也要用簡短的文字描述賦予這個地方靈魂。
-3.  **為經營玩法鋪路**: 你生成的資源、人口、設施、問題等，都將是未來玩家可以介入和改變的。一個地區的「當前問題」，就是未來玩家可以解決的「任務」。
-4.  **【核心修改】為地圖系統鋪路**: 你生成的相鄰地點資訊，必須為未來的「世界地圖」系統提供必要的數據。
+- **地點 (Location)**: 指的是一個村莊、城鎮或門派的整體。
+- **設施 (Facility)**: 指的是地點內部的具體建築，如「藥鋪」、「酒館」、「城門」。
+
+你生成的JSON檔案，其核心是一個「地點」，而其內部的 \`facilities\` 陣列則定義了該地點擁有的所有「設施」。
 
 ---
 
@@ -27,7 +28,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
   "locationId": "地點的唯一ID，通常就是它的名稱",
   "locationName": "地點的官方名稱",
   "locationType": "村莊 | 城鎮 | 山寨 | 門派 | 據點 | 自然景觀",
-  "description": "一段充滿意境的文字，描述這個地方的整體風貌、氛圍和第一印象。",
+  "description": "一段充滿意境的文字，描述這個地點的整體風貌、氛圍和第一印象。",
   "geography": {
     "terrain": "地形，例如：平原、山谷、丘陵、河流交匯處、沿海",
     "climate": "氣候，例如：溫潤多雨、四季分明、乾燥少風",
@@ -47,17 +48,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
   "economy": {
     "prosperity": "富裕程度（富裕 | 殷實 | 普通 | 貧困 | 貧瘠）",
     "primaryIndustry": ["主要的產業或經濟來源，可多個（例如：農業、漁業、礦業、商業、手工業、運輸）"],
-    "specialty": ["當地特產（例如：絲綢、瓷器、鐵礦、藥材、名酒）"],
-    "taxRevenue": "該地區每年能產生的基礎稅收（單位：文錢），根據富裕程度和產業決定一個合理的數字"
-  },
-  "demographics": {
-    "population": "大致的人口規模（一個數字）",
-    "populationComposition": "人口組成描述（例如：多為農夫與獵戶，有少量商人往來）"
-  },
-  "resources": {
-    "manpower": "可用於勞作或戰鬥的青壯年人力（一個數字，應小於人口）",
-    "food": "糧食儲備水平（充沛 | 足夠 | 勉強度日 | 匱乏）",
-    "materials": "基礎物資（木材、石料等）的豐富程度（豐富 | 普通 | 稀少）"
+    "specialty": ["當地特產（例如：絲綢、瓷器、鐵礦、藥材、名酒）"]
   },
   "infrastructure": {
     "buildings": ["本地擁有的主要建築設施列表（例如：民居、農田、鐵匠鋪、酒館、藥鋪、城牆、練武場）"]
@@ -65,7 +56,23 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
   "lore": {
     "history": "一段關於此地歷史的簡短傳說或故事。",
     "currentIssues": ["本地當前面臨的主要問題或衝突（例如：飽受山賊騷擾、水源被污染、家族派系鬥爭、稅賦過重）"]
-  }
+  },
+  "facilities": [
+    {
+      "facilityName": "藥鋪",
+      "facilityType": "商店",
+      "description": "一間樸素的藥鋪，空氣中瀰漫著濃重的草藥味。",
+      "owner": "王大夫",
+      "special_events": ["每日清晨，王大夫會在此為村民義診。"]
+    },
+    {
+      "facilityName": "鐵匠鋪",
+      "facilityType": "作坊",
+      "description": "終日傳來叮叮噹噹的打鐵聲，門口堆放著一些農具和礦石。",
+      "owner": "李鐵匠",
+      "special_events": []
+    }
+  ]
 }
 \`\`\`
 
@@ -78,8 +85,4 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 
 ---
 
-現在，請根據以上所有資訊，為「${locationName}」生成一份詳細的JSON檔案。
-`;
-};
-
-module.exports = { getLocationGeneratorPrompt };
+現在，請根據以上所有資訊，為「${locationName}」生成一份詳細的、包含巢狀設施結構的JSON檔案。
