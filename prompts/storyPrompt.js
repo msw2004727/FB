@@ -9,7 +9,7 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-// 函式簽名新增 npcContext 和 playerBulkScore 參數
+// 【核心修改】函式簽名新增 npcContext 和 playerBulkScore 參數
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
@@ -43,9 +43,8 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的**個性(personality)、秘密(secrets)和目標(goals)**，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！\n\`\`\`json\n${JSON.stringify(npcContext, null, 2)}\n\`\`\``
         : '';
 
-    // 敘事負重系統的規則
     const encumbranceInstruction = `
-## 【核心新增】敘事負重系統 (Narrative Encumbrance System)
+## 【敘事負重系統 (Narrative Encumbrance System)】
 你的描述必須考慮玩家的負重程度。玩家當前的「份量分數」為: **${playerBulkScore}**。
 
 * **輕裝上陣 (0-5分)**：當玩家負重很低時，你的描述應體現其**輕盈與敏捷**。例如在描述輕功或追逐時，可以加入「你身輕如燕，幾個起落便消失在林間」之類的文字。
@@ -84,25 +83,19 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於金庸武俠小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的非戰鬥指令，產生接下來發生的故事。
 
-## 【核心世界觀鐵律：現代回想與NPC反應系統】
-主角的靈魂來自現代，有時會不自覺地說出或做出一些不屬於這個武俠世界的言行。當玩家的指令中包含明顯的現代物品或概念時（例如：手機、摩托車、手槍、網路、電燈），你**絕對禁止**讓這些東西真實地出現。
-你的任務是將這個「時代錯置」的指令，轉化為一段有深度的角色扮演互動。你必須同時生成兩段劇情：
+## 【核心世界觀鐵律】
+1.  **現代回想與NPC反應系統**: 主角的靈魂來自現代，有時會不自覺地說出或做出一些不屬於這個武俠世界的言行。當玩家的指令中包含明顯的現代物品或概念時（例如：手機、摩托車、手槍、網路、電燈），你**絕對禁止**讓這些東西真實地出現。你的任務是將這個「時代錯置」的指令，轉化為一段有深度的角色扮演互動。你必須同時生成兩段劇情：
+    * **主角的「現代回想」**: 描寫主角因此回憶起現代生活的場景，體現對過去的懷念與身處異世的割裂感。
+    * **NPC的「情境反應」**: 根據在場NPC對玩家的友好度，生成符合邏輯的反應（友好則好奇、中立則困惑、敵對則嘲笑）。
+    * **劇情融合**: 最後，將上述的「主角回想」與「NPC反應」自然地融合到你的 "story" 敘述中。
 
-### 1. 主角的「現代回想」：
-你必須描寫一段主角因為這個指令，而瞬間回憶起現代生活的場景。這段回憶應該與指令中的物品相關，體現出主角對過去生活的懷念與身處異世的割裂感。
-- **範例 (指令：「我拿出手機」)**：你的描述應為「你不自覺地往懷中一摸，指尖傳來的粗布觸感讓你猛然一怔。你回想起那個只要輕輕一劃，就能知曉天下事、與親友即時通話的奇異鐵片。那螢幕上閃爍的光，曾是你再熟悉不過的日常...」
-
-### 2. NPC的「情境反應」：
-你必須根據在場NPC對玩家的**友好度**，為他們生成符合邏輯的反應。
-- **高友好度 (friendly, trusted, devoted)**：NPC會困惑，但傾向於相信玩家。他們可能認為玩家在說某種他們不懂的隱喻或家鄉的奇聞軼事。
-  - **範例**：王大夫會關切地問：「『手機』？那是何物？是你家鄉的某種傳訊法寶嗎？聽起來真是神奇。」
-- **中立或低友好度 (neutral, wary)**：NPC會感到莫名其妙，甚至覺得玩家在說胡話。
-  - **範例**：路過的村民會投來奇怪的目光，竊竊私語：「這人是不是腦子壞了？」
-- **敵對 (hostile, sworn_enemy)**：NPC會藉機嘲笑或羞辱玩家，認為這是攻擊其精神狀態的絕佳機會。
-  - **範例**：山賊頭目會放聲大笑：「哈哈哈！我看你是被打傻了吧！滿口胡言亂語，今天就送你上西天！」
-
-### 3. 劇情融合：
-最後，你必須將上述的「主角回想」與「NPC反應」自然地融合到你的 "story" 敘述中，讓它成為一個完整的、連貫的互動事件。
+2.  **【核心新增】語言挑釁與NPC激怒鐵律**:
+    * **定義**: 當玩家的文字指令中包含明確的攻擊性詞彙（例如「殺了你」、「砍死他」、「動手」等），你**絕對禁止**直接將其視為玩家的實際行動。你必須將這類指令解讀為玩家角色的一次**「口頭叫囂」**或**「虛張聲勢的挑釁」**。
+    * **你的任務**: 你的核心任務是根據在場NPC的**個性(personality)**來決定他們對此挑釁的反應。
+        * **如果NPC個性是「膽小」、「謹慎」、「圓滑」**: 他們可能會害怕、退縮或試圖緩和氣氛。友好度可能會下降，但**不會**觸發戰鬥。
+        * **如果NPC個性是「暴躁」、「高傲」、「易怒」、「好鬥」**: 他們**極有可能**被玩家的挑釁所激怒，並**主動發起攻擊**。
+    * **觸發戰鬥**: 只有在NPC被激怒並決定主動攻擊時，你才可以在回傳的JSON中觸發戰鬥系統。你的 "story" 敘述必須描寫NPC被激怒並發起攻擊的過程，然後在\`roundData\`中加入\`"enterCombat": true\`以及相應的戰鬥設定。
+    * **範例**: 玩家輸入「我要宰了你這惡霸！」。在場的NPC「張三」個性是「暴躁」。你的故事應為：「張三聽到你的喝斥，臉色一沉，怒極反笑道：『好大的口氣！我倒要看看你有幾斤幾兩！』說罷便從腰間抽出大刀，朝你猛撲過來。」，並在回傳的JSON中觸發戰鬥。
 
 ---
 
@@ -151,7 +144,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是「現代回想與NPC反應系統」和「敘事負重系統」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「現代回想」與「語言挑釁」鐵律）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
 `;
 };
 
