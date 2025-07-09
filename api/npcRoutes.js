@@ -3,24 +3,21 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
-// 【核心修改】引入 getMergedNpcProfile
 const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile } = require('./gameHelpers');
 
 const db = admin.firestore();
 
-// 【核心重構】獲取NPC公開資料的路由
+// 獲取NPC公開資料的路由
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
     try {
-        // 使用新的輔助函式獲取合併後的完整NPC資料
         const npcProfile = await getMergedNpcProfile(userId, npcName);
 
         if (!npcProfile) {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        // 檢查玩家與NPC是否在同一地點
         const latestSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         if (latestSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到玩家位置資訊。' });
@@ -31,11 +28,10 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
         }
 
-        // 回傳給前端的公開資料
         const publicProfile = {
             name: npcProfile.name,
             appearance: npcProfile.appearance,
-            friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0), // 動態計算友好度等級
+            friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0),
             romanceValue: npcProfile.romanceValue || 0,
             friendlinessValue: npcProfile.friendlinessValue || 0
         };
@@ -48,13 +44,13 @@ router.get('/npc-profile/:npcName', async (req, res) => {
     }
 });
 
-// 【核心重構】處理NPC聊天的路由
+// 處理NPC聊天的路由
 router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
     try {
         const [npcProfile, summaryDoc, allLocationsSnapshot] = await Promise.all([
-            getMergedNpcProfile(userId, npcName), // 使用新函式獲取NPC資料
+            getMergedNpcProfile(userId, npcName),
             db.collection('users').doc(userId).collection('game_state').doc('summary').get(),
             db.collection('locations').get()
         ]);
@@ -95,7 +91,7 @@ router.post('/npc-chat', async (req, res) => {
     }
 });
 
-// 【核心重構】處理贈予物品的路由
+// 【核心修改】處理贈予物品的路由
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -105,7 +101,7 @@ router.post('/give-item', async (req, res) => {
     try {
         const [playerProfile, npcProfile, latestSaveSnapshot, summaryDoc] = await Promise.all([
             db.collection('users').doc(userId).get().then(doc => doc.data()),
-            getMergedNpcProfile(userId, npcName), // 使用新函式獲取NPC資料
+            getMergedNpcProfile(userId, npcName),
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             db.collection('users').doc(userId).collection('game_state').doc('summary').get()
         ]);
@@ -122,26 +118,54 @@ router.post('/give-item', async (req, res) => {
         
         const { npc_response, friendlinessChange, itemChanges } = aiResponse;
         
+        const updatePromises = [];
+        
+        // --- 新增的程式碼開始 ---
+        // 只有在友好度為正向變化時，才將物品真正給予NPC
+        if (friendlinessChange > 0) {
+            const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+            const itemKey = type === 'money' ? '銀兩' : itemName;
+            const quantityToAdd = type === 'money' ? amount : (amount || 1);
+            
+            // 使用點記法來安全地更新或增加 inventory 中的物品數量
+            const fieldPath = `inventory.${itemKey}`;
+            const updatePayload = {
+                [fieldPath]: admin.firestore.FieldValue.increment(quantityToAdd)
+            };
+
+            // 將更新NPC庫存的操作加入異步隊列
+            updatePromises.push(npcStateRef.set(updatePayload, { merge: true }));
+            
+            // 同時，從玩家背包中移除對應的物品
+            const itemToRemove = {
+                action: 'remove',
+                itemName: itemKey,
+                quantity: quantityToAdd
+            };
+            updatePromises.push(updateInventory(userId, [itemToRemove]));
+        }
+        // --- 新增的程式碼結束 ---
+        
         // 更新友好度
         if(friendlinessChange) {
-            await updateFriendlinessValues(userId, [{ name: npcName, friendlinessChange }]);
+            updatePromises.push(updateFriendlinessValues(userId, [{ name: npcName, friendlinessChange }]));
         }
         
-        const itemNameToRemove = type === 'money' ? '銀兩' : itemName;
-        const quantityToRemove = type === 'money' ? amount : (amount || 1);
-        
-        const inventoryUpdates = [{ action: 'remove', itemName: itemNameToRemove, quantity: quantityToRemove }];
-        
+        // 處理NPC的回禮
         let giftNarrative = "";
         if (itemChanges && itemChanges.length > 0) {
+            // 將回禮物品加入玩家背包
+            updatePromises.push(updateInventory(userId, itemChanges));
+
             itemChanges.forEach(gift => {
-                inventoryUpdates.push(gift);
                 giftNarrative += ` 你收到了來自${npcName}的回禮：${gift.itemName}。`;
             });
         }
         
-        await updateInventory(userId, inventoryUpdates);
+        // 等待所有資料庫操作完成
+        await Promise.all(updatePromises);
         
+        // 構造新的回合數據
         const newRoundNumber = lastRoundData.R + 1;
         const inventoryState = await getInventoryState(userId);
         
@@ -161,7 +185,7 @@ router.post('/give-item', async (req, res) => {
             newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(updatedNpcProfile.friendlinessValue) });
         }
         
-        const baseNarrative = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
+        const baseNarrative = await getAINarrativeForGive(lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
         newRoundData.story = baseNarrative + giftNarrative;
         
         const [newSummary, suggestion] = await Promise.all([
