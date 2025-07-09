@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerSkills = gameState.combat.state?.player?.skills || [];
         // 假設 skill 物件有 type: 'attack' | 'defend' 等屬性
         const relevantSkills = playerSkills.filter(skill => {
-            if (strategy === 'attack' && skill.skillType === '拳腳' || skill.skillType === '兵器') return true;
+            if (strategy === 'attack' && (skill.skillType === '拳腳' || skill.skillType === '兵器')) return true;
             if (strategy === 'defend' && skill.skillType === '內功') return true; // 簡化：假設內功用於防禦
             return false;
         });
@@ -474,20 +474,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 【核心修改】修正後的 handleNpcClick 函式
     function handleNpcClick(event) {
-        const target = event.target.closest('.npc-name');
-        
-        if (event.target.closest('.npc-interaction-menu')) {
-            return;
-        }
-        
-        if (target) {
-            const npcName = target.dataset.npcName || target.textContent;
-            showNpcInteractionMenu(target, npcName);
-        } else {
+        const targetIsNpc = event.target.closest('.npc-name');
+        const targetIsMenu = event.target.closest('.npc-interaction-menu');
+
+        if (targetIsNpc) {
+            // 如果點擊的是NPC姓名，就顯示對應的選單
+            const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
+            showNpcInteractionMenu(targetIsNpc, npcName);
+        } else if (!targetIsMenu) {
+            // 如果點擊的既不是NPC姓名，也不是選單本身，就隱藏選單
             hideNpcInteractionMenu();
         }
+        // 如果點擊的是選單內部，則不做任何事，讓按鈕自己的事件監聽器去處理
     }
+
 
     async function sendChatMessage() {
         const message = chatInput.value.trim();
@@ -672,7 +674,6 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.addEventListener('click', handlePlayerAction);
         playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
         
-        // 【核心修改】將「確定」按鈕的事件監聽器綁定到 document 上，確保它在動態生成後依然有效
         document.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'combat-confirm-btn') {
                 handleConfirmCombatAction();
