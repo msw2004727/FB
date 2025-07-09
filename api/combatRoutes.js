@@ -14,7 +14,39 @@ const {
 
 const db = admin.firestore();
 
-// 【核心新增】處理戰鬥發起的核心函式
+// 輔助函式：根據NPC技能推斷其戰鬥特性標籤
+const getNpcTags = (skills = []) => {
+    if (!skills || skills.length === 0) return [{ name: '凡人', type: 'support' }];
+
+    const tags = new Set();
+    const tagMap = {
+        '攻擊': { type: 'attack', keywords: ['劍', '刀', '拳', '掌', '指', '鏢'] },
+        '防禦': { type: 'defend', keywords: ['罩', '盾', '罡', '體'] },
+        '治癒': { type: 'heal', keywords: ['療傷', '回春', '治癒'] },
+        '輔助': { type: 'support', keywords: ['陣', '歌', '舞'] }
+    };
+
+    skills.forEach(skill => {
+        if (skill.skillType === '醫術') tags.add('治癒');
+        if (skill.skillType === '毒術') tags.add('攻擊');
+
+        for (const [tagName, { type, keywords }] of Object.entries(tagMap)) {
+            if (keywords.some(kw => skill.name.includes(kw))) {
+                tags.add(tagName);
+            }
+        }
+    });
+
+    if (tags.size === 0) tags.add('攻擊'); // 如果沒有匹配，預設為攻擊
+
+    return Array.from(tags).map(tagName => ({
+        name: tagName,
+        type: Object.values(tagMap).find(t => t.keywords.includes(tagName))?.type || 'attack'
+    }));
+};
+
+
+// 處理戰鬥發起的核心函式
 const initiateCombatHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -33,16 +65,54 @@ const initiateCombatHandler = async (req, res) => {
         const lastSave = savesSnapshot.docs[0].data();
 
         const simulatedPlayerAction = isSparring ? `我想與 ${targetNpcName} 切磋一番。` : `我決定對 ${targetNpcName} 動手。`;
+        
+        // 1. 讓AI根據情境生成基礎戰鬥設定
         const combatSetupResult = await getAICombatSetup(simulatedPlayerAction, lastSave);
 
-        const skills = await getPlayerSkills(userId);
+        // 2. 獲取玩家的詳細資料
+        const playerSkills = await getPlayerSkills(userId);
         const userProfile = (await userDocRef.get()).data();
         const maxHp = (userProfile.externalPower || 5) * 10 + 50;
         const maxMp = (userProfile.internalPower || 5) * 5 + 20;
 
+        // 3. 【核心修改】獲取所有參戰NPC的詳細檔案以生成標籤
+        const allNpcNames = [
+            ...combatSetupResult.combatants.map(c => c.name),
+            ...combatSetupResult.allies.map(a => a.name)
+        ];
+        
+        const npcDocs = await Promise.all(
+            allNpcNames.map(name => userDocRef.collection('npcs').doc(name).get())
+        );
+
+        const npcProfiles = npcDocs.reduce((acc, doc) => {
+            if (doc.exists) {
+                acc[doc.id] = doc.data();
+            }
+            return acc;
+        }, {});
+
+        // 4. 為所有參戰者附加標籤
+        combatSetupResult.combatants.forEach(c => {
+            const profile = npcProfiles[c.name];
+            c.tags = profile ? getNpcTags(profile.skills) : [{ name: '攻擊', type: 'attack' }];
+        });
+        combatSetupResult.allies.forEach(a => {
+            const profile = npcProfiles[a.name];
+            a.tags = profile ? getNpcTags(profile.skills) : [{ name: '輔助', type: 'support' }];
+        });
+
         const combatState = { 
             turn: 1, 
-            player: { username, skills, hp: maxHp, maxHp, mp: maxMp, maxMp }, 
+            player: { 
+                username, 
+                skills: playerSkills, 
+                hp: maxHp, 
+                maxHp, 
+                mp: maxMp, 
+                maxMp,
+                tags: [{ name: '主角', type: 'attack' }] // 玩家預設標籤
+            }, 
             enemies: combatSetupResult.combatants,
             allies: combatSetupResult.allies || [], 
             bystanders: combatSetupResult.bystanders || [], 
@@ -272,7 +342,6 @@ const surrenderRouteHandler = async (req, res) => {
     }
 };
 
-// 【核心修改】移除路由地址中的 /combat 前綴
 router.post('/initiate', initiateCombatHandler);
 router.post('/action', combatActionRouteHandler);
 router.post('/surrender', surrenderRouteHandler);
