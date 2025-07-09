@@ -213,29 +213,28 @@
         
         <div id="combat-modal" class="combat-modal-overlay">
             <div class="combat-modal-content">
-                <div class="combat-header">
-                    <h3 id="combat-title">遭遇戰</h3>
-                    <div id="combat-roster" class="combat-roster">
-                         <div id="combat-allies" class="combat-roster-group">
-                             <strong>我方陣營</strong>
-                             <div class="roster-names"></div>
-                         </div>
-                         <div id="combat-enemies" class="combat-roster-group">
-                             <strong>敵方陣營</strong>
-                             <div class="roster-names"></div>
-                         </div>
+                <div class="combat-dashboard">
+                    <div id="allies-roster" class="roster-panel">
+                        </div>
+                    <div id="enemies-roster" class="roster-panel">
+                        </div>
+                </div>
+                <div class="combat-main-panel">
+                    <div id="combat-log" class="combat-log-area">
+                        </div>
+                    <div id="combat-turn-counter" class="combat-turn-counter">
+                        第一回合
+                    </div>
+                    <div id="combat-actions-panel" class="combat-actions-panel">
+                        <div id="strategy-buttons" class="strategy-buttons">
+                            </div>
+                        <div id="skill-selection" class="skill-selection">
+                            </div>
+                        <div id="confirm-action" class="confirm-action">
+                            </div>
                     </div>
                 </div>
-                <div id="combat-log" class="combat-log-area">
-                </div>
-                <div id="combat-skills-info" class="combat-skills-area">
-                </div>
-                <div class="combat-input-area">
-                    <input type="text" id="combat-input" placeholder="你想如何應對？..." autocomplete="off">
-                    <button id="combat-surrender-btn" class="combat-button surrender">認輸</button>
-                    <button id="combat-action-btn" class="combat-button action">行動</button>
-                </div>
-                <div id="combat-loader" class="combat-loader-overlay">
+                 <div id="combat-loader" class="combat-loader-overlay">
                     <div class="loader-dots">
                         <span></span>
                         <span></span>
