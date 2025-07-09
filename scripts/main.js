@@ -326,23 +326,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 重構NPC點擊相關的所有邏輯 ---
     function hideNpcInteractionMenu() {
-        npcInteractionMenu.classList.remove('visible');
+        if (npcInteractionMenu) {
+            npcInteractionMenu.classList.remove('visible');
+        }
     }
 
     function showNpcInteractionMenu(targetElement, npcName) {
-        const rect = targetElement.getBoundingClientRect();
-        const panelRect = storyPanel.getBoundingClientRect();
-        
-        npcInteractionMenu.style.top = `${rect.bottom - panelRect.top + storyPanel.scrollTop + 5}px`;
-        npcInteractionMenu.style.left = `${rect.left - panelRect.left}px`;
-
+        // 先填充內容，以便能準確測量選單尺寸
         npcInteractionMenu.innerHTML = `
             <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
             <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
         `;
         
+        // 取得所需元素的尺寸和位置
+        const menuRect = npcInteractionMenu.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        const panelRect = storyPanel.getBoundingClientRect();
+
+        // --- 核心定位與邊界偵測邏輯 ---
+        let top = targetRect.bottom - panelRect.top + storyPanel.scrollTop + 8;
+        let left = targetRect.left - panelRect.left + (targetRect.width / 2) - (menuRect.width / 2);
+
+        // 垂直邊界檢查：如果選單底部超出容器，則將其移動到目標上方
+        if (top + menuRect.height > storyPanel.scrollHeight) {
+            top = targetRect.top - panelRect.top + storyPanel.scrollTop - menuRect.height - 8;
+        }
+
+        // 水平邊界檢查
+        const rightEdge = left + menuRect.width;
+        if (rightEdge > panelRect.width) {
+            // 如果超出右邊界，向左移動
+            left = panelRect.width - menuRect.width - 5; 
+        }
+        if (left < 0) {
+            // 如果超出左邊界，貼齊左邊
+            left = 5;
+        }
+
+        // 應用最終計算出的位置
+        npcInteractionMenu.style.top = `${top}px`;
+        npcInteractionMenu.style.left = `${left}px`;
+        
+        // 顯示選單
         npcInteractionMenu.classList.add('visible');
 
+        // 為新生成的按鈕加上事件監聽
         npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
         npcInteractionMenu.querySelector('.attack').addEventListener('click', handleAttackButtonClick);
     }
@@ -393,15 +421,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleNpcClick(event) {
         const target = event.target.closest('.npc-name');
         
-        if (!target || npcInteractionMenu.contains(event.target)) {
-            if (!event.target.closest('.npc-interaction-menu')) {
-                 hideNpcInteractionMenu();
-            }
-            return;
+        if (event.target.closest('.npc-interaction-menu')) {
+            return; // 如果點擊的是選單本身，不做任何事
         }
-
-        const npcName = target.dataset.npcName || target.textContent;
-        showNpcInteractionMenu(target, npcName);
+        
+        if (target) {
+            const npcName = target.dataset.npcName || target.textContent;
+            showNpcInteractionMenu(target, npcName);
+        } else {
+            hideNpcInteractionMenu(); // 如果點擊的不是NPC，也不是選單，則隱藏選單
+        }
     }
 
     async function sendChatMessage() {
@@ -533,11 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-down');
         });
         menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
-        mainContent.addEventListener('click', (e) => {
-            if (window.innerWidth <= 1024 && !document.getElementById('dashboard').contains(e.target) && !menuToggle.contains(e.target)) {
-                gameContainer.classList.remove('sidebar-open');
-            }
-        });
+        
         logoutButton.addEventListener('click', () => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
