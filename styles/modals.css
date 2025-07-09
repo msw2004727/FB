@@ -20,6 +20,28 @@
     box-sizing: border-box;
 }
 
+/* 【核心新增】載入中提示標籤樣式 */
+.loader-disclaimer {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    color: var(--light-text-secondary);
+    padding: 0.4rem 1rem;
+    border-radius: 20px; /* 橢圓形/膠囊形狀 */
+    font-size: 0.8rem; /* xs尺寸小字 */
+    font-family: var(--font-sans);
+    max-width: 80%;
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 2rem; /* 與下方的"正在構思"拉開距離 */
+}
+
+body.dark-theme .loader-disclaimer {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+
 .ai-thinking-loader.visible {
     opacity: 1;
     visibility: visible;
