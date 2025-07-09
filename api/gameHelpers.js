@@ -1,7 +1,9 @@
 // /api/gameHelpers.js
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
-const { getAINpcProfile, getAIRomanceEvent, getSkillGeneratorPrompt, callAI, aiConfig, getNpcCreatorPrompt } = require('../services/aiService');
+// 【核心修改】從正確的路徑引入 getSkillGeneratorPrompt
+const { getAINpcProfile, getAIRomanceEvent, callAI, aiConfig, getNpcCreatorPrompt } = require('../services/aiService');
+const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js'); 
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
 
@@ -11,12 +13,6 @@ const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 
-/**
- * 【核心新增】獲取合併後的NPC完整資料。
- * @param {string} userId - 玩家ID.
- * @param {string} npcName - NPC名稱.
- * @returns {Promise<Object|null>} 合併後的NPC完整檔案，如果找不到則返回null.
- */
 async function getMergedNpcProfile(userId, npcName) {
     if (!userId || !npcName) return null;
 
@@ -37,7 +33,6 @@ async function getMergedNpcProfile(userId, npcName) {
         const templateData = templateDoc.data();
         const stateData = stateDoc.exists ? stateDoc.data() : {};
 
-        // 合併模板和玩家狀態
         return { ...templateData, ...stateData };
 
     } catch (error) {
@@ -65,7 +60,8 @@ async function getOrGenerateSkillTemplate(skillName) {
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await skillTemplateRef.set(newTemplateData);
         console.log(`[武學總綱] 成功為「${skillName}」建立並儲存了總綱模板。`);
-        return newTemplateData;
+        const newDoc = await skillTemplateRef.get();
+        return newDoc.data();
     } catch (error) {
         console.error(`[武學總綱] 在處理武學「${skillName}」的總綱時發生錯誤:`, error);
         return null;
@@ -180,16 +176,14 @@ const updateLibraryNovel = async (userId, username) => {
     }
 };
 
-// 【核心重構】創建NPC模板與玩家狀態的函式
 const createNpcProfileInBackground = async (userId, username, npcData, roundData, playerProfile) => {
     const npcName = npcData.name;
-    console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，啟動背景建檔程序...`);
+    console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序...`);
     
     try {
         const npcTemplateRef = db.collection('npcs').doc(npcName);
         const playerNpcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
-        // 1. 檢查模板是否存在，不存在則創建
         let templateDoc = await npcTemplateRef.get();
         if (!templateDoc.exists) {
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
@@ -203,7 +197,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             console.log(`[NPC系統] 成功為「${npcName}」建立並儲存了通用模板。`);
         }
 
-        // 2. 檢查玩家與該NPC的關係檔案是否存在，不存在則創建
         const stateDoc = await playerNpcStateRef.get();
         if (!stateDoc.exists) {
             const initialState = {
@@ -283,10 +276,8 @@ const updateInventory = async (userId, itemChanges) => {
     console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 };
 
-// 【核心重構】更新友好度的函式
 const updateFriendlinessValues = async (userId, npcChanges) => {
     if (!npcChanges || npcChanges.length === 0) return;
-    // 指向玩家與NPC的關係狀態集合
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const promises = npcChanges.map(async (change) => {
         if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) {
@@ -294,11 +285,9 @@ const updateFriendlinessValues = async (userId, npcChanges) => {
         }
         const npcStateDocRef = playerNpcStatesRef.doc(change.name);
         try {
-            // 使用事務性更新來確保數據一致性
             await db.runTransaction(async (transaction) => {
                 const npcStateDoc = await transaction.get(npcStateDocRef);
                 if (!npcStateDoc.exists) {
-                    // 如果關係檔案不存在，先創建一個（這是一個保護措施）
                     transaction.set(npcStateDocRef, { friendlinessValue: change.friendlinessChange });
                     return;
                 }
@@ -315,7 +304,6 @@ const updateFriendlinessValues = async (userId, npcChanges) => {
     await Promise.all(promises);
 };
 
-// 【核心重構】更新心動值的函式
 const updateRomanceValues = async (userId, romanceChanges) => {
     if (!romanceChanges || romanceChanges.length === 0) return;
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
@@ -333,17 +321,14 @@ const updateRomanceValues = async (userId, romanceChanges) => {
     await Promise.all(promises);
 };
 
-// 【核心重構】檢查並觸發戀愛事件的函式
 const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
-    const statesSnapshot = await playerNpcStatesRef.where('romanceValue', '>=', 50).get(); // 降低觸發門檻以測試
+    const statesSnapshot = await playerNpcStatesRef.where('romanceValue', '>=', 50).get();
     if (statesSnapshot.empty) return null;
 
     for (const stateDoc of statesSnapshot.docs) {
         const npcName = stateDoc.id;
         const npcState = stateDoc.data();
-        
-        // 使用新的輔助函式獲取完整的NPC檔案
         const npcProfile = await getMergedNpcProfile(userId, npcName);
         if (!npcProfile) continue;
 
@@ -375,7 +360,6 @@ const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
     return null; 
 };
 
-
 const getInventoryState = async (userId) => {
     const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const snapshot = await playerInventoryRef.get();
@@ -395,7 +379,6 @@ const getInventoryState = async (userId) => {
     const otherItems = Object.entries(itemCounts).map(([name, count]) => `${name} x${count}`);
     return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
 };
-
 
 const getRawInventory = async (userId) => {
     const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
@@ -494,11 +477,8 @@ const getPlayerSkills = async (userId) => {
     return mergedSkills;
 };
 
-// 【核心重構】更新NPC檔案的函式，現在只更新玩家狀態
 const processNpcUpdates = async (userId, updates) => {
-    if (!updates || !Array.isArray(updates) || updates.length === 0) {
-        return;
-    }
+    if (!updates || !Array.isArray(updates) || updates.length === 0) return;
     const batch = db.batch();
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     for (const update of updates) {
@@ -541,5 +521,5 @@ module.exports = {
     getPlayerSkills,
     processNpcUpdates,
     getMergedLocationData,
-    getMergedNpcProfile, // 【核心新增】匯出新函式
+    getMergedNpcProfile,
 };
