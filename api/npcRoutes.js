@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
-const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile } = require('./gameHelpers');
+const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory } = require('./gameHelpers');
 
 const db = admin.firestore();
 
@@ -43,6 +43,79 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         res.status(500).json({ message: '讀取人物檔案時發生內部錯誤。' });
     }
 });
+
+// --- 新增的程式碼開始 ---
+// 獲取交易初始化數據的路由
+router.get('/start-trade/:npcName', async (req, res) => {
+    const userId = req.user.id;
+    const { npcName } = req.params;
+
+    try {
+        // 並行獲取玩家背包和NPC資料
+        const [playerInventory, npcProfile] = await Promise.all([
+            getRawInventory(userId),
+            getMergedNpcProfile(userId, npcName)
+        ]);
+
+        if (!npcProfile) {
+            return res.status(404).json({ message: '找不到交易對象。' });
+        }
+
+        // 從玩家背包中分離出銀兩
+        let playerMoney = 0;
+        const playerItems = {};
+        for (const [key, item] of Object.entries(playerInventory)) {
+            if (item.templateId === '銀兩') {
+                playerMoney = item.quantity || 0;
+            } else {
+                playerItems[key] = item;
+            }
+        }
+
+        // 從NPC背包中分離出銀兩
+        let npcMoney = 0;
+        const npcItems = {};
+        if (npcProfile.inventory) {
+            for (const [key, item] of Object.entries(npcProfile.inventory)) {
+                if (key === '銀兩') {
+                    npcMoney = item || 0;
+                } else {
+                    // 這裡假設NPC庫存中儲存的是物品名稱和數量
+                    // 我們需要獲取物品的完整模板資訊
+                    const itemTemplate = await db.collection('items').doc(key).get();
+                    if(itemTemplate.exists) {
+                        npcItems[key] = {
+                            ...itemTemplate.data(),
+                            quantity: item
+                        };
+                    }
+                }
+            }
+        }
+
+        const tradeData = {
+            player: {
+                money: playerMoney,
+                items: playerItems
+            },
+            npc: {
+                name: npcProfile.name,
+                money: npcMoney,
+                items: npcItems,
+                personality: npcProfile.personality, // 為動態定價做準備
+                goals: npcProfile.goals // 為動態定價做準備
+            }
+        };
+
+        res.json(tradeData);
+
+    } catch (error) {
+        console.error(`[交易系統] /start-trade/${npcName} 錯誤:`, error);
+        res.status(500).json({ message: '開啟交易時發生內部錯誤。' });
+    }
+});
+// --- 新增的程式碼結束 ---
+
 
 // 處理NPC聊天的路由
 router.post('/npc-chat', async (req, res) => {
@@ -91,7 +164,7 @@ router.post('/npc-chat', async (req, res) => {
     }
 });
 
-// 【核心修改】處理贈予物品的路由
+// 處理贈予物品的路由
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -120,23 +193,18 @@ router.post('/give-item', async (req, res) => {
         
         const updatePromises = [];
         
-        // --- 新增的程式碼開始 ---
-        // 只有在友好度為正向變化時，才將物品真正給予NPC
         if (friendlinessChange > 0) {
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
             const itemKey = type === 'money' ? '銀兩' : itemName;
             const quantityToAdd = type === 'money' ? amount : (amount || 1);
             
-            // 使用點記法來安全地更新或增加 inventory 中的物品數量
             const fieldPath = `inventory.${itemKey}`;
             const updatePayload = {
                 [fieldPath]: admin.firestore.FieldValue.increment(quantityToAdd)
             };
 
-            // 將更新NPC庫存的操作加入異步隊列
             updatePromises.push(npcStateRef.set(updatePayload, { merge: true }));
             
-            // 同時，從玩家背包中移除對應的物品
             const itemToRemove = {
                 action: 'remove',
                 itemName: itemKey,
@@ -144,17 +212,16 @@ router.post('/give-item', async (req, res) => {
             };
             updatePromises.push(updateInventory(userId, [itemToRemove]));
         }
-        // --- 新增的程式碼結束 ---
         
-        // 更新友好度
         if(friendlinessChange) {
-            updatePromises.push(updateFriendlinessValues(userId, [{ name: npcName, friendlinessChange }]));
+            const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+            updatePromises.push(npcStateRef.set({ 
+                friendlinessValue: admin.firestore.FieldValue.increment(friendlinessChange) 
+            }, { merge: true }));
         }
         
-        // 處理NPC的回禮
         let giftNarrative = "";
         if (itemChanges && itemChanges.length > 0) {
-            // 將回禮物品加入玩家背包
             updatePromises.push(updateInventory(userId, itemChanges));
 
             itemChanges.forEach(gift => {
@@ -162,10 +229,8 @@ router.post('/give-item', async (req, res) => {
             });
         }
         
-        // 等待所有資料庫操作完成
         await Promise.all(updatePromises);
         
-        // 構造新的回合數據
         const newRoundNumber = lastRoundData.R + 1;
         const inventoryState = await getInventoryState(userId);
         
@@ -189,8 +254,8 @@ router.post('/give-item', async (req, res) => {
         newRoundData.story = baseNarrative + giftNarrative;
         
         const [newSummary, suggestion] = await Promise.all([
-            getAISummary(model, longTermSummary, newRoundData),
-            getAISuggestion(model, newRoundData)
+            getAISummary(longTermSummary, newRoundData),
+            getAISuggestion(newRoundData)
         ]);
 
         newRoundData.suggestion = suggestion;
