@@ -256,7 +256,8 @@ const interactRouteHandler = async (req, res) => {
                 } else {
                     const newSceneLocation = aiResponse.roundData.LOC[0];
                     if (newSceneLocation) {
-                        return npcDocRef.update({ currentLocation: newSceneLocation });
+                        // 【核心修改】將 .update() 改為 .set({ ... }, { merge: true })
+                        return npcDocRef.set({ currentLocation: newSceneLocation }, { merge: true });
                     }
                 }
                 return Promise.resolve();
