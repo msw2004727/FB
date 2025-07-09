@@ -6,6 +6,9 @@ const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js');
 const { getOrGenerateItemTemplate } = require('./itemManager');
 const { generateAndCacheLocation } = require('./worldEngine');
+// --- 新增的程式碼 ---
+const { processNpcRelationships } = require('./relationshipManager');
+// --- 程式碼修改結束 ---
 
 const db = admin.firestore();
 
@@ -197,6 +200,13 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             }
             await npcTemplateRef.set(newTemplateData);
             console.log(`[NPC系統] 成功為「${npcName}」建立並儲存了通用模板。`);
+
+            // --- 新增的程式碼 ---
+            // 在模板建立成功後，立即觸發關係更新器
+            if (newTemplateData.relationships) {
+                await processNpcRelationships(userId, npcName, newTemplateData.relationships);
+            }
+            // --- 程式碼修改結束 ---
         }
 
         const stateDoc = await playerNpcStateRef.get();
@@ -212,7 +222,7 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
                     event: roundData.EVT
                 },
                 isDeceased: false,
-                inventory: {} // --- 新增的欄位 ---
+                inventory: {}
             };
             await playerNpcStateRef.set(initialState);
             console.log(`[NPC系統] 成功為玩家 ${userId} 初始化了與「${npcName}」的關係檔案。`);
