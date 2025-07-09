@@ -3,89 +3,82 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
-const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
+// 【核心修改】引入 getMergedNpcProfile
+const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile } = require('./gameHelpers');
 
 const db = admin.firestore();
 
+// 【核心重構】獲取NPC公開資料的路由
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
     try {
-        const userDocRef = db.collection('users').doc(userId);
-        const npcDocRef = userDocRef.collection('npcs').doc(npcName);
+        // 使用新的輔助函式獲取合併後的完整NPC資料
+        const npcProfile = await getMergedNpcProfile(userId, npcName);
 
-        const [latestSaveSnapshot, npcDoc] = await Promise.all([
-            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
-            npcDocRef.get()
-        ]);
-
-        if (!npcDoc.exists) {
+        if (!npcProfile) {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
-
-        const npcData = npcDoc.data();
         
+        // 檢查玩家與NPC是否在同一地點
+        const latestSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         if (latestSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到玩家位置資訊。' });
         }
         const playerLocation = latestSaveSnapshot.docs[0].data().LOC[0];
 
-        if (playerLocation !== npcData.currentLocation) {
+        if (playerLocation !== npcProfile.currentLocation) {
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
         }
 
+        // 回傳給前端的公開資料
         const publicProfile = {
-            name: npcData.name,
-            appearance: npcData.appearance,
-            friendliness: npcData.friendliness || 'neutral',
-            romanceValue: npcData.romanceValue || 0,
-            friendlinessValue: npcData.friendlinessValue || 0
+            name: npcProfile.name,
+            appearance: npcProfile.appearance,
+            friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0), // 動態計算友好度等級
+            romanceValue: npcProfile.romanceValue || 0,
+            friendlinessValue: npcProfile.friendlinessValue || 0
         };
 
         res.json(publicProfile);
 
     } catch (error) {
+        console.error(`[NPC路由] /npc-profile/${npcName} 錯誤:`, error);
         res.status(500).json({ message: '讀取人物檔案時發生內部錯誤。' });
     }
 });
 
+// 【核心重構】處理NPC聊天的路由
 router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
     try {
-        const userDocRef = db.collection('users').doc(userId);
-        const npcDocRef = userDocRef.collection('npcs').doc(npcName);
-        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
-        const locationsRef = db.collection('locations');
-
-        const [npcDoc, summaryDoc, allLocationsSnapshot] = await Promise.all([
-            npcDocRef.get(),
-            summaryDocRef.get(),
-            locationsRef.get()
+        const [npcProfile, summaryDoc, allLocationsSnapshot] = await Promise.all([
+            getMergedNpcProfile(userId, npcName), // 使用新函式獲取NPC資料
+            db.collection('users').doc(userId).collection('game_state').doc('summary').get(),
+            db.collection('locations').get()
         ]);
 
-        if (!npcDoc.exists) {
+        if (!npcProfile) {
             return res.status(404).json({ message: '對話目標不存在。' });
         }
-        const npcProfile = npcDoc.data();
+        
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖事，無人知。';
 
-        // 獲取NPC所在的本地情報
         let localLocationContext = null;
         if (npcProfile.currentLocation) {
-            const locationDoc = await locationsRef.doc(npcProfile.currentLocation).get();
+            const locationDoc = await db.collection('locations').doc(npcProfile.currentLocation).get();
             if (locationDoc.exists) {
                 localLocationContext = locationDoc.data();
             }
         }
         
-        // 智慧判斷玩家是否在詢問一個外地，並獲取其情報
         let remoteLocationContext = null;
         const knownLocationNames = allLocationsSnapshot.docs.map(doc => doc.id);
         
         for (const locName of knownLocationNames) {
             if (playerMessage.includes(locName) && locName !== npcProfile.currentLocation) {
-                const remoteLocationDoc = await locationsRef.doc(locName).get();
+                const remoteLocationDoc = await db.collection('locations').doc(locName).get();
                 if (remoteLocationDoc.exists) {
                     remoteLocationContext = remoteLocationDoc.data();
                     console.log(`[情報網系統] 偵測到外地詢問: ${locName}`);
@@ -97,10 +90,12 @@ router.post('/npc-chat', async (req, res) => {
         const aiReply = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
         res.json({ reply: aiReply });
     } catch (error) {
+        console.error(`[NPC路由] /npc-chat 錯誤:`, error);
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
     }
 });
 
+// 【核心重構】處理贈予物品的路由
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -108,55 +103,43 @@ router.post('/give-item', async (req, res) => {
     const { target: npcName, itemName, amount, type } = giveData;
 
     try {
-        const userDocRef = db.collection('users').doc(userId);
-        const npcDocRef = userDocRef.collection('npcs').doc(npcName);
-        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
-
-
-        const [userDoc, npcDoc, latestSaveSnapshot, summaryDoc] = await Promise.all([
-            userDocRef.get(),
-            npcDocRef.get(),
-            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
-            summaryDocRef.get()
+        const [playerProfile, npcProfile, latestSaveSnapshot, summaryDoc] = await Promise.all([
+            db.collection('users').doc(userId).get().then(doc => doc.data()),
+            getMergedNpcProfile(userId, npcName), // 使用新函式獲取NPC資料
+            db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
+            db.collection('users').doc(userId).collection('game_state').doc('summary').get()
         ]);
 
-        if (!userDoc.exists || !npcDoc.exists || latestSaveSnapshot.empty) {
+        if (!playerProfile || !npcProfile || latestSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到玩家、NPC或遊戲存檔。' });
         }
         
-        const playerProfile = userDoc.data();
-        const npcProfile = npcDoc.data();
         let lastRoundData = latestSaveSnapshot.docs[0].data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
-
 
         const aiResponse = await getAIGiveItemResponse(model, playerProfile, npcProfile, giveData);
         if (!aiResponse) throw new Error('AI未能生成有效的贈予反應。');
         
-        const { npc_response, friendlinessChange, itemChanges } = aiResponse; // 新增：解構出 itemChanges
-        const newFriendlinessValue = (npcProfile.friendlinessValue || 0) + friendlinessChange;
+        const { npc_response, friendlinessChange, itemChanges } = aiResponse;
         
-        await npcDocRef.update({ 
-            friendlinessValue: newFriendlinessValue,
-            friendliness: getFriendlinessLevel(newFriendlinessValue)
-        });
-
+        // 更新友好度
+        if(friendlinessChange) {
+            await updateFriendlinessValues(userId, [{ name: npcName, friendlinessChange }]);
+        }
+        
         const itemNameToRemove = type === 'money' ? '銀兩' : itemName;
         const quantityToRemove = type === 'money' ? amount : (amount || 1);
         
-        // 使用一個陣列來收集所有庫存變更
         const inventoryUpdates = [{ action: 'remove', itemName: itemNameToRemove, quantity: quantityToRemove }];
         
-        // 【核心新增】如果NPC有回禮，也加入到庫存變更陣列中
         let giftNarrative = "";
         if (itemChanges && itemChanges.length > 0) {
             itemChanges.forEach(gift => {
-                inventoryUpdates.push(gift); // 將AI生成的回禮指令加入
-                giftNarrative += ` 你收到了來自${npcName}的回禮：${gift.itemName}。`; // 準備要附加到故事裡的文字
+                inventoryUpdates.push(gift);
+                giftNarrative += ` 你收到了來自${npcName}的回禮：${gift.itemName}。`;
             });
         }
         
-        // 一次性更新所有庫存變化
         await updateInventory(userId, inventoryUpdates);
         
         const newRoundNumber = lastRoundData.R + 1;
@@ -169,16 +152,17 @@ router.post('/give-item', async (req, res) => {
         newRoundData.PC = `${username}將${itemName || amount + '文錢'}贈予了${npcName}。`;
         newRoundData.EVT = `贈予${npcName}物品`;
         
+        const updatedNpcProfile = await getMergedNpcProfile(userId, npcName);
         const npcIndex = newRoundData.NPC.findIndex(n => n.name === npcName);
         if (npcIndex > -1) {
-            newRoundData.NPC[npcIndex].friendliness = getFriendlinessLevel(newFriendlinessValue);
+            newRoundData.NPC[npcIndex].friendliness = getFriendlinessLevel(updatedNpcProfile.friendlinessValue);
             newRoundData.NPC[npcIndex].status = npc_response;
         } else {
-            newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(newFriendlinessValue) });
+            newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(updatedNpcProfile.friendlinessValue) });
         }
         
         const baseNarrative = await getAINarrativeForGive(model, lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
-        newRoundData.story = baseNarrative + giftNarrative; // 將回禮敘事附加到主要故事後
+        newRoundData.story = baseNarrative + giftNarrative;
         
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(model, longTermSummary, newRoundData),
@@ -187,8 +171,8 @@ router.post('/give-item', async (req, res) => {
 
         newRoundData.suggestion = suggestion;
         
-        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
-        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
+        await db.collection('users').doc(userId).collection('game_state').doc('summary').set({ text: newSummary, lastUpdated: newRoundNumber });
         
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
