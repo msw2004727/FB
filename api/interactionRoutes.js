@@ -57,6 +57,18 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
         const npcProfile = await getMergedNpcProfile(userId, npcName);
         if (!npcProfile || npcProfile.isDeceased) continue;
         
+        // 復仇邏輯優先判斷
+        if (npcState.revengeInfo && npcState.revengeInfo.target === playerProfile.username) {
+            console.log(`[復仇引擎] 偵測到 ${npcName} 對玩家 ${playerProfile.username} 的復仇意圖！`);
+            // 清除復仇標記，避免重複觸發
+            await npcDoc.ref.update({ revengeInfo: admin.firestore.FieldValue.delete() });
+            return {
+                type: 'REVENGE_COMBAT',
+                npcName: npcName,
+                reason: npcState.revengeInfo.reason
+            };
+        }
+
         if (!npcState.triggeredProactiveEvents) {
             npcState.triggeredProactiveEvents = [];
         }
@@ -88,6 +100,7 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
             }
 
             return {
+                type: 'PROACTIVE_CHAT',
                 npcName: npcProfile.name,
                 openingLine: proactiveChatResult.openingLine,
                 itemChanges: proactiveChatResult.itemChanges || []
@@ -108,6 +121,29 @@ const interactRouteHandler = async (req, res) => {
         const { action: playerAction, round: currentRound, model: playerModelChoice } = req.body;
         const userDocRef = db.collection('users').doc(userId);
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+        
+        const lastSaveSnapshotBeforeAction = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const lastSaveBeforeAction = lastSaveSnapshotBeforeAction.docs[0].data();
+
+        // 檢查復仇事件
+        const playerProfileForEngine = (await userDocRef.get()).data();
+        const revengeEvent = await proactiveChatEngine(userId, { ...playerProfileForEngine, username }, lastSaveBeforeAction);
+        if (revengeEvent && revengeEvent.type === 'REVENGE_COMBAT') {
+            const combatStory = `${revengeEvent.npcName}見到你，想起${revengeEvent.reason}，怒火中燒，大喝一聲「納命來！」，便朝你攻了過來！`;
+            const combatRound = {
+                ...lastSaveBeforeAction,
+                R: lastSaveBeforeAction.R + 1,
+                story: combatStory,
+                PC: `你遭遇了 ${revengeEvent.npcName} 的尋仇。`,
+                EVT: '血親尋仇',
+                enterCombat: true,
+                combatants: [{ name: revengeEvent.npcName, status: "怒不可遏，前來尋仇！" }],
+                combatIntro: combatStory
+            };
+             await userDocRef.collection('game_saves').doc(`R${combatRound.R}`).set(combatRound);
+             return res.json({ roundData: combatRound, story: combatStory });
+        }
+
 
         const [userDoc, summaryDoc, savesSnapshot, skills, rawInventory] = await Promise.all([
             userDocRef.get(),
@@ -413,10 +449,15 @@ const interactRouteHandler = async (req, res) => {
             morality: newMorality, stamina: newStamina, ...finalDate, shortActionCounter
         };
         
-        const proactiveChatResult = await proactiveChatEngine(userId, { ...userProfile, ...playerUpdatesForDb, username }, aiResponse.roundData);
-        if (proactiveChatResult) {
-            aiResponse.proactiveChat = proactiveChatResult;
+        if (revengeEvent && revengeEvent.type === 'PROACTIVE_CHAT') {
+            aiResponse.proactiveChat = revengeEvent;
+        } else {
+             const proactiveChatResult = await proactiveChatEngine(userId, { ...userProfile, ...playerUpdatesForDb, username }, aiResponse.roundData);
+            if (proactiveChatResult) {
+                aiResponse.proactiveChat = proactiveChatResult;
+            }
         }
+
 
         await Promise.all([
              userDocRef.update(playerUpdatesForDb),
@@ -490,10 +531,10 @@ const finalizeCombatHandler = async (req, res) => {
         
         let reputationSummary = '';
         if (npcUpdates && npcUpdates.length > 0) {
-            await processNpcUpdates(userId, npcUpdates);
+            await processNpcUpdates(userId, npcUpdates, killerName);
             for (const update of npcUpdates) {
                 if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
-                   reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, preCombatRoundData.LOC[0], combatResult.finalState.allies.map(a => a.name));
+                   reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, preCombatRoundData.LOC[0], combatResult.finalState.allies.map(a => a.name), killerName);
                    if (reputationSummary) {
                        summary += `\n\n**【江湖反應】** ${reputationSummary}`;
                    }
@@ -600,7 +641,7 @@ router.post('/end-chat', async (req, res) => {
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
 
         res.json({
-            story: newRoundData.story,
+            story: finalRoundData.story,
             roundData: newRoundData,
             suggestion: newRoundData.suggestion,
         });
