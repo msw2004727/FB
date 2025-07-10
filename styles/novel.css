@@ -16,25 +16,12 @@ body.dark-theme .novel-header {
     border-bottom-color: var(--dark-border);
 }
 
-/* 為標題和連結的容器新增 Flexbox 排版 */
-.title-with-link {
-    display: flex;
-    justify-content: center; /* 【***核心修改***】改為置中對齊 */
-    align-items: center;
-    flex-wrap: wrap; /* 在窄螢幕上允許換行 */
-    gap: 1rem; /* 標題和按鈕之間的間距 */
-    margin-bottom: 0.5rem; /* 與下方的 <p> 標籤保留一些距離 */
-    position: relative; /* 【***核心修改***】為絕對定位的按鈕提供基準點 */
-}
-
-
 .novel-header h1 {
     font-family: var(--font-serif);
-    font-size: 2.2rem; /* 【***核心修改***】將字體大小從 2.8rem 調整為 2.2rem */
+    font-size: 2.8rem; /* 恢復原標題大小 */
     font-weight: 600;
     color: var(--light-text-primary);
-    margin: 0; /* 移除 h1 的預設 margin */
-    text-align: center; /* 確保標題文字在自己的容器內是置中的 */
+    margin: 0 0 0.5rem 0; /* 調整下方間距 */
 }
 body.dark-theme .novel-header h1 {
     color: var(--dark-text-primary);
@@ -44,13 +31,13 @@ body.dark-theme .novel-header h1 {
     font-family: var(--font-sans);
     font-size: 1rem;
     color: var(--light-text-secondary);
-    margin: 0;
-    text-align: center; /* 讓描述文字維持置中 */
+    margin: 0 0 1.5rem 0; /* 調整下方間距以容納按鈕 */
+    text-align: center;
 }
 
-/* 圖書館連結按鈕的完整樣式 */
+/* 【核心修改】重新定義圖書館連結按鈕樣式 */
 .library-link {
-    display: inline-flex;
+    display: inline-flex; /* 改為行內 Flex 佈局 */
     align-items: center;
     gap: 0.75rem;
     background-color: var(--light-bg);
@@ -60,19 +47,15 @@ body.dark-theme .novel-header h1 {
     color: var(--light-text-secondary);
     border: 1px solid var(--light-border);
     transition: all 0.3s ease;
-    flex-shrink: 0; /* 防止按鈕在空間不足時被過度壓縮 */
-    /* 【***核心修改***】將按鈕絕對定位到容器右側，使其不影響標題置中 */
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    flex-shrink: 0;
+    margin-bottom: 1rem; /* 與下方的返回按鈕隔開 */
 }
 
 .library-link:hover {
     background-color: var(--light-surface-bg);
     color: var(--light-text-primary);
     box-shadow: 0 4px 15px rgba(0,0,0,0.07);
-    transform: translateY(calc(-50% - 2px)); /* 【***核心修改***】結合絕對定位的 transform，以維持垂直置中和懸停效果 */
+    transform: translateY(-2px);
 }
 
 .library-link .icon-circle {
@@ -95,7 +78,6 @@ body.dark-theme .novel-header h1 {
 
 .back-to-game-btn {
     display: inline-block;
-    margin-top: 1.5rem;
     padding: 0.6rem 1.2rem;
     border: 1px solid var(--light-border);
     border-radius: 20px;
