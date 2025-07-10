@@ -137,26 +137,28 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-// 【核心修改】endCombat 現在只負責結束戰鬥狀態，並顯示結果
-function endCombat(combatResult) {
+async function endCombat(combatResult) {
     gameState.isInCombat = false;
     modal.closeCombatModal();
 
-    // 顯示戰鬥結果摘要
-    if (combatResult && combatResult.summary) {
-        let outcomeMessage = `<b>【戰鬥結束】</b>${combatResult.summary}`;
-        // 如果有江湖反應，也一併顯示
-        if(combatResult.reputationSummary) {
-            outcomeMessage += `<br><br><b>【江湖反應】</b>${combatResult.reputationSummary}`;
-        }
-        appendMessageToStory(outcomeMessage, 'system-message');
-    } else {
-        appendMessageToStory("<b>【戰鬥結束】</b>", 'system-message');
+    if (!combatResult) {
+        gameLoop.setLoading(false);
+        return;
     }
 
-    // 重新啟用主輸入框，讓玩家可以輸入後續動作
-    dom.playerInput.focus();
-    gameLoop.setLoading(false);
+    gameLoop.setLoading(true, "正在結算戰鬥結果...");
+
+    try {
+        const data = await api.finalizeCombat({
+            combatResult: combatResult,
+            model: dom.aiModelSelector.value
+        });
+        gameLoop.processNewRoundData(data);
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        gameLoop.setLoading(false);
+    }
 }
 
 async function handleTradeButtonClick(event) {
@@ -370,8 +372,11 @@ export async function handleCombatSurrender() {
 
         if (data.status === 'SURRENDER_ACCEPTED') {
             modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
-            // 【核心修改】認輸後也交由統一的 endCombat 處理，但傳入的是 newRound
-            setTimeout(() => endCombat(data.newRound), 2000);
+            setTimeout(() => {
+                modal.closeCombatModal();
+                gameLoop.processNewRoundData(data.newRound);
+                gameLoop.setLoading(false);
+            }, 2000);
         } else {
             modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
             gameLoop.setLoading(false);
@@ -413,7 +418,6 @@ export async function handleConfirmCombatAction() {
         gameState.combat.state = data.updatedState;
 
         if (data.status === 'COMBAT_END') {
-            // 【核心修改】戰鬥結束後，不再期待 newRound，而是傳入 combatResult
             setTimeout(() => endCombat(data.combatResult), 1500);
         } else {
             document.querySelectorAll('.strategy-btn.selected, .skill-btn.selected').forEach(el => el.classList.remove('selected'));
@@ -421,13 +425,11 @@ export async function handleConfirmCombatAction() {
             document.getElementById('combat-confirm-btn').disabled = true;
             gameState.combat.selectedStrategy = null;
             gameState.combat.selectedSkill = null;
-            // 【新增修改】如果戰鬥未結束，則在此處關閉讀取動畫
             gameLoop.setLoading(false);
         }
 
     } catch (error) {
         modal.updateCombatLog(`[系統] 你的招式似乎沒有生效，江湖的氣息有些不穩，請再試一次。(${error.message})`, 'system-message');
-        // 【新增修改】在出錯時也要關閉讀取動畫
         gameLoop.setLoading(false);
     }
 }
