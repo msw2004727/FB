@@ -69,6 +69,7 @@ router.post('/register', async (req, res) => {
             type: '拳腳',
             level: 1,
             exp: 0,
+            cost: 0, // 【核心修改】將內力消耗明確設定為0
             description: '來自另一個世界的格鬥技巧，招式直接有效，講求一擊制敵，但似乎缺少內力運轉的法門。',
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
