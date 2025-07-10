@@ -457,8 +457,15 @@ const finalizeCombatHandler = async (req, res) => {
         const preCombatRoundData = lastSaveSnapshot.docs[0].data();
         
         const userProfile = (await userDocRef.get()).data();
+        
+        const { finalState } = combatResult;
+        const playerWon = finalState.enemies.every(e => e.hp <= 0);
+        let killerName = null;
+        if (playerWon && finalState.intention === '打死') {
+            killerName = username;
+        }
 
-        const postCombatOutcome = await getAIPostCombatResult(playerModelChoice, { ...userProfile, username }, combatResult.finalState, combatResult.log);
+        const postCombatOutcome = await getAIPostCombatResult(playerModelChoice, { ...userProfile, username }, finalState, combatResult.log, killerName);
         
         if (!postCombatOutcome || !postCombatOutcome.outcome) {
              throw new Error("戰後結算AI未能生成有效回應。");
@@ -515,7 +522,7 @@ const finalizeCombatHandler = async (req, res) => {
         };
         
         const finalNpcList = [];
-        const sceneNpcNames = new Set(combatResult.finalState.enemies.map(e => e.name).concat(combatResult.finalState.allies.map(a => a.name)));
+        const sceneNpcNames = new Set(finalState.enemies.map(e => e.name).concat(finalState.allies.map(a => a.name)));
         
         for (const npcName of sceneNpcNames) {
             const profile = await getMergedNpcProfile(userId, npcName);
@@ -588,7 +595,7 @@ router.post('/end-chat', async (req, res) => {
         
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundData.R });
-
+        
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
 
