@@ -2,14 +2,16 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAICombatSetup, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
+const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult } = require('../services/aiService');
 const { 
     updateFriendlinessValues, 
     updateRomanceValues, 
     getInventoryState, 
     invalidateNovelCache, 
     updateLibraryNovel, 
-    getPlayerSkills 
+    getPlayerSkills,
+    updateInventory,
+    processNpcUpdates
 } = require('./gameHelpers');
 
 const db = admin.firestore();
@@ -164,8 +166,6 @@ const combatActionRouteHandler = async (req, res) => {
 
         if (combatResult.updatedState) {
             if (combatResult.updatedState.player) {
-                // 【核心修正】明確保留原有的武學列表，僅更新AI回傳的動態數值(如hp/mp)
-                // 這樣可以避免AI因忘記回傳武學列表而導致前端UI出錯
                 const originalSkills = finalUpdatedState.player.skills;
                 finalUpdatedState.player = { ...finalUpdatedState.player, ...combatResult.updatedState.player };
                 finalUpdatedState.player.skills = originalSkills;
@@ -187,40 +187,41 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
-            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-            const lastRoundData = lastSaveSnapshot.docs[0].data();
+            // --- 【核心修改】戰後清算 ---
+            const postCombatResult = await getAIPostCombatResult(playerModelChoice, playerProfile, finalUpdatedState, combatState.log);
+            const { narrative: postCombatNarrative, outcome } = postCombatResult;
 
-            const postCombatSummary = combatResult.newRound.summary || '戰鬥結束';
-            const playerChanges = combatResult.newRound.playerChanges || {};
+            // 1. 好感度懲罰
+            const hostilityChanges = [];
+            if (!combatState.isSparring) {
+                for (const enemy of combatState.enemies) {
+                    hostilityChanges.push({ name: enemy.name, friendlinessChange: -50 });
+                }
+                await updateFriendlinessValues(userId, hostilityChanges);
+                 console.log(`[戰鬥系統] 已對戰敗方 ${combatState.enemies.map(e => e.name).join(',')} 施加好感度-50懲罰。`);
+            }
             
-            const relationshipChanges = combatResult.newRound.relationshipChanges || [];
+            // 2. 更新物品與NPC狀態
+            if (outcome.itemChanges && outcome.itemChanges.length > 0) {
+                await updateInventory(userId, outcome.itemChanges, {});
+            }
+            if (outcome.npcUpdates && outcome.npcUpdates.length > 0) {
+                await processNpcUpdates(userId, outcome.npcUpdates);
+            }
             
-            const powerChange = playerChanges.powerChange || {};
+            // 3. 更新玩家狀態
+            const powerChange = outcome.playerChanges.powerChange || {};
             const finalPowerUpdate = {
                 internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
                 externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
                 lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
-                morality: admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0)
+                morality: admin.firestore.FieldValue.increment(outcome.playerChanges.moralityChange || 0)
             };
+            await userDocRef.update(finalPowerUpdate);
             
-            const relationshipPromises = [];
-            if (relationshipChanges.length > 0) {
-                const friendlinessChanges = relationshipChanges.map(c => ({ name: c.npcName, friendlinessChange: c.friendlinessChange })).filter(c => c.friendlinessChange);
-                const romanceChanges = relationshipChanges.map(c => ({ npcName: c.npcName, valueChange: c.romanceChange })).filter(c => c.valueChange);
-
-                if (friendlinessChanges.length > 0) relationshipPromises.push(updateFriendlinessValues(userId, friendlinessChanges));
-                if (romanceChanges.length > 0) relationshipPromises.push(updateRomanceValues(userId, romanceChanges));
-            }
-
-            const playerUpdatePayload = { ...finalPowerUpdate };
-            if (finalUpdatedState.player.hp <= 0) {
-                playerUpdatePayload.deathCountdown = 10;
-            }
-            await Promise.all([
-                userDocRef.update(playerUpdatePayload),
-                ...relationshipPromises
-            ]);
-            
+            // 4. 儲存新回合
+            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRoundData = lastSaveSnapshot.docs[0].data();
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
@@ -228,23 +229,23 @@ const combatActionRouteHandler = async (req, res) => {
             const newRoundData = {
                  ...lastRoundData,
                  R: lastRoundData.R + 1,
-                 story: combatResult.narrative,
-                 PC: playerChanges.PC || postCombatSummary,
-                 EVT: postCombatSummary,
+                 story: postCombatNarrative,
+                 PC: outcome.playerChanges.PC || outcome.summary,
+                 EVT: outcome.summary,
                  playerState: finalUpdatedState.player.hp <= 0 ? 'dying' : 'alive',
-                 causeOfDeath: null, 
+                 deathCountdown: finalUpdatedState.player.hp <= 0 ? 10 : null,
                  internalPower: updatedUserProfile.internalPower,
                  externalPower: updatedUserProfile.externalPower,
                  lightness: updatedUserProfile.lightness,
                  morality: updatedUserProfile.morality,
                  ITM: inventoryState.itemsString,
                  money: inventoryState.money,
-                 deathCountdown: updatedUserProfile.deathCountdown || null,
             };
             
              await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
              await invalidateNovelCache(userId);
              updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
+            // --- 清算結束 ---
 
             res.json({
                 status: 'COMBAT_END',
@@ -253,7 +254,7 @@ const combatActionRouteHandler = async (req, res) => {
                 newRound: {
                     story: newRoundData.story,
                     roundData: newRoundData,
-                    suggestion: finalUpdatedState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
+                    suggestion: "戰鬥結束了，你接下來打算怎麼辦？"
                 }
             });
 
