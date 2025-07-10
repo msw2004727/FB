@@ -104,14 +104,13 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, round: currentRound, model: playerModelChoice } = req.body;
         const userDocRef = db.collection('users').doc(userId);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-        // --- 【核心修改】將變數宣告移至 try 區塊的開頭 ---
         let aiResponse;
         let userProfile;
         let longTermSummary;
         let currentTimeOfDay;
         
-        // --- 【核心修改】世界因果引擎 ---
         const worldEventsRef = userDocRef.collection('world_events').orderBy('createdAt', 'asc').limit(1);
         const activeEventsSnapshot = await worldEventsRef.get();
 
@@ -120,7 +119,7 @@ const interactRouteHandler = async (req, res) => {
             const worldEvent = eventDoc.data();
             console.log(`[世界因果引擎] 偵測到活動事件: ${worldEvent.eventType}`);
             
-            userProfile = (await userDocRef.get()).data(); // 在這裡獲取一次即可
+            userProfile = (await userDocRef.get()).data(); 
             const eventResult = await getAIEventDirectorResult(playerModelChoice, userProfile, worldEvent);
             
             aiResponse = {
@@ -132,9 +131,7 @@ const interactRouteHandler = async (req, res) => {
                 }
             };
             
-            // 需要從 userProfile 獲取當前時間以保持一致性
             currentTimeOfDay = userProfile.timeOfDay || '上午';
-
 
             if (worldEvent.turnsRemaining - 1 <= 0) {
                 await eventDoc.ref.delete();
@@ -147,9 +144,6 @@ const interactRouteHandler = async (req, res) => {
                 });
             }
         } else {
-            // 如果沒有世界事件，才執行正常的故事AI
-            const summaryDocRef = userDocRef.collection('game_state').doc('summary');
-
             const [userDoc, summaryDoc, savesSnapshot, skills, rawInventory] = await Promise.all([
                 userDocRef.get(),
                 summaryDocRef.get(),
@@ -258,7 +252,6 @@ const interactRouteHandler = async (req, res) => {
             aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore, Array.from(actorCandidates));
             if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
         }
-        // --- 引擎結束 ---
         
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const lastSave = lastSaveSnapshot.empty ? {} : lastSaveSnapshot.docs[0].data();
@@ -282,7 +275,6 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        // 重新獲取最新的 userProfile
         userProfile = (await userDocRef.get()).data();
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
@@ -319,7 +311,7 @@ const interactRouteHandler = async (req, res) => {
         if (isShortAction) {
             shortActionCounter++;
         } else {
-            shortActionCounter = 0; // 重置計數器
+            shortActionCounter = 0;
         }
 
         let finalTimeOfDay = aiNextTimeOfDay || currentTimeOfDay;
@@ -330,10 +322,10 @@ const interactRouteHandler = async (req, res) => {
             const currentTimeIndex = TIME_SEQUENCE.indexOf(finalTimeOfDay);
             const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
             finalTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
-            if (nextTimeIndex === 0) { // 如果從深夜跳到清晨
+            if (nextTimeIndex === 0) {
                 daysToAdd += 1;
             }
-            shortActionCounter = 0; // 重置計數器
+            shortActionCounter = 0;
             console.log(`[時間系統] 短時行動觸發時間推進，新時辰: ${finalTimeOfDay}`);
         }
 
@@ -358,6 +350,9 @@ const interactRouteHandler = async (req, res) => {
         }
         
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, userProfile);
+        
+        longTermSummary = (await summaryDocRef.get()).exists ? (await summaryDocRef.get()).data().text : "遊戲剛剛開始...";
+        
         if (levelUpEvents.length > 0) {
             aiResponse.roundData.levelUpEvents = levelUpEvents;
             const levelUpNarrative = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify([aiResponse.roundData]), "我剛剛武學境界有所突破", { ...userProfile, ...finalDate }, username, finalTimeOfDay, playerPower, userProfile.morality, levelUpEvents, null, locationContext, npcContext, totalBulkScore, []);
@@ -388,7 +383,6 @@ const interactRouteHandler = async (req, res) => {
         const updatedUserProfileDoc = await userDocRef.get();
         userProfile = updatedUserProfileDoc.exists ? updatedUserProfileDoc.data() : {};
         
-        // 重新獲取一次 longTermSummary 以包含新生成的 NPC 資訊
         longTermSummary = (await summaryDocRef.get()).exists ? (await summaryDocRef.get()).data().text : "遊戲剛剛開始...";
 
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
@@ -415,7 +409,7 @@ const interactRouteHandler = async (req, res) => {
             await Promise.all(npcUpdatePromises);
         }
 
-        if (Math.random() < 0.05) { // 5% 的機率觸發懸賞生成
+        if (Math.random() < 0.05) {
             triggerBountyGeneration(userId, newSummary);
         }
 
@@ -442,7 +436,7 @@ const interactRouteHandler = async (req, res) => {
 
         await Promise.all([
              userDocRef.update(playerUpdatesForDb),
-            db.collection('users').doc(userId).collection('game_state').doc('summary').set({ text: newSummary, lastUpdated: newRoundNumber }),
+            summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
             userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(aiResponse.roundData)
         ]);
 
