@@ -4,6 +4,7 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
 const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
+const { getKnownNpcNames } = require('./cacheManager'); // 引入快取函式
 
 const db = admin.firestore();
 
@@ -60,29 +61,30 @@ router.get('/start-trade/:npcName', async (req, res) => {
         }
 
         const playerItems = Object.values(playerInventory);
-
-        // --- 【核心修改】重寫NPC物品處理邏輯 ---
+        
         const npcItems = [];
         if (npcProfile.inventory && typeof npcProfile.inventory === 'object') {
             const itemPromises = Object.entries(npcProfile.inventory).map(async ([itemName, quantity]) => {
-                const itemTemplate = await getOrGenerateItemTemplate(itemName);
-                if (itemTemplate && itemTemplate.template) {
-                     const itemData = {
-                        ...itemTemplate.template,
-                        quantity: quantity,
-                        instanceId: itemName, // 使用物品名作為唯一ID
-                        templateId: itemName,
-                        itemName: itemName
-                    };
-                    // 如果不是可堆疊的，則拆分成多個
-                    if (!itemTemplate.template.stackable && quantity > 1) {
-                        return Array(quantity).fill(null).map((_, i) => ({
-                            ...itemData,
-                            quantity: 1,
-                            instanceId: `${itemName}_${i}` // 給每個實例一個唯一的ID
-                        }));
+                if (quantity > 0 && itemName !== '銀兩') {
+                    const itemTemplateResult = await getOrGenerateItemTemplate(itemName);
+                    if (itemTemplateResult && itemTemplateResult.template) {
+                        const itemData = {
+                            ...itemTemplateResult.template,
+                            quantity: quantity,
+                            instanceId: itemName, // 預設使用物品名作為ID
+                            templateId: itemName,
+                            itemName: itemName
+                        };
+                        // 如果物品不可堆疊，且數量大於1，則拆分成多個獨立物品
+                        if (itemTemplateResult.template.itemType !== '材料' && itemTemplateResult.template.itemType !== '道具' && quantity > 1) {
+                             return Array(quantity).fill(null).map((_, i) => ({
+                                ...itemData,
+                                quantity: 1,
+                                instanceId: `${itemName}_${Date.now()}_${i}` // 確保每個實例有唯一的ID
+                            }));
+                        }
+                        return itemData;
                     }
-                    return itemData;
                 }
                 return null;
             });
@@ -90,7 +92,7 @@ router.get('/start-trade/:npcName', async (req, res) => {
             const resolvedItems = (await Promise.all(itemPromises)).flat().filter(item => item !== null);
             npcItems.push(...resolvedItems);
         }
-        
+
         const tradeData = {
             player: {
                 items: playerItems,
@@ -98,7 +100,7 @@ router.get('/start-trade/:npcName', async (req, res) => {
             },
             npc: {
                 name: npcProfile.name,
-                items: npcItems, 
+                items: npcItems,
                 money: npcProfile.inventory && npcProfile.inventory.銀兩 ? npcProfile.inventory.銀兩 : 0,
                 personality: npcProfile.personality,
                 goals: npcProfile.goals
@@ -118,10 +120,9 @@ router.post('/npc-chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
     try {
-        const [npcProfile, summaryDoc, allNpcsSnapshot] = await Promise.all([
+        const [npcProfile, summaryDoc] = await Promise.all([
             getMergedNpcProfile(userId, npcName),
             db.collection('users').doc(userId).collection('game_state').doc('summary').get(),
-            db.collection('npcs').get()
         ]);
 
         if (!npcProfile) {
@@ -139,7 +140,7 @@ router.post('/npc-chat', async (req, res) => {
         }
         
         let mentionedNpcContext = null;
-        const knownNpcNames = allNpcsSnapshot.docs.map(doc => doc.id);
+        const knownNpcNames = getKnownNpcNames(); // 從快取中光速獲取
         
         for (const knownName of knownNpcNames) {
             if (playerMessage.includes(knownName) && knownName !== npcName) {
@@ -158,6 +159,7 @@ router.post('/npc-chat', async (req, res) => {
         res.status(500).json({ message: '與人物交談時發生內部錯誤。' });
     }
 });
+
 
 // 處理贈予物品的路由
 router.post('/give-item', async (req, res) => {
@@ -356,5 +358,6 @@ router.post('/confirm-trade', async (req, res) => {
         res.status(500).json({ message: '交易過程中發生意外，交換失敗。' });
     }
 });
+
 
 module.exports = router;
