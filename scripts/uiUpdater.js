@@ -52,7 +52,9 @@ function highlightNpcNames(text, npcs) {
         sortedNpcs.forEach(npc => {
             const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(npcNameEscaped, 'g');
-            const replacement = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>`;
+            // 【核心修改】如果NPC已死亡，則加上 data-is-deceased="true" 屬性
+            const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
+            const replacement = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
         });
     }
