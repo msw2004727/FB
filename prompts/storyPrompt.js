@@ -9,7 +9,7 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = []) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -18,6 +18,10 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const currentDateString = `${userProfile.yearName || '元祐'}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`;
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
+
+    const actorCandidatesInstruction = actorCandidates.length > 0
+        ? `\n## 【演員候補名單】\n以下是幾位已在故事中被提及、但尚未正式登場的人物。當你需要一個新角色登場時，你必須優先從這份名單中選擇最符合當前劇情需求的一位，而不是創造一個全新的隨機角色。只有當名單上沒有合適人選時，你才能創造新角色。\n- ${actorCandidates.join('\n- ')}\n`
+        : '';
 
     const levelUpText = levelUpEvents.length > 0
         ? `\n## 【武學突破】\n在本回合中，玩家的武學境界發生了突破！你必須在你的故事敘述中，為以下事件生成一段充滿意境的描述，來體現玩家的成長，而不是簡單地告知。事件如下：\n${levelUpEvents.map(e => `- 「${e.skillName}」已突破至【${e.levelUpTo}成】境界。`).join('\n')}`
@@ -150,6 +154,9 @@ ${anachronismRule}
 ${languageProvocationRule}
 ${itemExistenceRule}
 
+## 【核心新增規則】優先登場鐵律
+${actorCandidatesInstruction}
+
 ---
 
 ${staminaSystemRule}
@@ -165,7 +172,7 @@ ${systemInteractionRules}
 - **時機**: 只有在發生了足以影響NPC檔案的**關鍵事件**時才觸發。例如：NPC更換了裝備、失去了親人、改變了人生目標、習得了新技能，或是與他人的關係發生了根本性轉變（例如與心上人分手）。
 - **結構**: \`{ "npcName": "要更新的NPC姓名", "fieldToUpdate": "要更新的欄位路徑", "newValue": "新的值", "updateType": "set | arrayUnion | arrayRemove" }\`
 - **欄位路徑**: 使用點表示法，例如 \`equipment\`、\`relationships.lover\`、\`goals\`。
-- **更新類型**: \`set\` 用於直接覆蓋欄位值，\`arrayUnion\` 用於向陣列欄位中添加新元素，\`arrayRemove\` 用於從陣列中移除元素。
+- **更新類型**: \`set\` 用於直接覆蓋欄位值，\`arrayUnion\` 用于向陣列欄位中添加新元素，\`arrayRemove\` 用於從陣列中移除元素。
 - **範例**:
     - 故事中李鐵匠為你打造了一把新劍並自己裝備了：\`"npcUpdates": [{ "npcName": "李鐵匠", "fieldToUpdate": "equipment", "newValue": "精鋼劍", "updateType": "arrayUnion" }]\`
     - 故事中王大夫的心上人不幸去世：\`"npcUpdates": [{ "npcName": "王大夫", "fieldToUpdate": "relationships.lover", "newValue": "已故的妻子", "updateType": "set" }]\`
@@ -198,7 +205,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是「穿越者背景的嚴格控制」禁令和「語言挑釁鐵律」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「優先登場鐵律」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
 `;
 };
 
