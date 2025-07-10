@@ -156,21 +156,20 @@ const updateLibraryNovel = async (userId, username) => {
         const fullStoryHTML = storyChapters.join('');
         const lastRoundData = snapshot.docs[snapshot.docs.length - 1].data();
         const isDeceased = lastRoundData.playerState === 'dead';
-        const yearName = lastRoundData.yearName || '元祐';
-        const year = lastRoundData.year || 1;
-        const month = lastRoundData.month || 1;
-        const day = lastRoundData.day || 1;
-        const latestEvent = lastRoundData.EVT || '初入江湖';
-        const novelTitle = `江湖路 - ${yearName}${year}年${month}月${day}日 - ${latestEvent} (${username})`;
+        const novelTitle = `${username}的江湖路`; // 簡化標題
         const libraryDocRef = db.collection('library_novels').doc(userId);
+
+        // 【核心修正】將最後一回合的完整資料存入，以便 libraryRoutes 讀取
         await libraryDocRef.set({
             playerName: username,
             novelTitle: novelTitle,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             storyHTML: fullStoryHTML,
             isDeceased,
-            lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`
+            lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`,
+            lastChapterData: lastRoundData // 儲存最後一回合的詳細資料
         }, { merge: true });
+
         console.log(`[圖書館系統] 成功更新 ${username} 的小說至圖書館！`);
     } catch (error) {
         console.error(`[圖書館系統] 更新 ${username} 的小說時發生錯誤:`, error);
@@ -408,7 +407,6 @@ const getRawInventory = async (userId) => {
     return inventoryData;
 };
 
-// 【核心修改】重構 updateSkills 函式以納入自創武學限制
 const updateSkills = async (userId, skillChanges, playerProfile) => {
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
 
@@ -429,7 +427,6 @@ const updateSkills = async (userId, skillChanges, playerProfile) => {
                         return;
                     }
 
-                    // 如果 isNew 為 true，代表是自創武學，需要進行驗證
                     if (templateResult.isNew) {
                         const powerType = templateResult.template.power_type || 'none';
                         const maxPowerAchieved = playerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
@@ -444,16 +441,15 @@ const updateSkills = async (userId, skillChanges, playerProfile) => {
                         if (totalCreatedSkills >= 10) {
                             customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
                             console.log(`[自創武學] 失敗：已達總上限10門。`);
-                            return; // 中斷本次 transaction
+                            return; 
                         }
 
                         if (createdSkillsCount >= availableSlots) {
                             customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
                              console.log(`[自創武學] 失敗：${powerType}類別名額不足。`);
-                            return; // 中斷本次 transaction
+                            return; 
                         }
 
-                        // 驗證通過，更新玩家的自創武學計數
                         const skillCountUpdate = {};
                         skillCountUpdate[`customSkillsCreated.${powerType}`] = admin.firestore.FieldValue.increment(1);
                         transaction.update(userDocRef, skillCountUpdate);
