@@ -26,8 +26,12 @@
 
     --internal-power-color-light: #0d6efd;
     --external-power-color-light: #198754;
+    --lightness-power-color-light: #fd7e14; /* 【核心新增】輕功顏色 */
+    --stamina-color-light: #ffc107; /* 【核心新增】精力顏色 */
     --internal-power-color-dark: #3b82f6;
     --external-power-color-dark: #22c55e;
+    --lightness-power-color-dark: #fca311; /* 【核心新增】輕功顏色 */
+    --stamina-color-dark: #fcc419; /* 【核心新增】精力顏色 */
 }
 
 body {
