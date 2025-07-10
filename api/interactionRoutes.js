@@ -257,18 +257,18 @@ const interactRouteHandler = async (req, res) => {
         const lastSave = lastSaveSnapshot.empty ? {} : lastSaveSnapshot.docs[0].data();
         
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const aliveNpcs = [];
+            // Fetch all profiles in parallel
             const npcProfiles = await Promise.all(
                 aiResponse.roundData.NPC.map(npc => getMergedNpcProfile(userId, npc.name))
             );
             
+            // Merge the isDeceased status into the scene NPCs
             aiResponse.roundData.NPC.forEach((sceneNpc, index) => {
                 const profile = npcProfiles[index];
-                if (!profile || profile.isDeceased !== true) {
-                    aliveNpcs.push(sceneNpc);
+                if (profile && profile.isDeceased === true) {
+                    sceneNpc.isDeceased = true;
                 }
             });
-            aiResponse.roundData.NPC = aliveNpcs;
         }
         
         const newRoundNumber = (lastSave.R || 0) + 1;
