@@ -145,6 +145,17 @@ export function processNewRoundData(data) {
     
     data.roundData.suggestion = data.suggestion;
     addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
+    
+    // 更新死亡名單
+    if (data.roundData.NPC && Array.isArray(data.roundData.NPC)) {
+        data.roundData.NPC.forEach(npc => {
+            if (npc.isDeceased && !gameState.deceasedNpcs.includes(npc.name)) {
+                gameState.deceasedNpcs.push(npc.name);
+                console.log(`[生死簿] 已記錄死亡NPC: ${npc.name}`);
+            }
+        });
+    }
+
     updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
     
     gameState.currentRound = data.roundData.R;
