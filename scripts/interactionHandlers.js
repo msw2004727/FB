@@ -421,13 +421,13 @@ export async function handleConfirmCombatAction() {
             document.getElementById('combat-confirm-btn').disabled = true;
             gameState.combat.selectedStrategy = null;
             gameState.combat.selectedSkill = null;
+            // 【新增修改】如果戰鬥未結束，則在此處關閉讀取動畫
+            gameLoop.setLoading(false);
         }
 
     } catch (error) {
         modal.updateCombatLog(`[系統] 你的招式似乎沒有生效，江湖的氣息有些不穩，請再試一次。(${error.message})`, 'system-message');
-    } finally {
-        if (gameState.isInCombat && data.status !== 'COMBAT_END') {
-             gameLoop.setLoading(false);
-        }
+        // 【新增修改】在出錯時也要關閉讀取動畫
+        gameLoop.setLoading(false);
     }
 }
