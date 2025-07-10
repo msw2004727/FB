@@ -43,7 +43,7 @@ const getNpcCreatorPrompt = (username, npcName, roundData, playerProfile) => {
   "gender": "女",
   "allegiance": "中立",
   "isRomanceable": true,
-  "romanceOrientation": "雙性戀",
+  "romanceOrientation": "異性戀",
   "personality": ["風情萬種", "精於算計", "內心孤獨"],
   "goals": ["為自己贖身，離開風月場所", "找到一個可以依靠的真心人"],
   "secrets": [
