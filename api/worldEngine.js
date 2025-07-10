@@ -127,6 +127,18 @@ async function triggerBountyGeneration(userId, longTermSummary) {
             return;
         }
 
+        // --- 【核心修改】根據使用者要求的機率分布，覆寫AI生成的難度等級 ---
+        const rand = Math.random();
+        if (rand < 0.4) { // 40% 的機率
+            newBountyData.difficulty = "低";
+        } else if (rand < 0.9) { // 50% 的機率
+            newBountyData.difficulty = "中";
+        } else { // 10% 的機率
+            newBountyData.difficulty = "高";
+        }
+        console.log(`[懸賞系統] 已為新懸賞隨機指派難度為: ${newBountyData.difficulty}`);
+        // --- 修改結束 ---
+
         newBountyData.status = 'active';
         newBountyData.isRead = false;
         newBountyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
