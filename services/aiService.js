@@ -153,8 +153,8 @@ async function getAISummary(oldSummary, newRoundData) {
     }
 }
 
-async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates);
+async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, worldEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, worldEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates);
     try {
         const modelToUse = playerModelChoice || aiConfig.story;
         const text = await callAI(modelToUse, prompt, true);
@@ -221,8 +221,8 @@ async function getAINpcProfile(username, npcName, roundData, playerProfile) {
     }
 }
 
-async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext) {
-    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
+async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext) {
+    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChat;
         const reply = await callAI(modelToUse, prompt, false);
@@ -416,25 +416,6 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
     }
 }
 
-// 【核心新增】
-async function getAIEventDirectorResult(playerModelChoice, playerProfile, worldEvent) {
-    const prompt = getEventDirectorPrompt(playerProfile, worldEvent);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.eventDirector || 'openai';
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error(`[AI 任務失敗] 事件導演任務 (事件: ${worldEvent.eventType}):`, error);
-        return {
-            story: "（你感覺到空氣中的氣氛有些凝重，似乎有什麼事情正在你看不見的地方悄然發生，但你一時無法抓住頭緒。）",
-            nextStage: worldEvent.currentStage,
-            playerChanges: {},
-            itemChanges: [],
-            npcUpdates: []
-        };
-    }
-}
-
 
 module.exports = {
     callAI,
@@ -462,5 +443,4 @@ module.exports = {
     getAIProactiveChat,
     getAIAnachronismResponse,
     getAIPostCombatResult,
-    getAIEventDirectorResult, // 【核心新增】
 };
