@@ -29,12 +29,15 @@ const getNpcTags = (skills = []) => {
     };
 
     skills.forEach(skill => {
-        if (skill.skillType === '醫術') tags.add('治癒');
-        if (skill.skillType === '毒術') tags.add('攻擊');
+        // 【核心修改】增加對 skill 和 skill.name 的有效性檢查
+        if (skill && skill.name) {
+            if (skill.skillType === '醫術') tags.add('治癒');
+            if (skill.skillType === '毒術') tags.add('攻擊');
 
-        for (const [tagName, { type, keywords }] of Object.entries(tagMap)) {
-            if (keywords.some(kw => skill.name.includes(kw))) {
-                tags.add(tagName);
+            for (const [tagName, { type, keywords }] of Object.entries(tagMap)) {
+                if (keywords.some(kw => skill.name.includes(kw))) {
+                    tags.add(tagName);
+                }
             }
         }
     });
