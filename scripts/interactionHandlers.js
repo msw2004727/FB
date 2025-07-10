@@ -19,6 +19,7 @@ function showNpcInteractionMenu(targetElement, npcName) {
     
     dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
     dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
+    // 【核心修正】將事件監聽器指向新的意圖選擇函式
     dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
 
     const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
@@ -45,7 +46,7 @@ function showNpcInteractionMenu(targetElement, npcName) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
-// 【核心修改】第一層：顯示戰鬥意圖選項
+// 第一層：顯示戰鬥意圖選項
 function showAttackIntention(event) {
     const npcName = event.currentTarget.dataset.npcName;
     dom.npcInteractionMenu.innerHTML = `
@@ -58,7 +59,7 @@ function showAttackIntention(event) {
     });
 }
 
-// 【核心新增】第二層：顯示最終確認
+// 第二層：顯示最終確認
 function showFinalConfirmation(event) {
     const npcName = event.currentTarget.dataset.npcName;
     const intention = event.currentTarget.dataset.intention;
@@ -81,7 +82,6 @@ function showFinalConfirmation(event) {
 }
 
 
-// 【核心修改】修正 handleStrategySelection 函式
 function handleStrategySelection(strategy) {
     gameState.combat.selectedStrategy = strategy;
     gameState.combat.selectedSkill = null; 
@@ -197,7 +197,6 @@ async function handleChatButtonClick(event) {
     }
 }
 
-// 【核心修改】現在會傳遞戰鬥意圖
 async function confirmAndInitiateAttack(event) {
     const npcName = event.currentTarget.dataset.npcName;
     const intention = event.currentTarget.dataset.intention;
@@ -208,7 +207,7 @@ async function confirmAndInitiateAttack(event) {
     try {
         const data = await api.initiateCombat({ 
             targetNpcName: npcName, 
-            intention: intention // 傳遞意圖
+            intention: intention
         });
         if (data.status === 'COMBAT_START') {
             startCombat(data.initialState);
