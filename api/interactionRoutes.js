@@ -197,15 +197,29 @@ const interactRouteHandler = async (req, res) => {
             });
         }
         
-        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore);
-        if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
+        // --- 【核心修改】生成「演員候補名單」 ---
+        const actorCandidates = new Set();
+        const allNpcTemplatesSnapshot = await db.collection('npcs').get();
+        const existingNpcTemplates = new Set(allNpcTemplatesSnapshot.docs.map(doc => doc.id));
 
-        // 【核心修改】在將資料回傳前端前，過濾掉已死亡的NPC
+        for (const npc of Object.values(npcContext)) {
+            if (npc.relationships) {
+                for (const relatedNpcName of Object.values(npc.relationships)) {
+                    if (relatedNpcName && !existingNpcTemplates.has(relatedNpcName)) {
+                        actorCandidates.add(relatedNpcName);
+                    }
+                }
+            }
+        }
+        // --- 修改結束 ---
+
+        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore, Array.from(actorCandidates));
+        if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
+        
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const aliveNpcs = [];
             for (const sceneNpc of aiResponse.roundData.NPC) {
                 const npcProfile = npcContext[sceneNpc.name];
-                // 如果在context中找不到該NPC，或其isDeceased不為true，則保留
                 if (!npcProfile || npcProfile.isDeceased !== true) {
                     aliveNpcs.push(sceneNpc);
                 }
@@ -286,7 +300,7 @@ const interactRouteHandler = async (req, res) => {
         
         const allNpcUpdates = [
             ...(aiResponse.roundData.npcUpdates || []),
-            ...(romanceEventData ? romanceEventData.eventStory.npcUpdates : [])
+            ...(romanceEventData ? romanceEventData.npcUpdates : [])
         ];
         
         const practiceKeywords = ['修練', '練習', '打坐', '閉關', '領悟'];
