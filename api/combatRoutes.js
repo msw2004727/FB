@@ -158,25 +158,24 @@ const combatActionRouteHandler = async (req, res) => {
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
-        // 【核心修正】在這裡手動組合出最完整、最正確的下一回合狀態
-        let finalUpdatedState = { ...combatState }; // 先複製一份舊的狀態
-        finalUpdatedState.turn = (finalUpdatedState.turn || 1) + 1; // 回合數手動+1，最準確
-        finalUpdatedState.log.push(combatResult.narrative); // 將新戰報加入日誌
+        let finalUpdatedState = { ...combatState };
+        finalUpdatedState.turn = (finalUpdatedState.turn || 1) + 1;
+        finalUpdatedState.log.push(combatResult.narrative);
 
-        // 將AI回傳的狀態變化，合併到我們的完整狀態中
         if (combatResult.updatedState) {
-            // 更新玩家狀態
             if (combatResult.updatedState.player) {
+                // 【核心修正】明確保留原有的武學列表，僅更新AI回傳的動態數值(如hp/mp)
+                // 這樣可以避免AI因忘記回傳武學列表而導致前端UI出錯
+                const originalSkills = finalUpdatedState.player.skills;
                 finalUpdatedState.player = { ...finalUpdatedState.player, ...combatResult.updatedState.player };
+                finalUpdatedState.player.skills = originalSkills;
             }
-            // 更新敵人狀態
             if (combatResult.updatedState.enemies) {
                 finalUpdatedState.enemies = finalUpdatedState.enemies.map(enemy => {
                     const updatedEnemy = combatResult.updatedState.enemies.find(u => u.name === enemy.name);
                     return updatedEnemy ? { ...enemy, ...updatedEnemy } : enemy;
                 });
             }
-            // 更新盟友狀態
              if (combatResult.updatedState.allies) {
                 finalUpdatedState.allies = finalUpdatedState.allies.map(ally => {
                     const updatedAlly = combatResult.updatedState.allies.find(u => u.name === ally.name);
