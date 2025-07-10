@@ -157,7 +157,9 @@ async function endCombat(combatResult) {
     } catch (error) {
         handleApiError(error);
     } finally {
-        gameLoop.setLoading(false);
+        if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
+            gameLoop.setLoading(false);
+        }
     }
 }
 
@@ -272,7 +274,8 @@ export function handleNpcClick(event) {
 
     if (targetIsNpc) {
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
-        const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
+        // 直接從 gameState 的「生死簿」中查詢NPC的死亡狀態
+        const isDeceased = gameState.deceasedNpcs.includes(npcName);
         showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
     } else if (!targetIsMenu) {
         hideNpcInteractionMenu();
