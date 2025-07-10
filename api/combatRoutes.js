@@ -12,7 +12,7 @@ const {
     updateInventory,
     processNpcUpdates
 } = require('./gameHelpers');
-const { processReputationChangesAfterDeath } = require('./reputationManager'); // 【核心新增】
+const { processReputationChangesAfterDeath } = require('./reputationManager');
 
 const db = admin.firestore();
 
@@ -52,7 +52,7 @@ const getNpcTags = (skills = []) => {
 const initiateCombatHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
-    const { targetNpcName, isSparring } = req.body;
+    const { targetNpcName, intention } = req.body; // 【核心修改】接收intention
 
     if (!targetNpcName) {
         return res.status(400).json({ message: "未指定對決目標。" });
@@ -66,7 +66,7 @@ const initiateCombatHandler = async (req, res) => {
         }
         const lastSave = savesSnapshot.docs[0].data();
 
-        const simulatedPlayerAction = isSparring ? `我想與 ${targetNpcName} 切磋一番。` : `我決定對 ${targetNpcName} 動手。`;
+        const simulatedPlayerAction = `我決定要「${intention}」${targetNpcName}。`;
         
         const combatSetupResult = await getAICombatSetup(simulatedPlayerAction, lastSave);
 
@@ -81,7 +81,7 @@ const initiateCombatHandler = async (req, res) => {
         ];
         
         const npcDocs = await Promise.all(
-            allNpcNames.map(name => db.collection('npcs').doc(name).get()) // 從通用模板獲取技能
+            allNpcNames.map(name => db.collection('npcs').doc(name).get())
         );
 
         const npcProfiles = npcDocs.reduce((acc, doc) => {
@@ -115,12 +115,13 @@ const initiateCombatHandler = async (req, res) => {
             allies: combatSetupResult.allies || [], 
             bystanders: combatSetupResult.bystanders || [], 
             log: [combatSetupResult.combatIntro || '戰鬥開始了！'],
-            isSparring: isSparring || false 
+            isSparring: intention === '切磋', // 【核心修改】根據意圖設定是否為切磋
+            intention: intention // 【核心新增】將意圖儲存到戰鬥狀態中
         };
 
         await userDocRef.collection('game_state').doc('current_combat').set(combatState);
         
-        console.log(`[戰鬥系統] 由玩家 ${username} 主動對 ${targetNpcName} 發起戰鬥。`);
+        console.log(`[戰鬥系統] 由玩家 ${username} 主動對 ${targetNpcName} 發起戰鬥，意圖為「${intention}」。`);
         res.json({ status: 'COMBAT_START', initialState: combatState });
 
     } catch (error) {
@@ -187,9 +188,6 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
-            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-            const lastRoundData = lastSaveSnapshot.docs[0].data();
-            
             const postCombatResult = await getAIPostCombatResult(playerModelChoice, playerProfile, finalUpdatedState, combatState.log);
             let { narrative: postCombatNarrative, outcome } = postCombatResult;
 
@@ -209,7 +207,6 @@ const combatActionRouteHandler = async (req, res) => {
             }
             if (outcome.npcUpdates && outcome.npcUpdates.length > 0) {
                 await processNpcUpdates(userId, outcome.npcUpdates);
-                // 【核心新增】在確認NPC死亡後，啟動關係引擎
                 for (const update of outcome.npcUpdates) {
                     if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
                         const reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, lastRoundData.LOC[0], combatState.allies.map(a => a.name));
@@ -232,6 +229,8 @@ const combatActionRouteHandler = async (req, res) => {
             }
             await userDocRef.update(playerUpdatePayload);
             
+            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRoundData = lastSaveSnapshot.docs[0].data();
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
