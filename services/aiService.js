@@ -49,6 +49,7 @@ const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
 const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
+const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -153,8 +154,8 @@ async function getAISummary(oldSummary, newRoundData) {
     }
 }
 
-async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext);
+async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore);
     try {
         const modelToUse = playerModelChoice || aiConfig.story;
         const text = await callAI(modelToUse, prompt, true);
@@ -393,10 +394,35 @@ async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
     }
 }
 
-// 【核心修改】匯出所有服務函式，並加上 aiConfig
+// 【核心新增】
+async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog) {
+    const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.postCombat || 'openai';
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 戰場清掃者任務:", error);
+        // 提供一個安全的、保底的回傳結果
+        const playerWon = finalCombatState.enemies.every(e => e.hp <= 0);
+        return {
+            narrative: playerWon ? "你擊敗了對手，但四周一片狼藉，空氣中瀰漫著血腥味，讓你一時無法回神。" : "你眼前一黑，重重地倒在地上，失去了知覺。",
+            outcome: {
+                summary: playerWon ? "你贏得了戰鬥。" : "你被擊敗了。",
+                playerChanges: {
+                    PC: playerWon ? "你雖然獲勝，但也消耗了大量體力，感到有些疲憊。" : "你身受重傷，氣息奄奄。",
+                },
+                itemChanges: [],
+                npcUpdates: []
+            }
+        };
+    }
+}
+
+
 module.exports = {
     callAI,
-    aiConfig, // <--- 新增這一行
+    aiConfig,
     getNarrative,
     getAISummary,
     getAIStory,
@@ -419,4 +445,5 @@ module.exports = {
     getAISurrenderResult,
     getAIProactiveChat,
     getAIAnachronismResponse,
+    getAIPostCombatResult, // 【核心新增】
 };
