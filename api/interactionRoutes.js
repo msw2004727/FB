@@ -184,7 +184,6 @@ const interactRouteHandler = async (req, res) => {
         };
 
         const currentTimeOfDay = userProfile.timeOfDay || '上午';
-        let levelUpEvents = [];
         
         const locationContext = await getMergedLocationData(userId, lastSave.LOC);
         const npcContext = {};
@@ -197,8 +196,11 @@ const interactRouteHandler = async (req, res) => {
                 }
             });
         }
+
+        // 【核心修改】將 levelUpEvents 的獲取移到 updateSkills 之後
+        // let levelUpEvents = [];
         
-        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, totalBulkScore);
+        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore);
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
 
         
@@ -206,7 +208,7 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
 
-        // --- 【核心修改】精力結算邏輯 ---
+        // --- 精力結算邏輯 ---
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
         let newStamina = userProfile.stamina;
 
@@ -259,7 +261,6 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.roundData.moralityChange = passOutEvent.moralityChange;
             newStamina = passOutEvent.stamina; 
         }
-        // --- 精力結算結束 ---
         
         if (aiResponse.roundData.removeDeathCountdown) {
             await userDocRef.update({ deathCountdown: admin.firestore.FieldValue.delete() });
@@ -294,10 +295,15 @@ const interactRouteHandler = async (req, res) => {
             }
         }
         
-        levelUpEvents = await updateSkills(userId, aiResponse.roundData.skillChanges);
+        const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, userProfile);
         if (levelUpEvents.length > 0) {
             aiResponse.roundData.levelUpEvents = levelUpEvents;
         }
+        // 如果自創武學失敗，將失敗原因附加到故事中
+        if (customSkillCreationResult && !customSkillCreationResult.success) {
+            aiResponse.story += `\n\n（${customSkillCreationResult.reason}）`;
+        }
+
 
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
@@ -438,6 +444,18 @@ const interactRouteHandler = async (req, res) => {
             shortActionCounter: shortActionCounter,
             ...finalDate
         };
+        
+        // 【核心新增】檢查並更新歷史最高能力值
+        if (newInternalPower > (userProfile.maxInternalPowerAchieved || 0)) {
+            playerUpdatesForDb.maxInternalPowerAchieved = newInternalPower;
+        }
+        if (newExternalPower > (userProfile.maxExternalPowerAchieved || 0)) {
+            playerUpdatesForDb.maxExternalPowerAchieved = newExternalPower;
+        }
+        if (newLightness > (userProfile.maxLightnessAchieved || 0)) {
+            playerUpdatesForDb.maxLightnessAchieved = newLightness;
+        }
+
 
         await Promise.all([
              userDocRef.update(playerUpdatesForDb),
