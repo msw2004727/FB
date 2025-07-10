@@ -21,13 +21,19 @@ router.get('/novels', async (req, res) => {
 
         const novelsList = snapshot.docs.map(doc => {
             const data = doc.data();
+            
+            // 【核心修改】從 lastChapterData 中提取更多資訊
+            const lastChapterData = data.lastChapterData || {};
+            const timeString = `${lastChapterData.yearName || '元祐'}${lastChapterData.year || 1}年${lastChapterData.month || 1}月${lastChapterData.day || 1}日`;
+
             return {
                 id: doc.id, // 這就是作者的 userId
                 playerName: data.playerName || '無名氏',
-                novelTitle: data.novelTitle || '未命名故事',
-                lastUpdated: data.lastUpdated.toDate(), // 轉換為可讀日期格式
+                novelTitle: data.lastChapterTitle || '開篇', // 直接將最新章節設為標題
+                lastUpdated: data.lastUpdated.toDate(),
                 isDeceased: data.isDeceased || false,
-                lastChapterTitle: data.lastChapterTitle || '開篇'
+                time: timeString, // 新增：時間
+                round: lastChapterData.R || '未知', // 新增：回合數
             };
         });
 
@@ -60,10 +66,12 @@ router.get('/novel/:userId', async (req, res) => {
 
         const novelData = doc.data();
         
-        // 只回傳小說需要顯示的公開資訊
+        // 【核心修改】從 lastChapterData 取得標題，如果不存在則用舊的
+        const title = novelData.lastChapterTitle || novelData.novelTitle || '未命名傳奇';
+
         res.json({
             playerName: novelData.playerName,
-            novelTitle: novelData.novelTitle,
+            novelTitle: title,
             storyHTML: novelData.storyHTML,
             lastUpdated: novelData.lastUpdated.toDate(),
             isDeceased: novelData.isDeceased
