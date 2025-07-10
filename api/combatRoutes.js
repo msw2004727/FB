@@ -52,7 +52,7 @@ const getNpcTags = (skills = []) => {
 const initiateCombatHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
-    const { targetNpcName, intention } = req.body; // 【核心修改】接收intention
+    const { targetNpcName, intention } = req.body;
 
     if (!targetNpcName) {
         return res.status(400).json({ message: "未指定對決目標。" });
@@ -115,8 +115,8 @@ const initiateCombatHandler = async (req, res) => {
             allies: combatSetupResult.allies || [], 
             bystanders: combatSetupResult.bystanders || [], 
             log: [combatSetupResult.combatIntro || '戰鬥開始了！'],
-            isSparring: intention === '切磋', // 【核心修改】根據意圖設定是否為切磋
-            intention: intention // 【核心新增】將意圖儲存到戰鬥狀態中
+            isSparring: intention === '切磋',
+            intention: intention
         };
 
         await userDocRef.collection('game_state').doc('current_combat').set(combatState);
@@ -188,6 +188,9 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
+            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRoundData = lastSaveSnapshot.docs[0].data();
+            
             const postCombatResult = await getAIPostCombatResult(playerModelChoice, playerProfile, finalUpdatedState, combatState.log);
             let { narrative: postCombatNarrative, outcome } = postCombatResult;
 
@@ -213,6 +216,20 @@ const combatActionRouteHandler = async (req, res) => {
                         if (reputationSummary) {
                             postCombatNarrative += `\n\n**【江湖反應】** ${reputationSummary}`;
                         }
+                        // 【核心新增】創建世界後續事件
+                        const worldEvent = {
+                            eventType: 'NPC_DEATH',
+                            eventData: {
+                                deceasedNpcName: update.npcName,
+                                summary: `玩家 ${playerProfile.username} 在 ${lastRoundData.LOC[0]} 殺死了 ${update.npcName}。`,
+                            },
+                            currentStage: '屍體處理',
+                            turnsRemaining: 10,
+                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                            lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+                        };
+                        await db.collection('users').doc(userId).collection('world_events').add(worldEvent);
+                        console.log(`[世界引擎] 已為NPC「${update.npcName}」之死創建後續事件。`);
                     }
                 }
             }
@@ -229,8 +246,6 @@ const combatActionRouteHandler = async (req, res) => {
             }
             await userDocRef.update(playerUpdatePayload);
             
-            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-            const lastRoundData = lastSaveSnapshot.docs[0].data();
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
