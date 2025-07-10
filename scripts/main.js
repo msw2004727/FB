@@ -6,13 +6,22 @@ import * as modal from './modalManager.js';
 import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js'; 
 
-// 【核心修改】將 gameLoop 中的函式傳遞給 interactionHandlers，建立連接
-// 這樣 interactionHandlers 就可以呼叫 gameLoop 的函式了
+// 將 gameLoop 中的函式傳遞給 interactionHandlers，建立連接
 interaction.setGameLoop({
     setLoading: (isLoading, text) => gameLoop.setLoading(isLoading, getDomElements(), text),
     processNewRoundData: (data) => gameLoop.processNewRoundData(data),
     handlePlayerDeath: () => gameLoop.handlePlayerDeath()
 });
+
+// 讓 interactionHandlers 可以呼叫到 gameLoop
+function getGameLoop() {
+    return {
+        setLoading: (isLoading, text) => gameLoop.setLoading(isLoading, getDomElements(), text),
+        processNewRoundData: (data) => gameLoop.processNewRoundData(data),
+        handlePlayerDeath: () => gameLoop.handlePlayerDeath()
+    };
+}
+
 
 // 輔助函式，用於集中獲取DOM元素，避免重複查詢
 function getDomElements() {
@@ -38,7 +47,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // --- 【核心修改】在 DOM 載入後，一次性獲取所有元素 ---
+    // --- 【核心修正】在這裡重新建立並插入讀取畫面 ---
+    const mainContent = document.getElementById('main-content');
+    if (mainContent && !mainContent.querySelector('.ai-thinking-loader')) {
+        const aiThinkingLoader = document.createElement('div');
+        aiThinkingLoader.className = 'ai-thinking-loader';
+        aiThinkingLoader.innerHTML = `
+            <div class="loader-disclaimer">說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。</div>
+            <div class="loader-text"></div>
+            <div class="loader-dots"><span></span><span></span><span></span></div>
+            <div class="loader-tip"></div>
+        `;
+        mainContent.appendChild(aiThinkingLoader);
+    }
+    // --- 修正結束 ---
+
+
+    // --- 在 DOM 載入後，一次性獲取所有元素 ---
     const dom = {
         storyHeader: document.querySelector('.story-header'),
         headerToggleButton: document.getElementById('header-toggle-btn'),
@@ -140,7 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dom.bountiesBtn) {
             dom.bountiesBtn.addEventListener('click', () => {
                 interaction.hideNpcInteractionMenu();
-                updateBountyButton(false);
+                // 這行目前沒有作用，因為 updateBountyButton 變成私有函式，但暫時保留
+                // updateBountyButton(false); 
             });
         }
         
