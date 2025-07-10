@@ -20,16 +20,12 @@ function updateBountyButton(hasNew) {
 
 // --- Exported Functions ---
 
-export function setLoading(isLoading, text = '') {
-    const playerInput = document.getElementById('player-input');
-    const submitButton = document.getElementById('submit-button');
-    const chatInput = document.getElementById('chat-input');
-    const chatActionBtn = document.getElementById('chat-action-btn');
-    const endChatBtn = document.getElementById('end-chat-btn');
-    const combatSurrenderBtn = document.getElementById('combat-surrender-btn');
-    const aiThinkingLoader = document.querySelector('.ai-thinking-loader');
-    const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
-    const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
+// 【核心修改】讓函式接收傳入的 DOM 元素，而不是自己去查詢
+export function setLoading(isLoading, domElements, text = '') {
+    const {
+        playerInput, submitButton, chatInput, chatActionBtn, endChatBtn,
+        combatSurrenderBtn, aiThinkingLoader
+    } = domElements;
 
     gameState.isRequesting = isLoading;
     playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
@@ -42,27 +38,33 @@ export function setLoading(isLoading, text = '') {
     if (combatSurrenderBtn) {
         combatSurrenderBtn.disabled = isLoading;
     }
-    
-    if(loaderTextElement) loaderTextElement.textContent = text;
-    
-    const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
-    if (showGlobalLoader) {
-        const rotateTip = () => {
-            if (gameTips.length > 0) {
-                const randomIndex = Math.floor(Math.random() * gameTips.length);
-                if (loaderTipElement) {
-                    loaderTipElement.innerHTML = gameTips[randomIndex];
+    if (aiThinkingLoader) {
+        const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
+        const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
+        
+        if(loaderTextElement) loaderTextElement.textContent = text;
+        
+        const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
+
+        if (showGlobalLoader) {
+            const rotateTip = () => {
+                if (gameTips.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * gameTips.length);
+                    if (loaderTipElement) {
+                        loaderTipElement.innerHTML = gameTips[randomIndex];
+                    }
                 }
-            }
-        };
-        rotateTip();
-        tipInterval = setInterval(rotateTip, 10000);
-    } else {
-        clearInterval(tipInterval);
-    }
+            };
+            rotateTip();
+            tipInterval = setInterval(rotateTip, 10000);
+        } else {
+            clearInterval(tipInterval);
+        }
 
-    aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
+        aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
+    }
+    
     modal.setCombatLoading(isLoading && gameState.isInCombat);
     modal.setChatLoading(isLoading && gameState.isInChat);
 }
@@ -130,13 +132,16 @@ export function processNewRoundData(data) {
     updateBountyButton(data.hasNewBounties);
 
     if (data.roundData.playerState === 'dead') {
-        setLoading(false);
+        // setLoading is now called in main.js, so we pass domElements
+        const domElements = getDomElements(); 
+        setLoading(false, domElements);
         handlePlayerDeath();
         return;
     }
     
     if (data.proactiveChat) {
-        setLoading(false); 
+        const domElements = getDomElements();
+        setLoading(false, domElements); 
         startProactiveChat(data.proactiveChat);
         return; 
     }
@@ -144,31 +149,32 @@ export function processNewRoundData(data) {
 
 export async function handlePlayerAction() {
     interaction.hideNpcInteractionMenu();
-    const playerInput = document.getElementById('player-input');
-    const actionText = playerInput.value.trim();
+    const domElements = getDomElements();
+
+    const actionText = domElements.playerInput.value.trim();
     if (!actionText || gameState.isRequesting) return;
 
     if (actionText.toUpperCase() === '/*GM') {
-        playerInput.value = '';
-        document.getElementById('gm-panel').classList.add('visible');
+        domElements.playerInput.value = '';
+        domElements.gmPanel.classList.add('visible');
         return;
     }
 
-    playerInput.value = '';
+    domElements.playerInput.value = '';
 
-    const prequelElement = document.getElementById('story-text-wrapper').querySelector('.prequel-summary');
+    const prequelElement = domElements.storyTextContainer.querySelector('.prequel-summary');
     if (prequelElement) {
-        document.getElementById('story-text-wrapper').innerHTML = '';
+        domElements.storyTextContainer.innerHTML = '';
     }
 
-    setLoading(true, '江湖百曉生正在構思...');
+    setLoading(true, domElements, '江湖百曉生正在構思...');
     appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
     try {
         const data = await api.interact({
             action: actionText,
             round: gameState.currentRound,
-            model: document.getElementById('ai-model-selector').value
+            model: domElements.aiModelSelector.value
         });
 
         if (data && data.roundData) {
@@ -187,19 +193,19 @@ export async function handlePlayerAction() {
         await loadInitialGame();
     } finally {
         if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
-             setLoading(false);
+             setLoading(false, domElements);
         }
     }
 }
 
 export async function loadInitialGame() {
-    const storyTextContainer = document.getElementById('story-text-wrapper');
-    setLoading(true, '正在連接你的世界，讀取記憶中...');
+    const domElements = getDomElements();
+    setLoading(true, domElements, '正在連接你的世界，讀取記憶中...');
     
     try {
         const data = await api.getLatestGame();
         
-        storyTextContainer.innerHTML = ''; 
+        domElements.storyTextContainer.innerHTML = ''; 
 
         if (data.gameState === 'deceased') {
             if(data.roundData) {
@@ -211,13 +217,13 @@ export async function loadInitialGame() {
                 const prequelDiv = document.createElement('div');
                 prequelDiv.className = 'prequel-summary';
                 prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
-                storyTextContainer.appendChild(prequelDiv);
+                domElements.storyTextContainer.appendChild(prequelDiv);
             }
             processNewRoundData(data);
         }
     } catch (error) {
         if (error.message.includes('找不到存檔')) {
-            storyTextContainer.innerHTML = '';
+            domElements.storyTextContainer.innerHTML = '';
             const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
             const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, stamina: 100, suggestion: '先檢查一下自己的身體狀況吧。' };
             
@@ -229,7 +235,23 @@ export async function loadInitialGame() {
         }
     } finally {
          if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
-             setLoading(false);
+             setLoading(false, domElements);
         }
     }
+}
+
+// 輔助函式，用於集中獲取DOM元素，以便傳遞
+function getDomElements() {
+    return {
+        playerInput: document.getElementById('player-input'),
+        submitButton: document.getElementById('submit-button'),
+        chatInput: document.getElementById('chat-input'),
+        chatActionBtn: document.getElementById('chat-action-btn'),
+        endChatBtn: document.getElementById('end-chat-btn'),
+        combatSurrenderBtn: document.getElementById('combat-surrender-btn'),
+        aiThinkingLoader: document.querySelector('.ai-thinking-loader'),
+        storyTextContainer: document.getElementById('story-text-wrapper'),
+        gmPanel: document.getElementById('gm-panel'),
+        aiModelSelector: document.getElementById('ai-model-selector')
+    };
 }
