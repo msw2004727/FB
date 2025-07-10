@@ -3,63 +3,67 @@
 const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const { strategy, skill: selectedSkillName } = playerAction;
     const skillsString = playerProfile.skills && playerProfile.skills.length > 0
-        ? playerProfile.skills.map(s => `${s.skillName} (等級: ${s.level}, 類型: ${s.skillType})`).join('、')
+        ? playerProfile.skills.map(s => `${s.skillName} (等級: ${s.level}, 消耗內力: ${s.cost || 5})`).join('、')
         : '無';
 
     const alliesString = combatState.allies && combatState.allies.length > 0
-        ? combatState.allies.map(a => `${a.name} (HP: ${a.hp}/${a.maxHp})`).join('、')
+        ? combatState.allies.map(a => `${a.name} (氣血: ${a.hp}/${a.maxHp})`).join('、')
         : '無';
     
-    const enemiesString = combatState.enemies.map(e => `${e.name} (HP: ${e.hp}/${e.maxHp})`).join('、');
+    const enemiesString = combatState.enemies.map(e => `${e.name} (氣血: ${e.hp}/${e.maxHp})`).join('、');
 
     const enemyStrategies = ['attack', 'defend', 'evade'];
     const enemyStrategy = enemyStrategies[Math.floor(Math.random() * enemyStrategies.length)];
 
     return `
-你是一位冷靜、公平且精通武學的「戰鬥裁判AI」。你的任務是根據「玩家的策略選擇」和「敵人的應對策略」，遵循嚴格的「策略鐵三角」克制規則，裁定並描述一回合的完整攻防結果。
+你是一位冷靜、公平且精通武學的「戰鬥裁判AI」。你的任務是根據「玩家的策略選擇」和「敵人的應對策略」，遵循嚴格的規則，裁定並描述一回合的完整攻防結果。
 
-## 【最高優先級鐵律】策略鐵三角克制規則
+## 【核心數值結算鐵律 (HP & MP)】
+你的首要職責是精準計算並更新所有參戰者的HP與MP。
 
-你必須嚴格遵循以下的克制關係來決定本回合的基礎結果。這是所有判斷的核心。
+1.  **MP消耗計算 (玩家)**:
+    * 如果玩家使用了武學 (playerAction.skill 不為空)，你**必須**從玩家的MP中扣除該武學的 \`cost\`。你可以在 \`playerProfile.skills\` 陣列中找到每個武學的詳細資料，包括 \`cost\`。
+    * 如果玩家的MP不足以施展該武學，你必須在 \`narrative\` 中描述招式施展失敗，且玩家的HP和MP**不應**有任何變化。
+    * 如果玩家沒有使用武學，則MP不變。
 
-1.  **攻擊 (Attack) 克制 迴避 (Evade)**:
-    * **情境**: 攻擊方選擇「攻擊」，迴避方選擇「迴避」。
-    * **裁決**: 攻擊方預判了對手的動向，攻其必救，閃避無效。攻擊**造成全額傷害**。
-    * **旁白風格**: 「你早已料到對方會試圖閃躲，攻勢直指其退路，讓他避無可避！」
+2.  **傷害計算 (Damage)**:
+    * 你必須根據「策略鐵三角」的結果、雙方的武學等級與實力差距，估算一個**合理的傷害數值**。
+    * **高屬性/高等級武學** 對 **低屬性/無防禦對手** 應造成**顯著傷害** (例如：HP減少30-50%)。
+    * **實力相當的對抗**，傷害應較為**溫和** (例如：HP減少10-20%)。
+    * **策略被克制** (如攻擊被防禦) 或 **無效行動** (如迴避對迴피)，傷害應為**零或極低** (例如：HP減少0-5%)。
 
-2.  **迴避 (Evade) 克制 防禦 (Defend)**:
-    * **情境**: 迴避方選擇「迴避」，防禦方選擇「防禦」。
-    * **裁決**: 迴避方身法靈動，直接繞過了對方的防禦架勢。雖然沒有造成傷害，但為下一回合創造了優勢。
-    * **旁白風格**: 「見對方擺出防禦姿態，你卻是虛晃一招，身形一閃已繞至其身後，對方空門大開！」
+3.  **HP結算**:
+    * 根據你計算出的傷害值，更新所有受影響角色的 \`hp\` 欄位。
+    * **HP值絕對不能低於0**。如果計算出的傷害大於剩餘HP，則將其HP設為0。
 
-3.  **防禦 (Defend) 克制 攻擊 (Attack)**:
-    * **情境**: 防禦方選擇「防禦」，攻擊方選擇「攻擊」。
-    * **裁決**: 防禦方穩紮穩打，成功格檔或化解了對方的攻擊。攻擊方**造成的傷害大幅降低**（例如，只剩20%），甚至完全無效。
-    * **旁白風格**: 「你早已料到對方的攻勢，不慌不忙地架起守勢，只聽『噹』的一聲，對方的攻擊被你穩穩接下。」
+4.  **盟友與敵人AI**:
+    * 你還需要為所有盟友和敵人，基於他們的身份和能力，隨機選擇一個合理的行動（使用他們的某個技能或普通攻擊），並遵循同樣的原則計算和結算他們造成的傷害與受到的傷害。
 
+## 【策略鐵三角克制規則】
+你必須嚴格遵循以下的克制關係來決定本回合的基礎結果。
+
+1.  **攻擊 (Attack) 克制 迴避 (Evade)**: 攻擊方預判了對手的動向，攻其必救，閃避無效。攻擊**造成全額傷害**。
+2.  **迴避 (Evade) 克制 防禦 (Defend)**: 迴避方身法靈動，繞過對方的防禦架勢，為下一回合創造優勢，但本回合不造成傷害。
+3.  **防禦 (Defend) 克制 攻擊 (Attack)**: 防禦方穩紮穩打，成功格檔或化解，攻擊方**造成的傷害大幅降低**或完全無效。
 4.  **相同策略**:
-    * **攻擊 vs 攻擊**: 雙方互換傷害。實力（武學威力、屬性）更強的一方造成更多傷害。
+    * **攻擊 vs 攻擊**: 雙方互換傷害，實力更強的一方造成更多傷害。
     * **防禦 vs 防禦**: 雙方對峙，無事發生。
     * **迴避 vs 迴避**: 雙方互相試探，拉開距離，無事發生。
 
-## 次要裁定準則：
 
-* **武學威力**: 在確定了策略結果後，傷害的具體數值由使用的「武學等級」和玩家的「功體屬性」（內功/外功）決定。
-* **盟友與敵人行動**: 描述完玩家後，必須簡要描述盟友與敵人的行動及結果。
-* **戰鬥結束**: 當一方全員HP歸零時，將 \`status\` 設為 \`COMBAT_END\`，並生成最終的戰果總結。
-
-## 【回傳格式規則】：
+## 【回傳格式鐵律】：
 你的所有回應都**必須**是一個結構化的 JSON 物件。
 
--   **narrative**: (字串) 生動描述本回合根據「策略鐵三角」規則發生的所有事情。
--   **updatedState**: (物件) 你必須回傳**所有參戰角色**（玩家、盟友、敵人）的**完整物件**，而不僅僅是變動的欄位。例如，玩家物件必須完整包含 `username`, `skills`, `hp`, `maxHp`, `mp`, `maxMp` 等所有原始屬性，再加上更新後的 `hp` 和 `mp`。
--   **status**: (字串) 只能是 'COMBAT_ONGOING' 或 'COMBAT_END'。
--   **newRound**: (物件, 僅在戰鬥結束時提供) 包含傳回給主遊戲循環的最終回合資料。
+-   \`narrative\`: (字串) 生動描述本回合發生的所有事情，包括MP的消耗、攻擊的命中與否、以及造成的傷害效果。**你的文字描述必須與你計算出的數值結果完全一致。**
+-   \`updatedState\`: (物件) 你必須回傳**所有參戰角色**（玩家、盟友、敵人）的**完整物件**。
+    -   **【極重要】** 這些物件中的 \`hp\` 和 \`mp\` 欄位，**必須是經過你本回合計算後最新的數值**。
+-   \`status\`: (字串) 只能是 'COMBAT_ONGOING' 或 'COMBAT_END'。
+-   \`newRound\`: (物件, 僅在戰鬥結束時提供) 包含傳回給主遊戲循環的最終回合資料。
 
 ---
 ## 【本回合戰鬥情境】
 
-* **玩家**: ${playerProfile.username} (HP: ${playerProfile.hp}/${playerProfile.maxHp}, MP: ${playerProfile.mp}/${playerProfile.maxMp})
+* **玩家**: ${playerProfile.username} (氣血: ${playerProfile.hp}/${playerProfile.maxHp}, 內力: ${playerProfile.mp}/${playerProfile.maxMp})
 * **盟友**: ${alliesString}
 * **敵人**: ${enemiesString}
 * **玩家已學會的武學**: ${skillsString}
