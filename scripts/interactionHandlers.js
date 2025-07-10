@@ -10,16 +10,19 @@ let gameLoop = {};
 
 // --- Helper Functions (Internal to this module) ---
 
-function showNpcInteractionMenu(targetElement, npcName) {
+function showNpcInteractionMenu(targetElement, npcName, isDeceased = false) {
+    const disabledAttr = isDeceased ? 'disabled' : '';
     dom.npcInteractionMenu.innerHTML = `
-        <button class="npc-interaction-btn trade" data-npc-name="${npcName}"><i class="fas fa-exchange-alt"></i> 交易</button>
-        <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
-        <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
+        <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> 交易</button>
+        <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> 聊天</button>
+        <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> 動手</button>
     `;
     
-    dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
-    dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
-    dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
+    if (!isDeceased) {
+        dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
+        dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
+        dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
+    }
 
     const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
     const targetRect = targetElement.getBoundingClientRect();
@@ -264,7 +267,8 @@ export function handleNpcClick(event) {
 
     if (targetIsNpc) {
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
-        showNpcInteractionMenu(targetIsNpc, npcName);
+        const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
+        showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
     } else if (!targetIsMenu) {
         hideNpcInteractionMenu();
     }
