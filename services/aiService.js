@@ -49,7 +49,8 @@ const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
 const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
-const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js'); // 【核心新增】
+const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
+const { getEventDirectorPrompt } = require('../prompts/eventDirectorPrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -121,13 +122,11 @@ function parseJsonResponse(text) {
 async function getAIAnachronismResponse(playerModelChoice, playerAction, anachronisticItem) {
     const prompt = getAnachronismPrompt(playerAction, anachronisticItem);
     try {
-        // 這類創意寫作可以使用較為靈活的模型
         const modelToUse = playerModelChoice || aiConfig.narrative || 'openai';
         const response = await callAI(modelToUse, prompt, false);
         return response.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 時空守序者任務:", error);
-        // 返回一個安全的預設回應
         return "你腦中閃過一個不屬於這個時代的念頭，但很快便將其甩開，專注於眼前的江湖事。";
     }
 }
@@ -154,8 +153,8 @@ async function getAISummary(oldSummary, newRoundData) {
     }
 }
 
-async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore);
+async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates);
     try {
         const modelToUse = playerModelChoice || aiConfig.story;
         const text = await callAI(modelToUse, prompt, true);
@@ -394,7 +393,6 @@ async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
     }
 }
 
-// 【核心新增】
 async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog) {
     const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog);
     try {
@@ -403,7 +401,6 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
         return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 戰場清掃者任務:", error);
-        // 提供一個安全的、保底的回傳結果
         const playerWon = finalCombatState.enemies.every(e => e.hp <= 0);
         return {
             narrative: playerWon ? "你擊敗了對手，但四周一片狼藉，空氣中瀰漫著血腥味，讓你一時無法回神。" : "你眼前一黑，重重地倒在地上，失去了知覺。",
@@ -415,6 +412,25 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
                 itemChanges: [],
                 npcUpdates: []
             }
+        };
+    }
+}
+
+// 【核心新增】
+async function getAIEventDirectorResult(playerModelChoice, playerProfile, worldEvent) {
+    const prompt = getEventDirectorPrompt(playerProfile, worldEvent);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.eventDirector || 'openai';
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error(`[AI 任務失敗] 事件導演任務 (事件: ${worldEvent.eventType}):`, error);
+        return {
+            story: "（你感覺到空氣中的氣氛有些凝重，似乎有什麼事情正在你看不見的地方悄然發生，但你一時無法抓住頭緒。）",
+            nextStage: worldEvent.currentStage,
+            playerChanges: {},
+            itemChanges: [],
+            npcUpdates: []
         };
     }
 }
@@ -445,5 +461,6 @@ module.exports = {
     getAISurrenderResult,
     getAIProactiveChat,
     getAIAnachronismResponse,
-    getAIPostCombatResult, // 【核心新增】
+    getAIPostCombatResult,
+    getAIEventDirectorResult, // 【核心新增】
 };
