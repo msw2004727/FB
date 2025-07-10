@@ -49,7 +49,7 @@ async function getOrGenerateSkillTemplate(skillName) {
     try {
         const doc = await skillTemplateRef.get();
         if (doc.exists) {
-            return doc.data();
+            return { template: doc.data(), isNew: false };
         }
         console.log(`[武學總綱] 武學「${skillName}」的總綱不存在，啟動AI生成...`);
         const prompt = getSkillGeneratorPrompt(skillName);
@@ -62,7 +62,7 @@ async function getOrGenerateSkillTemplate(skillName) {
         await skillTemplateRef.set(newTemplateData);
         console.log(`[武學總綱] 成功為「${skillName}」建立並儲存了總綱模板。`);
         const newDoc = await skillTemplateRef.get();
-        return newDoc.data();
+        return { template: newDoc.data(), isNew: true };
     } catch (error) {
         console.error(`[武學總綱] 在處理武學「${skillName}」的總綱時發生錯誤:`, error);
         return null;
@@ -228,7 +228,6 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
     }
 };
 
-// --- 核心修改開始 ---
 const updateInventory = async (userId, itemChanges, roundData = {}) => {
     if (!itemChanges || itemChanges.length === 0) return;
     const userInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
@@ -237,8 +236,8 @@ const updateInventory = async (userId, itemChanges, roundData = {}) => {
         const { action, itemName, quantity = 1 } = change;
         if (!itemName) continue;
         
-        // 將 roundData 傳遞給物品模板生成器
-        const template = await getOrGenerateItemTemplate(itemName, roundData);
+        const templateData = await getOrGenerateItemTemplate(itemName, roundData);
+        const template = templateData ? templateData.template : null;
         
         if (!template) {
             console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
@@ -287,7 +286,6 @@ const updateInventory = async (userId, itemChanges, roundData = {}) => {
     await batch.commit();
     console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 };
-// --- 核心修改結束 ---
 
 const updateFriendlinessValues = async (userId, npcChanges) => {
     if (!npcChanges || npcChanges.length === 0) return;
@@ -402,28 +400,67 @@ const getRawInventory = async (userId) => {
         const playerData = doc.data();
         const templateId = playerData.templateId;
         if (!templateId) continue;
-        const template = await getOrGenerateItemTemplate(templateId);
-        if (template) {
-            inventoryData[doc.id] = { ...template, ...playerData };
+        const templateData = await getOrGenerateItemTemplate(templateId);
+        if (templateData && templateData.template) {
+            inventoryData[doc.id] = { ...templateData.template, ...playerData };
         }
     }
     return inventoryData;
 };
 
-const updateSkills = async (userId, skillChanges) => {
-    if (!skillChanges || skillChanges.length === 0) return [];
+// 【核心修改】重構 updateSkills 函式以納入自創武學限制
+const updateSkills = async (userId, skillChanges, playerProfile) => {
+    if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
+
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
+    const userDocRef = db.collection('users').doc(userId);
     const levelUpEvents = [];
+    let customSkillCreationResult = null;
+
     for (const skillChange of skillChanges) {
         const playerSkillDocRef = playerSkillsRef.doc(skillChange.skillName);
         try {
             await db.runTransaction(async (transaction) => {
                 if (skillChange.isNewlyAcquired) {
-                    const template = await getOrGenerateSkillTemplate(skillChange.skillName);
-                    if (!template) {
+                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                    
+                    if (!templateResult || !templateResult.template) {
                         console.error(`無法為「${skillChange.skillName}」獲取或生成模板，跳過此武學。`);
                         return;
                     }
+
+                    // 如果 isNew 為 true，代表是自創武學，需要進行驗證
+                    if (templateResult.isNew) {
+                        const powerType = templateResult.template.power_type || 'none';
+                        const maxPowerAchieved = playerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
+                        const createdSkillsCount = playerProfile.customSkillsCreated?.[powerType] || 0;
+                        const totalCreatedSkills = Object.values(playerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
+
+                        const availableSlots = Math.floor(maxPowerAchieved / 100);
+
+                        console.log(`[自創武學] 驗證: ${skillChange.skillName} (${powerType})`);
+                        console.log(`[自創武學] 總上限: ${totalCreatedSkills}/10, 類別上限: ${createdSkillsCount}/${availableSlots}`);
+                        
+                        if (totalCreatedSkills >= 10) {
+                            customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
+                            console.log(`[自創武學] 失敗：已達總上限10門。`);
+                            return; // 中斷本次 transaction
+                        }
+
+                        if (createdSkillsCount >= availableSlots) {
+                            customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                             console.log(`[自創武學] 失敗：${powerType}類別名額不足。`);
+                            return; // 中斷本次 transaction
+                        }
+
+                        // 驗證通過，更新玩家的自創武學計數
+                        const skillCountUpdate = {};
+                        skillCountUpdate[`customSkillsCreated.${powerType}`] = admin.firestore.FieldValue.increment(1);
+                        transaction.update(userDocRef, skillCountUpdate);
+                        customSkillCreationResult = { success: true };
+                        console.log(`[自創武學] 成功：驗證通過，計數增加。`);
+                    }
+
                     const playerSkillData = {
                         level: skillChange.level || 0,
                         exp: skillChange.exp || 0,
@@ -431,24 +468,29 @@ const updateSkills = async (userId, skillChanges) => {
                     };
                     transaction.set(playerSkillDocRef, playerSkillData);
                     console.log(`[武學系統] 玩家 ${userId} 習得新武學: ${skillChange.skillName}，初始等級: ${playerSkillData.level}`);
+
                 } else if (skillChange.expChange > 0) {
                     const playerSkillDoc = await transaction.get(playerSkillDocRef);
                     if (!playerSkillDoc.exists) {
                         console.warn(`[武學系統] 玩家 ${userId} 試圖修練不存在的武學: ${skillChange.skillName}`);
                         return;
                     }
-                    const template = await getOrGenerateSkillTemplate(skillChange.skillName);
-                    if (!template) return;
+                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                    if (!templateResult || !templateResult.template) return;
+                    
                     let currentData = playerSkillDoc.data();
                     let currentLevel = currentData.level || 0;
                     let currentExp = currentData.exp || 0;
-                    const maxLevel = template.max_level || 10;
+                    const maxLevel = templateResult.template.max_level || 10;
+
                     if (currentLevel >= maxLevel) {
                          console.log(`[武學系統] 武學 ${skillChange.skillName} 已達最高等級(${maxLevel})。`);
                          return;
                     }
+
                     currentExp += skillChange.expChange;
                     let requiredExp = (currentLevel === 0) ? 100 : currentLevel * 100;
+
                     while (currentExp >= requiredExp && currentLevel < maxLevel) {
                         currentLevel++;
                         currentExp -= requiredExp;
@@ -467,8 +509,9 @@ const updateSkills = async (userId, skillChanges) => {
             console.error(`[武學系統] 更新武學 ${skillChange.skillName} 時發生錯誤:`, error);
         }
     }
-    return levelUpEvents;
+    return { levelUpEvents, customSkillCreationResult };
 };
+
 
 const getPlayerSkills = async (userId) => {
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
@@ -478,10 +521,10 @@ const getPlayerSkills = async (userId) => {
     for (const playerSkillDoc of playerSkillsSnapshot.docs) {
         const skillName = playerSkillDoc.id;
         const playerData = playerSkillDoc.data();
-        const template = await getOrGenerateSkillTemplate(skillName);
-        if (template) {
+        const templateData = await getOrGenerateSkillTemplate(skillName);
+        if (templateData && templateData.template) {
             mergedSkills.push({
-                ...template,
+                ...templateData.template,
                 level: playerData.level,
                 exp: playerData.exp
             });
@@ -535,4 +578,5 @@ module.exports = {
     processNpcUpdates,
     getMergedLocationData,
     getMergedNpcProfile,
+    getOrGenerateSkillTemplate,
 };
