@@ -219,7 +219,6 @@ const combatActionRouteHandler = async (req, res) => {
                         if (reputationSummary) {
                             postCombatNarrative += `\n\n**【江湖反應】** ${reputationSummary}`;
                         }
-                        // 【核心新增】創建世界後續事件
                         const worldEvent = {
                             eventType: 'NPC_DEATH',
                             eventData: {
@@ -236,6 +235,25 @@ const combatActionRouteHandler = async (req, res) => {
                     }
                 }
             }
+            
+            // 【核心修改】處理戰鬥結束後的NPC狀態更新
+            const deceasedNpcs = new Set(
+                (outcome.npcUpdates || [])
+                    .filter(u => u.fieldToUpdate === 'isDeceased' && u.newValue === true)
+                    .map(u => u.npcName)
+            );
+
+            const nextRoundNpcs = (lastRoundData.NPC || [])
+                .map(npc => {
+                    if (deceasedNpcs.has(npc.name)) {
+                        return {
+                            ...npc,
+                            status: `(屍體)`,
+                            isDeceased: true,
+                        };
+                    }
+                    return npc;
+                });
             
             const powerChange = outcome.playerChanges.powerChange || {};
             const playerUpdatePayload = {
@@ -259,6 +277,7 @@ const combatActionRouteHandler = async (req, res) => {
                  story: postCombatNarrative,
                  PC: outcome.playerChanges.PC || outcome.summary,
                  EVT: outcome.summary,
+                 NPC: nextRoundNpcs, // 使用我們剛剛處理過的新NPC列表
                  playerState: finalUpdatedState.player.hp <= 0 ? 'dying' : 'alive',
                  deathCountdown: finalUpdatedState.player.hp <= 0 ? 10 : null,
                  internalPower: updatedUserProfile.internalPower,
