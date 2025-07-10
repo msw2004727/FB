@@ -3,10 +3,35 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const jwt = 'jsonwebtoken';
 const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
+
+// 【核心修改】建立一個玩家預設欄位的「藍圖」
+// 未來所有新增的玩家欄位，都應該在這裡定義其預設值
+const DEFAULT_USER_FIELDS = {
+    internalPower: 5,
+    externalPower: 5,
+    lightness: 5,
+    morality: 0,
+    stamina: 100,
+    isDeceased: false,
+    maxInternalPowerAchieved: 5,
+    maxExternalPowerAchieved: 5,
+    maxLightnessAchieved: 5,
+    customSkillsCreated: {
+        internal: 0,
+        external: 0,
+        lightness: 0,
+        none: 0
+    },
+    shortActionCounter: 0,
+    // --- 未來可以繼續在這裡往下加，例如：---
+    // reputation: 0,
+    // maritalStatus: '未婚',
+};
+
 
 // API 路由: /api/auth/register
 router.post('/register', async (req, res) => {
@@ -24,32 +49,18 @@ router.post('/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
 
         const newUserRef = db.collection('users').doc();
+        // 【核心修改】註冊時直接使用預設欄位藍圖
         await newUserRef.set({
             username,
             gender,
             passwordHash,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            internalPower: 5,
-            externalPower: 5,
-            lightness: 5,
-            morality: 0,
-            stamina: 100, 
             timeOfDay: '上午',
             yearName: '元祐',
             year: 1,
             month: 1,
             day: 1,
-            isDeceased: false,
-            // 自創武學追蹤欄位
-            maxInternalPowerAchieved: 5,
-            maxExternalPowerAchieved: 5,
-            maxLightnessAchieved: 5,
-            customSkillsCreated: {
-                internal: 0,
-                external: 0,
-                lightness: 0,
-                none: 0
-            }
+            ...DEFAULT_USER_FIELDS, // 將藍圖中的所有預設欄位展開
         });
         
         const skillsCollectionRef = db.collection('users').doc(newUserRef.id).collection('skills');
@@ -103,7 +114,7 @@ router.post('/register', async (req, res) => {
         };
         await db.collection('users').doc(newUserRef.id).collection('game_saves').doc('R0').set(roundZeroData);
 
-        const token = jwt.sign(
+        const token = require('jsonwebtoken').sign(
             { userId: newUserRef.id, username: username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
@@ -143,27 +154,34 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
 
-        // --- 【核心新增】舊玩家資料欄位自動補全 ---
-        // 檢查是否存在新的追蹤欄位，如果不存在，則為舊玩家補上
-        if (userData.maxInternalPowerAchieved === undefined || userData.customSkillsCreated === undefined) {
-            console.log(`[資料庫維護] 偵測到舊玩家: ${username}，正在為其補全自創武學欄位...`);
-            const updates = {
-                maxInternalPowerAchieved: userData.internalPower || 5,
-                maxExternalPowerAchieved: userData.externalPower || 5,
-                maxLightnessAchieved: userData.lightness || 5,
-                customSkillsCreated: {
-                    internal: 0,
-                    external: 0,
-                    lightness: 0,
-                    none: 0
-                }
-            };
-            await userDoc.ref.update(updates);
-            console.log(`[資料庫維護] 已成功為 ${username} 更新資料結構。`);
-        }
-        // --- 新增結束 ---
+        // --- 【核心重構】未來化的舊玩家資料欄位自動補全 ---
+        const updates = {};
+        let needsUpdate = false;
 
-        const token = jwt.sign(
+        for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
+            if (userData[field] === undefined) {
+                needsUpdate = true;
+                // 特別處理：如果最高能力值不存在，則以當前能力值為準
+                if (field === 'maxInternalPowerAchieved') {
+                    updates[field] = userData.internalPower || defaultValue;
+                } else if (field === 'maxExternalPowerAchieved') {
+                    updates[field] = userData.externalPower || defaultValue;
+                } else if (field === 'maxLightnessAchieved') {
+                    updates[field] = userData.lightness || defaultValue;
+                } else {
+                    updates[field] = defaultValue;
+                }
+                console.log(`[資料庫維護] 玩家 ${username} 缺少欄位 [${field}]，將自動補全為預設值。`);
+            }
+        }
+
+        if (needsUpdate) {
+            await userDoc.ref.update(updates);
+            console.log(`[資料庫維護] 已成功為 ${username} 自動更新資料結構。`);
+        }
+        // --- 重構結束 ---
+
+        const token = require('jsonwebtoken').sign(
             { userId: userDoc.id, username: userData.username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
