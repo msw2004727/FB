@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary, getAIEventDirectorResult } = require('../services/aiService'); 
+const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary, getAIEventDirectorResult, getAIPostCombatResult } = require('../services/aiService'); 
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -19,10 +19,13 @@ const {
     getPlayerSkills,
     processNpcUpdates,
     getMergedLocationData,
-    getMergedNpcProfile
+    getMergedNpcProfile,
+    getFriendlinessLevel
 } = require('./gameHelpers');
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
+const { processReputationChangesAfterDeath } = require('./reputationManager');
+
 
 const db = admin.firestore();
 
@@ -52,7 +55,7 @@ const proactiveChatEngine = async (userId, playerProfile, finalRoundData) => {
         const npcState = npcDoc.data();
         const npcName = npcDoc.id;
         const npcProfile = await getMergedNpcProfile(userId, npcName);
-        if (!npcProfile) continue;
+        if (!npcProfile || npcProfile.isDeceased) continue;
         
         if (!npcState.triggeredProactiveEvents) {
             npcState.triggeredProactiveEvents = [];
@@ -257,12 +260,10 @@ const interactRouteHandler = async (req, res) => {
         const lastSave = lastSaveSnapshot.empty ? {} : lastSaveSnapshot.docs[0].data();
         
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            // Fetch all profiles in parallel
             const npcProfiles = await Promise.all(
                 aiResponse.roundData.NPC.map(npc => getMergedNpcProfile(userId, npc.name))
             );
             
-            // Merge the isDeceased status into the scene NPCs
             aiResponse.roundData.NPC.forEach((sceneNpc, index) => {
                 const profile = npcProfiles[index];
                 if (profile && profile.isDeceased === true) {
@@ -277,7 +278,7 @@ const interactRouteHandler = async (req, res) => {
         userProfile = (await userDocRef.get()).data();
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
-        let newStamina = userProfile.stamina || 100;
+        let newStamina = (userProfile.stamina === undefined) ? 100 : userProfile.stamina;
 
         const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇'];
         const isResting = restKeywords.some(kw => playerAction.includes(kw));
@@ -421,7 +422,6 @@ const interactRouteHandler = async (req, res) => {
         
         const finalUserProfile = (await userDocRef.get()).data();
         
-        // 【核心修正】在這裡組合最終要存檔的資料，並明確覆寫 story 欄位
         const newStory = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         aiResponse.roundData = { 
             ...lastSave, 
@@ -430,7 +430,7 @@ const interactRouteHandler = async (req, res) => {
             ...finalUserProfile, 
             ...finalDate, 
             timeOfDay: finalTimeOfDay,
-            story: newStory // 確保新的故事被寫入
+            story: newStory 
         };
         
         const playerUpdatesForDb = {
@@ -465,6 +465,115 @@ const interactRouteHandler = async (req, res) => {
 };
 
 router.post('/interact', interactRouteHandler);
+
+const finalizeCombatHandler = async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { combatResult } = req.body;
+
+    if (!combatResult) {
+        return res.status(400).json({ message: '缺少戰鬥結果數據。' });
+    }
+
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+
+        const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const preCombatRoundData = lastSaveSnapshot.docs[0].data();
+
+        const { narrative: combatNarrative, outcome } = await getAIPostCombatResult(req.body.model, { ...(await userDocRef.get()).data(), username }, combatResult.finalState, combatResult.log);
+        const { summary, EVT, playerChanges, itemChanges, npcUpdates } = outcome;
+        
+        const fullNarrative = `${combatResult.finalState.log.join('<br>')}<hr>${combatNarrative}`;
+
+        await updateInventory(userId, itemChanges || [], preCombatRoundData);
+        
+        const updates = {};
+        if (playerChanges && playerChanges.powerChange) {
+            updates.internalPower = admin.firestore.FieldValue.increment(playerChanges.powerChange.internal || 0);
+            updates.externalPower = admin.firestore.FieldValue.increment(playerChanges.powerChange.external || 0);
+            updates.lightness = admin.firestore.FieldValue.increment(playerChanges.powerChange.lightness || 0);
+        }
+        if (playerChanges && playerChanges.moralityChange) {
+            updates.morality = admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0);
+        }
+        if (Object.keys(updates).length > 0) {
+            await userDocRef.update(updates);
+        }
+        
+        if (npcUpdates && npcUpdates.length > 0) {
+            await processNpcUpdates(userId, npcUpdates);
+            for (const update of npcUpdates) {
+                if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
+                   const reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, preCombatRoundData.LOC[0], combatResult.finalState.allies.map(a => a.name));
+                   if (reputationSummary) {
+                       combatResult.summary += `\n\n**【江湖反應】** ${reputationSummary}`;
+                   }
+                }
+            }
+        }
+        
+        const newRoundNumber = preCombatRoundData.R + 1;
+        
+        const [updatedUserDoc, inventoryState, updatedSkills] = await Promise.all([
+            userDocRef.get(),
+            getInventoryState(userId),
+            getPlayerSkills(userId)
+        ]);
+        const finalUserProfile = updatedUserDoc.data();
+        
+        const finalRoundData = {
+            ...preCombatRoundData,
+            ...finalUserProfile,
+            ...inventoryState,
+            R: newRoundNumber,
+            story: summary,
+            PC: playerChanges.PC || summary,
+            EVT: EVT || '一場激鬥之後',
+            skills: updatedSkills,
+        };
+        
+        const finalNpcList = [];
+        const sceneNpcNames = new Set(combatResult.finalState.enemies.map(e => e.name).concat(combatResult.finalState.allies.map(a => a.name)));
+        
+        for (const npcName of sceneNpcNames) {
+            const profile = await getMergedNpcProfile(userId, npcName);
+            if (profile) {
+                finalNpcList.push({
+                    name: profile.name,
+                    status: profile.isDeceased ? '已無氣息' : (profile.status || '狀態不明'),
+                    friendliness: getFriendlinessLevel(profile.friendlinessValue),
+                    isDeceased: profile.isDeceased || false
+                });
+            }
+        }
+        finalRoundData.NPC = finalNpcList;
+
+        const longTermSummary = (await summaryDocRef.get()).data()?.text || '...';
+        const newSummary = await getAISummary(longTermSummary, finalRoundData);
+        const suggestion = await getAISuggestion(finalRoundData);
+
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
+        
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(戰後):", err));
+
+        res.json({
+            story: finalRoundData.story,
+            roundData: finalRoundData,
+            suggestion: suggestion,
+            locationData: await getMergedLocationData(userId, finalRoundData.LOC)
+        });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /finalize-combat 錯誤:`, error);
+        if (!res.headersSent) {
+            res.status(500).json({ message: error.message || "結算戰鬥時發生未知錯誤" });
+        }
+    }
+};
 
 router.post('/end-chat', async (req, res) => {
     const userId = req.user.id;
@@ -514,5 +623,7 @@ router.post('/end-chat', async (req, res) => {
         res.status(500).json({ message: '總結對話時發生內部錯誤。' });
     }
 });
+
+router.post('/finalize-combat', finalizeCombatHandler);
 
 module.exports = router;
