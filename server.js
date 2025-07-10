@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
+const cacheManager = require('./api/cacheManager'); // 引入快取管理器
 
 // --- Firebase 初始化 ---
 try {
@@ -74,4 +75,6 @@ app.get('/', (req, res) => {
 // 啟動伺服器
 app.listen(PORT, () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
+    // 在伺服器啟動後，立刻初始化NPC名稱快取
+    cacheManager.initializeNpcNameCache();
 });
