@@ -1,7 +1,10 @@
 // scripts/dom.js
 
+// 創建一個空物件，用來存放所有DOM元素的引用
 export const dom = {};
 
+// 導出一個初始化函式
+// 這個函式只會在 main.js 中，當 DOM 完全載入後被呼叫一次
 export function initializeDOM() {
     dom.gameContainer = document.querySelector('.game-container');
     dom.mainContent = document.getElementById('main-content');
@@ -30,7 +33,7 @@ export function initializeDOM() {
     dom.gmCloseBtn = document.getElementById('gm-close-btn');
     dom.gmMenu = document.getElementById('gm-menu');
     dom.gmContent = document.getElementById('gm-content');
-    
+
     // 動態建立讀取動畫
     if (dom.mainContent && !dom.mainContent.querySelector('.ai-thinking-loader')) {
         const aiThinkingLoader = document.createElement('div');
