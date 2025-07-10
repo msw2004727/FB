@@ -66,6 +66,7 @@ function showAttackConfirmation(event) {
     confirmBtn.addEventListener('click', confirmAndInitiateAttack);
 }
 
+// 【核心修改】修正 handleStrategySelection 函式
 function handleStrategySelection(strategy) {
     gameState.combat.selectedStrategy = strategy;
     gameState.combat.selectedSkill = null; 
@@ -90,12 +91,14 @@ function handleStrategySelection(strategy) {
         relevantSkills.forEach(skill => {
             const skillBtn = document.createElement('button');
             skillBtn.className = 'skill-btn';
-            skillBtn.dataset.skillName = skill.name;
+            // 【修正 1/2】將 skill.name 改為 skill.skillName
+            skillBtn.dataset.skillName = skill.skillName; 
             skillBtn.innerHTML = `
-                <span class="skill-name">${skill.name} (L${skill.level})</span>
+                // 【修正 2/2】將 skill.name 改為 skill.skillName
+                <span class="skill-name">${skill.skillName} (L${skill.level})</span> 
                 <span class="skill-cost">內力 ${skill.cost || 5}</span>
             `;
-            skillBtn.addEventListener('click', () => handleSkillSelection(skill.name));
+            skillBtn.addEventListener('click', () => handleSkillSelection(skill.skillName));
             skillSelectionContainer.appendChild(skillBtn);
         });
     } else {
@@ -201,19 +204,15 @@ async function confirmAndInitiateAttack(event) {
     }
 }
 
-// 【核心修改】startCombat 函式
 function startCombat(initialState) {
     gameState.isInCombat = true;
     gameState.combat.state = initialState;
     
-    // 定義一個簡單的取消函式
     const cancelCombat = () => {
         gameState.isInCombat = false;
         gameLoop.setLoading(false); 
-        // 不再顯示任何訊息
     };
     
-    // 將這個簡單的取消函式傳遞給 openCombatModal
     modal.openCombatModal(initialState, cancelCombat);
     
     document.querySelectorAll('.strategy-btn').forEach(btn => {
@@ -223,7 +222,6 @@ function startCombat(initialState) {
     const surrenderBtn = document.getElementById('combat-surrender-btn');
     if(surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
 }
-
 
 // --- Exported Functions ---
 
