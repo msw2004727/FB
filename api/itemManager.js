@@ -22,14 +22,13 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
 
         // 如果設計圖已存在，直接回傳
         if (doc.exists) {
-            return doc.data();
+            // 【核心修正】回傳標準格式的物件
+            return { template: doc.data(), isNew: false };
         }
 
         // 如果不存在，呼叫「神級工匠AI」進行設計
         console.log(`[神兵閣] 物品「${itemName}」的設計圖不存在，啟動AI生成...`);
         
-        // --- 核心修改開始 ---
-        // 1. 從 roundData 中構建生成物品所需的情境
         const playerLevel = (roundData.internalPower || 0) + (roundData.externalPower || 0) + (roundData.lightness || 0);
         const context = {
             location: roundData.LOC ? roundData.LOC[0] : '未知地點',
@@ -38,9 +37,7 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
             playerLevel: playerLevel
         };
 
-        // 2. 呼叫AI時，傳入完整的物品名稱和情境
         const prompt = getItemGeneratorPrompt(itemName, context);
-        // --- 核心修改結束 ---
         
         const modelToUse = aiConfig.itemTemplate || 'openai';
         const itemJsonString = await callAI(modelToUse, prompt, true); 
@@ -59,7 +56,8 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
         console.log(`[神兵閣] 成功為「${itemName}」建立並儲存了設計圖。`);
         
         const newDoc = await templateRef.get();
-        return newDoc.data();
+        // 【核心修正】回傳標準格式的物件
+        return { template: newDoc.data(), isNew: true };
 
     } catch (error) {
         console.error(`[神兵閣] 在處理物品「${itemName}」的設計圖時發生錯誤:`, error);
