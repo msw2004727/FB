@@ -471,7 +471,7 @@ const finalizeCombatHandler = async (req, res) => {
              throw new Error("戰後結算AI未能生成有效回應。");
         }
         
-        const { summary, EVT, playerChanges, itemChanges, npcUpdates } = postCombatOutcome.outcome;
+        let { summary, EVT, playerChanges, itemChanges, npcUpdates } = postCombatOutcome.outcome;
         
         await updateInventory(userId, itemChanges || [], preCombatRoundData);
         
