@@ -19,7 +19,7 @@ function showNpcInteractionMenu(targetElement, npcName) {
     
     dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
     dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
-    dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackConfirmation);
+    dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
 
     const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
     const targetRect = targetElement.getBoundingClientRect();
@@ -45,26 +45,41 @@ function showNpcInteractionMenu(targetElement, npcName) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
-function showAttackConfirmation(event) {
+// 【核心修改】第一層：顯示戰鬥意圖選項
+function showAttackIntention(event) {
     const npcName = event.currentTarget.dataset.npcName;
-    dom.npcInteractionMenu.querySelectorAll('.npc-interaction-btn').forEach(btn => btn.style.display = 'none');
-    const promptText = document.createElement('span');
-    promptText.className = 'confirm-prompt-text';
-    promptText.textContent = '確定要動手？';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'npc-interaction-btn cancel-attack';
-    cancelBtn.dataset.npcName = npcName;
-    cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'npc-interaction-btn confirm-attack';
-    confirmBtn.dataset.npcName = npcName;
-    confirmBtn.innerHTML = '<i class="fas fa-check"></i>';
-    dom.npcInteractionMenu.appendChild(promptText);
-    dom.npcInteractionMenu.appendChild(cancelBtn);
-    dom.npcInteractionMenu.appendChild(confirmBtn);
-    cancelBtn.addEventListener('click', hideNpcInteractionMenu);
-    confirmBtn.addEventListener('click', confirmAndInitiateAttack);
+    dom.npcInteractionMenu.innerHTML = `
+        <button class="npc-interaction-btn intention" data-intention="切磋" data-npc-name="${npcName}">切磋</button>
+        <button class="npc-interaction-btn intention" data-intention="教訓" data-npc-name="${npcName}">教訓</button>
+        <button class="npc-interaction-btn intention attack" data-intention="打死" data-npc-name="${npcName}">打死</button>
+    `;
+    dom.npcInteractionMenu.querySelectorAll('.intention').forEach(btn => {
+        btn.addEventListener('click', showFinalConfirmation);
+    });
 }
+
+// 【核心新增】第二層：顯示最終確認
+function showFinalConfirmation(event) {
+    const npcName = event.currentTarget.dataset.npcName;
+    const intention = event.currentTarget.dataset.intention;
+    
+    dom.npcInteractionMenu.innerHTML = `
+        <span class="confirm-prompt-text">確定要「${intention}」？</span>
+        <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}"><i class="fas fa-times"></i></button>
+        <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}"><i class="fas fa-check"></i></button>
+    `;
+
+    dom.npcInteractionMenu.querySelector('.cancel-attack').addEventListener('click', (e) => {
+        const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
+        if (originalTarget) {
+            showNpcInteractionMenu(originalTarget, npcName);
+        } else {
+            hideNpcInteractionMenu();
+        }
+    });
+    dom.npcInteractionMenu.querySelector('.confirm-attack').addEventListener('click', confirmAndInitiateAttack);
+}
+
 
 // 【核心修改】修正 handleStrategySelection 函式
 function handleStrategySelection(strategy) {
@@ -92,7 +107,6 @@ function handleStrategySelection(strategy) {
             const skillBtn = document.createElement('button');
             skillBtn.className = 'skill-btn';
             skillBtn.dataset.skillName = skill.skillName;
-            // 【修正】移除不該存在的註解文字
             skillBtn.innerHTML = `
                 <span class="skill-name">${skill.skillName} (L${skill.level})</span>
                 <span class="skill-cost">內力 ${skill.cost || 5}</span>
@@ -183,14 +197,19 @@ async function handleChatButtonClick(event) {
     }
 }
 
+// 【核心修改】現在會傳遞戰鬥意圖
 async function confirmAndInitiateAttack(event) {
     const npcName = event.currentTarget.dataset.npcName;
+    const intention = event.currentTarget.dataset.intention;
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
     
     gameLoop.setLoading(true, `準備與 ${npcName} 對決...`);
     try {
-        const data = await api.initiateCombat({ targetNpcName: npcName, isSparring: false });
+        const data = await api.initiateCombat({ 
+            targetNpcName: npcName, 
+            intention: intention // 傳遞意圖
+        });
         if (data.status === 'COMBAT_START') {
             startCombat(data.initialState);
         }
