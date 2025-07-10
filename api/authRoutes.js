@@ -40,7 +40,17 @@ router.post('/register', async (req, res) => {
             year: 1,
             month: 1,
             day: 1,
-            isDeceased: false
+            isDeceased: false,
+            // 【核心新增】自創武學追蹤欄位
+            maxInternalPowerAchieved: 5,
+            maxExternalPowerAchieved: 5,
+            maxLightnessAchieved: 5,
+            customSkillsCreated: {
+                internal: 0,
+                external: 0,
+                lightness: 0,
+                none: 0
+            }
         });
         
         const skillsCollectionRef = db.collection('users').doc(newUserRef.id).collection('skills');
