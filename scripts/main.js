@@ -1,27 +1,34 @@
 // scripts/main.js
 
-import { loadInitialGame, handlePlayerAction } from './gameLoop.js';
+import * as gameLoop from './gameLoop.js';
 import * as interaction from './interactionHandlers.js';
 import * as modal from './modalManager.js';
 import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js'; 
 
-// 將 gameLoop 中的函式傳遞給 interactionHandlers，建立連接
+// 【核心修改】將 gameLoop 中的函式傳遞給 interactionHandlers，建立連接
+// 這樣 interactionHandlers 就可以呼叫 gameLoop 的函式了
 interaction.setGameLoop({
-    setLoading: (isLoading, text) => getGameLoop().setLoading(isLoading, text),
-    processNewRoundData: (data) => getGameLoop().processNewRoundData(data),
-    handlePlayerDeath: () => getGameLoop().handlePlayerDeath()
+    setLoading: (isLoading, text) => gameLoop.setLoading(isLoading, getDomElements(), text),
+    processNewRoundData: (data) => gameLoop.processNewRoundData(data),
+    handlePlayerDeath: () => gameLoop.handlePlayerDeath()
 });
 
-// 讓 interactionHandlers 可以呼叫到 gameLoop
-function getGameLoop() {
+// 輔助函式，用於集中獲取DOM元素，避免重複查詢
+function getDomElements() {
     return {
-        setLoading: (isLoading, text) => setLoading(isLoading, text),
-        processNewRoundData: (data) => processNewRoundData(data),
-        handlePlayerDeath: () => handlePlayerDeath()
+        playerInput: document.getElementById('player-input'),
+        submitButton: document.getElementById('submit-button'),
+        chatInput: document.getElementById('chat-input'),
+        chatActionBtn: document.getElementById('chat-action-btn'),
+        endChatBtn: document.getElementById('end-chat-btn'),
+        combatSurrenderBtn: document.getElementById('combat-surrender-btn'),
+        aiThinkingLoader: document.querySelector('.ai-thinking-loader'),
+        storyTextContainer: document.getElementById('story-text-wrapper'),
+        gmPanel: document.getElementById('gm-panel'),
+        aiModelSelector: document.getElementById('ai-model-selector')
     };
 }
-
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- 登入驗證 ---
@@ -31,46 +38,47 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // --- 獲取主要互動的 DOM 元素 ---
-    const storyHeader = document.querySelector('.story-header');
-    const headerToggleButton = document.getElementById('header-toggle-btn');
-    const playerInput = document.getElementById('player-input');
-    const submitButton = document.getElementById('submit-button');
-    const menuToggle = document.getElementById('menu-toggle');
-    const gameContainer = document.querySelector('.game-container');
-    const themeSwitcher = document.getElementById('theme-switcher');
-    const logoutButton = document.getElementById('logout-btn');
-    const suicideButton = document.getElementById('suicide-btn');
-    const skillsBtn = document.getElementById('skills-btn');
-    const bountiesBtn = document.getElementById('bounties-btn');
-    const storyPanel = document.getElementById('story-panel');
-    const chatInput = document.getElementById('chat-input');
-    const chatActionBtn = document.getElementById('chat-action-btn');
-    const closeChatBtn = document.getElementById('close-chat-btn');
-    const endChatBtn = document.getElementById('end-chat-btn');
-    const giveItemBtn = document.getElementById('give-item-btn');
-    const cancelGiveBtn = document.getElementById('cancel-give-btn');
-    const closeSkillsBtn = document.getElementById('close-skills-btn');
-    const gmPanel = document.getElementById('gm-panel');
-    const gmCloseBtn = document.getElementById('gm-close-btn');
-    const gmMenu = document.getElementById('gm-menu');
-    const gmContent = document.getElementById('gm-content');
-
-    // --- 初始化與事件綁定 ---
+    // --- 【核心修改】在 DOM 載入後，一次性獲取所有元素 ---
+    const dom = {
+        storyHeader: document.querySelector('.story-header'),
+        headerToggleButton: document.getElementById('header-toggle-btn'),
+        playerInput: document.getElementById('player-input'),
+        submitButton: document.getElementById('submit-button'),
+        menuToggle: document.getElementById('menu-toggle'),
+        gameContainer: document.querySelector('.game-container'),
+        themeSwitcher: document.getElementById('theme-switcher'),
+        logoutButton: document.getElementById('logout-btn'),
+        suicideButton: document.getElementById('suicide-btn'),
+        skillsBtn: document.getElementById('skills-btn'),
+        bountiesBtn: document.getElementById('bounties-btn'),
+        storyPanel: document.getElementById('story-panel'),
+        chatInput: document.getElementById('chat-input'),
+        chatActionBtn: document.getElementById('chat-action-btn'),
+        closeChatBtn: document.getElementById('close-chat-btn'),
+        endChatBtn: document.getElementById('end-chat-btn'),
+        giveItemBtn: document.getElementById('give-item-btn'),
+        cancelGiveBtn: document.getElementById('cancel-give-btn'),
+        closeSkillsBtn: document.getElementById('close-skills-btn'),
+        gmPanel: document.getElementById('gm-panel'),
+        gmCloseBtn: document.getElementById('gm-close-btn'),
+        gmMenu: document.getElementById('gm-menu'),
+        gmContent: document.getElementById('gm-content'),
+        aiModelSelector: document.getElementById('ai-model-selector'),
+    };
 
     function setGameContainerHeight() {
-        if (gameContainer) {
-            gameContainer.style.height = `${window.innerHeight}px`;
+        if (dom.gameContainer) {
+            dom.gameContainer.style.height = `${window.innerHeight}px`;
         }
     }
 
     function initialize() {
         // 主題切換
         let currentTheme = localStorage.getItem('game_theme') || 'light';
-        const themeIcon = themeSwitcher.querySelector('i');
+        const themeIcon = dom.themeSwitcher.querySelector('i');
         document.body.className = `${currentTheme}-theme`;
         themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        themeSwitcher.addEventListener('click', () => {
+        dom.themeSwitcher.addEventListener('click', () => {
             currentTheme = (document.body.classList.contains('light-theme')) ? 'dark' : 'light';
             localStorage.setItem('game_theme', currentTheme);
             document.body.className = `${currentTheme}-theme`;
@@ -78,70 +86,70 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // 摺疊/展開儀表板
-        headerToggleButton.addEventListener('click', () => {
-            storyHeader.classList.toggle('collapsed');
-            headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
-            headerToggleButton.querySelector('i').classList.toggle('fa-chevron-down');
+        dom.headerToggleButton.addEventListener('click', () => {
+            dom.storyHeader.classList.toggle('collapsed');
+            dom.headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
+            dom.headerToggleButton.querySelector('i').classList.toggle('fa-chevron-down');
         });
 
         // 手機側邊欄
-        menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
+        dom.menuToggle.addEventListener('click', () => dom.gameContainer.classList.toggle('sidebar-open'));
         
         // 登出
-        logoutButton.addEventListener('click', () => {
+        dom.logoutButton.addEventListener('click', () => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
             window.location.href = 'login.html';
         });
         
         // 了卻此生
-        suicideButton.addEventListener('click', async () => {
+        dom.suicideButton.addEventListener('click', async () => {
             interaction.hideNpcInteractionMenu();
             if (gameState.isRequesting) return;
             if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) { 
-                getGameLoop().setLoading(true, '英雄末路，傳奇落幕...');
+                gameLoop.setLoading(true, getDomElements(), '英雄末路，傳奇落幕...');
                 try {
-                    const data = await api.forceSuicide({ model: document.getElementById('ai-model-selector').value });
+                    const data = await api.forceSuicide({ model: dom.aiModelSelector.value });
                     updateUI(data.story, data.roundData, null, data.locationData);
-                    getGameLoop().handlePlayerDeath();
+                    gameLoop.handlePlayerDeath();
                 } catch (error) {
                     handleApiError(error);
-                    getGameLoop().setLoading(false);
+                    gameLoop.setLoading(false, getDomElements());
                 }
             }
         });
 
         // 武學總覽
-        if (skillsBtn) {
-            skillsBtn.addEventListener('click', async () => {
+        if (dom.skillsBtn) {
+            dom.skillsBtn.addEventListener('click', async () => {
                 interaction.hideNpcInteractionMenu();
                 if (gameState.isRequesting) return;
-                getGameLoop().setLoading(true, '獲取武學資料...');
+                gameLoop.setLoading(true, getDomElements(), '獲取武學資料...');
                 try {
                     const skills = await api.getSkills();
                     modal.openSkillsModal(skills);
                 } catch (error) {
                     handleApiError(error);
                 } finally {
-                    getGameLoop().setLoading(false);
+                    gameLoop.setLoading(false, getDomElements());
                 }
             });
         }
         
         // 懸賞按鈕
-        if (bountiesBtn) {
-            bountiesBtn.addEventListener('click', () => {
+        if (dom.bountiesBtn) {
+            dom.bountiesBtn.addEventListener('click', () => {
                 interaction.hideNpcInteractionMenu();
                 updateBountyButton(false);
             });
         }
         
         // GM 面板
-        initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent);
+        initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
         // 主要動作提交
-        submitButton.addEventListener('click', handlePlayerAction);
-        playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
+        dom.submitButton.addEventListener('click', gameLoop.handlePlayerAction);
+        dom.playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); gameLoop.handlePlayerAction(); } });
         
         // 戰鬥確認
         document.addEventListener('click', (e) => {
@@ -151,37 +159,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // NPC 互動
-        storyPanel.addEventListener('click', interaction.handleNpcClick);
+        dom.storyPanel.addEventListener('click', interaction.handleNpcClick);
 
         // 聊天互動
-        chatActionBtn.addEventListener('click', interaction.sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); interaction.sendChatMessage(); } });
-        closeChatBtn.addEventListener('click', () => {
+        dom.chatActionBtn.addEventListener('click', interaction.sendChatMessage);
+        dom.chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); interaction.sendChatMessage(); } });
+        dom.closeChatBtn.addEventListener('click', () => {
              gameState.isInChat = false;
              gameState.currentChatNpc = null;
              gameState.chatHistory = [];
              modal.closeChatModal();
-             getGameLoop().setLoading(false); 
+             gameLoop.setLoading(false, getDomElements()); 
         });
-        endChatBtn.addEventListener('click', interaction.endChatSession);
+        dom.endChatBtn.addEventListener('click', interaction.endChatSession);
 
         // 贈予物品
-        giveItemBtn.addEventListener('click', () => {
+        dom.giveItemBtn.addEventListener('click', () => {
             if (gameState.isInChat && gameState.currentChatNpc) {
                 modal.openGiveItemModal(gameState.currentChatNpc, interaction.handleGiveItem);
             }
         });
 
         // 關閉彈窗
-        cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
-        closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
+        dom.cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
+        dom.closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
 
         // 設定視窗高度
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);
 
         // 載入遊戲
-        loadInitialGame();
+        gameLoop.loadInitialGame();
     }
 
     initialize();
