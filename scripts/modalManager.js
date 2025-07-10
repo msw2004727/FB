@@ -1,6 +1,6 @@
 // scripts/modalManager.js
 import { api } from './api.js';
-import { initializeTrade } from './tradeManager.js'; // 【核心新增】引入新的交易邏輯管理器
+import { initializeTrade } from './tradeManager.js'; 
 
 // --- 獲取所有彈窗相關的 DOM 元素 ---
 const deceasedOverlay = document.getElementById('deceased-overlay');
@@ -39,7 +39,7 @@ const skillsTabsContainer = document.getElementById('skills-tabs-container');
 const skillsBodyContainer = document.getElementById('skills-body-container');
 
 
-// --- 【核心修改】交易系統函式 ---
+// --- 交易系統函式 ---
 
 /**
  * 開啟新版「江湖貨棧」交易彈窗並初始化
@@ -51,12 +51,10 @@ export function openTradeModal(tradeData, npcName, onTradeComplete) {
     const tradeModalEl = document.getElementById('trade-modal');
     if (!tradeModalEl || !tradeData) return;
 
-    // 呼叫新的交易管理器來處理所有複雜邏輯
     initializeTrade(tradeData, npcName, onTradeComplete);
     
-    // 顯示彈窗
     tradeModalEl.classList.remove('hidden');
-    tradeModalEl.classList.add('flex'); // 使用 flex 顯示
+    tradeModalEl.classList.add('flex');
 }
 
 /**
@@ -69,10 +67,8 @@ export function closeTradeModal() {
         tradeModalEl.classList.remove('flex');
     }
 }
-// --- 交易系統修改結束 ---
 
-
-// --- Helper Functions (無變動) ---
+// --- Helper Functions ---
 function displayRomanceValue(value) {
     if (!value || value <= 0) {
         const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
@@ -158,7 +154,7 @@ function createCharacterCard(character) {
 }
 
 
-// --- 死亡與結局 (無變動) ---
+// --- 死亡與結局 ---
 export function showDeceasedScreen() {
     const username = localStorage.getItem('username');
     deceasedTitle.textContent = `${username || '你'}的江湖路已到盡頭`;
@@ -182,7 +178,7 @@ export function closeEpilogueModal() {
     if (epilogueModal) epilogueModal.classList.remove('visible');
 }
 
-// --- 戰鬥彈窗 (無變動) ---
+// --- 戰鬥彈窗 ---
 
 export function openCombatModal(initialState, onCombatCancel) {
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
@@ -213,7 +209,11 @@ export function openCombatModal(initialState, onCombatCancel) {
         <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
     `;
     
-    confirmActionContainer.innerHTML = `<button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>`;
+    // 【核心修改】確保「認輸」按鈕存在於HTML中
+    confirmActionContainer.innerHTML = `
+        <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
+        <button id="combat-surrender-btn" class="surrender-btn">認輸</button>
+    `;
     
     if (closeCombatBtn) {
         const closeHandler = () => {
@@ -276,7 +276,7 @@ export function closeCombatModal() {
 export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.classList.toggle('visible', isLoading); }
 
 
-// --- 對話彈窗 (無變動) ---
+// --- 對話彈窗 ---
 export function openChatModalUI(profile) {
     chatNpcName.textContent = `與 ${profile.name} 交談`;
     chatNpcInfo.innerHTML = profile.appearance || '';
@@ -295,7 +295,7 @@ export function appendChatMessage(speaker, message) {
 }
 export function setChatLoading(isLoading) { if (chatLoader) chatLoader.classList.toggle('visible', isLoading); }
 
-// --- 贈予物品彈窗 (無變動) ---
+// --- 贈予物品彈窗 ---
 export async function openGiveItemModal(currentNpcName, giveItemCallback) {
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
@@ -333,7 +333,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
 export function closeGiveItemModal() { giveItemModal.classList.remove('visible'); }
 
 
-// --- 武學總覽彈窗 (無變動) ---
+// --- 武學總覽彈窗 ---
 export function openSkillsModal(skillsData) {
     if (!skillsModal || !skillsTabsContainer || !skillsBodyContainer) return;
 
@@ -419,36 +419,3 @@ export function closeSkillsModal() {
         skillsModal.classList.remove('visible');
     }
 }
-
-
-/* --- 【舊版程式碼，已註解保留】 ---
-const oldTradeModal = document.getElementById('trade-modal');
-const oldCloseTradeBtn = document.getElementById('close-trade-btn');
-const oldPlayerTradeName = document.getElementById('player-trade-name');
-const oldPlayerTradeMoney = document.getElementById('player-trade-money');
-const oldPlayerTradeInventory = document.getElementById('player-trade-inventory');
-const oldNpcTradeName = document.getElementById('npc-trade-name');
-const oldNpcTradeMoney = document.getElementById('npc-trade-money');
-const oldNpcTradeInventory = document.getElementById('npc-trade-inventory');
-const oldPlayerOfferArea = document.getElementById('player-offer-area')?.querySelector('.offer-items-list');
-const oldNpcOfferArea = document.getElementById('npc-offer-area')?.querySelector('.offer-items-list');
-const oldPlayerOfferMoneyInput = document.getElementById('player-offer-money');
-const oldNpcOfferMoneyInput = document.getElementById('npc-offer-money');
-const oldTradeValueDiff = document.getElementById('trade-value-diff');
-const oldConfirmTradeBtn = document.getElementById('confirm-trade-btn');
-
-function oldCreateTradeItemElement(itemId, itemData) {
-    const itemEl = document.createElement('div');
-    itemEl.className = 'trade-item';
-    itemEl.dataset.itemId = itemId;
-    itemEl.dataset.itemName = itemData.itemName;
-    itemEl.dataset.itemValue = itemData.value || 0;
-    itemEl.title = `${itemData.itemName}\n類型: ${itemData.itemType}\n價值: ${itemData.value || 0}文\n${itemData.baseDescription || ''}`;
-    
-    itemEl.innerHTML = `
-        <span class="trade-item-name">${itemData.itemName}</span>
-        <span class="trade-item-quantity">x${itemData.quantity || 1}</span>
-    `;
-    return itemEl;
-}
---- */
