@@ -201,17 +201,20 @@ async function confirmAndInitiateAttack(event) {
     }
 }
 
+// 【核心修改】startCombat 函式
 function startCombat(initialState) {
     gameState.isInCombat = true;
     gameState.combat.state = initialState;
     
-    modal.openCombatModal(initialState, () => {
-        if (window.confirm("確定要逃離這次戰鬥嗎？這可能會對你的江湖聲望造成影響。")) {
-            gameState.isInCombat = false;
-            gameLoop.setLoading(false); 
-            appendMessageToStory("[系統] 你決定不戰而退，迅速離開了現場。", 'system-message');
-        }
-    });
+    // 定義一個簡單的取消函式
+    const cancelCombat = () => {
+        gameState.isInCombat = false;
+        gameLoop.setLoading(false); 
+        // 不再顯示任何訊息
+    };
+    
+    // 將這個簡單的取消函式傳遞給 openCombatModal
+    modal.openCombatModal(initialState, cancelCombat);
     
     document.querySelectorAll('.strategy-btn').forEach(btn => {
         btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
@@ -220,6 +223,7 @@ function startCombat(initialState) {
     const surrenderBtn = document.getElementById('combat-surrender-btn');
     if(surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
 }
+
 
 // --- Exported Functions ---
 
