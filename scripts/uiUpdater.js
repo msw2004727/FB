@@ -12,8 +12,8 @@ const externalPowerBar = document.getElementById('external-power-bar');
 const externalPowerValue = document.getElementById('external-power-value');
 const lightnessPowerBar = document.getElementById('lightness-power-bar');
 const lightnessPowerValue = document.getElementById('lightness-power-value');
-const staminaBar = document.getElementById('stamina-bar'); // 【核心新增】
-const staminaValue = document.getElementById('stamina-value'); // 【核心新增】
+const staminaBar = document.getElementById('stamina-bar');
+const staminaValue = document.getElementById('stamina-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
@@ -30,7 +30,12 @@ const skillsContent = document.getElementById('skills-content');
 
 export function appendMessageToStory(htmlContent, className) {
     const p = document.createElement('p');
-    p.innerHTML = htmlContent;
+    // 【核心修改】在設定HTML內容前，先將換行符 \n 替換為 <br> 標籤
+    if (typeof htmlContent === 'string') {
+        p.innerHTML = htmlContent.replace(/\n/g, '<br>');
+    } else {
+        p.innerHTML = htmlContent;
+    }
     if (className) p.className = className;
     storyTextContainer.appendChild(p);
     storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
@@ -52,7 +57,6 @@ function highlightNpcNames(text, npcs) {
         sortedNpcs.forEach(npc => {
             const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(npcNameEscaped, 'g');
-            // 【核心修改】如果NPC已死亡，則加上 data-is-deceased="true" 屬性
             const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
             const replacement = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
@@ -96,7 +100,6 @@ function updatePowerBar(barElement, valueElement, currentValue, maxValue) {
     }
 }
 
-// 【核心新增】一個專門處理倒數計時器顯示的函式
 function updateDeathCountdownUI(countdownValue) {
     let countdownEl = document.getElementById('death-countdown-timer');
     
@@ -105,12 +108,10 @@ function updateDeathCountdownUI(countdownValue) {
             countdownEl = document.createElement('div');
             countdownEl.id = 'death-countdown-timer';
             countdownEl.className = 'death-countdown';
-            // 將它插入到角色狀態(pcContent)的後面
             pcContent.parentNode.insertBefore(countdownEl, pcContent.nextSibling);
         }
         countdownEl.innerHTML = `<i class="fas fa-hourglass-half"></i> 氣息將絕 (剩餘 ${countdownValue} 回合)`;
     } else {
-        // 如果沒有倒數值，就移除這個元素
         if (countdownEl) {
             countdownEl.remove();
         }
@@ -152,7 +153,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
-    updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100); // 【核心新增】更新精力條
+    updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100);
 
     updateMoralityBar(roundData.morality);
 
