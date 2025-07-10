@@ -126,6 +126,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 * **觸發戰鬥**: 只有在NPC被激怒並決定主動攻擊時，你才可以在回傳的JSON中觸發戰鬥系統。你的 "story" 敘述必須描寫NPC被激怒並發起攻擊的過程，然後在\`roundData\`中加入\`"enterCombat": true\`以及相應的戰鬥設定。
 `;
 
+    // 【核心修改】將 getMartialArtsRule 的呼叫移到函式內部，並傳遞 npcContext
+    const martialArtsRules = getMartialArtsRule({ npcContext });
+
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於金庸武俠小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的非戰鬥指令，產生接下來發生的故事。
 
@@ -162,7 +165,7 @@ ${worldviewAndProgressionRules}
 ---
 ${getItemLedgerRule()}
 ---
-${getMartialArtsRule()}
+${martialArtsRules}
 ---
 ${getNpcRule()}
 ---
