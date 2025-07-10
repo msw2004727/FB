@@ -7,8 +7,42 @@ import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError } 
 import { dom } from './dom.js';
 
 let gameLoop = {};
-export function setGameLoop(loop) {
-    gameLoop = loop;
+
+// --- Helper Functions (Internal to this module) ---
+
+function showNpcInteractionMenu(targetElement, npcName) {
+    dom.npcInteractionMenu.innerHTML = `
+        <button class="npc-interaction-btn trade" data-npc-name="${npcName}"><i class="fas fa-exchange-alt"></i> 交易</button>
+        <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
+        <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
+    `;
+    
+    dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
+    dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
+    dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackConfirmation);
+
+    const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    const panelRect = dom.storyPanel.getBoundingClientRect();
+
+    let top = targetRect.bottom - panelRect.top + dom.storyPanel.scrollTop + 8;
+    let left = targetRect.left - panelRect.left + (targetRect.width / 2) - (menuRect.width / 2);
+
+    if (top + menuRect.height > dom.storyPanel.scrollHeight) {
+        top = targetRect.top - panelRect.top + dom.storyPanel.scrollTop - menuRect.height - 8;
+    }
+
+    const rightEdge = left + menuRect.width;
+    if (rightEdge > panelRect.width) {
+        left = panelRect.width - menuRect.width - 5; 
+    }
+    if (left < 0) {
+        left = 5;
+    }
+
+    dom.npcInteractionMenu.style.top = `${top}px`;
+    dom.npcInteractionMenu.style.left = `${left}px`;
+    dom.npcInteractionMenu.classList.add('visible');
 }
 
 function showAttackConfirmation(event) {
@@ -30,6 +64,75 @@ function showAttackConfirmation(event) {
     dom.npcInteractionMenu.appendChild(confirmBtn);
     cancelBtn.addEventListener('click', hideNpcInteractionMenu);
     confirmBtn.addEventListener('click', confirmAndInitiateAttack);
+}
+
+function handleStrategySelection(strategy) {
+    gameState.combat.selectedStrategy = strategy;
+    gameState.combat.selectedSkill = null; 
+
+    document.querySelectorAll('.strategy-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.strategy === strategy);
+    });
+
+    const skillSelectionContainer = document.getElementById('skill-selection');
+    const confirmBtn = document.getElementById('combat-confirm-btn');
+    skillSelectionContainer.innerHTML = '';
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    const playerSkills = gameState.combat.state?.player?.skills || [];
+    
+    const categoryMap = { 'attack': '攻擊', 'defend': '防禦', 'evade': '迴避' };
+    const targetCategory = categoryMap[strategy];
+
+    const relevantSkills = playerSkills.filter(skill => skill.combatCategory === targetCategory);
+
+    if (relevantSkills.length > 0) {
+        relevantSkills.forEach(skill => {
+            const skillBtn = document.createElement('button');
+            skillBtn.className = 'skill-btn';
+            skillBtn.dataset.skillName = skill.name;
+            skillBtn.innerHTML = `
+                <span class="skill-name">${skill.name} (L${skill.level})</span>
+                <span class="skill-cost">內力 ${skill.cost || 5}</span>
+            `;
+            skillBtn.addEventListener('click', () => handleSkillSelection(skill.name));
+            skillSelectionContainer.appendChild(skillBtn);
+        });
+    } else {
+         skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
+    }
+    
+    if (strategy === 'evade') {
+         if (confirmBtn) confirmBtn.disabled = false;
+    }
+}
+
+function handleSkillSelection(skillName) {
+    gameState.combat.selectedSkill = skillName;
+    document.querySelectorAll('.skill-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.skillName === skillName);
+    });
+    const confirmBtn = document.getElementById('combat-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = false;
+}
+
+function endCombat(newRoundData) {
+    gameState.isInCombat = false;
+    modal.closeCombatModal();
+    
+    if (newRoundData && newRoundData.roundData && newRoundData.roundData.playerState === 'dead') {
+        updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
+        gameLoop.handlePlayerDeath();
+        return;
+    }
+
+    if (newRoundData && newRoundData.roundData && newRoundData.story) {
+        gameLoop.processNewRoundData(newRoundData);
+    } else {
+        appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
+    }
+    dom.playerInput.focus();
+    gameLoop.setLoading(false);
 }
 
 async function handleTradeButtonClick(event) {
@@ -118,73 +221,10 @@ function startCombat(initialState) {
     if(surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
 }
 
-function endCombat(newRoundData) {
-    gameState.isInCombat = false;
-    modal.closeCombatModal();
-    
-    if (newRoundData && newRoundData.roundData && newRoundData.roundData.playerState === 'dead') {
-        updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
-        gameLoop.handlePlayerDeath();
-        return;
-    }
+// --- Exported Functions ---
 
-    if (newRoundData && newRoundData.roundData && newRoundData.story) {
-        gameLoop.processNewRoundData(newRoundData);
-    } else {
-        appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
-    }
-    dom.playerInput.focus();
-    gameLoop.setLoading(false);
-}
-
-function handleStrategySelection(strategy) {
-    gameState.combat.selectedStrategy = strategy;
-    gameState.combat.selectedSkill = null; 
-
-    document.querySelectorAll('.strategy-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.strategy === strategy);
-    });
-
-    const skillSelectionContainer = document.getElementById('skill-selection');
-    const confirmBtn = document.getElementById('combat-confirm-btn');
-    skillSelectionContainer.innerHTML = '';
-    if (confirmBtn) confirmBtn.disabled = true;
-
-    const playerSkills = gameState.combat.state?.player?.skills || [];
-    
-    const categoryMap = { 'attack': '攻擊', 'defend': '防禦', 'evade': '迴避' };
-    const targetCategory = categoryMap[strategy];
-
-    const relevantSkills = playerSkills.filter(skill => skill.combatCategory === targetCategory);
-
-    if (relevantSkills.length > 0) {
-        relevantSkills.forEach(skill => {
-            const skillBtn = document.createElement('button');
-            skillBtn.className = 'skill-btn';
-            skillBtn.dataset.skillName = skill.name;
-            skillBtn.innerHTML = `
-                <span class="skill-name">${skill.name} (L${skill.level})</span>
-                <span class="skill-cost">內力 ${skill.cost || 5}</span>
-            `;
-            skillBtn.addEventListener('click', () => handleSkillSelection(skill.name));
-            skillSelectionContainer.appendChild(skillBtn);
-        });
-    } else {
-         skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
-    }
-    
-    if (strategy === 'evade') {
-         if (confirmBtn) confirmBtn.disabled = false;
-    }
-}
-
-function handleSkillSelection(skillName) {
-    gameState.combat.selectedSkill = skillName;
-    document.querySelectorAll('.skill-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.skillName === skillName);
-    });
-    const confirmBtn = document.getElementById('combat-confirm-btn');
-    if (confirmBtn) confirmBtn.disabled = false;
+export function setGameLoop(loop) {
+    gameLoop = loop;
 }
 
 export function hideNpcInteractionMenu() {
