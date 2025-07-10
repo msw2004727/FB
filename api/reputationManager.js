@@ -13,9 +13,10 @@ const NEGATIVE_RELATIONSHIP_TYPES = ['殺父仇人', '殺母仇人', '宿敵', '
  * @param {string} deceasedNpcName - 死去NPC的姓名
  * @param {string} murderLocation - 謀殺發生的地點
  * @param {Array<string>} alliesInCombat - 戰鬥中玩家的盟友名字列表
+ * @param {string|null} killerName - 兇手的名字
  * @returns {Promise<string>} 一段描述聲譽變化的文字摘要
  */
-async function processReputationChangesAfterDeath(userId, deceasedNpcName, murderLocation, alliesInCombat = []) {
+async function processReputationChangesAfterDeath(userId, deceasedNpcName, murderLocation, alliesInCombat = [], killerName = null) {
     console.log(`[關係引擎] 啟動！處理NPC「${deceasedNpcName}」死亡後的連鎖反應...`);
     const batch = db.batch();
     const userNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
@@ -35,23 +36,31 @@ async function processReputationChangesAfterDeath(userId, deceasedNpcName, murde
         const relatedNpcs = {};
         for (const type of POSITIVE_RELATIONSHIP_TYPES) {
             if (deceasedRelationships[type]) {
-                relatedNpcs[deceasedRelationships[type]] = 'friend';
+                relatedNpcs[deceasedRelationships[type]] = { type: 'friend', relationship: type };
             }
         }
         for (const type of NEGATIVE_RELATIONSHIP_TYPES) {
             if (deceasedRelationships[type]) {
-                relatedNpcs[deceasedRelationships[type]] = 'enemy';
+                relatedNpcs[deceasedRelationships[type]] = { type: 'enemy', relationship: type };
             }
         }
 
         // 3. 處理這些有直接關係的NPC
-        for (const [npcName, relationType] of Object.entries(relatedNpcs)) {
+        for (const [npcName, relation] of Object.entries(relatedNpcs)) {
             const npcStateRef = userNpcStatesRef.doc(npcName);
-            if (relationType === 'friend') {
-                // 親友變世仇
-                batch.set(npcStateRef, { friendlinessValue: -100 }, { merge: true });
+            if (relation.type === 'friend' && killerName) {
+                // 親友變世仇，並記錄復仇目標
+                const revengeReason = `殺害我${relation.relationship}之仇`;
+                batch.set(npcStateRef, { 
+                    friendlinessValue: -100,
+                    revengeInfo: {
+                        target: killerName,
+                        reason: revengeReason,
+                        timestamp: admin.firestore.FieldValue.serverTimestamp()
+                    }
+                }, { merge: true });
                 reputationChangeSummary.push(`身為死者至親的「${npcName}」已將你視為血海深仇的敵人。`);
-            } else if (relationType === 'enemy') {
+            } else if (relation.type === 'enemy') {
                 // 宿敵變友好
                 batch.set(npcStateRef, { friendlinessValue: admin.firestore.FieldValue.increment(50) }, { merge: true });
                 reputationChangeSummary.push(`死者的宿敵「${npcName}」對你的行為頗為讚賞，對你的好感大幅提升。`);
