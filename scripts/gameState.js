@@ -14,5 +14,6 @@ export const gameState = {
         selectedStrategy: null,
         selectedSkill: null,
         selectedTarget: null,
-    }
+    },
+    deceasedNpcs: [] // 新增：死亡NPC名單
 };
