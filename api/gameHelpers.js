@@ -10,6 +10,9 @@ const { processNpcRelationships } = require('./relationshipManager');
 
 const db = admin.firestore();
 
+// --- 【核心修改】新增伺服器層級的武學模板快取 ---
+const skillTemplateCache = new Map();
+
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -42,27 +45,45 @@ async function getMergedNpcProfile(userId, npcName) {
     }
 }
 
-
+// --- 【核心修改】重寫此函式，加入快取邏輯 ---
 async function getOrGenerateSkillTemplate(skillName) {
     if (!skillName) return null;
+
+    // 1. 優先從快取讀取
+    if (skillTemplateCache.has(skillName)) {
+        return { template: skillTemplateCache.get(skillName), isNew: false };
+    }
+    
+    // 2. 快取沒有，再讀取資料庫
     const skillTemplateRef = db.collection('skills').doc(skillName);
     try {
         const doc = await skillTemplateRef.get();
         if (doc.exists) {
-            return { template: doc.data(), isNew: false };
+            const templateData = doc.data();
+            skillTemplateCache.set(skillName, templateData); // 存入快取
+            return { template: templateData, isNew: false };
         }
+        
+        // 3. 資料庫沒有，才呼叫AI生成
         console.log(`[武學總綱] 武學「${skillName}」的總綱不存在，啟動AI生成...`);
         const prompt = getSkillGeneratorPrompt(skillName);
         const skillJsonString = await callAI(aiConfig.skillTemplate || 'openai', prompt, true);
         const newTemplateData = JSON.parse(skillJsonString);
+        
         if (!newTemplateData.skillName) {
             throw new Error('AI生成的武學模板缺少必要的skillName欄位。');
         }
+        
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await skillTemplateRef.set(newTemplateData);
-        console.log(`[武學總綱] 成功為「${skillName}」建立並儲存了總綱模板。`);
+        
         const newDoc = await skillTemplateRef.get();
-        return { template: newDoc.data(), isNew: true };
+        const finalTemplateData = newDoc.data();
+        skillTemplateCache.set(skillName, finalTemplateData); // 將新生成的模板存入快取
+        
+        console.log(`[武學總綱] 成功為「${skillName}」建立並儲存了總綱模板。`);
+        return { template: finalTemplateData, isNew: true };
+
     } catch (error) {
         console.error(`[武學總綱] 在處理武學「${skillName}」的總綱時發生錯誤:`, error);
         return null;
@@ -434,10 +455,8 @@ const updateSkills = async (userId, skillChanges, playerProfile) => {
         try {
             await db.runTransaction(async (transaction) => {
                 if (skillChange.isNewlyAcquired) {
-                    // --- 【核心修改】從這裡開始，加入新的判斷邏輯 ---
-                    const acquisitionMethod = skillChange.acquisitionMethod || 'created'; // 默認為 "created" 以相容舊版
+                    const acquisitionMethod = skillChange.acquisitionMethod || 'created'; 
 
-                    // 只有在武學是「自創」時，才執行數量上限檢查
                     if (acquisitionMethod === 'created') {
                         const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
                         
@@ -477,7 +496,6 @@ const updateSkills = async (userId, skillChanges, playerProfile) => {
                     } else {
                         console.log(`[武學系統] 偵測到「學習」行為 (learned)，跳過自創數量檢查。`);
                     }
-                    // --- 修改結束，後續邏輯不變 ---
 
                     const playerSkillData = {
                         level: skillChange.level || 0,
@@ -531,25 +549,33 @@ const updateSkills = async (userId, skillChanges, playerProfile) => {
 };
 
 
-const getPlayerSkills = async (userId) => {
+// --- 【核心修改】重寫此函式，使其優先從快取讀取 ---
+async function getPlayerSkills(userId) {
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
     const playerSkillsSnapshot = await playerSkillsRef.get();
     if (playerSkillsSnapshot.empty) return [];
+    
     const mergedSkills = [];
-    for (const playerSkillDoc of playerSkillsSnapshot.docs) {
+    const skillPromises = playerSkillsSnapshot.docs.map(async (playerSkillDoc) => {
         const skillName = playerSkillDoc.id;
         const playerData = playerSkillDoc.data();
-        const templateData = await getOrGenerateSkillTemplate(skillName);
-        if (templateData && templateData.template) {
-            mergedSkills.push({
-                ...templateData.template,
+        
+        // 直接呼叫包含快取邏輯的函式
+        const templateResult = await getOrGenerateSkillTemplate(skillName);
+        
+        if (templateResult && templateResult.template) {
+            return {
+                ...templateResult.template,
                 level: playerData.level,
                 exp: playerData.exp
-            });
+            };
         }
-    }
-    return mergedSkills;
-};
+        return null;
+    });
+
+    const results = await Promise.all(skillPromises);
+    return results.filter(skill => skill !== null);
+}
 
 const processNpcUpdates = async (userId, updates) => {
     if (!updates || !Array.isArray(updates) || updates.length === 0) return;
