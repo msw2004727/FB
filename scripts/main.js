@@ -1,16 +1,31 @@
 // scripts/main.js
-import { api } from './api.js';
-import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
+
+import { loadInitialGame, handlePlayerAction } from './gameLoop.js';
+import * as interaction from './interactionHandlers.js';
 import * as modal from './modalManager.js';
-import { gameTips } from './tips.js';
 import { initializeGmPanel } from './gmManager.js';
-import { initializeTrade } from './tradeManager.js';
+import { gameState } from './gameState.js'; 
+
+// 將 gameLoop 中的函式傳遞給 interactionHandlers，建立連接
+interaction.setGameLoop({
+    setLoading: (isLoading, text) => getGameLoop().setLoading(isLoading, text),
+    processNewRoundData: (data) => getGameLoop().processNewRoundData(data),
+    handlePlayerDeath: () => getGameLoop().handlePlayerDeath()
+});
+
+// 讓 interactionHandlers 可以呼叫到 gameLoop
+function getGameLoop() {
+    return {
+        setLoading: (isLoading, text) => setLoading(isLoading, text),
+        processNewRoundData: (data) => processNewRoundData(data),
+        handlePlayerDeath: () => handlePlayerDeath()
+    };
+}
 
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- 登入驗證 ---
     const token = localStorage.getItem('jwt_token');
-    const username = localStorage.getItem('username');
     if (!token) {
         window.location.href = 'login.html';
         return;
@@ -21,19 +36,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerToggleButton = document.getElementById('header-toggle-btn');
     const playerInput = document.getElementById('player-input');
     const submitButton = document.getElementById('submit-button');
-    const aiModelSelector = document.getElementById('ai-model-selector');
     const menuToggle = document.getElementById('menu-toggle');
     const gameContainer = document.querySelector('.game-container');
-    const mainContent = document.getElementById('main-content');
     const themeSwitcher = document.getElementById('theme-switcher');
-    const themeIcon = themeSwitcher.querySelector('i');
     const logoutButton = document.getElementById('logout-btn');
     const suicideButton = document.getElementById('suicide-btn');
     const skillsBtn = document.getElementById('skills-btn');
     const bountiesBtn = document.getElementById('bounties-btn');
     const storyPanel = document.getElementById('story-panel');
-    const storyTextContainer = document.getElementById('story-text-wrapper');
-    const npcInteractionMenu = document.getElementById('npc-interaction-menu');
     const chatInput = document.getElementById('chat-input');
     const chatActionBtn = document.getElementById('chat-action-btn');
     const closeChatBtn = document.getElementById('close-chat-btn');
@@ -46,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gmMenu = document.getElementById('gm-menu');
     const gmContent = document.getElementById('gm-content');
 
-    let combatSurrenderBtn = null; 
+    // --- 初始化與事件綁定 ---
 
     function setGameContainerHeight() {
         if (gameContainer) {
@@ -54,630 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 遊戲狀態變數 ---
-    let gameState = {
-        currentRound: 0,
-        isRequesting: false,
-        isInCombat: false,
-        isInChat: false,
-        currentChatNpc: null,
-        chatHistory: [],
-        roundData: null,
-        combat: {
-            state: null,
-            selectedStrategy: null,
-            selectedSkill: null,
-            selectedTarget: null,
-        }
-    };
-    let tipInterval = null;
-
-    // --- 全局讀取動畫 ---
-    const aiThinkingLoader = document.createElement('div');
-    aiThinkingLoader.className = 'ai-thinking-loader';
-    aiThinkingLoader.innerHTML = `
-        <div class="loader-disclaimer">說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。</div>
-        <div class="loader-text"></div>
-        <div class="loader-dots"><span></span><span></span><span></span></div>
-        <div class="loader-tip"></div>
-    `;
-    mainContent.appendChild(aiThinkingLoader);
-    const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
-
-    function rotateTip() {
-        if (gameTips.length > 0) {
-            const randomIndex = Math.floor(Math.random() * gameTips.length);
-            if (loaderTipElement) {
-                loaderTipElement.innerHTML = gameTips[randomIndex];
-            }
-        }
-    }
-
-    function setLoadingState(isLoading, text = '') {
-        gameState.isRequesting = isLoading;
-        playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-        submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-        submitButton.textContent = isLoading ? '撰寫中...' : '動作';
-        chatInput.disabled = isLoading;
-        chatActionBtn.disabled = isLoading;
-        endChatBtn.disabled = isLoading;
-
-        if (combatSurrenderBtn) {
-            combatSurrenderBtn.disabled = isLoading;
-        }
-
-        const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
-        if(loaderTextElement) loaderTextElement.textContent = text;
-        
-        const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
-
-        if (showGlobalLoader) {
-            rotateTip();
-            tipInterval = setInterval(rotateTip, 10000);
-        } else {
-            clearInterval(tipInterval);
-        }
-
-        aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
-        modal.setCombatLoading(isLoading && gameState.isInCombat);
-        modal.setChatLoading(isLoading && gameState.isInChat);
-    }
-
-    function updateBountyButton(hasNew) {
-        if (bountiesBtn) {
-            bountiesBtn.classList.toggle('has-new-bounty', hasNew);
-        }
-    }
-    
-    async function handlePlayerDeath() {
-        modal.showEpilogueModal('<div class="loading-placeholder"><p>史官正在為您的人生撰寫終章...</p><div class="loader-dots"><span></span><span></span><span></span></div></div>', () => {
-            modal.showDeceasedScreen();
-        });
-
-        try {
-            const data = await api.getEpilogue();
-            if (data && data.epilogue) {
-                const formattedEpilogue = data.epilogue.replace(/\n/g, '<br><br>');
-                modal.showEpilogueModal(formattedEpilogue, () => {
-                    modal.showDeceasedScreen();
-                });
-            } else {
-                throw new Error("未能獲取有效的結局故事。");
-            }
-        } catch (error) {
-            modal.showEpilogueModal(`<p class="system-message">史官的筆墨耗盡，未能為您寫下終章...<br>(${error.message})</p>`, () => {
-                modal.showDeceasedScreen();
-            });
-            console.error("獲取結局失敗:", error);
-        }
-    }
-
-    async function startProactiveChat(proactiveData) {
-        const { npcName, openingLine, itemChanges } = proactiveData;
-        
-        try {
-            const profile = await api.getNpcProfile(npcName);
-            
-            gameState.isInChat = true;
-            gameState.currentChatNpc = npcName;
-            gameState.chatHistory = [];
-
-            modal.openChatModalUI(profile); 
-            
-            modal.appendChatMessage('npc', openingLine);
-            gameState.chatHistory.push({ speaker: 'npc', message: openingLine });
-
-            if (itemChanges && itemChanges.length > 0) {
-                const itemNames = itemChanges.map(item => `${item.itemName} x${item.quantity}`).join('、');
-                const giftMessage = `你獲得了來自 ${npcName} 的贈禮：${itemNames}。`;
-                modal.appendChatMessage('system', giftMessage);
-                gameState.chatHistory.push({ speaker: 'system', message: giftMessage });
-            }
-
-            chatInput.focus();
-        } catch (error) {
-            console.error(`啟動與 ${npcName} 的主動對話失敗:`, error);
-            appendMessageToStory(`[系統] ${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
-        }
-    }
-
-
-    // --- 事件處理函式 ---
-    async function handlePlayerAction() {
-        hideNpcInteractionMenu();
-        const startTime = performance.now();
-        const actionText = playerInput.value.trim();
-        if (!actionText || gameState.isRequesting) return;
-
-        if (actionText.toUpperCase() === '/*GM') {
-            playerInput.value = '';
-            gmPanel.classList.add('visible');
-            return;
-        }
-
-        playerInput.value = '';
-
-        const prequelElement = storyTextContainer.querySelector('.prequel-summary');
-        if (prequelElement) {
-            storyTextContainer.innerHTML = '';
-        }
-
-        setLoadingState(true, '江湖百曉生正在構思...');
-        appendMessageToStory(`> ${actionText}`, 'player-action-log');
-
-        try {
-            const data = await api.interact({
-                action: actionText,
-                round: gameState.currentRound,
-                model: aiModelSelector.value
-            });
-
-            if (data && data.roundData) {
-                data.roundData.suggestion = data.suggestion;
-                
-                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
-                
-                gameState.currentRound = data.roundData.R;
-                gameState.roundData = data.roundData;
-
-                updateBountyButton(data.hasNewBounties);
-
-                if (data.roundData.playerState === 'dead') {
-                    setLoadingState(false);
-                    handlePlayerDeath();
-                    return;
-                }
-                
-                if (data.proactiveChat) {
-                    setLoadingState(false); 
-                    startProactiveChat(data.proactiveChat);
-                    return; 
-                }
-
-            } else {
-                throw new Error("從伺服器收到的回應格式不正確。");
-            }
-
-            if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
-                startCombat(data.combatInfo.initialState);
-            }
-        } catch (error) {
-            // 【核心修改】在捕捉到錯誤時，執行恢復流程
-            console.error('API 錯誤或通訊中斷:', error);
-            appendMessageToStory(`[系統] 通訊似乎發生了中斷... 正在嘗試為您同步最新的江湖狀態...`, 'system-message');
-            // 不直接顯示錯誤，而是嘗試重新讀取最新遊戲狀態
-            await loadInitialGame();
-        } finally {
-            if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
-                 setLoadingState(false);
-            }
-            const endTime = performance.now();
-            const durationInSeconds = ((endTime - startTime) / 1000).toFixed(2);
-            console.log(`[效能監控] 從按下「動作」到收到回應，總耗時: ${durationInSeconds} 秒。`);
-        }
-    }
-
-    // --- 新戰鬥系統邏輯 ---
-
-    function startCombat(initialState) {
-        gameState.isInCombat = true;
-        gameState.combat.state = initialState;
-        
-        modal.openCombatModal(initialState, () => {
-            if (window.confirm("確定要逃離這次戰鬥嗎？這可能會對你的江湖聲望造成影響。")) {
-                gameState.isInCombat = false;
-                setLoadingState(false); 
-                appendMessageToStory("[系統] 你決定不戰而退，迅速離開了現場。", 'system-message');
-            }
-        });
-        
-        const strategyButtons = document.querySelectorAll('.strategy-btn');
-        strategyButtons.forEach(btn => {
-            btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
-        });
-        
-        const confirmActionContainer = document.getElementById('confirm-action');
-        if (confirmActionContainer) {
-            confirmActionContainer.innerHTML = `
-                <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
-                <button id="combat-surrender-btn" class="surrender-btn">投降</button>
-            `;
-            combatSurrenderBtn = document.getElementById('combat-surrender-btn');
-            combatSurrenderBtn.addEventListener('click', handleCombatSurrender);
-        }
-    }
-
-    async function handleCombatSurrender() {
-        if (!gameState.isInCombat || gameState.isRequesting) return;
-        if (!window.confirm("你確定要在此刻認輸嗎？")) return;
-        
-        setLoadingState(true, "正在與對方交涉...");
-
-        try {
-            const data = await api.combatSurrender({ model: aiModelSelector.value });
-
-            if (data.status === 'SURRENDER_ACCEPTED') {
-                modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
-                setTimeout(() => endCombat(data.newRound), 2000);
-            } else { // SURRENDER_REJECTED
-                modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
-                setLoadingState(false);
-            }
-        } catch (error) {
-            modal.updateCombatLog(`[系統] 你的認輸請求似乎被對方無視了。(${error.message})`, 'system-message');
-            setLoadingState(false);
-        }
-    }
-
-    function handleStrategySelection(strategy) {
-        gameState.combat.selectedStrategy = strategy;
-        gameState.combat.selectedSkill = null; 
-
-        document.querySelectorAll('.strategy-btn').forEach(btn => {
-            btn.classList.toggle('selected', btn.dataset.strategy === strategy);
-        });
-
-        const skillSelectionContainer = document.getElementById('skill-selection');
-        const confirmBtn = document.getElementById('combat-confirm-btn');
-        skillSelectionContainer.innerHTML = '';
-        if (confirmBtn) confirmBtn.disabled = true;
-
-        const playerSkills = gameState.combat.state?.player?.skills || [];
-        
-        const categoryMap = {
-            'attack': '攻擊',
-            'defend': '防禦',
-            'evade': '迴避'
-        };
-        const targetCategory = categoryMap[strategy];
-
-        const relevantSkills = playerSkills.filter(skill => skill.combatCategory === targetCategory);
-
-        if (relevantSkills.length > 0) {
-            relevantSkills.forEach(skill => {
-                const skillBtn = document.createElement('button');
-                skillBtn.className = 'skill-btn';
-                skillBtn.dataset.skillName = skill.name;
-                skillBtn.innerHTML = `
-                    <span class="skill-name">${skill.name} (L${skill.level})</span>
-                    <span class="skill-cost">內力 ${skill.cost || 5}</span>
-                `;
-                skillBtn.addEventListener('click', () => handleSkillSelection(skill.name));
-                skillSelectionContainer.appendChild(skillBtn);
-            });
-        } else {
-             skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
-        }
-        
-        if (strategy === 'evade') {
-             if (confirmBtn) confirmBtn.disabled = false;
-        }
-    }
-
-    function handleSkillSelection(skillName) {
-        gameState.combat.selectedSkill = skillName;
-        document.querySelectorAll('.skill-btn').forEach(btn => {
-            btn.classList.toggle('selected', btn.dataset.skillName === skillName);
-        });
-        const confirmBtn = document.getElementById('combat-confirm-btn');
-        if (confirmBtn) confirmBtn.disabled = false;
-    }
-
-    async function handleConfirmCombatAction() {
-        if (!gameState.combat.selectedStrategy) {
-            alert('請選擇一個策略！');
-            return;
-        }
-        
-        const hasRelevantSkills = (gameState.combat.state?.player?.skills || []).some(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避'}[gameState.combat.selectedStrategy]);
-
-        if (gameState.combat.selectedStrategy !== 'evade' && hasRelevantSkills && !gameState.combat.selectedSkill) {
-            alert('請選擇一門武學！');
-            return;
-        }
-
-        setLoadingState(true);
-
-        try {
-            const combatActionPayload = {
-                strategy: gameState.combat.selectedStrategy,
-                skill: gameState.combat.selectedSkill,
-                target: gameState.combat.selectedTarget, 
-                model: aiModelSelector.value
-            };
-
-            const data = await api.combatAction(combatActionPayload);
-            
-            modal.setTurnCounter(data.updatedState.turn);
-            modal.updateCombatLog(data.narrative);
-            modal.updateCombatUI(data.updatedState);
-            gameState.combat.state = data.updatedState;
-
-            if (data.status === 'COMBAT_END') {
-                setTimeout(() => endCombat(data.newRound), 2000);
-            } else {
-                document.querySelectorAll('.strategy-btn.selected, .skill-btn.selected').forEach(el => el.classList.remove('selected'));
-                document.getElementById('skill-selection').innerHTML = '<p class="system-message">請先選擇一個策略</p>';
-                const confirmBtn = document.getElementById('combat-confirm-btn');
-                if (confirmBtn) confirmBtn.disabled = true;
-                gameState.combat.selectedStrategy = null;
-                gameState.combat.selectedSkill = null;
-            }
-
-        } catch (error) {
-            modal.updateCombatLog(`[系統] 你的招式似乎沒有生效，江湖的氣息有些不穩，請再試一次。(${error.message})`, 'system-message');
-        } finally {
-            if (gameState.isInCombat) setLoadingState(false);
-        }
-    }
-
-    function endCombat(newRoundData) {
-        gameState.isInCombat = false;
-        modal.closeCombatModal();
-        
-        if (newRoundData && newRoundData.roundData && newRoundData.roundData.playerState === 'dead') {
-            updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
-            handlePlayerDeath();
-            return;
-        }
-
-        if (newRoundData && newRoundData.roundData && newRoundData.story) {
-            gameState.currentRound = newRoundData.roundData.R;
-            gameState.roundData = newRoundData.roundData;
-            addRoundTitleToStory(newRoundData.roundData.EVT || `第 ${newRoundData.roundData.R} 回`);
-            updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
-        } else {
-            appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
-        }
-        playerInput.focus();
-        setLoadingState(false);
-    }
-    
-    // --- NPC 互動與對話 ---
-
-    function hideNpcInteractionMenu() {
-        if (npcInteractionMenu) {
-            npcInteractionMenu.classList.remove('visible');
-            npcInteractionMenu.innerHTML = '';
-        }
-    }
-
-    function showNpcInteractionMenu(targetElement, npcName) {
-        npcInteractionMenu.innerHTML = `
-            <button class="npc-interaction-btn trade" data-npc-name="${npcName}"><i class="fas fa-exchange-alt"></i> 交易</button>
-            <button class="npc-interaction-btn chat" data-npc-name="${npcName}"><i class="fas fa-comments"></i> 聊天</button>
-            <button class="npc-interaction-btn attack" data-npc-name="${npcName}"><i class="fas fa-khanda"></i> 動手</button>
-        `;
-        
-        npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
-        npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
-        npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackConfirmation);
-
-        const menuRect = npcInteractionMenu.getBoundingClientRect();
-        const targetRect = targetElement.getBoundingClientRect();
-        const panelRect = storyPanel.getBoundingClientRect();
-
-        let top = targetRect.bottom - panelRect.top + storyPanel.scrollTop + 8;
-        let left = targetRect.left - panelRect.left + (targetRect.width / 2) - (menuRect.width / 2);
-
-        if (top + menuRect.height > storyPanel.scrollHeight) {
-            top = targetRect.top - panelRect.top + storyPanel.scrollTop - menuRect.height - 8;
-        }
-
-        const rightEdge = left + menuRect.width;
-        if (rightEdge > panelRect.width) {
-            left = panelRect.width - menuRect.width - 5; 
-        }
-        if (left < 0) {
-            left = 5;
-        }
-
-        npcInteractionMenu.style.top = `${top}px`;
-        npcInteractionMenu.style.left = `${left}px`;
-        npcInteractionMenu.classList.add('visible');
-    }
-
-    async function handleTradeButtonClick(event) {
-        const npcName = event.currentTarget.dataset.npcName;
-        hideNpcInteractionMenu();
-        if (gameState.isRequesting) return;
-        setLoadingState(true, `正在與 ${npcName} 準備交易...`);
-        try {
-            const tradeData = await api.startTrade(npcName);
-            modal.openTradeModal(tradeData, npcName, (newRound) => {
-                modal.closeTradeModal();
-                if (newRound && newRound.roundData) {
-                    addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
-                    updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
-                    gameState.currentRound = newRound.roundData.R;
-                    gameState.roundData = newRound.roundData;
-                }
-            });
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            setLoadingState(false);
-        }
-    }
-
-    async function handleChatButtonClick(event) {
-        const npcName = event.currentTarget.dataset.npcName;
-        hideNpcInteractionMenu();
-        if (gameState.isRequesting) return;
-        setLoadingState(true, '正在查找此人檔案...');
-        try {
-            const profile = await api.getNpcProfile(npcName);
-            gameState.isInChat = true;
-            gameState.currentChatNpc = profile.name;
-            gameState.chatHistory = [];
-            modal.openChatModalUI(profile);
-            chatInput.focus();
-        } catch (error) {
-            if (error.message && error.message.includes('並未見到')) {
-                appendMessageToStory(error.message, 'system-message');
-            } else {
-                handleApiError(error);
-            }
-        } finally {
-            setLoadingState(false);
-        }
-    }
-    
-    function showAttackConfirmation(event) {
-        const npcName = event.currentTarget.dataset.npcName;
-        const existingButtons = npcInteractionMenu.querySelectorAll('.npc-interaction-btn');
-        existingButtons.forEach(btn => btn.style.display = 'none');
-        const promptText = document.createElement('span');
-        promptText.className = 'confirm-prompt-text';
-        promptText.textContent = '確定要動手？';
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'npc-interaction-btn cancel-attack';
-        cancelBtn.dataset.npcName = npcName;
-        cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
-        const confirmBtn = document.createElement('button');
-        confirmBtn.className = 'npc-interaction-btn confirm-attack';
-        confirmBtn.dataset.npcName = npcName;
-        confirmBtn.innerHTML = '<i class="fas fa-check"></i>';
-        npcInteractionMenu.appendChild(promptText);
-        npcInteractionMenu.appendChild(cancelBtn);
-        npcInteractionMenu.appendChild(confirmBtn);
-        cancelBtn.addEventListener('click', hideNpcInteractionMenu);
-        confirmBtn.addEventListener('click', confirmAndInitiateAttack);
-    }
-
-
-    async function confirmAndInitiateAttack(event) {
-        const npcName = event.currentTarget.dataset.npcName;
-        hideNpcInteractionMenu();
-        if (gameState.isRequesting) return;
-        
-        setLoadingState(true, `準備與 ${npcName} 對決...`);
-        try {
-            const data = await api.initiateCombat({ targetNpcName: npcName, isSparring: false });
-            if (data.status === 'COMBAT_START') {
-                startCombat(data.initialState);
-            }
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            if (!gameState.isInCombat) {
-                 setLoadingState(false);
-            }
-        }
-    }
-
-    function handleNpcClick(event) {
-        const targetIsNpc = event.target.closest('.npc-name');
-        const targetIsMenu = event.target.closest('.npc-interaction-menu');
-
-        if (targetIsNpc) {
-            const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
-            showNpcInteractionMenu(targetIsNpc, npcName);
-        } else if (!targetIsMenu) {
-            hideNpcInteractionMenu();
-        }
-    }
-
-
-    async function sendChatMessage() {
-        const message = chatInput.value.trim();
-        if (!message || gameState.isRequesting) return;
-        chatInput.value = '';
-        modal.appendChatMessage('player', message);
-        gameState.chatHistory.push({ speaker: 'player', message });
-        setLoadingState(true);
-
-        try {
-            const data = await api.npcChat({
-                npcName: gameState.currentChatNpc,
-                chatHistory: gameState.chatHistory,
-                playerMessage: message,
-                model: aiModelSelector.value
-            });
-            modal.appendChatMessage('npc', data.reply);
-            gameState.chatHistory.push({ speaker: 'npc', message: data.reply });
-        } catch (error) {
-            modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
-        } finally {
-            setLoadingState(false);
-        }
-    }
-
-    async function endChatSession() {
-        if (gameState.isRequesting || !gameState.currentChatNpc) return;
-        const npcNameToSummarize = gameState.currentChatNpc;
-        
-        modal.closeChatModal();
-        gameState.isInChat = false; 
-        setLoadingState(true, '正在總結對話，更新江湖事態...');
-
-        try {
-            const data = await api.endChat({
-                npcName: npcNameToSummarize,
-                fullChatHistory: gameState.chatHistory,
-                model: aiModelSelector.value
-            });
-            if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
-                appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
-                data.roundData.suggestion = data.suggestion;
-                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
-                gameState.currentRound = data.roundData.R;
-                gameState.roundData = data.roundData;
-                updateBountyButton(data.hasNewBounties);
-            } else {
-                throw new Error('從伺服器收到的回應格式不正確。');
-            }
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            gameState.currentChatNpc = null;
-            gameState.chatHistory = [];
-            setLoadingState(false);
-        }
-    }
-
-    async function handleGiveItem(giveData) {
-        modal.closeGiveItemModal(); 
-        modal.closeChatModal(); 
-
-        gameState.isInChat = false;
-        
-        setLoadingState(true, "正在更新江湖事態..."); 
-
-        try {
-            const body = {
-                giveData: {
-                    target: gameState.currentChatNpc,
-                    ...giveData
-                },
-                model: aiModelSelector.value
-            };
-            const data = await api.giveItemToNpc(body);
-
-            if (data && data.roundData) {
-                data.roundData.suggestion = data.suggestion;
-                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, null, data.locationData); 
-                gameState.currentRound = data.roundData.R; 
-                gameState.roundData = data.roundData; 
-                updateBountyButton(data.hasNewBounties);
-            } else {
-                throw new Error("從伺服器收到的回應格式不正確。");
-            }
-        } catch (error) {
-            handleApiError(error); 
-        } finally {
-            gameState.currentChatNpc = null;
-            gameState.chatHistory = [];
-            setLoadingState(false); 
-        }
-    }
-
-    // --- 初始化 ---
     function initialize() {
+        // 主題切換
         let currentTheme = localStorage.getItem('game_theme') || 'light';
+        const themeIcon = themeSwitcher.querySelector('i');
         document.body.className = `${currentTheme}-theme`;
         themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         themeSwitcher.addEventListener('click', () => {
@@ -687,161 +77,111 @@ document.addEventListener('DOMContentLoaded', () => {
             themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         });
 
-        aiModelSelector.value = 'openai';
-
-        aiModelSelector.addEventListener('change', () => {
-            const selectedModel = aiModelSelector.value;
-            const notification = document.createElement('p');
-            notification.className = 'system-message ai-switch-notification';
-            notification.textContent = `系統：AI 核心已切換為 ${selectedModel.toUpperCase()}。`;
-            storyTextContainer.appendChild(notification);
-            storyTextContainer.parentElement.scrollTop = storyTextContainer.parentElement.scrollHeight;
-            setTimeout(() => {
-                notification.classList.add('fading-out');
-                setTimeout(() => notification.remove(), 500);
-            }, 5000);
-        });
-        
+        // 摺疊/展開儀表板
         headerToggleButton.addEventListener('click', () => {
             storyHeader.classList.toggle('collapsed');
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
             headerToggleButton.querySelector('i').classList.toggle('fa-chevron-down');
         });
+
+        // 手機側邊欄
         menuToggle.addEventListener('click', () => gameContainer.classList.toggle('sidebar-open'));
         
+        // 登出
         logoutButton.addEventListener('click', () => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
             window.location.href = 'login.html';
         });
         
+        // 了卻此生
         suicideButton.addEventListener('click', async () => {
-            hideNpcInteractionMenu();
+            interaction.hideNpcInteractionMenu();
             if (gameState.isRequesting) return;
             if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) { 
-                setLoadingState(true, '英雄末路，傳奇落幕...');
+                getGameLoop().setLoading(true, '英雄末路，傳奇落幕...');
                 try {
-                    const data = await api.forceSuicide({ model: aiModelSelector.value });
+                    const data = await api.forceSuicide({ model: document.getElementById('ai-model-selector').value });
                     updateUI(data.story, data.roundData, null, data.locationData);
-                    handlePlayerDeath();
+                    getGameLoop().handlePlayerDeath();
                 } catch (error) {
                     handleApiError(error);
-                    setLoadingState(false);
+                    getGameLoop().setLoading(false);
                 }
             }
         });
 
+        // 武學總覽
         if (skillsBtn) {
             skillsBtn.addEventListener('click', async () => {
-                hideNpcInteractionMenu();
+                interaction.hideNpcInteractionMenu();
                 if (gameState.isRequesting) return;
-                setLoadingState(true, '獲取武學資料...');
+                getGameLoop().setLoading(true, '獲取武學資料...');
                 try {
                     const skills = await api.getSkills();
                     modal.openSkillsModal(skills);
                 } catch (error) {
                     handleApiError(error);
                 } finally {
-                    setLoadingState(false);
+                    getGameLoop().setLoading(false);
                 }
             });
         }
         
-        if (closeSkillsBtn) {
-            closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
-        }
-
+        // 懸賞按鈕
         if (bountiesBtn) {
             bountiesBtn.addEventListener('click', () => {
-                hideNpcInteractionMenu();
+                interaction.hideNpcInteractionMenu();
                 updateBountyButton(false);
             });
         }
-
+        
+        // GM 面板
         initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent);
 
+        // 主要動作提交
         submitButton.addEventListener('click', handlePlayerAction);
         playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); handlePlayerAction(); } });
         
+        // 戰鬥確認
         document.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'combat-confirm-btn') {
-                handleConfirmCombatAction();
+                interaction.handleConfirmCombatAction();
             }
         });
 
-        storyPanel.addEventListener('click', handleNpcClick);
-        chatActionBtn.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendChatMessage(); } });
+        // NPC 互動
+        storyPanel.addEventListener('click', interaction.handleNpcClick);
+
+        // 聊天互動
+        chatActionBtn.addEventListener('click', interaction.sendChatMessage);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); interaction.sendChatMessage(); } });
         closeChatBtn.addEventListener('click', () => {
              gameState.isInChat = false;
              gameState.currentChatNpc = null;
              gameState.chatHistory = [];
              modal.closeChatModal();
-             setLoadingState(false); 
+             getGameLoop().setLoading(false); 
         });
-        endChatBtn.addEventListener('click', endChatSession);
+        endChatBtn.addEventListener('click', interaction.endChatSession);
+
+        // 贈予物品
         giveItemBtn.addEventListener('click', () => {
             if (gameState.isInChat && gameState.currentChatNpc) {
-                modal.openGiveItemModal(gameState.currentChatNpc, handleGiveItem);
+                modal.openGiveItemModal(gameState.currentChatNpc, interaction.handleGiveItem);
             }
         });
-        cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
 
+        // 關閉彈窗
+        cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
+        closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
+
+        // 設定視窗高度
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);
 
+        // 載入遊戲
         loadInitialGame();
-    }
-
-    async function loadInitialGame() {
-        setLoadingState(true, '正在連接你的世界，讀取記憶中...');
-        try {
-            const data = await api.getLatestGame();
-            
-            storyTextContainer.innerHTML = ''; 
-
-            if (data.gameState === 'deceased') {
-                if(data.roundData) {
-                    updateUI('', data.roundData, null, data.locationData);
-                }
-                handlePlayerDeath();
-
-            } else {
-                gameState.currentRound = data.roundData.R;
-                gameState.roundData = data.roundData;
-                
-                if (data.prequel) {
-                    const prequelDiv = document.createElement('div');
-                    prequelDiv.className = 'prequel-summary';
-                    prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
-                    storyTextContainer.appendChild(prequelDiv);
-                }
-
-                data.roundData.suggestion = data.suggestion;
-                
-                addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-                updateUI(data.story, data.roundData, null, data.locationData);
-
-                updateBountyButton(data.hasNewBounties);
-            }
-        } catch (error) {
-            if (error.message.includes('找不到存檔')) {
-                storyTextContainer.innerHTML = '';
-                const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
-                const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, stamina: 100, suggestion: '先檢查一下自己的身體狀況吧。' };
-                
-                addRoundTitleToStory(roundZeroData.EVT);
-                appendMessageToStory(initialMessage, 'system-message');
-                updateUI(null, roundZeroData, null, null);
-
-            } else {
-                handleApiError(error);
-            }
-        } finally {
-             if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
-                 setLoadingState(false);
-            }
-        }
     }
 
     initialize();
