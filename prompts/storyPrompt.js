@@ -9,7 +9,7 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = []) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = []) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -22,17 +22,26 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const actorCandidatesInstruction = actorCandidates.length > 0
         ? `\n## 【演員候補名單】\n以下是幾位已在故事中被提及、但尚未正式登場的人物。當你需要一個新角色登場時，你必須優先從這份名單中選擇最符合當前劇情需求的一位，而不是創造一個全新的隨機角色。只有當名單上沒有合適人選時，你才能創造新角色。\n- ${actorCandidates.join('\n- ')}\n`
         : '';
+        
+    const worldEventInstruction = worldEventToWeave
+        ? `\n## 【最高優先級特殊劇情指令：世界事件編織】
+        江湖中一樁大事正在發酵，你本回合的故事必須圍繞此事展開。這不是一個可選項，而是必須完成的核心任務！
+        - **事件類型**: ${worldEventToWeave.eventType}
+        - **事件核心**: ${worldEventToWeave.eventData.summary}
+        - **當前階段**: ${worldEventToWeave.currentStage}
+        - **你的任務**: 你必須將「${worldEventToWeave.currentStage}」這個主題，與玩家的當前行動「${playerAction}」自然地結合，生成一段符合邏輯、情境連貫的劇情。例如，如果事件是「NPC死亡後的社會反應」，而玩家行動是「去酒館喝酒」，你可以描寫酒館裡的人們正在議論此事。如果玩家的行動與事件無關，你可以描寫事件的餘波如何影響到玩家周遭的環境。`
+        : '';
 
     const levelUpText = levelUpEvents.length > 0
         ? `\n## 【武學突破】\n在本回合中，玩家的武學境界發生了突破！你必須在你的故事敘述中，為以下事件生成一段充滿意境的描述，來體現玩家的成長，而不是簡單地告知。事件如下：\n${levelUpEvents.map(e => `- 「${e.skillName}」已突破至【${e.levelUpTo}成】境界。`).join('\n')}`
         : '';
     
     const romanceInstruction = romanceEventToWeave
-        ? `\n## 【最高優先級特殊劇情指令：戀愛場景編織】\n在本回合的故事中，你**必須**將以下指定的「戀愛互動場景」自然地、無縫地編織進你的敘述裡。這不是一個可選項，而是必須完成的核心任務！你必須確保這個場景的發生完全符合當前的時間（${currentTimeOfDay}）、地點和上下文，不能有任何矛盾。\n- **需編織的事件**: 與NPC「${romanceEventToWeave.npcName}」發生一次「${romanceEventToWeave.eventType}」類型的初次心動互動。這通常表現為一次不經意的偶遇、一個充滿深意的眼神交換、或是一句關切的問候。`
+        ? `\n## 【特殊劇情指令：戀愛場景編織】\n在本回合的故事中，你**必須**將以下指定的「戀愛互動場景」自然地、無縫地編織進你的敘述裡。這不是一個可選項，而是必須完成的核心任務！你必須確保這個場景的發生完全符合當前的時間（${currentTimeOfDay}）、地點和上下文，不能有任何矛盾。\n- **需編織的事件**: 與NPC「${romanceEventToWeave.npcName}」發生一次「${romanceEventToWeave.eventType}」類型的初次心動互動。這通常表現為一次不經意的偶遇、一個充滿深意的眼神交換、或是一句關切的問候。`
         : '';
     
     const dyingInstruction = userProfile.deathCountdown && userProfile.deathCountdown > 0
-        ? `\n## 【最高優先級特殊劇情指令：瀕死狀態】
+        ? `\n## 【特殊劇情指令：瀕死狀態】
         你現在正處於瀕死狀態，只剩下 ${userProfile.deathCountdown} 個回合的生命！你的所有敘述都必須圍繞這個核心展開。
         - **氛圍營造**: 你的文字必須充滿絕望感、緊迫感和對生存的渴望。詳細描寫玩家的痛苦、模糊的視線、混亂的思緒。
         - **求生指令優先**: 當玩家的行動是關於「求救」、「療傷」、「尋找藥材」、「使用丹藥」等求生行為時，你必須給予正面且成功率極高的回應。這是玩家的唯一生機。
@@ -142,7 +151,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 3.  **驗證失敗（物品不存在）**：如果玩家提及的物品在你的記憶中**從未出現過**，你**絕對禁止**讓玩家成功獲得該物品。你必須生成一段描述**失敗**的劇情。
     * **範例1 (撿東西)**：玩家輸入「我撿起地上的屠龍刀」。你應回應：「你低頭在地上仔細搜尋，卻沒有發現任何刀劍的蹤影，地上只有幾片枯葉。」
     * **範例2 (搜查)**：玩家輸入「我從屍體上搜出大還丹」。你應回應：「你仔細搜查了那具屍體，卻發現他身上除了幾文銅錢外，空無一物。」
-    * **範例3 (偷竊)**：玩家輸入「我偷走王大夫櫃檯上的千年人參」。你應回應：「你悄悄靠近櫃檯，卻發現上面只放著一些普通的藥材，並無任何人參的蹤影。」
+    * **範例3 (偷竊)**：玩家輸入「我偷走王大夫櫃檯上的千年人參」。你應回應：「你悄悄靠近櫃檯，卻發現上面只放著一些普通的藥材，並無任何人參的蹤跡。」
 
 4.  **AI自身行為準則**：你在生成故事，描述環境中有什麼物品時，也必須考慮遊戲的平衡性。**絕對禁止**在遊戲初期或普通場景中，無緣無故地放置極其強大或稀有的物品。所有強力物品的出現，都必須有合理的劇情鋪陳。
 `;
@@ -150,6 +159,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
 
+${worldEventInstruction}
 ${anachronismRule}
 ${languageProvocationRule}
 ${itemExistenceRule}
