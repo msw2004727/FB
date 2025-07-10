@@ -8,7 +8,17 @@ import { gameTips } from './tips.js';
 import * as interaction from './interactionHandlers.js';
 import { dom } from './dom.js';
 
+// --- 【核心修改】新增載入提醒文字陣列 ---
+const loadingDisclaimers = [
+    "說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。",
+    "天機運轉，世界演化...若初遇奇人、初探秘境，耗時或將近一分鐘，還望少俠耐心等候。",
+    "我正為你鋪展前路，此刻切莫分心。若移步他處，恐致天機紊亂，因果錯亂，前功盡棄矣。",
+    "江湖之大，變數無窮。為你編織全新際遇需耗心神，請稍安勿躁，莫要離開。",
+    "緣法交織，命途展開...為保推演無誤，請留在此畫面，靜候佳音。"
+];
+
 let tipInterval = null;
+let disclaimerInterval = null; // 【核心新增】為載入提醒創建獨立的計時器
 
 function updateBountyButton(hasNew) {
     if (dom.bountiesBtn) {
@@ -31,6 +41,7 @@ export function setLoading(isLoading, text = '') {
     }
 
     if (dom.aiThinkingLoader) {
+        const loaderDisclaimerElement = dom.aiThinkingLoader.querySelector('.loader-disclaimer');
         const loaderTextElement = dom.aiThinkingLoader.querySelector('.loader-text');
         const loaderTipElement = dom.aiThinkingLoader.querySelector('.loader-tip');
         
@@ -39,6 +50,9 @@ export function setLoading(isLoading, text = '') {
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
+            // --- 【核心修改】同時啟動兩個獨立的輪播 ---
+            
+            // 1. 遊戲技巧輪播
             const rotateTip = () => {
                 if (gameTips.length > 0) {
                     const randomIndex = Math.floor(Math.random() * gameTips.length);
@@ -48,9 +62,24 @@ export function setLoading(isLoading, text = '') {
                 }
             };
             rotateTip();
-            tipInterval = setInterval(rotateTip, 10000);
+            tipInterval = setInterval(rotateTip, 10000); // 技巧提示10秒換一次
+
+            // 2. 載入提醒輪播
+            const rotateDisclaimer = () => {
+                if (loadingDisclaimers.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
+                    if(loaderDisclaimerElement) {
+                        loaderDisclaimerElement.innerHTML = loadingDisclaimers[randomIndex];
+                    }
+                }
+            };
+            rotateDisclaimer();
+            disclaimerInterval = setInterval(rotateDisclaimer, 6000); // 載入提醒6秒換一次
+
         } else {
+            // --- 【核心修改】同時停止兩個輪播 ---
             clearInterval(tipInterval);
+            clearInterval(disclaimerInterval);
         }
         dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }
