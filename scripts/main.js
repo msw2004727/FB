@@ -4,7 +4,6 @@ import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } 
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 import { initializeGmPanel } from './gmManager.js';
-// --- 新增引入 ---
 import { initializeTrade } from './tradeManager.js';
 
 
@@ -244,7 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 startCombat(data.combatInfo.initialState);
             }
         } catch (error) {
-            handleApiError(error);
+            // 【核心修改】在捕捉到錯誤時，執行恢復流程
+            console.error('API 錯誤或通訊中斷:', error);
+            appendMessageToStory(`[系統] 通訊似乎發生了中斷... 正在嘗試為您同步最新的江湖狀態...`, 'system-message');
+            // 不直接顯示錯誤，而是嘗試重新讀取最新遊戲狀態
+            await loadInitialGame();
         } finally {
             if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
                  setLoadingState(false);
