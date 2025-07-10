@@ -84,7 +84,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     
     const romanceRules = getRomanceRule({ playerGender });
     
-    // 【核心修正】將被遺漏的 worldviewAndProgressionRules 變數定義加回來
     const worldviewAndProgressionRules = getWorldviewAndProgressionRule({
         protagonistDescription,
         playerPower
@@ -99,7 +98,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         timeSequence
     });
     
-    // 【核心修改】引入師承有序鐵律
     const martialArtsRules = getMartialArtsRule({ npcContext });
 
     const anachronismRule = `
@@ -129,7 +127,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 * **觸發戰鬥**: 只有在NPC被激怒並決定主動攻擊時，你才可以在回傳的JSON中觸發戰鬥系統。你的 "story" 敘述必須描寫NPC被激怒並發起攻擊的過程，然後在\`roundData\`中加入\`"enterCombat": true\`以及相應的戰鬥設定。
 `;
 
-    // 【核心新增】物品存在性鐵律
     const itemExistenceRule = `
 ## 【最高優先級鐵律】物品存在性鐵律 (Item Existence Law)
 為了維護遊戲世界的平衡與邏輯，你必須嚴格遵守此規則。
@@ -145,9 +142,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
 4.  **AI自身行為準則**：你在生成故事，描述環境中有什麼物品時，也必須考慮遊戲的平衡性。**絕對禁止**在遊戲初期或普通場景中，無緣無故地放置極其強大或稀有的物品。所有強力物品的出現，都必須有合理的劇情鋪陳。
 `;
-
+    
     return `
-你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於金庸武俠小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的非戰鬥指令，產生接下來發生的故事。
+你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
 
 ${anachronismRule}
 ${languageProvocationRule}
