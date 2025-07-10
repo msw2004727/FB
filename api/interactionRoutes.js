@@ -200,12 +200,23 @@ const interactRouteHandler = async (req, res) => {
         const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore);
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
 
+        // 【核心修改】在將資料回傳前端前，過濾掉已死亡的NPC
+        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
+            const aliveNpcs = [];
+            for (const sceneNpc of aiResponse.roundData.NPC) {
+                const npcProfile = npcContext[sceneNpc.name];
+                // 如果在context中找不到該NPC，或其isDeceased不為true，則保留
+                if (!npcProfile || npcProfile.isDeceased !== true) {
+                    aliveNpcs.push(sceneNpc);
+                }
+            }
+            aiResponse.roundData.NPC = aliveNpcs;
+        }
         
         const newRoundNumber = (currentRound || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
 
-        // --- 精力結算邏輯 ---
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
         let newStamina = userProfile.stamina;
 
@@ -236,9 +247,8 @@ const interactRouteHandler = async (req, res) => {
             newStamina += staminaChange;
         }
 
-        // 【核心新增】每回合固定精力消耗
         if (!isResting) {
-            const passiveStaminaDrain = Math.floor(Math.random() * 5) + 1; // 產生 1-5 的隨機整數
+            const passiveStaminaDrain = Math.floor(Math.random() * 5) + 1; 
             newStamina -= passiveStaminaDrain;
             console.log(`[精力系統] 非休息回合，額外消耗精力: ${passiveStaminaDrain}`);
         }
@@ -276,7 +286,7 @@ const interactRouteHandler = async (req, res) => {
         
         const allNpcUpdates = [
             ...(aiResponse.roundData.npcUpdates || []),
-            ...(romanceEventData ? romanceEventData.npcUpdates : [])
+            ...(romanceEventData ? romanceEventData.eventStory.npcUpdates : [])
         ];
         
         const practiceKeywords = ['修練', '練習', '打坐', '閉關', '領悟'];
