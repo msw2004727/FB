@@ -74,7 +74,7 @@ export function setLoading(isLoading, text = '') {
                 }
             };
             rotateDisclaimer();
-            disclaimerInterval = setInterval(rotateDisclaimer, 6000); // 載入提醒6秒換一次
+            disclaimerInterval = setInterval(rotateDisclaimer, 10000); // 載入提醒10秒換一次
 
         } else {
             // --- 【核心修改】同時停止兩個輪播 ---
