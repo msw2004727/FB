@@ -83,7 +83,8 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     });
     
     const romanceRules = getRomanceRule({ playerGender });
-
+    
+    // 【核心修正】將被遺漏的 worldviewAndProgressionRules 變數定義加回來
     const worldviewAndProgressionRules = getWorldviewAndProgressionRule({
         protagonistDescription,
         playerPower
@@ -109,7 +110,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **劇情融合**: 最後，將上述的「主角聯想」與「NPC反應」自然地融合到你的 "story" 敘述中。例如：玩家說「我要用科學的方法分析這個毒藥」，你可以寫「你腦中閃過一個名為『科學』的奇異念頭，似乎是一種能洞察萬物構成的格物之學，但終究是虛無縹緲。一旁的王大夫見你沉思，困惑地問道：『這位少俠，何謂科學？』」
 `;
     
-    // 【核心修正】將被誤刪的「語言挑釁鐵律」加回來
     const languageProvocationRule = `
 ## 【核心新增】語言挑釁與NPC三層式反應鐵律:
 * **定義**: 當玩家的文字指令中包含明確的攻擊性詞彙（例如「殺了你」、「砍死他」、「動手」等），你**絕對禁止**直接將其視為玩家的實際行動。你必須將這類指令解讀為玩家角色的一次**「口頭叫囂」**或**「虛張聲勢的挑釁」**。
@@ -157,7 +157,7 @@ ${systemInteractionRules}
 ${longTermSummary}
 ${levelUpText}
 
-${worldviewAndProgressionRule}
+${worldviewAndProgressionRules}
 
 ---
 ${getItemLedgerRule()}
@@ -180,7 +180,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是「穿越者背景的嚴格控制」禁令和「三層式反應」鐵律）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「穿越者背景的嚴格控制」禁令和「語言挑釁鐵律」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
 `;
 };
 
