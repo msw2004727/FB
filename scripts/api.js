@@ -27,6 +27,7 @@ export const api = {
     // Gameplay Routes
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/play/end-chat', { method: 'POST', body: JSON.stringify(body) }),
+    finalizeCombat: (body) => fetchApi('/api/game/play/finalize-combat', { method: 'POST', body: JSON.stringify(body) }),
 
     // Combat Routes
     initiateCombat: (body) => fetchApi('/api/game/play/initiate', { method: 'POST', body: JSON.stringify(body) }),
