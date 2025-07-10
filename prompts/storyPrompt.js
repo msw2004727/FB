@@ -48,13 +48,21 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         - **移除瀕死狀態**: 只有當玩家透過有效的自救或他人幫助，你才能在其 \`roundData.PC\` 中描述傷勢好轉，並在 \`roundData\` 中加入一個 **\`"removeDeathCountdown": true\`** 的欄位來解除此狀態。否則，絕對不要包含此欄位。`
         : '';
 
+    const npcContextInstruction = Object.keys(npcContext).length > 0
+        ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的資訊，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！
+        ### 【復仇行為鐵律】
+        如果NPC的檔案中存在 'revengeInfo' 欄位，這代表他心中燃燒著復仇的怒火。這將成為他本回合行動的**最主要動機**，其優先級高於一切。你必須：
+        1. 讓他對復仇目標（玩家）表現出極度的敵意。
+        2. 根據他的個性，生成充滿仇恨的狀態描述或對白。
+        3. 如果情境合適（例如雙方獨處或狹路相逢），你**必須**讓他主動發起攻擊，並在回傳中觸發戰鬥系統。
+        \`\`\`json
+        ${JSON.stringify(npcContext, null, 2)}
+        \`\`\``
+        : '';
+
     const locationContextInstruction = locationContext
         ? `\n## 【重要地點情境參考】\n你當前正處於「${locationContext.locationName}」，以下是關於此地的詳細情報，你在生成故事時必須嚴格參考這些設定，確保你的描述（如天氣、統治者、氛圍等）與之相符：\n\`\`\`json\n${JSON.stringify(locationContext, null, 2)}\n\`\`\``
         : `\n## 【重要地點情境參考】\n你目前身處一個未知之地，關於此地的詳細情報尚不明朗。`;
-
-    const npcContextInstruction = Object.keys(npcContext).length > 0
-        ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的**個性(personality)、秘密(secrets)和目標(goals)**，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！\n\`\`\`json\n${JSON.stringify(npcContext, null, 2)}\n\`\`\``
-        : '';
 
     const encumbranceInstruction = `
 ## 【敘事負重系統 (Narrative Encumbrance System)】
@@ -121,7 +129,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 * **處理方式**: 觸發後，你**絕對禁止**讓這些現代物品真實地出現在武俠世界中。你的任務是將這個「時代錯置」的指令，巧妙地轉化為一段有深度的角色扮演互動。
     * **主角的「奇異聯想」**: 描寫主角因此聯想到某個看似相關但不屬於這個時代的奇異念頭。
     * **NPC的「情境反應」**: 根據在場NPC對玩家的友好度，生成符合邏輯的反應（友好則好奇、中立則困惑、敵對則嘲笑）。
-    * **劇情融合**: 最後，將上述的「主角聯想」與「NPC反應」自然地融合到你的 "story" 敘述中。例如：玩家說「我要用科學的方法分析這個毒藥」，你可以寫「你腦中閃過一個名為『科學』的奇異念頭，似乎是一種能洞察萬物構成的格物之學，但終究是虛無縹縲。一旁的王大夫見你沉思，困惑地問道：『這位少俠，何謂科學？』」
+    * **劇情融合**: 最後，將上述的「主角聯想」與「NPC反應」自然地融合到你的 "story" 敘述中。例如：玩家說「我要用科學的方法分析這個毒藥」，你可以寫「你腦中閃過一個名為『科學』的奇異念頭，似乎是一種能洞察萬物構成的格物之學，但終究是虛無縹緲。一旁的王大夫見你沉思，困惑地問道：『這位少俠，何謂科學？』」
 `;
     
     const languageProvocationRule = `
