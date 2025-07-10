@@ -5,7 +5,6 @@ const admin = require('firebase-admin');
 const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult } = require('../services/aiService');
 const { 
     updateFriendlinessValues, 
-    updateRomanceValues, 
     getInventoryState, 
     invalidateNovelCache, 
     updateLibraryNovel, 
@@ -13,6 +12,7 @@ const {
     updateInventory,
     processNpcUpdates
 } = require('./gameHelpers');
+const { processReputationChangesAfterDeath } = require('./reputationManager'); // 【核心新增】
 
 const db = admin.firestore();
 
@@ -81,7 +81,7 @@ const initiateCombatHandler = async (req, res) => {
         ];
         
         const npcDocs = await Promise.all(
-            allNpcNames.map(name => userDocRef.collection('npcs').doc(name).get())
+            allNpcNames.map(name => db.collection('npcs').doc(name).get()) // 從通用模板獲取技能
         );
 
         const npcProfiles = npcDocs.reduce((acc, doc) => {
@@ -187,8 +187,11 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
+            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            const lastRoundData = lastSaveSnapshot.docs[0].data();
+            
             const postCombatResult = await getAIPostCombatResult(playerModelChoice, playerProfile, finalUpdatedState, combatState.log);
-            const { narrative: postCombatNarrative, outcome } = postCombatResult;
+            let { narrative: postCombatNarrative, outcome } = postCombatResult;
 
             const hostilityChanges = [];
             if (!combatState.isSparring) {
@@ -206,6 +209,15 @@ const combatActionRouteHandler = async (req, res) => {
             }
             if (outcome.npcUpdates && outcome.npcUpdates.length > 0) {
                 await processNpcUpdates(userId, outcome.npcUpdates);
+                // 【核心新增】在確認NPC死亡後，啟動關係引擎
+                for (const update of outcome.npcUpdates) {
+                    if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
+                        const reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, lastRoundData.LOC[0], combatState.allies.map(a => a.name));
+                        if (reputationSummary) {
+                            postCombatNarrative += `\n\n**【江湖反應】** ${reputationSummary}`;
+                        }
+                    }
+                }
             }
             
             const powerChange = outcome.playerChanges.powerChange || {};
@@ -220,8 +232,6 @@ const combatActionRouteHandler = async (req, res) => {
             }
             await userDocRef.update(playerUpdatePayload);
             
-            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-            const lastRoundData = lastSaveSnapshot.docs[0].data();
             const updatedUserDoc = await userDocRef.get();
             const updatedUserProfile = updatedUserDoc.data();
             const inventoryState = await getInventoryState(userId);
