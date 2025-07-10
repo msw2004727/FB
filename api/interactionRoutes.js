@@ -104,18 +104,24 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, round: currentRound, model: playerModelChoice } = req.body;
         const userDocRef = db.collection('users').doc(userId);
+
+        // --- 【核心修改】將變數宣告移至 try 區塊的開頭 ---
+        let aiResponse;
+        let userProfile;
+        let longTermSummary;
+        let currentTimeOfDay;
         
         // --- 【核心修改】世界因果引擎 ---
         const worldEventsRef = userDocRef.collection('world_events').orderBy('createdAt', 'asc').limit(1);
         const activeEventsSnapshot = await worldEventsRef.get();
-        let aiResponse;
 
         if (!activeEventsSnapshot.empty) {
             const eventDoc = activeEventsSnapshot.docs[0];
             const worldEvent = eventDoc.data();
             console.log(`[世界因果引擎] 偵測到活動事件: ${worldEvent.eventType}`);
             
-            const eventResult = await getAIEventDirectorResult(playerModelChoice, userDoc.data(), worldEvent);
+            userProfile = (await userDocRef.get()).data(); // 在這裡獲取一次即可
+            const eventResult = await getAIEventDirectorResult(playerModelChoice, userProfile, worldEvent);
             
             aiResponse = {
                 story: eventResult.story,
@@ -125,6 +131,10 @@ const interactRouteHandler = async (req, res) => {
                     npcUpdates: eventResult.npcUpdates
                 }
             };
+            
+            // 需要從 userProfile 獲取當前時間以保持一致性
+            currentTimeOfDay = userProfile.timeOfDay || '上午';
+
 
             if (worldEvent.turnsRemaining - 1 <= 0) {
                 await eventDoc.ref.delete();
@@ -161,7 +171,7 @@ const interactRouteHandler = async (req, res) => {
                 });
             }
             
-            let userProfile = userDoc.exists ? userDoc.data() : {};
+            userProfile = userDoc.exists ? userDoc.data() : {};
             if (userProfile.isDeceased) {
                 return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
             }
@@ -185,7 +195,7 @@ const interactRouteHandler = async (req, res) => {
                     userProfile.deathCountdown = newCountdown; 
                 }
             }
-            const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
+            longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
             const lastSave = savesSnapshot.docs[0]?.data() || {};
             
             if (userProfile.stamina === undefined) {
@@ -217,7 +227,7 @@ const interactRouteHandler = async (req, res) => {
                 day: userProfile.day || lastSave.day || 1,
             };
 
-            const currentTimeOfDay = userProfile.timeOfDay || '上午';
+            currentTimeOfDay = userProfile.timeOfDay || '上午';
             
             const locationContext = await getMergedLocationData(userId, lastSave.LOC);
             const npcContext = {};
@@ -268,22 +278,23 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.roundData.NPC = aliveNpcs;
         }
         
-        const newRoundNumber = (currentRound || 0) + 1;
+        const newRoundNumber = (lastSave.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
-        let userProfile = (await userDocRef.get()).data();
+        // 重新獲取最新的 userProfile
+        userProfile = (await userDocRef.get()).data();
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
         let newStamina = userProfile.stamina || 100;
 
         const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇'];
         const isResting = restKeywords.some(kw => playerAction.includes(kw));
-
+        
         const timeDidAdvance = (aiDaysToAdvance && aiDaysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== currentTimeOfDay);
         
         if (isResting && timeDidAdvance) {
-            const oldTimeIndex = TIME_SEQUENCE.indexOf(userProfile.timeOfDay);
+            const oldTimeIndex = TIME_SEQUENCE.indexOf(currentTimeOfDay);
             const newTimeIndex = TIME_SEQUENCE.indexOf(aiNextTimeOfDay);
             let slotsPassed = 0;
 
@@ -302,12 +313,34 @@ const interactRouteHandler = async (req, res) => {
             newStamina += staminaChange;
         }
 
-        if (!isResting) {
-            newStamina -= (Math.floor(Math.random() * 5) + 1);
+        const isShortAction = !timeDidAdvance && !isResting;
+        let shortActionCounter = userProfile.shortActionCounter || 0;
+
+        if (isShortAction) {
+            shortActionCounter++;
+        } else {
+            shortActionCounter = 0; // 重置計數器
         }
+
+        let finalTimeOfDay = aiNextTimeOfDay || currentTimeOfDay;
+        let finalDate = { year: userProfile.year, month: userProfile.month, day: userProfile.day, yearName: userProfile.yearName };
+        let daysToAdd = aiDaysToAdvance || 0;
         
-        newStamina = Math.max(0, Math.min(100, newStamina));
-        
+        if (shortActionCounter >= 3) {
+            const currentTimeIndex = TIME_SEQUENCE.indexOf(finalTimeOfDay);
+            const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
+            finalTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
+            if (nextTimeIndex === 0) { // 如果從深夜跳到清晨
+                daysToAdd += 1;
+            }
+            shortActionCounter = 0; // 重置計數器
+            console.log(`[時間系統] 短時行動觸發時間推進，新時辰: ${finalTimeOfDay}`);
+        }
+
+        for (let i = 0; i < daysToAdd; i++) {
+            finalDate = advanceDate(finalDate);
+        }
+
         if (newStamina <= 0) {
              const passOutEvent = { 
                 story: "你感到一陣天旋地轉，眼前的景象逐漸模糊，最終眼前一黑，徹底失去了知覺。", PC: "你因體力不支而昏倒在地。",
@@ -327,21 +360,37 @@ const interactRouteHandler = async (req, res) => {
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, userProfile);
         if (levelUpEvents.length > 0) {
             aiResponse.roundData.levelUpEvents = levelUpEvents;
+            const levelUpNarrative = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify([aiResponse.roundData]), "我剛剛武學境界有所突破", { ...userProfile, ...finalDate }, username, finalTimeOfDay, playerPower, userProfile.morality, levelUpEvents, null, locationContext, npcContext, totalBulkScore, []);
+            if (levelUpNarrative && levelUpNarrative.story) {
+                aiResponse.story += `\n\n${levelUpNarrative.story}`;
+            }
         }
+
         if (customSkillCreationResult && !customSkillCreationResult.success) {
             aiResponse.story += `\n\n（${customSkillCreationResult.reason}）`;
         }
-
+        
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
             updateFriendlinessValues(userId, aiResponse.roundData.NPC),
-            processNpcUpdates(userId, aiResponse.roundData.npcUpdates || [])
+            processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []),
+            processLocationUpdates(userId, lastSave.LOC?.[0], aiResponse.roundData.locationUpdates)
         ]);
+        
+        if(aiResponse.roundData.mentionedLocations && aiResponse.roundData.mentionedLocations.length > 0) {
+             const locationPromises = aiResponse.roundData.mentionedLocations.map(locName => 
+                generateAndCacheLocation(userId, locName, '未知', longTermSummary)
+            );
+            await Promise.all(locationPromises);
+        }
         
         const updatedUserProfileDoc = await userDocRef.get();
         userProfile = updatedUserProfileDoc.exists ? updatedUserProfileDoc.data() : {};
         
+        // 重新獲取一次 longTermSummary 以包含新生成的 NPC 資訊
+        longTermSummary = (await summaryDocRef.get()).exists ? (await summaryDocRef.get()).data().text : "遊戲剛剛開始...";
+
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
             getAISummary(longTermSummary, aiResponse.roundData),
             getAISuggestion(aiResponse.roundData),
@@ -357,38 +406,40 @@ const interactRouteHandler = async (req, res) => {
         aiResponse.roundData.skills = updatedSkills;
 
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => 
-                createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile)
-            );
+            const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
+                 if (npc.isNew) {
+                    return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
+                 }
+                 return Promise.resolve();
+            });
             await Promise.all(npcUpdatePromises);
         }
 
-        if (aiResponse.roundData.enterCombat) {
-            // ... 戰鬥處理邏輯 (此處省略) ...
+        if (Math.random() < 0.05) { // 5% 的機率觸發懸賞生成
+            triggerBountyGeneration(userId, newSummary);
         }
-        
-        // ... 其他更新邏輯 (此處省略) ...
 
-        const { powerChange = {}, moralityChange = 0, timeOfDay: nextTimeOfDay, daysToAdvance } = aiResponse.roundData;
+        const { powerChange = {}, moralityChange = 0 } = aiResponse.roundData;
         
-        let finalDate = { year: userProfile.year, month: userProfile.month, day: userProfile.day, yearName: userProfile.yearName };
-        let finalTimeOfDay = nextTimeOfDay || userProfile.timeOfDay;
-        
-        // ... 時間推進邏輯 (此處省略) ...
-
         const newInternalPower = Math.max(0, Math.min(999, (userProfile.internalPower || 0) + (powerChange.internal || 0)));
         const newExternalPower = Math.max(0, Math.min(999, (userProfile.externalPower || 0) + (powerChange.external || 0)));
         const newLightness = Math.max(0, Math.min(999, (userProfile.lightness || 0) + (powerChange.lightness || 0)));
         let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
-
-        aiResponse.roundData = { ...lastSave, ...aiResponse.roundData, internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness, morality: newMorality, stamina: newStamina, timeOfDay: finalTimeOfDay, ...finalDate };
+        
+        const finalUserProfile = (await userDocRef.get()).data();
+        aiResponse.roundData = { ...lastSave, ...aiResponse.roundData, ...inventoryState, ...finalUserProfile, ...finalDate, timeOfDay: finalTimeOfDay };
         
         const playerUpdatesForDb = {
             timeOfDay: finalTimeOfDay,
             internalPower: newInternalPower, externalPower: newExternalPower, lightness: newLightness,
-            morality: newMorality, stamina: newStamina, ...finalDate
+            morality: newMorality, stamina: newStamina, ...finalDate, shortActionCounter
         };
         
+        const proactiveChatResult = await proactiveChatEngine(userId, { ...userProfile, ...playerUpdatesForDb, username }, aiResponse.roundData);
+        if (proactiveChatResult) {
+            aiResponse.proactiveChat = proactiveChatResult;
+        }
+
         await Promise.all([
              userDocRef.update(playerUpdatesForDb),
             db.collection('users').doc(userId).collection('game_state').doc('summary').set({ text: newSummary, lastUpdated: newRoundNumber }),
@@ -398,6 +449,7 @@ const interactRouteHandler = async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
         
+        aiResponse.locationData = await getMergedLocationData(userId, aiResponse.roundData.LOC);
         res.json(aiResponse);
 
     } catch (error) {
@@ -410,5 +462,53 @@ const interactRouteHandler = async (req, res) => {
 
 router.post('/interact', interactRouteHandler);
 
-// ... 其餘路由 ...
+router.post('/end-chat', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { npcName, fullChatHistory, model: playerModelChoice } = req.body;
+
+    if (!npcName || !fullChatHistory) {
+        return res.status(400).json({ message: '缺少必要的對話數據。' });
+    }
+
+    try {
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "對話發生在一個未知的時間點。";
+        
+        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        if (lastSaveSnapshot.empty) {
+            return res.status(404).json({ message: "找不到玩家存檔。" });
+        }
+        let lastRoundData = lastSaveSnapshot.docs[0].data();
+        
+        const chatSummary = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
+        
+        let newRoundData = { ...lastRoundData, R: lastRoundData.R + 1 };
+        newRoundData.EVT = chatSummary;
+        newRoundData.story = `你結束了與${npcName}的交談，${chatSummary}。`;
+        newRoundData.PC = `你與${npcName}深入交談了一番。`;
+
+        const newSummary = await getAISummary(longTermSummary, newRoundData);
+        const suggestion = await getAISuggestion(newRoundData);
+        newRoundData.suggestion = suggestion;
+        
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundData.R });
+
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
+
+        res.json({
+            story: newRoundData.story,
+            roundData: newRoundData,
+            suggestion: newRoundData.suggestion,
+        });
+
+    } catch (error) {
+        console.error(`[結束對話系統] 替玩家 ${username} 總結與 ${npcName} 的對話時出錯:`, error);
+        res.status(500).json({ message: '總結對話時發生內部錯誤。' });
+    }
+});
+
 module.exports = router;
