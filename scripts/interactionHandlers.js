@@ -6,7 +6,7 @@ import * as modal from './modalManager.js';
 import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError } from './uiUpdater.js';
 import { dom } from './dom.js';
 
-let gameLoop;
+let gameLoop = {};
 export function setGameLoop(loop) {
     gameLoop = loop;
 }
