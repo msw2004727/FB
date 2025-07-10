@@ -195,7 +195,18 @@ const combatActionRouteHandler = async (req, res) => {
             const lastRoundData = lastSaveSnapshot.docs[0].data();
             
             const postCombatResult = await getAIPostCombatResult(playerModelChoice, playerProfile, finalUpdatedState, combatState.log);
-            let { narrative: postCombatNarrative, outcome } = postCombatResult;
+            let { outcome } = postCombatResult;
+
+            // 如果AI沒有回傳有效的outcome，給一個預設值
+            if (!outcome) {
+                outcome = {
+                    summary: '戰鬥結束了。',
+                    EVT: '塵埃落定',
+                    playerChanges: { PC: '你結束了戰鬥。', powerChange: {}, moralityChange: 0 },
+                    itemChanges: [],
+                    npcUpdates: []
+                };
+            }
 
             const hostilityChanges = [];
             if (!combatState.isSparring) {
@@ -211,13 +222,15 @@ const combatActionRouteHandler = async (req, res) => {
             if (outcome.itemChanges && outcome.itemChanges.length > 0) {
                 await updateInventory(userId, outcome.itemChanges, {});
             }
+            
+            let reputationSummary = '';
             if (outcome.npcUpdates && outcome.npcUpdates.length > 0) {
                 await processNpcUpdates(userId, outcome.npcUpdates);
                 for (const update of outcome.npcUpdates) {
                     if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
-                        const reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, lastRoundData.LOC[0], combatState.allies.map(a => a.name));
+                        reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, lastRoundData.LOC[0], combatState.allies.map(a => a.name));
                         if (reputationSummary) {
-                            postCombatNarrative += `\n\n**【江湖反應】** ${reputationSummary}`;
+                           outcome.summary += `\n\n**【江湖反應】** ${reputationSummary}`;
                         }
                         const worldEvent = {
                             eventType: 'NPC_DEATH',
@@ -235,71 +248,21 @@ const combatActionRouteHandler = async (req, res) => {
                     }
                 }
             }
-            
-            // 【核心修改】處理戰鬥結束後的NPC狀態更新
-            const deceasedNpcs = new Set(
-                (outcome.npcUpdates || [])
-                    .filter(u => u.fieldToUpdate === 'isDeceased' && u.newValue === true)
-                    .map(u => u.npcName)
-            );
 
-            const nextRoundNpcs = (lastRoundData.NPC || [])
-                .map(npc => {
-                    if (deceasedNpcs.has(npc.name)) {
-                        return {
-                            ...npc,
-                            status: `(屍體)`,
-                            isDeceased: true,
-                        };
-                    }
-                    return npc;
-                });
+            // 將戰鬥結果暫存到一個新的文檔中，等待玩家的下一步行動
+            await userDocRef.collection('game_state').doc('last_combat_outcome').set({
+                ...outcome,
+                playerWon: finalUpdatedState.enemies.every(e => e.hp <= 0),
+                defeatedEnemies: finalUpdatedState.enemies.filter(e => e.hp <= 0).map(e => e.name)
+            });
             
-            const powerChange = outcome.playerChanges.powerChange || {};
-            const playerUpdatePayload = {
-                internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
-                externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
-                lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
-                morality: admin.firestore.FieldValue.increment(outcome.playerChanges.moralityChange || 0)
-            };
-            if (finalUpdatedState.player.hp <= 0) {
-                playerUpdatePayload.deathCountdown = 10;
-            }
-            await userDocRef.update(playerUpdatePayload);
-            
-            const updatedUserDoc = await userDocRef.get();
-            const updatedUserProfile = updatedUserDoc.data();
-            const inventoryState = await getInventoryState(userId);
-
-            const newRoundData = {
-                 ...lastRoundData,
-                 R: lastRoundData.R + 1,
-                 story: postCombatNarrative,
-                 PC: outcome.playerChanges.PC || outcome.summary,
-                 EVT: outcome.summary,
-                 NPC: nextRoundNpcs, // 使用我們剛剛處理過的新NPC列表
-                 playerState: finalUpdatedState.player.hp <= 0 ? 'dying' : 'alive',
-                 deathCountdown: finalUpdatedState.player.hp <= 0 ? 10 : null,
-                 internalPower: updatedUserProfile.internalPower,
-                 externalPower: updatedUserProfile.externalPower,
-                 lightness: updatedUserProfile.lightness,
-                 morality: updatedUserProfile.morality,
-                 ITM: inventoryState.itemsString,
-                 money: inventoryState.money,
-            };
-            
-             await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
-             await invalidateNovelCache(userId);
-             updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
-
             res.json({
                 status: 'COMBAT_END',
                 narrative: combatResult.narrative, 
                 updatedState: finalUpdatedState,
-                newRound: {
-                    story: newRoundData.story,
-                    roundData: newRoundData,
-                    suggestion: "戰鬥結束了，你接下來打算怎麼辦？"
+                combatResult: { // 將裁決結果傳給前端
+                    ...outcome,
+                    reputationSummary: reputationSummary || ''
                 }
             });
 
@@ -389,7 +352,7 @@ const surrenderRouteHandler = async (req, res) => {
         
         await userDocRef.collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
         await invalidateNovelCache(userId);
-        updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗:", err));
+        updateLibraryNovel(userId, playerProfile.username).catch(err => console.error("背景更新圖書館失敗(認輸):", err));
 
         res.json({
             status: 'SURRENDER_ACCEPTED',
