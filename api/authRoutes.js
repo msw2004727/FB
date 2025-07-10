@@ -4,7 +4,6 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-// 【核心修改】修正引用路徑
 const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
@@ -34,14 +33,14 @@ router.post('/register', async (req, res) => {
             externalPower: 5,
             lightness: 5,
             morality: 0,
-            stamina: 100, // 【核心新增】為新玩家設定初始精力值
+            stamina: 100, 
             timeOfDay: '上午',
             yearName: '元祐',
             year: 1,
             month: 1,
             day: 1,
             isDeceased: false,
-            // 【核心新增】自創武學追蹤欄位
+            // 自創武學追蹤欄位
             maxInternalPowerAchieved: 5,
             maxExternalPowerAchieved: 5,
             maxLightnessAchieved: 5,
@@ -63,7 +62,6 @@ router.post('/register', async (req, res) => {
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // 在儲存第0回合前，主動為新玩家生成並快取好「無名村」這個初始地點
         console.log(`[註冊流程] 正在為新玩家 ${username} 主動建立初始地點「無名村」...`);
         await generateAndCacheLocation(newUserRef.id, '無名村', '村莊', '玩家初入江湖，身在無名村。');
         console.log(`[註冊流程] 「無名村」建立完畢。`);
@@ -96,7 +94,7 @@ router.post('/register', async (req, res) => {
             internalPower: 5,
             externalPower: 5,
             lightness: 5,
-            stamina: 100, // 【核心新增】在初始存檔中也記錄精力值
+            stamina: 100, 
             morality: 0,
             yearName: '元祐',
             year: 1,
@@ -144,6 +142,26 @@ router.post('/login', async (req, res) => {
         if (!isPasswordMatch) {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
+
+        // --- 【核心新增】舊玩家資料欄位自動補全 ---
+        // 檢查是否存在新的追蹤欄位，如果不存在，則為舊玩家補上
+        if (userData.maxInternalPowerAchieved === undefined || userData.customSkillsCreated === undefined) {
+            console.log(`[資料庫維護] 偵測到舊玩家: ${username}，正在為其補全自創武學欄位...`);
+            const updates = {
+                maxInternalPowerAchieved: userData.internalPower || 5,
+                maxExternalPowerAchieved: userData.externalPower || 5,
+                maxLightnessAchieved: userData.lightness || 5,
+                customSkillsCreated: {
+                    internal: 0,
+                    external: 0,
+                    lightness: 0,
+                    none: 0
+                }
+            };
+            await userDoc.ref.update(updates);
+            console.log(`[資料庫維護] 已成功為 ${username} 更新資料結構。`);
+        }
+        // --- 新增結束 ---
 
         const token = jwt.sign(
             { userId: userDoc.id, username: userData.username },
