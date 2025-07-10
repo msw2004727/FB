@@ -6,42 +6,33 @@ import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } 
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 import * as interaction from './interactionHandlers.js';
+import { dom } from './dom.js';
 
 let tipInterval = null;
 
-// --- Private Functions ---
-
 function updateBountyButton(hasNew) {
-    const bountiesBtn = document.getElementById('bounties-btn');
-    if (bountiesBtn) {
-        bountiesBtn.classList.toggle('has-new-bounty', hasNew);
+    if (dom.bountiesBtn) {
+        dom.bountiesBtn.classList.toggle('has-new-bounty', hasNew);
     }
 }
 
-// --- Exported Functions ---
-
-// 【核心修改】讓函式接收傳入的 DOM 元素，而不是自己去查詢
-export function setLoading(isLoading, domElements, text = '') {
-    const {
-        playerInput, submitButton, chatInput, chatActionBtn, endChatBtn,
-        combatSurrenderBtn, aiThinkingLoader
-    } = domElements;
-
+export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
-    playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    submitButton.textContent = isLoading ? '撰寫中...' : '動作';
-    chatInput.disabled = isLoading;
-    chatActionBtn.disabled = isLoading;
-    endChatBtn.disabled = isLoading;
+    dom.playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
+    dom.submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
+    dom.submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+    dom.chatInput.disabled = isLoading;
+    dom.chatActionBtn.disabled = isLoading;
+    dom.endChatBtn.disabled = isLoading;
 
+    const combatSurrenderBtn = document.getElementById('combat-surrender-btn');
     if (combatSurrenderBtn) {
         combatSurrenderBtn.disabled = isLoading;
     }
 
-    if (aiThinkingLoader) {
-        const loaderTextElement = aiThinkingLoader.querySelector('.loader-text');
-        const loaderTipElement = aiThinkingLoader.querySelector('.loader-tip');
+    if (dom.aiThinkingLoader) {
+        const loaderTextElement = dom.aiThinkingLoader.querySelector('.loader-text');
+        const loaderTipElement = dom.aiThinkingLoader.querySelector('.loader-tip');
         
         if(loaderTextElement) loaderTextElement.textContent = text;
         
@@ -61,8 +52,7 @@ export function setLoading(isLoading, domElements, text = '') {
         } else {
             clearInterval(tipInterval);
         }
-
-        aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
+        dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }
     
     modal.setCombatLoading(isLoading && gameState.isInCombat);
@@ -114,7 +104,7 @@ async function startProactiveChat(proactiveData) {
             gameState.chatHistory.push({ speaker: 'system', message: giftMessage });
         }
 
-        document.getElementById('chat-input').focus();
+        dom.chatInput.focus();
     } catch (error) {
         console.error(`啟動與 ${npcName} 的主動對話失敗:`, error);
         appendMessageToStory(`[系統] ${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
@@ -122,6 +112,8 @@ async function startProactiveChat(proactiveData) {
 }
 
 export function processNewRoundData(data) {
+    if(!data.roundData) return;
+    
     data.roundData.suggestion = data.suggestion;
     addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
     updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
@@ -132,49 +124,42 @@ export function processNewRoundData(data) {
     updateBountyButton(data.hasNewBounties);
 
     if (data.roundData.playerState === 'dead') {
-        // setLoading is now called in main.js, so we pass domElements
-        const domElements = getDomElements(); 
-        setLoading(false, domElements);
+        setLoading(false);
         handlePlayerDeath();
         return;
     }
     
     if (data.proactiveChat) {
-        const domElements = getDomElements();
-        setLoading(false, domElements); 
         startProactiveChat(data.proactiveChat);
-        return; 
     }
 }
 
 export async function handlePlayerAction() {
     interaction.hideNpcInteractionMenu();
-    const domElements = getDomElements();
-
-    const actionText = domElements.playerInput.value.trim();
+    const actionText = dom.playerInput.value.trim();
     if (!actionText || gameState.isRequesting) return;
 
     if (actionText.toUpperCase() === '/*GM') {
-        domElements.playerInput.value = '';
-        domElements.gmPanel.classList.add('visible');
+        dom.playerInput.value = '';
+        dom.gmPanel.classList.add('visible');
         return;
     }
 
-    domElements.playerInput.value = '';
+    dom.playerInput.value = '';
 
-    const prequelElement = domElements.storyTextContainer.querySelector('.prequel-summary');
+    const prequelElement = dom.storyTextContainer.querySelector('.prequel-summary');
     if (prequelElement) {
-        domElements.storyTextContainer.innerHTML = '';
+        dom.storyTextContainer.innerHTML = '';
     }
 
-    setLoading(true, domElements, '江湖百曉生正在構思...');
+    setLoading(true, '江湖百曉生正在構思...');
     appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
     try {
         const data = await api.interact({
             action: actionText,
             round: gameState.currentRound,
-            model: domElements.aiModelSelector.value
+            model: dom.aiModelSelector.value
         });
 
         if (data && data.roundData) {
@@ -193,19 +178,18 @@ export async function handlePlayerAction() {
         await loadInitialGame();
     } finally {
         if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
-             setLoading(false, domElements);
+             setLoading(false);
         }
     }
 }
 
 export async function loadInitialGame() {
-    const domElements = getDomElements();
-    setLoading(true, domElements, '正在連接你的世界，讀取記憶中...');
+    setLoading(true, '正在連接你的世界，讀取記憶中...');
     
     try {
         const data = await api.getLatestGame();
         
-        domElements.storyTextContainer.innerHTML = ''; 
+        dom.storyTextContainer.innerHTML = ''; 
 
         if (data.gameState === 'deceased') {
             if(data.roundData) {
@@ -217,13 +201,13 @@ export async function loadInitialGame() {
                 const prequelDiv = document.createElement('div');
                 prequelDiv.className = 'prequel-summary';
                 prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
-                domElements.storyTextContainer.appendChild(prequelDiv);
+                dom.storyTextContainer.appendChild(prequelDiv);
             }
             processNewRoundData(data);
         }
     } catch (error) {
         if (error.message.includes('找不到存檔')) {
-            domElements.storyTextContainer.innerHTML = '';
+            dom.storyTextContainer.innerHTML = '';
             const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
             const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, stamina: 100, suggestion: '先檢查一下自己的身體狀況吧。' };
             
@@ -235,23 +219,7 @@ export async function loadInitialGame() {
         }
     } finally {
          if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
-             setLoading(false, domElements);
+             setLoading(false);
         }
     }
-}
-
-// 輔助函式，用於集中獲取DOM元素，以便傳遞
-function getDomElements() {
-    return {
-        playerInput: document.getElementById('player-input'),
-        submitButton: document.getElementById('submit-button'),
-        chatInput: document.getElementById('chat-input'),
-        chatActionBtn: document.getElementById('chat-action-btn'),
-        endChatBtn: document.getElementById('end-chat-btn'),
-        combatSurrenderBtn: document.getElementById('combat-surrender-btn'),
-        aiThinkingLoader: document.querySelector('.ai-thinking-loader'),
-        storyTextContainer: document.getElementById('story-text-wrapper'),
-        gmPanel: document.getElementById('gm-panel'),
-        aiModelSelector: document.getElementById('ai-model-selector')
-    };
 }
