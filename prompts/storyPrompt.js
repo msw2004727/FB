@@ -98,6 +98,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         username,
         timeSequence
     });
+    
+    // 【核心修改】引入師承有序鐵律
+    const martialArtsRules = getMartialArtsRule({ npcContext });
 
     const anachronismRule = `
 ## 【最高優先級禁令】穿越者背景的嚴格控制
@@ -126,14 +129,29 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 * **觸發戰鬥**: 只有在NPC被激怒並決定主動攻擊時，你才可以在回傳的JSON中觸發戰鬥系統。你的 "story" 敘述必須描寫NPC被激怒並發起攻擊的過程，然後在\`roundData\`中加入\`"enterCombat": true\`以及相應的戰鬥設定。
 `;
 
-    // 【核心修改】將 getMartialArtsRule 的呼叫移到函式內部，並傳遞 npcContext
-    const martialArtsRules = getMartialArtsRule({ npcContext });
+    // 【核心新增】物品存在性鐵律
+    const itemExistenceRule = `
+## 【最高優先級鐵律】物品存在性鐵律 (Item Existence Law)
+為了維護遊戲世界的平衡與邏輯，你必須嚴格遵守此規則。
+
+1.  **驗證玩家指令**：當玩家的行動涉及獲取、拾取、偷竊或與任何具體物品互動時（例如，「我撿起地上的劍」、「我偷走桌上的錢袋」），你**必須**首先在你的核心記憶（長期故事摘要）和短期記憶（最近發生的事件）中，驗證該物品是否**由你本人**在前文中明確提及過。
+
+2.  **驗證成功（物品存在）**：如果你之前確實在故事中描述過該物品的存在（例如，你寫過「一把生鏽的鐵劍掉落在地上」），那麼你可以生成玩家成功與該物品互動的劇情，並在 \`itemChanges\` 中記錄物品的增加。
+
+3.  **驗證失敗（物品不存在）**：如果玩家提及的物品在你的記憶中**從未出現過**，你**絕對禁止**讓玩家成功獲得該物品。你必須生成一段描述**失敗**的劇情。
+    * **範例1 (撿東西)**：玩家輸入「我撿起地上的屠龍刀」。你應回應：「你低頭在地上仔細搜尋，卻沒有發現任何刀劍的蹤影，地上只有幾片枯葉。」
+    * **範例2 (搜查)**：玩家輸入「我從屍體上搜出大還丹」。你應回應：「你仔細搜查了那具屍體，卻發現他身上除了幾文銅錢外，空無一物。」
+    * **範例3 (偷竊)**：玩家輸入「我偷走王大夫櫃檯上的千年人參」。你應回應：「你悄悄靠近櫃檯，卻發現上面只放著一些普通的藥材，並無任何人參的蹤影。」
+
+4.  **AI自身行為準則**：你在生成故事，描述環境中有什麼物品時，也必須考慮遊戲的平衡性。**絕對禁止**在遊戲初期或普通場景中，無緣無故地放置極其強大或稀有的物品。所有強力物品的出現，都必須有合理的劇情鋪陳。
+`;
 
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於金庸武俠小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的非戰鬥指令，產生接下來發生的故事。
 
 ${anachronismRule}
 ${languageProvocationRule}
+${itemExistenceRule}
 
 ---
 
