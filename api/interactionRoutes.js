@@ -196,9 +196,6 @@ const interactRouteHandler = async (req, res) => {
                 }
             });
         }
-
-        // 【核心修改】將 levelUpEvents 的獲取移到 updateSkills 之後
-        // let levelUpEvents = [];
         
         const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore);
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
@@ -238,11 +235,18 @@ const interactRouteHandler = async (req, res) => {
         } else {
             newStamina += staminaChange;
         }
+
+        // 【核心新增】每回合固定精力消耗
+        if (!isResting) {
+            const passiveStaminaDrain = Math.floor(Math.random() * 5) + 1; // 產生 1-5 的隨機整數
+            newStamina -= passiveStaminaDrain;
+            console.log(`[精力系統] 非休息回合，額外消耗精力: ${passiveStaminaDrain}`);
+        }
+        
         newStamina = Math.max(0, Math.min(100, newStamina));
         
         if (newStamina <= 0) {
             console.log(`[精力系統] 玩家 ${username} 精力耗盡，觸發昏迷事件！`);
-            // const passOutEvent = await getAIPassOutEvent(playerProfile, lastSave);
             const passOutEvent = { 
                 story: "你感到一陣天旋地轉，眼前的景象逐漸模糊，最終眼前一黑，徹底失去了知覺。",
                 PC: "你因體力不支而昏倒在地。",
@@ -299,11 +303,9 @@ const interactRouteHandler = async (req, res) => {
         if (levelUpEvents.length > 0) {
             aiResponse.roundData.levelUpEvents = levelUpEvents;
         }
-        // 如果自創武學失敗，將失敗原因附加到故事中
         if (customSkillCreationResult && !customSkillCreationResult.success) {
             aiResponse.story += `\n\n（${customSkillCreationResult.reason}）`;
         }
-
 
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
@@ -445,7 +447,6 @@ const interactRouteHandler = async (req, res) => {
             ...finalDate
         };
         
-        // 【核心新增】檢查並更新歷史最高能力值
         if (newInternalPower > (userProfile.maxInternalPowerAchieved || 0)) {
             playerUpdatesForDb.maxInternalPowerAchieved = newInternalPower;
         }
@@ -455,7 +456,6 @@ const interactRouteHandler = async (req, res) => {
         if (newLightness > (userProfile.maxLightnessAchieved || 0)) {
             playerUpdatesForDb.maxLightnessAchieved = newLightness;
         }
-
 
         await Promise.all([
              userDocRef.update(playerUpdatesForDb),
