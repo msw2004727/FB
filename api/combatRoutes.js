@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAICombatSetup, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
+const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult } = require('../services/aiService');
 const { 
     updateFriendlinessValues, 
     getInventoryState, 
@@ -29,6 +29,7 @@ const getNpcTags = (skills = []) => {
     };
 
     skills.forEach(skill => {
+        // 【核心修改】增加對 skill 和 skill.name 的有效性檢查
         if (skill && skill.name) {
             if (skill.skillType === '醫術') tags.add('治癒');
             if (skill.skillType === '毒術') tags.add('攻擊');
@@ -41,7 +42,7 @@ const getNpcTags = (skills = []) => {
         }
     });
 
-    if (tags.size === 0) tags.add('攻擊');
+    if (tags.size === 0) tags.add('攻擊'); // 如果沒有匹配，預設為攻擊
 
     const typeMapping = { '攻擊': 'attack', '防禦': 'defend', '治癒': 'heal', '輔助': 'support' };
     return Array.from(tags).map(tagName => ({
@@ -169,21 +170,38 @@ const combatActionRouteHandler = async (req, res) => {
         finalUpdatedState.log.push(combatResult.narrative);
 
         if (combatResult.updatedState) {
+            // 玩家數值修正
             if (combatResult.updatedState.player) {
                 const originalSkills = finalUpdatedState.player.skills;
                 finalUpdatedState.player = { ...finalUpdatedState.player, ...combatResult.updatedState.player };
                 finalUpdatedState.player.skills = originalSkills;
+                if (finalUpdatedState.player.hp < 0) finalUpdatedState.player.hp = 0;
+                if (finalUpdatedState.player.mp < 0) finalUpdatedState.player.mp = 0;
             }
+            // 敵人數值修正
             if (combatResult.updatedState.enemies) {
                 finalUpdatedState.enemies = finalUpdatedState.enemies.map(enemy => {
                     const updatedEnemy = combatResult.updatedState.enemies.find(u => u.name === enemy.name);
-                    return updatedEnemy ? { ...enemy, ...updatedEnemy } : enemy;
+                    if (updatedEnemy) {
+                        const newEnemy = { ...enemy, ...updatedEnemy };
+                        if (newEnemy.hp < 0) newEnemy.hp = 0;
+                        if (newEnemy.mp < 0) newEnemy.mp = 0;
+                        return newEnemy;
+                    }
+                    return enemy;
                 });
             }
-             if (combatResult.updatedState.allies) {
+            // 盟友數值修正
+            if (combatResult.updatedState.allies) {
                 finalUpdatedState.allies = finalUpdatedState.allies.map(ally => {
                     const updatedAlly = combatResult.updatedState.allies.find(u => u.name === ally.name);
-                    return updatedAlly ? { ...ally, ...updatedAlly } : ally;
+                     if (updatedAlly) {
+                        const newAlly = { ...ally, ...updatedAlly };
+                        if (newAlly.hp < 0) newAlly.hp = 0;
+                        if (newAlly.mp < 0) newAlly.mp = 0;
+                        return newAlly;
+                    }
+                    return ally;
                 });
             }
         }
