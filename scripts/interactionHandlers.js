@@ -19,7 +19,6 @@ function showNpcInteractionMenu(targetElement, npcName) {
     
     dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
     dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
-    // 【核心修正】將事件監聽器指向新的意圖選擇函式
     dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
 
     const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
@@ -48,6 +47,7 @@ function showNpcInteractionMenu(targetElement, npcName) {
 
 // 第一層：顯示戰鬥意圖選項
 function showAttackIntention(event) {
+    event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     dom.npcInteractionMenu.innerHTML = `
         <button class="npc-interaction-btn intention" data-intention="切磋" data-npc-name="${npcName}">切磋</button>
@@ -61,6 +61,7 @@ function showAttackIntention(event) {
 
 // 第二層：顯示最終確認
 function showFinalConfirmation(event) {
+    event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     const intention = event.currentTarget.dataset.intention;
     
@@ -71,6 +72,7 @@ function showFinalConfirmation(event) {
     `;
 
     dom.npcInteractionMenu.querySelector('.cancel-attack').addEventListener('click', (e) => {
+        e.stopPropagation();
         const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
         if (originalTarget) {
             showNpcInteractionMenu(originalTarget, npcName);
@@ -152,6 +154,7 @@ function endCombat(newRoundData) {
 }
 
 async function handleTradeButtonClick(event) {
+    event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
@@ -175,6 +178,7 @@ async function handleTradeButtonClick(event) {
 }
 
 async function handleChatButtonClick(event) {
+    event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
@@ -198,6 +202,7 @@ async function handleChatButtonClick(event) {
 }
 
 async function confirmAndInitiateAttack(event) {
+    event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     const intention = event.currentTarget.dataset.intention;
     hideNpcInteractionMenu();
