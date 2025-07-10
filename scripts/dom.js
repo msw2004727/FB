@@ -39,7 +39,7 @@ export function initializeDOM() {
         const aiThinkingLoader = document.createElement('div');
         aiThinkingLoader.className = 'ai-thinking-loader';
         aiThinkingLoader.innerHTML = `
-            <div class="loader-disclaimer">說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。</div>
+            <div class="loader-disclaimer"></div>
             <div class="loader-text"></div>
             <div class="loader-dots"><span></span><span></span><span></span></div>
             <div class="loader-tip"></div>
