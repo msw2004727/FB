@@ -1,6 +1,6 @@
 // api/cacheManager.js
 const admin = require('firebase-admin');
-const db = admin.firestore();
+// 【移除】不再在這裡初始化db
 
 // 創建一個物件來存放我們的快取數據
 const cache = {
@@ -12,6 +12,8 @@ const cache = {
  * 這個函式會在伺服器啟動時被呼叫一次。
  */
 async function initializeNpcNameCache() {
+    // 【修改】將db的初始化移到函式內部，確保此時Firebase App已經被初始化
+    const db = admin.firestore();
     try {
         console.log('[快取系統] 正在初始化NPC名稱快取...');
         const snapshot = await db.collection('npcs').get();
