@@ -41,12 +41,6 @@ const skillsBodyContainer = document.getElementById('skills-body-container');
 
 // --- 交易系統函式 ---
 
-/**
- * 開啟新版「江湖貨棧」交易彈窗並初始化
- * @param {object} tradeData - 從後端API獲取的交易初始化數據
- * @param {string} npcName - 正在交易的NPC名稱
- * @param {function} onTradeComplete - 交易成功後的回調函式
- */
 export function openTradeModal(tradeData, npcName, onTradeComplete) {
     const tradeModalEl = document.getElementById('trade-modal');
     if (!tradeModalEl || !tradeData) return;
@@ -57,9 +51,6 @@ export function openTradeModal(tradeData, npcName, onTradeComplete) {
     tradeModalEl.classList.add('flex');
 }
 
-/**
- * 關閉新版「江湖貨棧」交易彈窗
- */
 export function closeTradeModal() {
     const tradeModalEl = document.getElementById('trade-modal');
     if (tradeModalEl) {
@@ -209,18 +200,19 @@ export function openCombatModal(initialState, onCombatCancel) {
         <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
     `;
     
-    // 【核心修改】確保「認輸」按鈕存在於HTML中
     confirmActionContainer.innerHTML = `
         <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
         <button id="combat-surrender-btn" class="surrender-btn">認輸</button>
     `;
     
     if (closeCombatBtn) {
+        // 【核心修改】將關閉按鈕的邏輯簡化為直接取消
         const closeHandler = () => {
             closeCombatModal();
             if (typeof onCombatCancel === 'function') {
                 onCombatCancel();
             }
+            // 移除監聽器以避免記憶體洩漏
             closeCombatBtn.removeEventListener('click', closeHandler);
         };
         closeCombatBtn.addEventListener('click', closeHandler);
@@ -357,6 +349,14 @@ export function openSkillsModal(skillsData) {
 
     const skillTypes = Object.keys(skillsByType);
 
+    // 【核心新增】建立一個翻譯對照表
+    const powerTypeMap = {
+        internal: '內功',
+        external: '外功',
+        lightness: '輕功',
+        none: '無'
+    };
+
     skillTypes.forEach((type, index) => {
         const tabButton = document.createElement('button');
         tabButton.className = 'skill-tab';
@@ -371,12 +371,15 @@ export function openSkillsModal(skillsData) {
             const expToNextLevel = (skill.level + 1) * 100;
             const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
             
+            // 【核心修改】使用翻譯後的中文名稱
+            const translatedPowerType = powerTypeMap[skill.power_type] || '無';
+
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
             skillEntry.innerHTML = `
                 <div class="skill-entry-header">
                     <h4>${skill.skillName}</h4>
-                    <span class="skill-type">${skill.power_type || '無'}</span>
+                    <span class="skill-type">${translatedPowerType}</span>
                 </div>
                 <p class="skill-description">${skill.base_description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
