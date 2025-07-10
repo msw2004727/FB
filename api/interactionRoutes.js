@@ -26,7 +26,6 @@ const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEn
 const { processLocationUpdates } = require('./locationManager');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
 
-
 const db = admin.firestore();
 
 // 主動互動引擎 (Proactive Chat Engine)
@@ -469,10 +468,10 @@ router.post('/interact', interactRouteHandler);
 const finalizeCombatHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
-    const { combatResult } = req.body;
+    const { combatResult, model: playerModelChoice } = req.body;
 
-    if (!combatResult) {
-        return res.status(400).json({ message: '缺少戰鬥結果數據。' });
+    if (!combatResult || !combatResult.finalState) {
+        return res.status(400).json({ message: '缺少完整的戰鬥結果數據。' });
     }
 
     try {
@@ -481,12 +480,17 @@ const finalizeCombatHandler = async (req, res) => {
 
         const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const preCombatRoundData = lastSaveSnapshot.docs[0].data();
-
-        const { narrative: combatNarrative, outcome } = await getAIPostCombatResult(req.body.model, { ...(await userDocRef.get()).data(), username }, combatResult.finalState, combatResult.log);
-        const { summary, EVT, playerChanges, itemChanges, npcUpdates } = outcome;
         
-        const fullNarrative = `${combatResult.finalState.log.join('<br>')}<hr>${combatNarrative}`;
+        const userProfile = (await userDocRef.get()).data();
 
+        const postCombatOutcome = await getAIPostCombatResult(playerModelChoice, { ...userProfile, username }, combatResult.finalState, combatResult.log);
+        
+        if (!postCombatOutcome || !postCombatOutcome.outcome) {
+             throw new Error("戰後結算AI未能生成有效回應。");
+        }
+        
+        const { summary, EVT, playerChanges, itemChanges, npcUpdates } = postCombatOutcome.outcome;
+        
         await updateInventory(userId, itemChanges || [], preCombatRoundData);
         
         const updates = {};
@@ -502,13 +506,14 @@ const finalizeCombatHandler = async (req, res) => {
             await userDocRef.update(updates);
         }
         
+        let reputationSummary = '';
         if (npcUpdates && npcUpdates.length > 0) {
             await processNpcUpdates(userId, npcUpdates);
             for (const update of npcUpdates) {
                 if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
-                   const reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, preCombatRoundData.LOC[0], combatResult.finalState.allies.map(a => a.name));
+                   reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, preCombatRoundData.LOC[0], combatResult.finalState.allies.map(a => a.name));
                    if (reputationSummary) {
-                       combatResult.summary += `\n\n**【江湖反應】** ${reputationSummary}`;
+                       summary += `\n\n**【江湖反應】** ${reputationSummary}`;
                    }
                 }
             }
