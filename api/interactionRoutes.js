@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary, getAIEventDirectorResult, getAIPostCombatResult } = require('../services/aiService'); 
+const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat, getAIChatSummary, getAIPostCombatResult } = require('../services/aiService'); 
 const {
     TIME_SEQUENCE,
     advanceDate,
@@ -25,6 +25,7 @@ const {
 const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
+
 
 const db = admin.firestore();
 
@@ -108,155 +109,135 @@ const interactRouteHandler = async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-        let aiResponse;
-        let userProfile;
-        let longTermSummary;
-        let currentTimeOfDay;
+        const [userDoc, summaryDoc, savesSnapshot, skills, rawInventory] = await Promise.all([
+            userDocRef.get(),
+            summaryDocRef.get(),
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get(),
+            getPlayerSkills(userId),
+            getRawInventory(userId)
+        ]);
+
+        let totalBulkScore = 0;
+        if (rawInventory) {
+            Object.values(rawInventory).forEach(item => {
+                const quantity = item.quantity || 1;
+                switch (item.bulk) {
+                    case '中': totalBulkScore += 1 * quantity; break;
+                    case '重': totalBulkScore += 3 * quantity; break;
+                    case '極重': totalBulkScore += 10 * quantity; break;
+                    default: break;
+                }
+            });
+        }
+        
+        let userProfile = userDoc.exists ? userDoc.data() : {};
+        if (userProfile.isDeceased) {
+            return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
+        }
+        if (userProfile.deathCountdown && userProfile.deathCountdown > 0) {
+            const newCountdown = userProfile.deathCountdown - 1;
+            if (newCountdown <= 0) {
+                await userDocRef.update({ isDeceased: true, deathCountdown: admin.firestore.FieldValue.delete() });
+                const lastSaveData = savesSnapshot.docs[0]?.data() || {};
+                const finalSave = {
+                    ...lastSaveData,
+                    R: lastSaveData.R + 1,
+                    playerState: 'dead',
+                    PC: '你終究沒能撐過去，在傷痛中耗盡了最後一絲氣力。',
+                    story: '你的意識逐漸模糊，江湖中的恩怨情仇如走馬燈般在眼前閃過，最終，一切歸於永恆的寂靜。',
+                    EVT: '氣力耗盡，傷重不治'
+                };
+                await userDocRef.collection('game_saves').doc(`R${finalSave.R}`).set(finalSave);
+                return res.json({ roundData: finalSave });
+            } else {
+                await userDocRef.update({ deathCountdown: newCountdown });
+                userProfile.deathCountdown = newCountdown; 
+            }
+        }
+        
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
+        const lastSave = savesSnapshot.docs[0]?.data() || {};
+        
+        if (userProfile.stamina === undefined) {
+            userProfile.stamina = 100;
+        }
+
+        const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
+        const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
         
         const worldEventsRef = userDocRef.collection('world_events').orderBy('createdAt', 'asc').limit(1);
         const activeEventsSnapshot = await worldEventsRef.get();
-
+        let worldEventToWeave = null;
         if (!activeEventsSnapshot.empty) {
             const eventDoc = activeEventsSnapshot.docs[0];
             const worldEvent = eventDoc.data();
-            console.log(`[世界因果引擎] 偵測到活動事件: ${worldEvent.eventType}`);
-            
-            userProfile = (await userDocRef.get()).data(); 
-            const eventResult = await getAIEventDirectorResult(playerModelChoice, userProfile, worldEvent);
-            
-            aiResponse = {
-                story: eventResult.story,
-                roundData: {
-                    ...eventResult.playerChanges,
-                    itemChanges: eventResult.itemChanges,
-                    npcUpdates: eventResult.npcUpdates
-                }
-            };
-            
-            currentTimeOfDay = userProfile.timeOfDay || '上午';
+            worldEventToWeave = worldEvent;
+            console.log(`[世界因果引擎] 偵測到活動事件: ${worldEvent.eventType}，已傳遞給主AI處理。`);
 
             if (worldEvent.turnsRemaining - 1 <= 0) {
                 await eventDoc.ref.delete();
-                 console.log(`[世界因果引擎] 事件 ${worldEvent.eventType} 已結束。`);
+                console.log(`[世界因果引擎] 事件 ${worldEvent.eventType} 已結束。`);
             } else {
                 await eventDoc.ref.update({
                     turnsRemaining: admin.firestore.FieldValue.increment(-1),
-                    currentStage: eventResult.nextStage,
                     lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
-        } else {
-            const [userDoc, summaryDoc, savesSnapshot, skills, rawInventory] = await Promise.all([
-                userDocRef.get(),
-                summaryDocRef.get(),
-                userDocRef.collection('game_saves').orderBy('R', 'desc').limit(3).get(),
-                getPlayerSkills(userId),
-                getRawInventory(userId)
-            ]);
-            
-            let totalBulkScore = 0;
-            if (rawInventory) {
-                Object.values(rawInventory).forEach(item => {
-                    const quantity = item.quantity || 1;
-                    switch (item.bulk) {
-                        case '中': totalBulkScore += 1 * quantity; break;
-                        case '重': totalBulkScore += 3 * quantity; break;
-                        case '極重': totalBulkScore += 10 * quantity; break;
-                        default: break;
-                    }
-                });
-            }
-            
-            userProfile = userDoc.exists ? userDoc.data() : {};
-            if (userProfile.isDeceased) {
-                return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
-            }
-            if (userProfile.deathCountdown && userProfile.deathCountdown > 0) {
-                const newCountdown = userProfile.deathCountdown - 1;
-                if (newCountdown <= 0) {
-                    await userDocRef.update({ isDeceased: true, deathCountdown: admin.firestore.FieldValue.delete() });
-                    const lastSaveData = savesSnapshot.docs[0]?.data() || {};
-                    const finalSave = {
-                        ...lastSaveData,
-                        R: lastSaveData.R + 1,
-                        playerState: 'dead',
-                        PC: '你終究沒能撐過去，在傷痛中耗盡了最後一絲氣力。',
-                        story: '你的意識逐漸模糊，江湖中的恩怨情仇如走馬燈般在眼前閃過，最終，一切歸於永恆的寂靜。',
-                        EVT: '氣力耗盡，傷重不治'
-                    };
-                    await userDocRef.collection('game_saves').doc(`R${finalSave.R}`).set(finalSave);
-                    return res.json({ roundData: finalSave });
-                } else {
-                    await userDocRef.update({ deathCountdown: newCountdown });
-                    userProfile.deathCountdown = newCountdown; 
-                }
-            }
-            longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "遊戲剛剛開始...";
-            const lastSave = savesSnapshot.docs[0]?.data() || {};
-            
-            if (userProfile.stamina === undefined) {
-                userProfile.stamina = 100;
-            }
+        }
 
-            const romanceEventData = await checkAndTriggerRomanceEvent(userId, { ...userProfile, username });
-            const romanceEventToWeave = romanceEventData ? romanceEventData.eventStory : null;
-            const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
-            const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
-            
-            if (userProfile.stamina < 60) {
-                playerPower.internal *= 0.8;
-                playerPower.external *= 0.8;
-                playerPower.lightness *= 0.8;
-            }
-            if (userProfile.stamina < 40) {
-                playerPower.internal *= 0.5;
-                playerPower.external *= 0.5;
-                playerPower.lightness *= 0.5;
-            }
-            
-            const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
-            
-            const currentDate = {
-                yearName: userProfile.yearName || lastSave.yearName || '元祐',
-                year: userProfile.year || lastSave.year || 1,
-                month: userProfile.month || lastSave.month || 1,
-                day: userProfile.day || lastSave.day || 1,
-            };
-
-            currentTimeOfDay = userProfile.timeOfDay || '上午';
-            
-            const locationContext = await getMergedLocationData(userId, lastSave.LOC);
-            const npcContext = {};
-            if (lastSave.NPC && lastSave.NPC.length > 0) {
-                const npcPromises = lastSave.NPC.map(npcInScene => getMergedNpcProfile(userId, npcInScene.name));
-                const npcProfiles = await Promise.all(npcPromises);
-                npcProfiles.forEach(profile => {
-                    if (profile) {
-                        npcContext[profile.name] = profile;
-                    }
-                });
-            }
-            
-            const actorCandidates = new Set();
-            const allNpcTemplatesSnapshot = await db.collection('npcs').get();
-            const existingNpcTemplates = new Set(allNpcTemplatesSnapshot.docs.map(doc => doc.id));
-
-            for (const npc of Object.values(npcContext)) {
-                if (npc.relationships) {
-                    for (const relatedNpcName of Object.values(npc.relationships)) {
-                        if (relatedNpcName && !existingNpcTemplates.has(relatedNpcName)) {
-                            actorCandidates.add(relatedNpcName);
-                        }
-                    }
-                }
-            }
-
-            aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, locationContext, npcContext, totalBulkScore, Array.from(actorCandidates));
-            if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
+        const recentHistoryRounds = savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R);
+        const playerPower = { internal: userProfile.internalPower || 5, external: userProfile.externalPower || 5, lightness: userProfile.lightness || 5 };
+        
+        if (userProfile.stamina < 60) {
+            playerPower.internal *= 0.8;
+            playerPower.external *= 0.8;
+            playerPower.lightness *= 0.8;
+        }
+        if (userProfile.stamina < 40) {
+            playerPower.internal *= 0.5;
+            playerPower.external *= 0.5;
+            playerPower.lightness *= 0.5;
         }
         
-        const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-        const lastSave = lastSaveSnapshot.empty ? {} : lastSaveSnapshot.docs[0].data();
+        const playerMorality = userProfile.morality === undefined ? 0 : userProfile.morality;
+        
+        const currentDate = {
+            yearName: userProfile.yearName || lastSave.yearName || '元祐',
+            year: userProfile.year || lastSave.year || 1,
+            month: userProfile.month || lastSave.month || 1,
+            day: userProfile.day || lastSave.day || 1,
+        };
+
+        const currentTimeOfDay = userProfile.timeOfDay || '上午';
+        
+        const locationContext = await getMergedLocationData(userId, lastSave.LOC);
+        const npcContext = {};
+        if (lastSave.NPC && lastSave.NPC.length > 0) {
+            const npcPromises = lastSave.NPC.map(npcInScene => getMergedNpcProfile(userId, npcInScene.name));
+            const npcProfiles = await Promise.all(npcPromises);
+            npcProfiles.forEach(profile => {
+                if (profile) {
+                    npcContext[profile.name] = profile;
+                }
+            });
+        }
+        
+        const actorCandidates = new Set();
+        const allNpcTemplatesSnapshot = await db.collection('npcs').get();
+        const existingNpcTemplates = new Set(allNpcTemplatesSnapshot.docs.map(doc => doc.id));
+
+        for (const npc of Object.values(npcContext)) {
+            if (npc.relationships) {
+                for (const relatedNpcName of Object.values(npc.relationships)) {
+                    if (relatedNpcName && !existingNpcTemplates.has(relatedNpcName)) {
+                        actorCandidates.add(relatedNpcName);
+                    }
+                }
+            }
+        }
+
+        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistoryRounds), playerAction, { ...userProfile, ...currentDate }, username, currentTimeOfDay, playerPower, playerMorality, [], romanceEventToWeave, worldEventToWeave, locationContext, npcContext, totalBulkScore, Array.from(actorCandidates));
+        if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
         
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcProfiles = await Promise.all(
@@ -273,8 +254,6 @@ const interactRouteHandler = async (req, res) => {
         
         const newRoundNumber = (lastSave.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
-        
-        userProfile = (await userDocRef.get()).data();
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance, staminaChange = 0 } = aiResponse.roundData;
         let newStamina = (userProfile.stamina === undefined) ? 100 : userProfile.stamina;
@@ -350,11 +329,11 @@ const interactRouteHandler = async (req, res) => {
         
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, userProfile);
         
-        longTermSummary = (await summaryDocRef.get()).exists ? (await summaryDocRef.get()).data().text : "遊戲剛剛開始...";
+        const currentLongTermSummary = (await summaryDocRef.get()).exists ? (await summaryDocRef.get()).data().text : "遊戲剛剛開始...";
         
         if (levelUpEvents.length > 0) {
             aiResponse.roundData.levelUpEvents = levelUpEvents;
-            const levelUpNarrative = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify([aiResponse.roundData]), "我剛剛武學境界有所突破", { ...userProfile, ...finalDate }, username, finalTimeOfDay, playerPower, userProfile.morality, levelUpEvents, null, locationContext, npcContext, totalBulkScore, []);
+            const levelUpNarrative = await getAIStory(playerModelChoice, currentLongTermSummary, JSON.stringify([aiResponse.roundData]), "我剛剛武學境界有所突破", { ...userProfile, ...finalDate }, username, finalTimeOfDay, playerPower, userProfile.morality, levelUpEvents, null, null, locationContext, npcContext, totalBulkScore, []);
             if (levelUpNarrative && levelUpNarrative.story) {
                 aiResponse.story += `\n\n${levelUpNarrative.story}`;
             }
@@ -374,16 +353,14 @@ const interactRouteHandler = async (req, res) => {
         
         if(aiResponse.roundData.mentionedLocations && aiResponse.roundData.mentionedLocations.length > 0) {
              const locationPromises = aiResponse.roundData.mentionedLocations.map(locName => 
-                generateAndCacheLocation(userId, locName, '未知', longTermSummary)
+                generateAndCacheLocation(userId, locName, '未知', currentLongTermSummary)
             );
             await Promise.all(locationPromises);
         }
         
         const updatedUserProfileDoc = await userDocRef.get();
-        userProfile = updatedUserProfileDoc.exists ? updatedUserProfileDoc.data() : {};
+        const finalUserProfile = updatedUserProfileDoc.exists ? updatedUserProfileDoc.data() : {};
         
-        longTermSummary = (await summaryDocRef.get()).exists ? (await summaryDocRef.get()).data().text : "遊戲剛剛開始...";
-
         const [newSummary, suggestion, inventoryState, updatedSkills, newBountiesSnapshot] = await Promise.all([
             getAISummary(longTermSummary, aiResponse.roundData),
             getAISuggestion(aiResponse.roundData),
@@ -401,7 +378,7 @@ const interactRouteHandler = async (req, res) => {
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcUpdatePromises = aiResponse.roundData.NPC.map(npc => {
                  if (npc.isNew) {
-                    return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, userProfile);
+                    return createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, finalUserProfile);
                  }
                  return Promise.resolve();
             });
@@ -414,12 +391,10 @@ const interactRouteHandler = async (req, res) => {
 
         const { powerChange = {}, moralityChange = 0 } = aiResponse.roundData;
         
-        const newInternalPower = Math.max(0, Math.min(999, (userProfile.internalPower || 0) + (powerChange.internal || 0)));
-        const newExternalPower = Math.max(0, Math.min(999, (userProfile.externalPower || 0) + (powerChange.external || 0)));
-        const newLightness = Math.max(0, Math.min(999, (userProfile.lightness || 0) + (powerChange.lightness || 0)));
-        let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
-        
-        const finalUserProfile = (await userDocRef.get()).data();
+        const newInternalPower = Math.max(0, Math.min(999, (finalUserProfile.internalPower || 0) + (powerChange.internal || 0)));
+        const newExternalPower = Math.max(0, Math.min(999, (finalUserProfile.externalPower || 0) + (powerChange.external || 0)));
+        const newLightness = Math.max(0, Math.min(999, (finalUserProfile.lightness || 0) + (powerChange.lightness || 0)));
+        let newMorality = Math.max(-100, Math.min(100, (finalUserProfile.morality || 0) + moralityChange));
         
         const newStory = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         aiResponse.roundData = { 
