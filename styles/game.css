@@ -12,6 +12,7 @@
     height: 100%;
     /* 新增：為了解決 iOS 上的滾動問題 */
     position: relative;
+    min-width: 0; /* 【核心新增】避免 flex 項目內容溢出，解決窄視窗裁切問題 */
 }
 .dashboard {
     width: 320px;
