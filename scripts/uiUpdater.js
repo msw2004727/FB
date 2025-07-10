@@ -58,7 +58,7 @@ function highlightNpcNames(text, npcs) {
             const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(npcNameEscaped, 'g');
             const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
-            const replacement = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
+            const replacement = `<span class="npc-name npc-${npc.friendliness || 'neutral'}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
         });
     }
@@ -170,12 +170,19 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
 
 
     npcContent.innerHTML = '';
-    if (roundData.NPC && Array.isArray(roundData.NPC) && roundData.NPC.length > 0) {
-        roundData.NPC.forEach(npc => {
-            const npcLine = document.createElement('div');
-            npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
-            npcContent.appendChild(npcLine);
-        });
+    if (roundData.NPC && Array.isArray(roundData.NPC)) {
+        // 過濾掉已死亡的NPC，再渲染到側邊欄
+        const aliveNpcs = roundData.NPC.filter(npc => !npc.isDeceased);
+
+        if (aliveNpcs.length > 0) {
+            aliveNpcs.forEach(npc => {
+                const npcLine = document.createElement('div');
+                npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
+                npcContent.appendChild(npcLine);
+            });
+        } else {
+            npcContent.textContent = '未見人煙';
+        }
     } else {
         npcContent.textContent = '未見人煙';
     }
