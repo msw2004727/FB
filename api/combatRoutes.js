@@ -29,7 +29,6 @@ const getNpcTags = (skills = []) => {
     };
 
     skills.forEach(skill => {
-        // 【核心修改】增加對 skill 和 skill.name 的有效性檢查
         if (skill && skill.name) {
             if (skill.skillType === '醫術') tags.add('治癒');
             if (skill.skillType === '毒術') tags.add('攻擊');
@@ -44,9 +43,10 @@ const getNpcTags = (skills = []) => {
 
     if (tags.size === 0) tags.add('攻擊'); // 如果沒有匹配，預設為攻擊
 
+    const typeMapping = { '攻擊': 'attack', '防禦': 'defend', '治癒': 'heal', '輔助': 'support' };
     return Array.from(tags).map(tagName => ({
         name: tagName,
-        type: Object.values(tagMap).find(t => t.keywords.includes(tagName))?.type || 'attack'
+        type: typeMapping[tagName] || 'attack'
     }));
 };
 
@@ -191,78 +191,13 @@ const combatActionRouteHandler = async (req, res) => {
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
-            const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-            const lastRoundData = lastSaveSnapshot.docs[0].data();
-            
-            const postCombatResult = await getAIPostCombatResult(playerModelChoice, playerProfile, finalUpdatedState, combatState.log);
-            let { outcome } = postCombatResult;
-
-            // 如果AI沒有回傳有效的outcome，給一個預設值
-            if (!outcome) {
-                outcome = {
-                    summary: '戰鬥結束了。',
-                    EVT: '塵埃落定',
-                    playerChanges: { PC: '你結束了戰鬥。', powerChange: {}, moralityChange: 0 },
-                    itemChanges: [],
-                    npcUpdates: []
-                };
-            }
-
-            const hostilityChanges = [];
-            if (!combatState.isSparring) {
-                for (const enemy of combatState.enemies) {
-                    hostilityChanges.push({ name: enemy.name, friendlinessChange: -50 });
-                }
-                if (hostilityChanges.length > 0) {
-                    await updateFriendlinessValues(userId, hostilityChanges);
-                    console.log(`[戰鬥系統] 已對戰敗方 ${combatState.enemies.map(e => e.name).join(',')} 施加好感度-50懲罰。`);
-                }
-            }
-            
-            if (outcome.itemChanges && outcome.itemChanges.length > 0) {
-                await updateInventory(userId, outcome.itemChanges, {});
-            }
-            
-            let reputationSummary = '';
-            if (outcome.npcUpdates && outcome.npcUpdates.length > 0) {
-                await processNpcUpdates(userId, outcome.npcUpdates);
-                for (const update of outcome.npcUpdates) {
-                    if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
-                        reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, lastRoundData.LOC[0], combatState.allies.map(a => a.name));
-                        if (reputationSummary) {
-                           outcome.summary += `\n\n**【江湖反應】** ${reputationSummary}`;
-                        }
-                        const worldEvent = {
-                            eventType: 'NPC_DEATH',
-                            eventData: {
-                                deceasedNpcName: update.npcName,
-                                summary: `玩家 ${playerProfile.username} 在 ${lastRoundData.LOC[0]} 殺死了 ${update.npcName}。`,
-                            },
-                            currentStage: '屍體處理',
-                            turnsRemaining: 10,
-                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                            lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-                        };
-                        await db.collection('users').doc(userId).collection('world_events').add(worldEvent);
-                        console.log(`[世界引擎] 已為NPC「${update.npcName}」之死創建後續事件。`);
-                    }
-                }
-            }
-
-            // 將戰鬥結果暫存到一個新的文檔中，等待玩家的下一步行動
-            await userDocRef.collection('game_state').doc('last_combat_outcome').set({
-                ...outcome,
-                playerWon: finalUpdatedState.enemies.every(e => e.hp <= 0),
-                defeatedEnemies: finalUpdatedState.enemies.filter(e => e.hp <= 0).map(e => e.name)
-            });
-            
             res.json({
                 status: 'COMBAT_END',
                 narrative: combatResult.narrative, 
                 updatedState: finalUpdatedState,
-                combatResult: { // 將裁決結果傳給前端
-                    ...outcome,
-                    reputationSummary: reputationSummary || ''
+                combatResult: {
+                    finalState: finalUpdatedState,
+                    log: combatState.log
                 }
             });
 
