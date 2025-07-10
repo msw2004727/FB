@@ -22,7 +22,7 @@ router.get('/novels', async (req, res) => {
         const novelsList = snapshot.docs.map(doc => {
             const data = doc.data();
             
-            // 【核心修改】從 lastChapterData 中提取更多資訊
+            // 從 lastChapterData 中提取更多資訊，並提供預設值以防出錯
             const lastChapterData = data.lastChapterData || {};
             const timeString = `${lastChapterData.yearName || '元祐'}${lastChapterData.year || 1}年${lastChapterData.month || 1}月${lastChapterData.day || 1}日`;
 
@@ -33,7 +33,7 @@ router.get('/novels', async (req, res) => {
                 lastUpdated: data.lastUpdated.toDate(),
                 isDeceased: data.isDeceased || false,
                 time: timeString, // 新增：時間
-                round: lastChapterData.R || '未知', // 新增：回合數
+                round: lastChapterData.R !== undefined ? lastChapterData.R : '未知', // 新增：回合數
             };
         });
 
@@ -66,7 +66,6 @@ router.get('/novel/:userId', async (req, res) => {
 
         const novelData = doc.data();
         
-        // 【核心修改】從 lastChapterData 取得標題，如果不存在則用舊的
         const title = novelData.lastChapterTitle || novelData.novelTitle || '未命名傳奇';
 
         res.json({
