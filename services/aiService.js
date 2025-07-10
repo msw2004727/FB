@@ -50,7 +50,6 @@ const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
-const { getEventDirectorPrompt } = require('../prompts/eventDirectorPrompt.js'); // 【核心新增】
 
 
 // 統一的AI調度中心
@@ -221,8 +220,8 @@ async function getAINpcProfile(username, npcName, roundData, playerProfile) {
     }
 }
 
-async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext) {
-    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
+async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext) {
+    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChat;
         const reply = await callAI(modelToUse, prompt, false);
