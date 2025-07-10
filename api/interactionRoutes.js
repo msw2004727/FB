@@ -273,7 +273,6 @@ const interactRouteHandler = async (req, res) => {
         
         const newRoundNumber = (lastSave.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
-        aiResponse.story = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
         
         userProfile = (await userDocRef.get()).data();
         
@@ -421,7 +420,18 @@ const interactRouteHandler = async (req, res) => {
         let newMorality = Math.max(-100, Math.min(100, (userProfile.morality || 0) + moralityChange));
         
         const finalUserProfile = (await userDocRef.get()).data();
-        aiResponse.roundData = { ...lastSave, ...aiResponse.roundData, ...inventoryState, ...finalUserProfile, ...finalDate, timeOfDay: finalTimeOfDay };
+        
+        // 【核心修正】在這裡組合最終要存檔的資料，並明確覆寫 story 欄位
+        const newStory = aiResponse.story || "江湖靜悄悄，似乎什麼也沒發生。";
+        aiResponse.roundData = { 
+            ...lastSave, 
+            ...aiResponse.roundData, 
+            ...inventoryState, 
+            ...finalUserProfile, 
+            ...finalDate, 
+            timeOfDay: finalTimeOfDay,
+            story: newStory // 確保新的故事被寫入
+        };
         
         const playerUpdatesForDb = {
             timeOfDay: finalTimeOfDay,
