@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult } = require('../services/aiService');
+const { getAICombatSetup, getAICombatAction, getAISurrenderResult } = require('../services/aiService');
 const { 
     updateFriendlinessValues, 
     getInventoryState, 
@@ -41,7 +41,7 @@ const getNpcTags = (skills = []) => {
         }
     });
 
-    if (tags.size === 0) tags.add('攻擊'); // 如果沒有匹配，預設為攻擊
+    if (tags.size === 0) tags.add('攻擊');
 
     const typeMapping = { '攻擊': 'attack', '防禦': 'defend', '治癒': 'heal', '輔助': 'support' };
     return Array.from(tags).map(tagName => ({
