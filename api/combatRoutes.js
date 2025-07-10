@@ -66,16 +66,13 @@ const initiateCombatHandler = async (req, res) => {
 
         const simulatedPlayerAction = isSparring ? `我想與 ${targetNpcName} 切磋一番。` : `我決定對 ${targetNpcName} 動手。`;
         
-        // 1. 讓AI根據情境生成基礎戰鬥設定
         const combatSetupResult = await getAICombatSetup(simulatedPlayerAction, lastSave);
 
-        // 2. 獲取玩家的詳細資料
         const playerSkills = await getPlayerSkills(userId);
         const userProfile = (await userDocRef.get()).data();
         const maxHp = (userProfile.externalPower || 5) * 10 + 50;
         const maxMp = (userProfile.internalPower || 5) * 5 + 20;
 
-        // 3. 【核心修改】獲取所有參戰NPC的詳細檔案以生成標籤
         const allNpcNames = [
             ...combatSetupResult.combatants.map(c => c.name),
             ...combatSetupResult.allies.map(a => a.name)
@@ -92,7 +89,6 @@ const initiateCombatHandler = async (req, res) => {
             return acc;
         }, {});
 
-        // 4. 為所有參戰者附加標籤
         combatSetupResult.combatants.forEach(c => {
             const profile = npcProfiles[c.name];
             c.tags = profile ? getNpcTags(profile.skills) : [{ name: '攻擊', type: 'attack' }];
@@ -111,7 +107,7 @@ const initiateCombatHandler = async (req, res) => {
                 maxHp, 
                 mp: maxMp, 
                 maxMp,
-                tags: [{ name: '主角', type: 'attack' }] // 玩家預設標籤
+                tags: [{ name: '主角', type: 'attack' }]
             }, 
             enemies: combatSetupResult.combatants,
             allies: combatSetupResult.allies || [], 
@@ -162,10 +158,33 @@ const combatActionRouteHandler = async (req, res) => {
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
-        const updatedState = combatResult.updatedState;
-        updatedState.log = combatState.log;
-        updatedState.log.push(combatResult.narrative);
+        // 【核心修正】在這裡手動組合出最完整、最正確的下一回合狀態
+        let finalUpdatedState = { ...combatState }; // 先複製一份舊的狀態
+        finalUpdatedState.turn = (finalUpdatedState.turn || 1) + 1; // 回合數手動+1，最準確
+        finalUpdatedState.log.push(combatResult.narrative); // 將新戰報加入日誌
 
+        // 將AI回傳的狀態變化，合併到我們的完整狀態中
+        if (combatResult.updatedState) {
+            // 更新玩家狀態
+            if (combatResult.updatedState.player) {
+                finalUpdatedState.player = { ...finalUpdatedState.player, ...combatResult.updatedState.player };
+            }
+            // 更新敵人狀態
+            if (combatResult.updatedState.enemies) {
+                finalUpdatedState.enemies = finalUpdatedState.enemies.map(enemy => {
+                    const updatedEnemy = combatResult.updatedState.enemies.find(u => u.name === enemy.name);
+                    return updatedEnemy ? { ...enemy, ...updatedEnemy } : enemy;
+                });
+            }
+            // 更新盟友狀態
+             if (combatResult.updatedState.allies) {
+                finalUpdatedState.allies = finalUpdatedState.allies.map(ally => {
+                    const updatedAlly = combatResult.updatedState.allies.find(u => u.name === ally.name);
+                    return updatedAlly ? { ...ally, ...updatedAlly } : ally;
+                });
+            }
+        }
+        
         if (combatResult.status === 'COMBAT_END') {
             await combatDocRef.delete();
             
@@ -174,6 +193,7 @@ const combatActionRouteHandler = async (req, res) => {
 
             const postCombatSummary = combatResult.newRound.summary || '戰鬥結束';
             const playerChanges = combatResult.newRound.playerChanges || {};
+            
             const relationshipChanges = combatResult.newRound.relationshipChanges || [];
             
             const powerChange = playerChanges.powerChange || {};
@@ -194,7 +214,7 @@ const combatActionRouteHandler = async (req, res) => {
             }
 
             const playerUpdatePayload = { ...finalPowerUpdate };
-            if (updatedState.player.hp <= 0) {
+            if (finalUpdatedState.player.hp <= 0) {
                 playerUpdatePayload.deathCountdown = 10;
             }
             await Promise.all([
@@ -212,7 +232,7 @@ const combatActionRouteHandler = async (req, res) => {
                  story: combatResult.narrative,
                  PC: playerChanges.PC || postCombatSummary,
                  EVT: postCombatSummary,
-                 playerState: updatedState.player.hp <= 0 ? 'dying' : 'alive',
+                 playerState: finalUpdatedState.player.hp <= 0 ? 'dying' : 'alive',
                  causeOfDeath: null, 
                  internalPower: updatedUserProfile.internalPower,
                  externalPower: updatedUserProfile.externalPower,
@@ -230,20 +250,20 @@ const combatActionRouteHandler = async (req, res) => {
             res.json({
                 status: 'COMBAT_END',
                 narrative: combatResult.narrative, 
-                updatedState: updatedState,
+                updatedState: finalUpdatedState,
                 newRound: {
                     story: newRoundData.story,
                     roundData: newRoundData,
-                    suggestion: updatedState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
+                    suggestion: finalUpdatedState.player.hp <= 0 ? "你還有10個回合的時間自救..." : "戰鬥結束了，你接下來打算怎麼辦？"
                 }
             });
 
         } else { 
-            await combatDocRef.set(updatedState);
+            await combatDocRef.set(finalUpdatedState);
             res.json({
                 status: 'COMBAT_ONGOING',
                 narrative: combatResult.narrative,
-                updatedState: updatedState,
+                updatedState: finalUpdatedState,
             });
         }
     } catch (error) {
