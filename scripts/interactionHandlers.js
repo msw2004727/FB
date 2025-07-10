@@ -137,21 +137,24 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-function endCombat(newRoundData) {
+// 【核心修改】endCombat 現在只負責結束戰鬥狀態，並顯示結果
+function endCombat(combatResult) {
     gameState.isInCombat = false;
     modal.closeCombatModal();
-    
-    if (newRoundData && newRoundData.roundData && newRoundData.roundData.playerState === 'dead') {
-        updateUI(newRoundData.story, newRoundData.roundData, null, newRoundData.locationData);
-        gameLoop.handlePlayerDeath();
-        return;
+
+    // 顯示戰鬥結果摘要
+    if (combatResult && combatResult.summary) {
+        let outcomeMessage = `<b>【戰鬥結束】</b>${combatResult.summary}`;
+        // 如果有江湖反應，也一併顯示
+        if(combatResult.reputationSummary) {
+            outcomeMessage += `<br><br><b>【江湖反應】</b>${combatResult.reputationSummary}`;
+        }
+        appendMessageToStory(outcomeMessage, 'system-message');
+    } else {
+        appendMessageToStory("<b>【戰鬥結束】</b>", 'system-message');
     }
 
-    if (newRoundData && newRoundData.roundData && newRoundData.story) {
-        gameLoop.processNewRoundData(newRoundData);
-    } else {
-        appendMessageToStory("[系統] 戰鬥已結束，請繼續你的旅程。", 'system-message');
-    }
+    // 重新啟用主輸入框，讓玩家可以輸入後續動作
     dom.playerInput.focus();
     gameLoop.setLoading(false);
 }
@@ -367,6 +370,7 @@ export async function handleCombatSurrender() {
 
         if (data.status === 'SURRENDER_ACCEPTED') {
             modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
+            // 【核心修改】認輸後也交由統一的 endCombat 處理，但傳入的是 newRound
             setTimeout(() => endCombat(data.newRound), 2000);
         } else {
             modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
@@ -409,7 +413,8 @@ export async function handleConfirmCombatAction() {
         gameState.combat.state = data.updatedState;
 
         if (data.status === 'COMBAT_END') {
-            setTimeout(() => endCombat(data.newRound), 2000);
+            // 【核心修改】戰鬥結束後，不再期待 newRound，而是傳入 combatResult
+            setTimeout(() => endCombat(data.combatResult), 1500);
         } else {
             document.querySelectorAll('.strategy-btn.selected, .skill-btn.selected').forEach(el => el.classList.remove('selected'));
             document.getElementById('skill-selection').innerHTML = '<p class="system-message">請先選擇一個策略</p>';
@@ -421,6 +426,8 @@ export async function handleConfirmCombatAction() {
     } catch (error) {
         modal.updateCombatLog(`[系統] 你的招式似乎沒有生效，江湖的氣息有些不穩，請再試一次。(${error.message})`, 'system-message');
     } finally {
-        if (gameState.isInCombat) gameLoop.setLoading(false);
+        if (gameState.isInCombat && data.status !== 'COMBAT_END') {
+             gameLoop.setLoading(false);
+        }
     }
 }
