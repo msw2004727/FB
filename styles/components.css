@@ -721,3 +721,30 @@ body.dark-theme .npc-interaction-btn.cancel-attack {
 }
 
 /* 【核心修改】刪除了之前為 mobile 添加的固定定位規則 */
+
+/* --- 【本次新增】禁用按鈕的樣式 --- */
+.npc-interaction-btn:disabled {
+    color: #adb5bd;
+    border-color: #dee2e6;
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.npc-interaction-btn:disabled:hover {
+    color: #adb5bd;
+    border-color: #dee2e6;
+    background-color: #f8f9fa;
+}
+
+body.dark-theme .npc-interaction-btn:disabled {
+    color: #6c757d;
+    border-color: #495057;
+    background-color: #343a40;
+}
+
+body.dark-theme .npc-interaction-btn:disabled:hover {
+    color: #6c757d;
+    border-color: #495057;
+    background-color: #343a40;
+}
