@@ -220,8 +220,8 @@ async function getAINpcProfile(username, npcName, roundData, playerProfile) {
     }
 }
 
-async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext) {
-    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, remoteLocationContext);
+async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext) {
+    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChat;
         const reply = await callAI(modelToUse, prompt, false);
@@ -392,8 +392,8 @@ async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
     }
 }
 
-async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog) {
-    const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog);
+async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog, killerName) {
+    const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog, killerName);
     try {
         const modelToUse = playerModelChoice || aiConfig.postCombat || 'openai';
         const text = await callAI(modelToUse, prompt, true);
