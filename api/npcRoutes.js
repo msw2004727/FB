@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
-const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory } = require('./gameHelpers');
+const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
 
 const db = admin.firestore();
 
@@ -59,43 +59,35 @@ router.get('/start-trade/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到交易對象。' });
         }
 
-        let playerMoney = 0;
-        const playerItems = {};
-        for (const [key, item] of Object.entries(playerInventory)) {
-            if (item.templateId === '銀兩') {
-                playerMoney = item.quantity || 0;
-            } else {
-                playerItems[key] = item;
-            }
-        }
+        const playerItems = Object.values(playerInventory);
 
-        let npcMoney = 0;
-        const npcItems = {};
-        if (npcProfile.inventory) {
-            for (const [key, itemData] of Object.entries(npcProfile.inventory)) {
-                 if (key === '銀兩') {
-                    npcMoney = itemData || 0;
-                } else {
-                    const itemTemplate = await db.collection('items').doc(key).get();
-                    if(itemTemplate.exists) {
-                        npcItems[key] = {
-                            ...itemTemplate.data(),
-                            quantity: itemData
-                        };
+        // --- 【核心修改】重寫NPC物品處理邏輯 ---
+        const npcItems = [];
+        if (npcProfile.inventory && typeof npcProfile.inventory === 'object') {
+            const itemPromises = Object.entries(npcProfile.inventory).map(async ([itemName, quantity]) => {
+                if (quantity > 0) {
+                    const template = await getOrGenerateItemTemplate(itemName);
+                    if (template) {
+                        return { ...template, quantity: quantity, instanceId: itemName, templateId: itemName, itemName: itemName };
                     }
                 }
-            }
+                return null;
+            });
+
+            const resolvedItems = await Promise.all(itemPromises);
+            npcItems.push(...resolvedItems.filter(item => item !== null));
         }
+        // --- 修改結束 ---
 
         const tradeData = {
             player: {
-                money: playerMoney,
+                // 前端期望的是一個物品陣列
                 items: playerItems
             },
             npc: {
                 name: npcProfile.name,
-                money: npcMoney,
-                items: npcItems,
+                // 前端期望的是一個物品陣列
+                items: npcItems, 
                 personality: npcProfile.personality,
                 goals: npcProfile.goals
             }
