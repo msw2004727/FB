@@ -91,11 +91,10 @@ function handleStrategySelection(strategy) {
         relevantSkills.forEach(skill => {
             const skillBtn = document.createElement('button');
             skillBtn.className = 'skill-btn';
-            // 【修正 1/2】將 skill.name 改為 skill.skillName
-            skillBtn.dataset.skillName = skill.skillName; 
+            skillBtn.dataset.skillName = skill.skillName;
+            // 【修正】移除不該存在的註解文字
             skillBtn.innerHTML = `
-                // 【修正 2/2】將 skill.name 改為 skill.skillName
-                <span class="skill-name">${skill.skillName} (L${skill.level})</span> 
+                <span class="skill-name">${skill.skillName} (L${skill.level})</span>
                 <span class="skill-cost">內力 ${skill.cost || 5}</span>
             `;
             skillBtn.addEventListener('click', () => handleSkillSelection(skill.skillName));
