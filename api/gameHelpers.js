@@ -192,6 +192,20 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             const cleanedJsonString = npcJsonString.replace(/^```json\s*|```\s*$/g, '');
             const newTemplateData = JSON.parse(cleanedJsonString);
             
+            // --- 【核心修改】根據使用者要求的機率分布，覆寫AI生成的戀愛傾向 ---
+            const rand = Math.random();
+            if (rand < 0.7) {
+                newTemplateData.romanceOrientation = "異性戀";
+            } else if (rand < 0.85) { // 0.7 + 0.15
+                newTemplateData.romanceOrientation = "雙性戀";
+            } else if (rand < 0.95) { // 0.85 + 0.10
+                newTemplateData.romanceOrientation = "同性戀";
+            } else { // 0.95 + 0.05
+                newTemplateData.romanceOrientation = "無性戀";
+            }
+            console.log(`[戀愛傾向系統] 已為NPC「${npcName}」隨機指派戀愛傾向為: ${newTemplateData.romanceOrientation}`);
+            // --- 修改結束 ---
+
             if (newTemplateData.createdAt === "CURRENT_TIMESTAMP") {
                 newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             }
