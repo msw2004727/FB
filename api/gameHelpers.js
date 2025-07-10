@@ -434,42 +434,50 @@ const updateSkills = async (userId, skillChanges, playerProfile) => {
         try {
             await db.runTransaction(async (transaction) => {
                 if (skillChange.isNewlyAcquired) {
-                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
-                    
-                    if (!templateResult || !templateResult.template) {
-                        console.error(`無法為「${skillChange.skillName}」獲取或生成模板，跳過此武學。`);
-                        return;
-                    }
+                    // --- 【核心修改】從這裡開始，加入新的判斷邏輯 ---
+                    const acquisitionMethod = skillChange.acquisitionMethod || 'created'; // 默認為 "created" 以相容舊版
 
-                    if (templateResult.isNew) {
-                        const powerType = templateResult.template.power_type || 'none';
-                        const maxPowerAchieved = playerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
-                        const createdSkillsCount = playerProfile.customSkillsCreated?.[powerType] || 0;
-                        const totalCreatedSkills = Object.values(playerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
-
-                        const availableSlots = Math.floor(maxPowerAchieved / 100);
-
-                        console.log(`[自創武學] 驗證: ${skillChange.skillName} (${powerType})`);
-                        console.log(`[自創武學] 總上限: ${totalCreatedSkills}/10, 類別上限: ${createdSkillsCount}/${availableSlots}`);
+                    // 只有在武學是「自創」時，才執行數量上限檢查
+                    if (acquisitionMethod === 'created') {
+                        const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
                         
-                        if (totalCreatedSkills >= 10) {
-                            customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
-                            console.log(`[自創武學] 失敗：已達總上限10門。`);
-                            return; 
+                        if (!templateResult || !templateResult.template) {
+                            console.error(`無法為「${skillChange.skillName}」獲取或生成模板，跳過此武學。`);
+                            return;
                         }
 
-                        if (createdSkillsCount >= availableSlots) {
-                            customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
-                             console.log(`[自創武學] 失敗：${powerType}類別名額不足。`);
-                            return; 
-                        }
+                        if (templateResult.isNew) {
+                            const powerType = templateResult.template.power_type || 'none';
+                            const maxPowerAchieved = playerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
+                            const createdSkillsCount = playerProfile.customSkillsCreated?.[powerType] || 0;
+                            const totalCreatedSkills = Object.values(playerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
+                            const availableSlots = Math.floor(maxPowerAchieved / 100);
 
-                        const skillCountUpdate = {};
-                        skillCountUpdate[`customSkillsCreated.${powerType}`] = admin.firestore.FieldValue.increment(1);
-                        transaction.update(userDocRef, skillCountUpdate);
-                        customSkillCreationResult = { success: true };
-                        console.log(`[自創武學] 成功：驗證通過，計數增加。`);
+                            console.log(`[自創武學] 驗證: ${skillChange.skillName} (${powerType})`);
+                            console.log(`[自創武學] 總上限: ${totalCreatedSkills}/10, 類別上限: ${createdSkillsCount}/${availableSlots}`);
+                            
+                            if (totalCreatedSkills >= 10) {
+                                customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
+                                console.log(`[自創武學] 失敗：已達總上限10門。`);
+                                return; 
+                            }
+
+                            if (createdSkillsCount >= availableSlots) {
+                                customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                                 console.log(`[自創武學] 失敗：${powerType}類別名額不足。`);
+                                return; 
+                            }
+
+                            const skillCountUpdate = {};
+                            skillCountUpdate[`customSkillsCreated.${powerType}`] = admin.firestore.FieldValue.increment(1);
+                            transaction.update(userDocRef, skillCountUpdate);
+                            customSkillCreationResult = { success: true };
+                            console.log(`[自創武學] 成功：驗證通過，計數增加。`);
+                        }
+                    } else {
+                        console.log(`[武學系統] 偵測到「學習」行為 (learned)，跳過自創數量檢查。`);
                     }
+                    // --- 修改結束，後續邏輯不變 ---
 
                     const playerSkillData = {
                         level: skillChange.level || 0,
