@@ -74,6 +74,7 @@ async function buildContext(userId, username) {
         const playerContext = {
             ...userProfile,
             username,
+            R: lastSave.R,
             skills,
             ...rawInventory, // 將物品詳情合併進來
             currentLocation: lastSave.LOC,
