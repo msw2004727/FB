@@ -22,10 +22,10 @@ const {
     advanceDate,
     invalidateNovelCache,
     updateLibraryNovel,
+    getMergedLocationData, // 【核心修正】已將引用來源更正到此處
 } = require('./worldStateHelpers');
 const { triggerBountyGeneration } = require('./worldEngine');
-// 【核心修正】已為您從 locationManager 補上遺漏的 getMergedLocationData 引用
-const { processLocationUpdates, getMergedLocationData } = require('./locationManager');
+const { processLocationUpdates } = require('./locationManager'); // 維持對 locationManager 的正確引用
 const { buildContext } = require('./contextBuilder');
 
 const db = admin.firestore();
