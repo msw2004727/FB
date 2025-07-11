@@ -194,10 +194,13 @@ export function openCombatModal(initialState, onCombatCancel) {
     }
     setTurnCounter(initialState.turn || 1);
     
+    // 【核心修正】在這裡動態生成所有五個策略按鈕
     strategyButtonsContainer.innerHTML = `
         <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
         <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
         <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
+        <button class="strategy-btn" data-strategy="support"><i class="fas fa-hands-helping"></i> 輔助</button>
+        <button class="strategy-btn" data-strategy="heal"><i class="fas fa-briefcase-medical"></i> 治癒</button>
     `;
     
     confirmActionContainer.innerHTML = `
@@ -206,13 +209,11 @@ export function openCombatModal(initialState, onCombatCancel) {
     `;
     
     if (closeCombatBtn) {
-        // 【核心修改】將關閉按鈕的邏輯簡化為直接取消
         const closeHandler = () => {
             closeCombatModal();
             if (typeof onCombatCancel === 'function') {
                 onCombatCancel();
             }
-            // 移除監聽器以避免記憶體洩漏
             closeCombatBtn.removeEventListener('click', closeHandler);
         };
         closeCombatBtn.addEventListener('click', closeHandler);
@@ -349,7 +350,6 @@ export function openSkillsModal(skillsData) {
 
     const skillTypes = Object.keys(skillsByType);
 
-    // 【核心新增】建立一個翻譯對照表
     const powerTypeMap = {
         internal: '內功',
         external: '外功',
@@ -371,7 +371,6 @@ export function openSkillsModal(skillsData) {
             const expToNextLevel = (skill.level + 1) * 100;
             const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
             
-            // 【核心修改】使用翻譯後的中文名稱
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
 
             const skillEntry = document.createElement('div');
