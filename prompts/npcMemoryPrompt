@@ -1,0 +1,45 @@
+// prompts/npcMemoryPrompt.js
+
+const getNpcMemoryPrompt = (npcName, oldSummary, fullChatHistory) => {
+    // 將完整的對話紀錄格式化
+    const formattedHistory = fullChatHistory.map(line => {
+        return `${line.speaker}: "${line.message}"`;
+    }).join('\n');
+
+    return `
+你是一位心細如髮的「記憶檔案管理員」。你的任務是為NPC「${npcName}」更新他與玩家的「互動歷史摘要」。
+
+## 核心準則：
+
+1.  **繼承與擴展**：你必須先閱讀「舊的歷史摘要」，然後將「最近的對話紀錄」中的關鍵資訊（例如：達成的約定、產生的情愫、結下的樑子、交換的秘密等）融入其中，生成一份新的、更完整的摘要。
+2.  **第一人稱視角**：新的摘要必須以NPC「${npcName}」的第一人稱視角來書寫，就好像是他在寫自己的日記一樣。
+3.  **精簡扼要**：新的摘要必須保持精煉，總字數控制在300字以內。
+4.  **語言鐵律**: 你的所有文字都必須只包含「繁體中文」。
+
+## JSON 輸出結構：
+
+你必須嚴格按照以下格式輸出，你的回覆**只能包含JSON物件**，絕對禁止任何額外的文字或標記。
+
+\`\`\`json
+{
+  "newSummary": "你生成的、300字以內、第一人稱視角的新互動歷史摘要。"
+}
+\`\`\`
+
+---
+
+## 【參考資料】
+
+### 1. 舊的歷史摘要：
+${oldSummary}
+
+### 2. 最近的對話紀錄：
+${formattedHistory}
+
+---
+
+現在，請開始你的檔案更新工作。
+`;
+};
+
+module.exports = { getNpcMemoryPrompt };
