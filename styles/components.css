@@ -50,7 +50,7 @@ body.dark-theme .welcome-card {
     color: var(--light-accent);
     border-bottom: 1px solid var(--light-border);
     padding-bottom: 0.5rem;
-    font-weight: bold;
+    font-weight: bold; /* 【核心修正】重新將粗體樣式加回來 */
 }
 body.dark-theme .info-card h4 {
     color: var(--dark-accent);
@@ -65,9 +65,18 @@ body.dark-theme .info-card h4 {
 
 /* 瀕死倒數計時器樣式 */
 @keyframes pulse-red {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.7; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 .death-countdown {
     margin-top: 0.75rem;
@@ -85,6 +94,7 @@ body.dark-theme .death-countdown {
     color: #f5c6cb;
     border-color: #8c2a34;
 }
+
 
 /* 地點資訊欄的專屬樣式 */
 #location-info .location-ruler {
@@ -109,6 +119,7 @@ body.dark-theme #location-info .location-desc {
     color: var(--dark-text-secondary);
 }
 
+
 /* 卡片標題 Flex 容器 */
 .card-header-flex {
     display: flex;
@@ -121,6 +132,7 @@ body.dark-theme #location-info .location-desc {
 body.dark-theme .card-header-flex {
     border-bottom-color: var(--dark-border);
 }
+
 .card-header-flex h4 {
     margin: 0;
     border-bottom: none;
@@ -212,6 +224,7 @@ body.dark-theme .header-icon-btn:hover {
 .header-icon-btn .fas {
     margin: 0;
 }
+
 
 /* --- AI 模型選擇器 --- */
 .select-wrapper {
@@ -321,10 +334,18 @@ body.dark-theme .npc-sworn_enemy { color: #ff2424; }
     font-size: 0.85rem;
     font-weight: bold;
 }
-.morality-label.evil { color: var(--morality-evil-light); }
-body.dark-theme .morality-label.evil { color: var(--morality-evil-dark); }
-.morality-label.justice { color: var(--morality-justice-light); }
-body.dark-theme .morality-label.justice { color: var(--morality-justice-dark); }
+.morality-label.evil {
+    color: var(--morality-evil-light);
+}
+body.dark-theme .morality-label.evil {
+    color: var(--morality-evil-dark);
+}
+.morality-label.justice {
+    color: var(--morality-justice-light);
+}
+body.dark-theme .morality-label.justice {
+    color: var(--morality-justice-dark);
+}
 .morality-bar-background {
     flex-grow: 1;
     height: 8px;
@@ -333,7 +354,9 @@ body.dark-theme .morality-label.justice { color: var(--morality-justice-dark); }
     position: relative;
     overflow: hidden;
 }
-body.dark-theme .morality-bar-background { background-color: var(--dark-border); }
+body.dark-theme .morality-bar-background {
+    background-color: var(--dark-border);
+}
 .morality-bar-indicator {
     position: absolute;
     top: 0;
@@ -346,7 +369,9 @@ body.dark-theme .morality-bar-background { background-color: var(--dark-border);
     transform: translateX(-50%);
     transition: left 0.5s ease-out, background-color 0.5s ease;
 }
-body.dark-theme .morality-bar-indicator { background-color: var(--morality-neutral-dark); }
+body.dark-theme .morality-bar-indicator {
+    background-color: var(--morality-neutral-dark);
+}
 
 /* --- 內功外功進度條樣式 --- */
 .power-display {
@@ -360,26 +385,43 @@ body.dark-theme .morality-bar-indicator { background-color: var(--morality-neutr
     width: 3em;
     color: var(--light-text-secondary);
 }
-body.dark-theme .power-label { color: var(--dark-text-secondary); }
+body.dark-theme .power-label {
+    color: var(--dark-text-secondary);
+}
 .power-bar-container {
     flex-grow: 1;
     height: 10px;
     background-color: var(--light-border);
     border-radius: 5px;
 }
-body.dark-theme .power-bar-container { background-color: var(--dark-border); }
+body.dark-theme .power-bar-container {
+    background-color: var(--dark-border);
+}
 .power-bar {
     height: 100%;
     width: 0%;
     border-radius: 5px;
     transition: width 0.5s ease-out;
 }
-#internal-power-bar { background-color: var(--internal-power-color-light); }
-body.dark-theme #internal-power-bar { background-color: var(--internal-power-color-dark); }
-#external-power-bar { background-color: var(--external-power-color-light); }
-body.dark-theme #external-power-bar { background-color: var(--external-power-color-dark); }
-#stamina-bar { background-color: var(--stamina-color-light); }
-body.dark-theme #stamina-bar { background-color: var(--stamina-color-dark); }
+#internal-power-bar {
+    background-color: var(--internal-power-color-light);
+}
+body.dark-theme #internal-power-bar {
+    background-color: var(--internal-power-color-dark);
+}
+#external-power-bar {
+    background-color: var(--external-power-color-light);
+}
+body.dark-theme #external-power-bar {
+    background-color: var(--external-power-color-dark);
+}
+/* 【核心新增】精力條樣式 */
+#stamina-bar {
+    background-color: var(--stamina-color-light);
+}
+body.dark-theme #stamina-bar {
+    background-color: var(--stamina-color-dark);
+}
 
 .power-value {
     font-size: 0.8rem;
@@ -388,7 +430,9 @@ body.dark-theme #stamina-bar { background-color: var(--stamina-color-dark); }
     min-width: 50px;
     text-align: right;
 }
-body.dark-theme .power-value { color: var(--dark-text-secondary); }
+body.dark-theme .power-value {
+    color: var(--dark-text-secondary);
+}
 
 /* --- 隨機事件訊息 --- */
 .random-event-message {
@@ -404,11 +448,13 @@ body.dark-theme .power-value { color: var(--dark-text-secondary); }
     font-style: italic;
     animation: fadeIn 0.5s ease-in-out;
 }
+
 body.dark-theme .random-event-message {
     border-color: var(--dark-accent);
     background-color: var(--dark-surface-bg);
     color: var(--dark-text-primary);
 }
+
 
 /* --- AI 核心切換提示樣式 --- */
 .ai-switch-notification {
@@ -423,12 +469,16 @@ body.dark-theme .random-event-message {
     font-weight: bold;
     transition: opacity 0.5s ease-in-out;
 }
+
 body.dark-theme .ai-switch-notification {
     color: #a3e6b8;
     background-color: #2e4b37;
     border-color: #3f684e;
 }
-.ai-switch-notification.fading-out { opacity: 0; }
+
+.ai-switch-notification.fading-out {
+    opacity: 0;
+}
 
 /* --- 戀愛事件特殊樣式 --- */
 .romance-event {
@@ -438,13 +488,67 @@ body.dark-theme .ai-switch-notification {
     color: #a6324a;
     font-weight: 600;
 }
+
 body.dark-theme .romance-event {
     border-color: #ff6b81;
     background-color: #4d2b33;
     color: #ffb3c1;
 }
 
-/* --- 【核心新增】負重狀態樣式 --- */
+.dashboard-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 1rem 3.5rem 1rem 1.5rem;
+    border-bottom: 1px solid var(--light-border);
+    flex-shrink: 0;
+}
+body.dark-theme .dashboard-header {
+    border-bottom: 1px solid var(--dark-border);
+}
+.dashboard-header .header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.header-action-group {
+    display: flex;
+    align-items: center;
+}
+
+.header-prompt-text {
+    font-size: 0.75rem;
+    color: var(--light-text-secondary);
+    margin-right: 0.5rem;
+}
+
+body.dark-theme .header-prompt-text {
+    color: var(--dark-text-secondary);
+}
+
+/* --- 人物見聞卡片樣式 --- */
+#npc-content > div {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-left: 3px solid var(--light-accent);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem; /* 卡片之間的細縫 */
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+#npc-content > div:last-child {
+    margin-bottom: 0;
+}
+
+body.dark-theme #npc-content > div {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+    border-left-color: var(--dark-accent);
+}
+
+/* --- 【核心新增】負重與物品卡片完整樣式 --- */
 .bulk-status-display {
     font-family: var(--font-sans);
     font-size: 0.8rem;
@@ -461,8 +565,12 @@ body.dark-theme .bulk-medium { background-color: #5d4d1c; color: #ffd43b; }
 body.dark-theme .bulk-heavy { background-color: #5c2b30; color: #ff8787; }
 body.dark-theme .bulk-extreme { background-color: #c92a2a; color: #fff; }
 
+#itm-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem; /* 物品卡片之間的間距 */
+}
 
-/* --- 【核心新增】物品卡片樣式 --- */
 .item-entry {
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
@@ -479,7 +587,7 @@ body.dark-theme .item-entry {
 }
 .item-entry.equipped {
     border-left: 4px solid var(--light-accent);
-    background-color: var(--light-surface-bg);
+    background-color: var(--light-surface-bg); /* 已裝備時有不同背景色 */
 }
 body.dark-theme .item-entry.equipped {
     border-left-color: var(--dark-accent);
@@ -488,7 +596,13 @@ body.dark-theme .item-entry.equipped {
 
 .item-info {
     display: flex;
-    flex-direction: column;
+    align-items: center; /* 讓圖示和文字垂直置中 */
+    gap: 0.75rem;
+}
+.item-icon {
+    width: 1.2em;
+    text-align: center;
+    color: var(--light-text-secondary);
 }
 .item-name {
     font-weight: bold;
@@ -526,6 +640,7 @@ body.dark-theme .equipped-slot-icon {
     display: inline-block;
     width: 44px;
     height: 24px;
+    flex-shrink: 0; /* 防止開關被壓縮 */
 }
 .switch input { 
     opacity: 0;
