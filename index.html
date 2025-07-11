@@ -137,7 +137,10 @@
                 </div>
 
                 <div class="info-card">
-                    <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
+                    <h4 class="card-header-flex">
+                        <span><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</span>
+                        <span id="bulk-status" class="bulk-status-display"></span>
+                    </h4>
                     <div id="itm-content">--</div>
                 </div>
 
@@ -230,7 +233,7 @@
                     <div id="combat-log" class="combat-log-area"></div>
                     <div class="combat-actions-container">
                         <div id="combat-turn-counter" class="combat-turn-counter"></div>
-                        <div id="combat-actions-panel" class="combat-actions-panel">
+                        <div class="combat-actions-panel" class="combat-actions-panel">
                             <div id="strategy-buttons" class="strategy-buttons">
                                 <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
                                 <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
