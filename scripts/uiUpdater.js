@@ -18,6 +18,8 @@ const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
 const itmContent = document.getElementById('itm-content');
+// 【核心新增】獲取負重顯示的DOM元素
+const bulkStatus = document.getElementById('bulk-status');
 const qstContent = document.getElementById('qst-content');
 const psyContent = document.getElementById('psy-content');
 const clsContent = document.getElementById('cls-content');
@@ -97,7 +99,6 @@ function updatePowerBar(barElement, valueElement, currentValue, maxValue, barId 
         barElement.style.width = `${percentage}%`;
         valueElement.textContent = `${currentValue || 0}/${maxValue}`;
 
-        // 【核心修正】在這裡加入精力警示的邏輯
         if (barId === 'stamina-bar') {
             if (currentValue < 30) {
                 barElement.classList.add('low-stamina');
@@ -124,6 +125,32 @@ function updateDeathCountdownUI(countdownValue) {
             countdownEl.remove();
         }
     }
+}
+
+// 【核心新增】更新負重狀態的函式
+function updateBulkStatus(score) {
+    if (!bulkStatus) return;
+
+    let emoji = '🎒';
+    let text = '輕裝上陣';
+    let colorClass = 'bulk-light';
+
+    if (score > 30) {
+        emoji = '🥵';
+        text = '不堪重負';
+        colorClass = 'bulk-extreme';
+    } else if (score > 15) {
+        emoji = '😫';
+        text = '重物纏身';
+        colorClass = 'bulk-heavy';
+    } else if (score > 5) {
+        emoji = '🤔';
+        text = '略有份量';
+        colorClass = 'bulk-medium';
+    }
+
+    bulkStatus.innerHTML = `${emoji} 負重：${text}`;
+    bulkStatus.className = `bulk-status-display ${colorClass}`;
 }
 
 
@@ -161,10 +188,12 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
-    // 傳入第四個參數以識別精力條
     updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100, 'stamina-bar');
 
     updateMoralityBar(roundData.morality);
+    
+    // 【核心新增】在更新UI時呼叫負重更新函式
+    updateBulkStatus(roundData.bulkScore || 0);
 
     if (locationInfo) {
         if (locationData) {
