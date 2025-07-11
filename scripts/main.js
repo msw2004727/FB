@@ -86,11 +86,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
+        // --- 【核心修改】 ---
         if (dom.bountiesBtn) {
             dom.bountiesBtn.addEventListener('click', () => {
                 interaction.hideNpcInteractionMenu();
+                // 在點擊的瞬間，立刻移除高亮樣式，達到「已讀」的視覺效果
+                dom.bountiesBtn.classList.remove('has-new-bounty');
             });
         }
+        // --- 修改結束 ---
         
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
