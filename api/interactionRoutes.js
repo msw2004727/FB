@@ -449,6 +449,13 @@ const interactRouteHandler = async (req, res) => {
             morality: newMorality, stamina: newStamina, ...finalDate, shortActionCounter
         };
         
+        // 【核心修改】死亡後續回合計時器邏輯
+        if (userProfile.deathAftermathCooldown && userProfile.deathAftermathCooldown > 1) {
+            playerUpdatesForDb.deathAftermathCooldown = admin.firestore.FieldValue.increment(-1);
+        } else if (userProfile.deathAftermathCooldown === 1) {
+            playerUpdatesForDb.deathAftermathCooldown = admin.firestore.FieldValue.delete();
+        }
+        
         if (revengeEvent && revengeEvent.type === 'PROACTIVE_CHAT') {
             aiResponse.proactiveChat = revengeEvent;
         } else {
@@ -500,10 +507,15 @@ const finalizeCombatHandler = async (req, res) => {
         const userProfile = (await userDocRef.get()).data();
         
         const { finalState } = combatResult;
+        
+        // 【核心修改】找出兇手是誰
         const playerWon = finalState.enemies.every(e => e.hp <= 0);
         let killerName = null;
         if (playerWon && finalState.intention === '打死') {
-            killerName = username;
+            killerName = username; // 如果玩家贏了且意圖是打死，兇手就是玩家
+        } else if (!playerWon && finalState.player.hp <= 0) {
+            // 如果玩家輸了且死了，需要判斷是誰殺的（這裡簡化為第一個還有血的敵人）
+            killerName = finalState.enemies.find(e => e.hp > 0)?.name || '未知敵人';
         }
 
         const postCombatOutcome = await getAIPostCombatResult(playerModelChoice, { ...userProfile, username }, finalState, combatResult.log, killerName);
@@ -525,21 +537,34 @@ const finalizeCombatHandler = async (req, res) => {
         if (playerChanges && playerChanges.moralityChange) {
             updates.morality = admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0);
         }
+
+        // 【核心修改】找出所有死亡NPC，並呼叫關係處理器
+        const killedNpcNames = (npcUpdates || []).filter(u => u.fieldToUpdate === 'isDeceased' && u.newValue === true).map(u => u.npcName);
+
+        if (killedNpcNames.length > 0) {
+            // 如果有NPC死亡，則重置計時器
+            updates.deathAftermathCooldown = 5;
+            
+            const reputationSummary = await processReputationChangesAfterDeath(
+                userId, 
+                killedNpcNames, // 傳遞整個死亡名單
+                preCombatRoundData.LOC[0], 
+                combatResult.finalState.allies.map(a => a.name), 
+                killerName
+            );
+            if (reputationSummary) {
+                summary += `\n\n**【江湖反應】** ${reputationSummary}`;
+            }
+        }
+        
+        // 統一更新玩家狀態
         if (Object.keys(updates).length > 0) {
             await userDocRef.update(updates);
         }
         
-        let reputationSummary = '';
+        // 統一更新所有NPC狀態
         if (npcUpdates && npcUpdates.length > 0) {
-            await processNpcUpdates(userId, npcUpdates, killerName);
-            for (const update of npcUpdates) {
-                if (update.fieldToUpdate === 'isDeceased' && update.newValue === true) {
-                   reputationSummary = await processReputationChangesAfterDeath(userId, update.npcName, preCombatRoundData.LOC[0], combatResult.finalState.allies.map(a => a.name), killerName);
-                   if (reputationSummary) {
-                       summary += `\n\n**【江湖反應】** ${reputationSummary}`;
-                   }
-                }
-            }
+            await processNpcUpdates(userId, npcUpdates);
         }
         
         const newRoundNumber = preCombatRoundData.R + 1;
