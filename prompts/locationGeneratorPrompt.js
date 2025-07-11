@@ -13,32 +13,32 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 - **技術水平**: 處於中國古代封建社會，農業為本，商業正在萌芽，不同地區的富裕程度差異巨大。
 
 ## 【核心修改：靜態模板 vs 動態狀態分離鐵律】
-你的輸出現在必須包含兩個主要部分：`staticTemplate` 和 `initialDynamicState`。
+你的輸出現在必須包含兩個主要部分：\`staticTemplate\` 和 \`initialDynamicState\`。
 
-### 1. `staticTemplate` (靜態地點模板)
+### 1. \`staticTemplate\` (靜態地點模板)
 這部分定義了地點的**固有屬性**，這些屬性通常**不會**因為玩家的行為而改變。
 
-* **`locationId` / `locationName`**: 地點的唯一ID和官方名稱。
-* **`parentLocation` / `locationType`**: 地點的層級關係。
-* **`address` / `coordinates`**: 地點的絕對與相對位置。
-* **`geography`**: 地形的固有特徵。
-* **`economy.prosperityPotential`**: 該地區的**潛在**繁榮度（貧瘠 | 普通 | 殷實 | 富裕 | 天府之國）。這代表了此地的資源與地理位置潛力，而非現狀。
-* **`economy.specialty`**: 當地固有的特產（例如：某種礦石、藥材、農作物）。
-* **`lore.history`**: 該地點的歷史背景和傳說，這些是已經發生的、不會改變的故事。
+* **\`locationId\` / \`locationName\`**: 地點的唯一ID和官方名稱。
+* **\`parentLocation\` / \`locationType\`**: 地點的層級關係。
+* **\`address\` / \`coordinates\`**: 地點的絕對與相對位置。
+* **\`geography\`**: 地形的固有特徵。
+* **\`economy.prosperityPotential\`**: 該地區的**潛在**繁榮度（貧瘠 | 普通 | 殷實 | 富裕 | 天府之國）。這代表了此地的資源與地理位置潛力，而非現狀。
+* **\`economy.specialty\`**: 當地固有的特產（例如：某種礦石、藥材、農作物）。
+* **\`lore.history\`**: 該地點的歷史背景和傳說，這些是已經發生的、不會改變的故事。
 
-### 2. `initialDynamicState` (初始動態狀態)
+### 2. \`initialDynamicState\` (初始動態狀態)
 這部分定義了地點的**可變屬性**，這些是玩家未來可以透過行動來影響的。
 
-* **`governance`**: 當前的統治結構。
-    * `ruler`: 當前的統治者姓名。
-    * `allegiance`: 當前所屬的勢力。
-    * `security`: 當前的維安力量描述，例如「幾名懶散的鄉勇」或「一隊裝備精良的官兵」。
-* **`economy.currentProsperity`**: 當前的實際繁榮度（蕭條 | 普通 | 繁榮）。
-* **`facilities`**: 一個包含該地區所有**功能性設施**的**陣列**。
-    * 每個設施都是一個物件，必須包含 `name`, `type` (商業 | 公共 | 軍事), `owner`, `status` (營業中 | 荒廢)。
-* **`buildings`**: 一個包含該地區所有**主要建築物**的**陣列**。
-    * 每個建築都是一個物件，必須包含 `name`, `type` (住宅 | 倉庫 | 地標), `owner`。
-* **`lore.currentIssues`**: 當地**目前**正在發生的、可以被玩家解決或影響的事件或傳聞。
+* **\`governance\`**: 當前的統治結構。
+    * \`ruler\`: 當前的統治者姓名。
+    * \`allegiance\`: 當前所屬的勢力。
+    * \`security\`: 當前的維安力量描述，例如「幾名懶散的鄉勇」或「一隊裝備精良的官兵」。
+* **\`economy.currentProsperity\`**: 當前的實際繁榮度（蕭條 | 普通 | 繁榮）。
+* **\`facilities\`**: 一個包含該地區所有**功能性設施**的**陣列**。
+    * 每個設施都是一個物件，必須包含 \`name\`, \`type\` (商業 | 公共 | 軍事), \`owner\`, \`status\` (營業中 | 荒廢)。
+* **\`buildings\`**: 一個包含該地區所有**主要建築物**的**陣列**。
+    * 每個建築都是一個物件，必須包含 \`name\`, \`type\` (住宅 | 倉庫 | 地標), \`owner\`。
+* **\`lore.currentIssues\`**: 當地**目前**正在發生的、可以被玩家解決或影響的事件或傳聞。
 
 ---
 
