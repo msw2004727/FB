@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAISummary, getAISuggestion } = require('../services/aiService');
+const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion } = require('../services/aiService');
 const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
 const { getKnownNpcNames } = require('./cacheManager'); // 引入快取函式
 
@@ -71,16 +71,15 @@ router.get('/start-trade/:npcName', async (req, res) => {
                         const itemData = {
                             ...itemTemplateResult.template,
                             quantity: quantity,
-                            instanceId: itemName, // 預設使用物品名作為ID
+                            instanceId: itemName,
                             templateId: itemName,
                             itemName: itemName
                         };
-                        // 如果物品不可堆疊，且數量大於1，則拆分成多個獨立物品
                         if (itemTemplateResult.template.itemType !== '材料' && itemTemplateResult.template.itemType !== '道具' && quantity > 1) {
                              return Array(quantity).fill(null).map((_, i) => ({
                                 ...itemData,
                                 quantity: 1,
-                                instanceId: `${itemName}_${Date.now()}_${i}` // 確保每個實例有唯一的ID
+                                instanceId: `${itemName}_${Date.now()}_${i}`
                             }));
                         }
                         return itemData;
@@ -140,7 +139,7 @@ router.post('/npc-chat', async (req, res) => {
         }
         
         let mentionedNpcContext = null;
-        const knownNpcNames = getKnownNpcNames(); // 從快取中光速獲取
+        const knownNpcNames = getKnownNpcNames();
         
         for (const knownName of knownNpcNames) {
             if (playerMessage.includes(knownName) && knownName !== npcName) {
@@ -275,7 +274,7 @@ router.post('/give-item', async (req, res) => {
     }
 });
 
-// --- 【核心新增】確認並執行交易的路由 ---
+// 確認並執行交易的路由
 router.post('/confirm-trade', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -296,7 +295,6 @@ router.post('/confirm-trade', async (req, res) => {
                     const doc = docRef ? await transaction.get(docRef) : null;
                     
                     if (owner === 'player') {
-                        // 從玩家移除
                         if (doc && doc.exists) {
                             const currentQty = doc.data().quantity || 0;
                             if (currentQty > item.quantity) {
@@ -305,15 +303,12 @@ router.post('/confirm-trade', async (req, res) => {
                                 transaction.delete(docRef);
                             }
                         }
-                         // 添加到NPC
                         const npcFieldPath = `inventory.${item.name}`;
                         transaction.set(npcStateRef, { [npcFieldPath]: admin.firestore.FieldValue.increment(item.quantity) }, { merge: true });
 
-                    } else { // NPC -> Player
-                        // 從NPC移除
+                    } else {
                         const npcFieldPath = `inventory.${item.name}`;
                         transaction.set(npcStateRef, { [npcFieldPath]: admin.firestore.FieldValue.increment(-item.quantity) }, { merge: true });
-                        // 添加到玩家
                         await updateInventory(userId, [{ action: 'add', itemName: item.name, quantity: item.quantity }], {});
                     }
                 }
@@ -356,6 +351,56 @@ router.post('/confirm-trade', async (req, res) => {
     } catch (error) {
         console.error(`[交易系統] /confirm-trade 錯誤:`, error);
         res.status(500).json({ message: '交易過程中發生意外，交換失敗。' });
+    }
+});
+
+// 結束對話的路由
+router.post('/end-chat', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { npcName, fullChatHistory, model: playerModelChoice } = req.body;
+
+    if (!npcName || !fullChatHistory) {
+        return res.status(400).json({ message: '缺少必要的對話數據。' });
+    }
+
+    try {
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "對話發生在一個未知的時間點。";
+        
+        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        if (lastSaveSnapshot.empty) {
+            return res.status(404).json({ message: "找不到玩家存檔。" });
+        }
+        let lastRoundData = lastSaveSnapshot.docs[0].data();
+        
+        const chatSummary = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
+        
+        let newRoundData = { ...lastRoundData, R: lastRoundData.R + 1 };
+        newRoundData.EVT = chatSummary;
+        newRoundData.story = `你結束了與${npcName}的交談，${chatSummary}。`;
+        newRoundData.PC = `你與${npcName}深入交談了一番。`;
+
+        const newSummary = await getAISummary(longTermSummary, newRoundData);
+        const suggestion = await getAISuggestion(newRoundData);
+        newRoundData.suggestion = suggestion;
+        
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundData.R });
+        
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
+
+        res.json({
+            story: newRoundData.story,
+            roundData: newRoundData,
+            suggestion: newRoundData.suggestion,
+        });
+
+    } catch (error) {
+        console.error(`[結束對話系統] 替玩家 ${username} 總結與 ${npcName} 的對話時出錯:`, error);
+        res.status(500).json({ message: '總結對話時發生內部錯誤。' });
     }
 });
 
