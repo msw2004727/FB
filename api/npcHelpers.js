@@ -85,19 +85,29 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
 
 async function updateFriendlinessValues(userId, npcChanges, roundData) {
     if (!npcChanges || npcChanges.length === 0) return;
+
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const batch = db.batch();
+
+    // 【核心修正】主動防禦機制：先獲取已存在的NPC名單
+    const existingNpcSnapshot = await playerNpcStatesRef.get();
+    const existingNpcIds = new Set(existingNpcSnapshot.docs.map(doc => doc.id));
+    console.log('[友好度系統] 已建立玩家的現存NPC名單:', Array.from(existingNpcIds));
 
     for (const change of npcChanges) {
         if (!change.name) continue;
         
         const npcStateDocRef = playerNpcStatesRef.doc(change.name);
+        
+        // 判斷是否為新NPC的最終依據：資料庫裡到底有沒有這個人
+        const isTrulyNew = !existingNpcIds.has(change.name);
 
-        if (change.isNew) {
-            // 【核心修正】如果是新NPC，直接創建完整的初始狀態檔案
-            console.log(`[友好度系統] 偵測到新NPC「${change.name}」，正在為其創建完整的初始狀態...`);
+        if (isTrulyNew) {
+            console.log(`[友好度系統] 資料庫查核確認「${change.name}」為新NPC，強制創建完整檔案...`);
+            
             const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
             const encounterTime = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日 ${roundData.timeOfDay || '未知時辰'}`;
+            
             const initialState = {
                 interactionSummary: `你與${change.name}的交往尚淺。`,
                 currentLocation: encounterLocation,
@@ -117,6 +127,7 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
 
         } else if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
             // 對於舊NPC，只更新友好度
+            console.log(`[友好度系統] 更新舊識「${change.name}」的友好度: ${change.friendlinessChange > 0 ? '+' : ''}${change.friendlinessChange}`);
             batch.set(npcStateDocRef, { 
                 friendlinessValue: admin.firestore.FieldValue.increment(change.friendlinessChange) 
             }, { merge: true });
@@ -125,7 +136,7 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
     
     try {
         await batch.commit();
-        console.log(`[友好度系統] 批次更新了 ${npcChanges.length} 位NPC的友好度狀態。`);
+        console.log(`[友好度系統] 批次更新NPC關係完畢。`);
     } catch (error) {
         console.error(`[友好度系統] 批次更新NPC關係時出錯:`, error);
     }
