@@ -3,7 +3,8 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
-const { getFriendlinessLevel, createNpcProfileInBackground, updateInventory, getInventoryState } = require('./gameHelpers');
+const { getFriendlinessLevel, createNpcProfileInBackground } = require('./npcHelpers');
+const { updateInventory, getInventoryState } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { v4: uuidv4 } = require('uuid');
 
