@@ -10,7 +10,7 @@ const inventoryModel = require('./models/inventoryModel');
 const db = admin.firestore();
 
 /**
- * 【核心重構】獲取玩家統一的物品列表（背包+裝備），並標記每個物品的裝備狀態
+ * 【最終修正版】獲取玩家統一的物品列表（背包+裝備），並標記每個物品的裝備狀態
  * @param {string} userId - 玩家ID
  * @returns {Promise<Array<object>>}
  */
@@ -22,27 +22,28 @@ async function getUnifiedInventory(userId) {
     const equipment = userData.equipment || {};
     const inventory = await getRawInventory(userId); // 這會返回一個以instanceId為鍵的物件
 
-    const unifiedList = Object.values(inventory); // 先將背包物品轉為陣列
+    const unifiedList = [];
+    const processedIds = new Set();
 
-    // 創建一個已裝備物品的ID集合，方便查找
-    const equippedInstanceIds = new Set(
-        Object.values(equipment)
-        .filter(item => item && item.instanceId)
-        .map(item => item.instanceId)
-    );
-
-    // 遍歷統一列表，為每一項添加 isEquipped 標記
-    unifiedList.forEach(item => {
-        if (equippedInstanceIds.has(item.instanceId)) {
-            item.isEquipped = true;
-            // 為了排序，把裝備槽位也加上
-            const slot = Object.keys(equipment).find(s => equipment[s] && equipment[s].instanceId === item.instanceId);
-            item.equipSlot = slot;
-        } else {
-            item.isEquipped = false;
+    // 1. 添加已裝備的物品
+    Object.keys(equipment).forEach(slot => {
+        const item = equipment[slot];
+        if (item && item.instanceId && !processedIds.has(item.instanceId)) {
+            // 合併模板和實例數據
+            const completeItemData = { ...(inventory[item.instanceId] || {}), ...item, isEquipped: true, equipSlot: slot };
+            unifiedList.push(completeItemData);
+            processedIds.add(item.instanceId);
         }
     });
 
+    // 2. 添加背包中的物品
+    Object.keys(inventory).forEach(instanceId => {
+        if (!processedIds.has(instanceId)) {
+            unifiedList.push({ ...inventory[instanceId], isEquipped: false });
+            processedIds.add(instanceId);
+        }
+    });
+    
     return unifiedList;
 }
 
