@@ -18,18 +18,20 @@ router.get('/characters', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     try {
-        const npcsSnapshot = await db.collection('users').doc(userId).collection('npcs').get();
-        const characterList = [{ id: userId, name: username }]; // 將玩家自己加入列表
+        // 【核心修正】從正確的 'npc_states' 集合中讀取
+        const npcsSnapshot = await db.collection('users').doc(userId).collection('npc_states').get();
+        const characterList = [{ id: userId, name: username, isPlayer: true }]; // 將玩家自己加入列表
 
-        npcsSnapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.name) {
+        for (const doc of npcsSnapshot.docs) {
+            // 為了獲取NPC的真實姓名，我們需要反向查詢一下通用模板
+            const npcTemplateDoc = await db.collection('npcs').doc(doc.id).get();
+            if (npcTemplateDoc.exists) {
                 characterList.push({
                     id: doc.id,
-                    name: data.name
+                    name: npcTemplateDoc.data().name || doc.id
                 });
             }
-        });
+        }
         res.json(characterList);
     } catch (error) {
         console.error(`[GM工具] 獲取角色列表時出錯:`, error);
@@ -43,23 +45,36 @@ router.get('/characters', async (req, res) => {
 router.get('/npcs', async (req, res) => {
     const userId = req.user.id;
     try {
-        const userNpcsRef = db.collection('users').doc(userId).collection('npcs');
+        // 【核心修正】從 'npcs' 改為從 'npc_states' 讀取玩家的NPC關係檔案
+        const userNpcsRef = db.collection('users').doc(userId).collection('npc_states');
         const userSavesRef = db.collection('users').doc(userId).collection('game_saves');
 
         const npcsSnapshot = await userNpcsRef.get();
         const existingNpcs = new Map();
-        npcsSnapshot.forEach(doc => {
+
+        // 為了獲取NPC的真實姓名，我們需要異步處理
+        const promises = npcsSnapshot.docs.map(async (doc) => {
             const data = doc.data();
-            // 【核心修改】同時讀取關係數據
-            existingNpcs.set(data.name || doc.id, {
-                id: doc.id,
-                name: data.name || doc.id,
+            const npcName = doc.id;
+            let displayName = npcName;
+
+            // 從通用模板獲取更準確的資訊
+            const npcTemplateDoc = await db.collection('npcs').doc(npcName).get();
+            if (npcTemplateDoc.exists) {
+                displayName = npcTemplateDoc.data().name || npcName;
+            }
+            
+            existingNpcs.set(npcName, {
+                id: npcName, // ID 就是NPC的名字
+                name: displayName,
                 friendlinessValue: data.friendlinessValue || 0,
                 romanceValue: data.romanceValue || 0,
-                relationships: data.relationships || {}, // 讀取關係
+                relationships: data.relationships || {},
                 isGhost: false
             });
         });
+        await Promise.all(promises);
+
 
         const savesSnapshot = await userSavesRef.get();
         const mentionedNpcNames = new Set();
@@ -74,7 +89,7 @@ router.get('/npcs', async (req, res) => {
 
         mentionedNpcNames.forEach(name => {
             if (!existingNpcs.has(name)) {
-                existingNpcs.set(name, { id: name, name: name, isGhost: true });
+                existingNpcs.set(name, { id: name, name: name, isGhost: true, relationships: {} });
             }
         });
 
@@ -92,11 +107,11 @@ router.post('/update-npc', async (req, res) => {
         return res.status(400).json({ message: '未提供NPC ID。' });
     }
     try {
-        const npcRef = db.collection('users').doc(userId).collection('npcs').doc(npcId);
+        // 【核心修正】更新 'npc_states' 集合中的文件
+        const npcRef = db.collection('users').doc(userId).collection('npc_states').doc(npcId);
         const updates = {};
         if (friendlinessValue !== undefined) {
             updates.friendlinessValue = Number(friendlinessValue);
-            updates.friendliness = getFriendlinessLevel(Number(friendlinessValue));
         }
         if (romanceValue !== undefined) {
             updates.romanceValue = Number(romanceValue);
@@ -111,7 +126,7 @@ router.post('/update-npc', async (req, res) => {
     }
 });
 
-// --- 【核心新增】更新NPC關係的API ---
+// --- 更新NPC關係的API ---
 router.post('/update-npc-relationship', async (req, res) => {
     const userId = req.user.id;
     const { npcId, relationshipType, targetName } = req.body;
@@ -121,19 +136,17 @@ router.post('/update-npc-relationship', async (req, res) => {
     }
 
     try {
-        const npcRef = db.collection('users').doc(userId).collection('npcs').doc(npcId);
-        // 使用點標記法來更新巢狀物件中的特定欄位
-        const fieldToUpdate = `relationships.${relationshipType}`;
+        // 【核心修正】更新 'npc_states' 集合中的文件
+        const npcRef = db.collection('users').doc(userId).collection('npc_states').doc(npcId);
         
-        const updatePayload = {};
         // 如果 targetName 是空的，代表要刪除這個關係
-        updatePayload[fieldToUpdate] = targetName ? targetName : admin.firestore.FieldValue.delete();
-
-        await npcRef.set({
+        const updatePayload = {
             relationships: {
                 [relationshipType]: targetName || admin.firestore.FieldValue.delete()
             }
-        }, { merge: true });
+        };
+
+        await npcRef.set(updatePayload, { merge: true });
         
         res.json({ message: `NPC「${npcId}」的關係已更新。` });
 
@@ -164,6 +177,7 @@ router.post('/rebuild-npc', async (req, res) => {
             return res.status(404).json({ message: `在存檔中找不到NPC「${npcName}」的初見情境。` });
         }
 
+        // createNpcProfileInBackground 已經是寫入到正確的 'npc_states'，所以無需修改
         await createNpcProfileInBackground(userId, username, { name: npcName, isNew: true }, firstMentionRound);
         
         res.json({ message: `已成功為「${npcName}」重建檔案。` });
@@ -173,7 +187,7 @@ router.post('/rebuild-npc', async (req, res) => {
     }
 });
 
-// --- 地區管理相關API ---
+// --- 地區管理相關API (此部分邏輯正確，無需修改) ---
 router.get('/locations', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -230,7 +244,7 @@ router.post('/rebuild-location', async (req, res) => {
     }
 });
 
-// --- 玩家屬性管理API ---
+// --- 玩家屬性管理API (此部分邏輯正確，無需修改) ---
 router.get('/player-state', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -302,11 +316,9 @@ router.post('/update-player-resources', async (req, res) => {
             const moneyAmount = Number(money);
             const moneyRef = userDocRef.collection('inventory_items').doc('銀兩');
             await moneyRef.set({
-                 itemName: '銀兩',
+                 templateId: '銀兩',
                  itemType: '財寶',
-                 rarity: '普通',
                  quantity: moneyAmount,
-                 description: '流通的貨幣。'
             }, { merge: true });
         }
 
@@ -349,7 +361,7 @@ router.post('/teleport', async (req, res) => {
             PC: `你感到一陣時空扭曲，下一刻已身處「${locationName}」。`,
             story: `一股無形的力量包裹住你的身體，周遭景物瞬間模糊、拉長、扭曲成絢爛的光帶。你感到一陣輕微的失重，彷彿靈魂被從軀體中抽離，穿梭於時間的洪流之中。這感覺稍縱即逝，當你再次睜開雙眼時，先前的景象已蕩然無存，取而代之的是一片全新的天地。你，已然抵達了「${locationName}」。`,
             IMP: `透過一股神秘的力量，你瞬間移動到了「${locationName}」。`,
-            LOC: [locationName, { description: '一個全新的未知之地' }],
+            LOC: [locationName],
             NPC: [],
             CLS: '',
             QST: '探索這個新地方。'
