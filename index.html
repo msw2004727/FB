@@ -101,7 +101,7 @@
                     </div>
                     <div class="power-display">
                         <span class="power-label">精力</span>
-                        <div class="power-bar-container">
+                        <div class="power-bar-container" id="stamina-bar-container">
                             <div id="stamina-bar" class="power-bar"></div>
                         </div>
                         <span id="stamina-value" class="power-value">--/100</span>
@@ -137,11 +137,11 @@
                 </div>
 
                 <div class="info-card">
-                    <h4 class="card-header-flex">
-                        <span><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</span>
+                    <div class="card-header-flex">
+                        <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
                         <span id="bulk-status" class="bulk-status-display"></span>
-                    </h4>
-                    <div id="itm-content">--</div>
+                    </div>
+                    <div id="itm-content" class="space-y-2">--</div>
                 </div>
 
                 <div class="info-card">
@@ -233,7 +233,7 @@
                     <div id="combat-log" class="combat-log-area"></div>
                     <div class="combat-actions-container">
                         <div id="combat-turn-counter" class="combat-turn-counter"></div>
-                        <div class="combat-actions-panel" class="combat-actions-panel">
+                        <div id="combat-actions-panel" class="combat-actions-panel">
                             <div id="strategy-buttons" class="strategy-buttons">
                                 <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
                                 <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
