@@ -22,7 +22,6 @@ router.get('/world-map', async (req, res) => {
 
         const discoveredLocationNames = playerLocationsSnapshot.docs.map(doc => doc.id);
         
-        // 根據玩家已知的地點名稱，去總表中撈取完整的靜態資料
         const locationsRef = db.collection('locations');
         const knownLocationsSnapshot = await locationsRef.where(admin.firestore.FieldPath.documentId(), 'in', discoveredLocationNames).get();
 
@@ -34,7 +33,6 @@ router.get('/world-map', async (req, res) => {
         const idMap = new Map();
         let mermaidIdCounter = 0;
 
-        // 步驟一：遍歷所有已知地點，為每個地點創建一個安全的內部ID
         knownLocationsSnapshot.forEach(doc => {
             const originalId = doc.id;
             const safeId = `loc${mermaidIdCounter++}`;
@@ -45,13 +43,11 @@ router.get('/world-map', async (req, res) => {
             });
         });
 
-        // 步驟二：開始建構Mermaid語法
         let mermaidSyntax = 'graph TD;\n';
-
-        // 步驟三：使用安全ID定義所有節點和樣式
         mermaidSyntax += '    %% --- Node Definitions & Styles ---\n';
         const typeStyles = {
             '城市': 'fill:#ffe8d6,stroke:#8c6f54,stroke-width:2px,color:#3a2d21',
+            '縣城': 'fill:#ffe8d6,stroke:#8c6f54,stroke-width:2px,color:#3a2d21',
             '村莊': 'fill:#f0fff0,stroke:#28a745,stroke-width:1px,color:#000',
             '建築': 'fill:#e7f5ff,stroke:#0d6efd,stroke-width:1px,color:#000',
             '門派': 'fill:#f8f0ff,stroke:#845ef7,stroke-width:2px,color:#000',
@@ -66,13 +62,20 @@ router.get('/world-map', async (req, res) => {
             }
         });
 
-        // 步驟四：使用安全ID定義所有連結
         mermaidSyntax += '\n    %% --- Link Definitions ---\n';
         const definedLinks = new Set();
-        locations.forEach((loc, originalId) => {
-            // 層級關係連結
-            if (loc.parentLocation && idMap.has(loc.parentLocation)) {
-                const parentSafeId = idMap.get(loc.parentLocation);
+        locations.forEach((loc) => {
+            // 【核心修改】增加從 address 推斷 parent 的後備邏輯
+            let parentName = loc.parentLocation;
+            if (!parentName && loc.address) {
+                if(loc.address.town && loc.address.district) parentName = loc.address.district;
+                else if(loc.address.district && loc.address.city) parentName = loc.address.city;
+                else if(loc.address.city && loc.address.region) parentName = loc.address.region;
+                else if(loc.address.region && loc.address.country) parentName = loc.address.country;
+            }
+
+            if (parentName && idMap.has(parentName)) {
+                const parentSafeId = idMap.get(parentName);
                 const childSafeId = loc.safeId;
                 const linkKey = `${parentSafeId}-->${childSafeId}`;
                 if (!definedLinks.has(linkKey)) {
@@ -80,7 +83,7 @@ router.get('/world-map', async (req, res) => {
                     definedLinks.add(linkKey);
                 }
             }
-            // 鄰近地點連結
+
             if (loc.geography && Array.isArray(loc.geography.nearbyLocations)) {
                 loc.geography.nearbyLocations.forEach(neighbor => {
                     if (neighbor.name && idMap.has(neighbor.name)) {
