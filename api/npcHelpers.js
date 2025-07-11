@@ -1,7 +1,8 @@
 // api/npcHelpers.js
 const admin = require('firebase-admin');
 const { callAI, aiConfig } = require('../services/aiService');
-const { getNpcCreatorPrompt, getAIRomanceEvent } = require('../prompts/prompts'); // 【路徑修正】
+const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
+const { getAIRomanceEvent } = require('../prompts/romanceEventPrompt.js');
 const { processNpcRelationships } = require('./relationshipManager');
 
 const db = admin.firestore();
