@@ -50,6 +50,7 @@ const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
+const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js'); // 新增
 
 
 // 統一的AI調度中心
@@ -247,6 +248,18 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
     }
 }
 
+// 新增：更新NPC個人記憶的函式
+async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, fullChatHistory) {
+    const prompt = getNpcMemoryPrompt(npcName, oldSummary, fullChatHistory);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.npcMemory || 'openai';
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text).newSummary;
+    } catch (error) {
+        console.error(`[AI 任務失敗] 為 ${npcName} 更新個人記憶時出錯:`, error);
+        return oldSummary; // 出錯時返回舊摘要，避免資料遺失
+    }
+}
 
 async function getAICombatAction(playerModelChoice, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
@@ -446,4 +459,5 @@ module.exports = {
     getAIProactiveChat,
     getAIAnachronismResponse,
     getAIPostCombatResult,
+    getAIPerNpcSummary, // 匯出新函式
 };
