@@ -10,7 +10,7 @@ const {
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
     processNpcUpdates,
-    updateNpcMemoryAfterInteraction // 【核心】引入記憶更新輔助函式
+    updateNpcMemoryAfterInteraction
 } = require('./npcHelpers');
 const {
     updateInventory,
@@ -99,6 +99,20 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (player.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
+        // 【核心優化】將NPC記憶更新移至背景執行
+        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
+            const npcsToUpdate = aiResponse.roundData.NPC.filter(npc => npc.status);
+            if (npcsToUpdate.length > 0) {
+                console.log(`[背景任務] 正在為 ${npcsToUpdate.length} 位在場NPC啟動非同步記憶更新...`);
+                npcsToUpdate.forEach(npc => {
+                    const interactionContext = `事件：「${aiResponse.roundData.EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
+                    // 直接呼叫，不使用 await，讓它在背景執行
+                    updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext)
+                        .catch(err => console.error(`[背景記憶更新錯誤] NPC: ${npc.name}, UserID: ${userId}, 錯誤:`, err));
+                });
+            }
+        }
+        
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
         
         let newStamina = (player.stamina || 100) + staminaChange;
@@ -172,6 +186,7 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
+        // 這些是需要同步完成的關鍵資料更新
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
@@ -180,24 +195,12 @@ const interactRouteHandler = async (req, res) => {
             processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
         ]);
         
-        // 【核心修正】為所有在場且有互動的NPC，更新他們的個人記憶
-        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const memoryUpdatePromises = aiResponse.roundData.NPC
-                // 篩選條件：只要NPC在場景中被提及(有status)，就更新其記憶
-                .filter(npc => npc.status) 
-                .map(npc => {
-                    // 將整個故事的上下文作為記憶材料
-                    const interactionContext = `事件：「${aiResponse.roundData.EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
-                    return updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext);
-                });
-            await Promise.all(memoryUpdatePromises);
-        }
-        
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const newNpcs = aiResponse.roundData.NPC.filter(npc => npc.isNew);
             if (newNpcs.length > 0) {
                 console.log(`[非同步優化] 偵測到 ${newNpcs.length} 位新NPC，已將通用模板建檔任務推入背景執行。`);
-                Promise.all(newNpcs.map(npc => createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, player)));
+                newNpcs.forEach(npc => createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, player)
+                    .catch(err => console.error(`[背景建檔錯誤] NPC: ${npc.name}, UserID: ${userId}, 錯誤:`, err)));
             }
         }
 
