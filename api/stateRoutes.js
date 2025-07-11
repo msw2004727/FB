@@ -9,6 +9,42 @@ const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
+/**
+ * 獲取玩家統一的物品列表（背包+裝備）
+ * @param {string} userId - 玩家ID
+ * @returns {Promise<Array<object>>}
+ */
+async function getUnifiedInventory(userId) {
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data() || {};
+    const equipment = userData.equipment || {};
+    const inventory = await getRawInventory(userId);
+
+    const unifiedList = [];
+    const equippedInstanceIds = new Set();
+
+    // 添加已裝備的物品，並標記
+    for (const slot in equipment) {
+        const item = equipment[slot];
+        if (item && item.instanceId) {
+            if (!equippedInstanceIds.has(item.instanceId)) {
+                unifiedList.push({ ...item, isEquipped: true });
+                equippedInstanceIds.add(item.instanceId);
+            }
+        }
+    }
+
+    // 添加背包中的物品，並標記
+    for (const instanceId in inventory) {
+        if (!equippedInstanceIds.has(instanceId)) {
+            unifiedList.push({ ...inventory[instanceId], isEquipped: false });
+        }
+    }
+    
+    return unifiedList;
+}
+
+
 router.post('/equip', async (req, res) => {
     const { itemId, equip, slot } = req.body;
     const userId = req.user.id;
@@ -21,18 +57,16 @@ router.post('/equip', async (req, res) => {
             result = await inventoryModel.unequipItem(userId, slot);
         }
 
+        // 操作成功後，回傳最新的完整、統一的玩家狀態給前端
         const userDoc = await db.collection('users').doc(userId).get();
-        const inventory = await getRawInventory(userId);
-        const equipment = userDoc.data().equipment || {};
-        const bulkScore = userDoc.data().bulkScore || 0;
-
+        const unifiedInventory = await getUnifiedInventory(userId);
+        
         res.json({
             success: true,
             message: result.message,
             playerState: {
-                inventory: Object.values(inventory),
-                equipment,
-                bulkScore
+                inventory: unifiedInventory,
+                bulkScore: userDoc.data().bulkScore || 0
             }
         });
 
@@ -42,6 +76,65 @@ router.post('/equip', async (req, res) => {
     }
 });
 
+router.get('/latest-game', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        const userData = userDoc.data() || {};
+
+        if (userData.isDeceased) {
+            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
+        }
+
+        const [snapshot, newBountiesSnapshot, unifiedInventory, skills] = await Promise.all([
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
+            userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
+            getUnifiedInventory(userId), // 【核心修改】直接獲取統一的物品列表
+            getPlayerSkills(userId)
+        ]);
+        
+        if (snapshot.empty) {
+            return res.status(404).json({ message: '找不到存檔紀錄。' });
+        }
+
+        let latestGameData = snapshot.docs[0].data();
+        
+        const locationData = await getMergedLocationData(userId, latestGameData.LOC);
+        
+        // 【核心修改】將統一的、最新的數據合併到要傳回的物件中
+        Object.assign(latestGameData, { 
+            ...userData, 
+            skills: skills,
+            inventory: unifiedInventory, // 直接使用統一後的列表
+        });
+        
+        const inventoryState = await getInventoryState(userId);
+        latestGameData.ITM = inventoryState.itemsString;
+        latestGameData.money = inventoryState.money;
+
+        const [prequelText, suggestion] = await Promise.all([
+            getAIPrequel(userData.preferredModel, [latestGameData]),
+            getAISuggestion(latestGameData)
+        ]);
+
+        res.json({
+            prequel: prequelText,
+            story: latestGameData.story || "你靜靜地站在原地，思索著下一步。",
+            roundData: latestGameData,
+            suggestion: suggestion,
+            locationData: locationData,
+            hasNewBounties: !newBountiesSnapshot.empty
+        });
+    } catch (error) {
+        console.error(`[讀取進度API] 替玩家 ${req.user.id} 讀取進度時出錯:`, error);
+        res.status(500).json({ message: "讀取最新進度失敗。" });
+    }
+});
+
+
+// 其他未修改的路由...
 router.get('/inventory', async (req, res) => {
     try {
         const inventoryData = await getRawInventory(req.user.id);
@@ -115,64 +208,6 @@ router.get('/get-encyclopedia', async (req, res) => {
     }
 });
 
-router.get('/latest-game', async (req, res) => {
-    const userId = req.user.id;
-    try {
-        const userDocRef = db.collection('users').doc(userId);
-        const userDoc = await userDocRef.get();
-        const userData = userDoc.data() || {};
-
-        if (userData.isDeceased) {
-            const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
-            return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
-        }
-
-        const [snapshot, newBountiesSnapshot, inventory, skills] = await Promise.all([
-            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
-            userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
-            getRawInventory(userId), // 【核心修改】讀取完整物品資料
-            getPlayerSkills(userId)
-        ]);
-        
-        if (snapshot.empty) {
-            return res.status(404).json({ message: '找不到存檔紀錄。' });
-        }
-
-        let latestGameData = snapshot.docs[0].data();
-        
-        const locationData = await getMergedLocationData(userId, latestGameData.LOC);
-        
-        // 【核心修改】將完整的、最新的數據合併到要傳回的物件中
-        Object.assign(latestGameData, { 
-            ...userData, 
-            skills: skills,
-            inventory: Object.values(inventory), // 將物件轉為陣列
-            equipment: userData.equipment || {}
-        });
-        
-        const inventoryState = await getInventoryState(userId);
-        latestGameData.ITM = inventoryState.itemsString;
-        latestGameData.money = inventoryState.money;
-
-        const [prequelText, suggestion] = await Promise.all([
-            getAIPrequel(userData.preferredModel, [latestGameData]),
-            getAISuggestion(latestGameData)
-        ]);
-
-        res.json({
-            prequel: prequelText,
-            story: latestGameData.story || "你靜靜地站在原地，思索著下一步。",
-            roundData: latestGameData,
-            suggestion: suggestion,
-            locationData: locationData,
-            hasNewBounties: !newBountiesSnapshot.empty
-        });
-    } catch (error) {
-        console.error(`[讀取進度API] 替玩家 ${req.user.id} 讀取進度時出錯:`, error);
-        res.status(500).json({ message: "讀取最新進度失敗。" });
-    }
-});
-
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -226,7 +261,6 @@ router.post('/restart', async (req, res) => {
         await userDocRef.set({
             internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
             timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1,
-            // 重置裝備相關
             equipment: {}, bulkScore: 0
         }, { merge: true });
 
