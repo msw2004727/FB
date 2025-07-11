@@ -1,69 +1,110 @@
-【遊戲AI團隊結構圖】
+江湖AI夢幻團隊 - 結構支狀圖
+========================================
 
-AI職位：江湖百曉生 (主AI)
-職責：遊戲的核心，負責推演主線故事、處理玩家的絕大部分行動、並整合其他AI的工作結果。
-負責檔案：prompts/storyPrompt.js
+一、 世界構建總司 (World-Building Division)
+----------------------------------------
+[主責：負責生成與維護遊戲世界的底層設定與持續演化的內容。]
 
-AI職位：AI總導演
-職責：在所有AI之前，第一時間分析玩家的指令，將其快速分類為「戰鬥」、「對話」或「一般行動」等，以便交給對應的專業AI處理。
-負責檔案：prompts/actionClassifierPrompt.js
+* prompts/locationGeneratorPrompt.js
+    * 江湖職稱：輿圖司大總管
+    * 核心任務：為遊戲中首次出現的新地點，設計包含地理、經濟、歷史在內的詳細設定檔案。
 
-AI職位：角色扮演大師
-職責：在「密談」模式下，深度扮演NPC，根據其人設與玩家進行一對一的即時對話。
-負責檔案：prompts/chatMasterPrompt.js
+* prompts/itemGeneratorPrompt.js
+    * 江湖職稱：神級工匠
+    * 核心任務：為遊戲中首次出現的新物品，設計符合其來源與情境的詳細屬性、價值與稀有度。
 
-AI職位：首席編劇
-職責：在特定條件滿足時（如好感度突破），主動為NPC生成對話，讓NPC看起來更「活」、更主動。
-負責檔案：prompts/proactiveChatPrompt.js
+* prompts/skillGeneratorPrompt.js
+    * 江湖職稱：武學大宗師
+    * 核心任務：為玩家自創或新學的武學，設計其功體屬性、內力消耗與潛力上限等核心規則。
 
-AI職位：戰鬥裁判
-職責：當戰鬥發生時，專職處理每一回合的攻防裁決、傷害計算與戰鬥描述。
-負責檔案：prompts/combatPrompt.js, prompts/combatSetupPrompt.js
+* prompts/bountyGeneratorPrompt.js
+    * 江湖職稱：江湖說書人 (事件產生器)
+    * 核心任務：根據玩家當前的世界狀態，從中找出衝突點，創造出符合邏輯的全新懸賞任務。
 
-AI職位：江湖公證人
-職責：專門處理戰鬥中的「認輸」請求，根據情勢判斷敵人是否接受，以及認輸的後果。
-負責檔案：prompts/surrenderPrompt.js
+* prompts/randomEventPrompt.js
+    * 江湖職稱：司命星君
+    * 核心任務：根據玩家的狀態與運勢，為江湖世界注入小小的意外，生成各種正面或負面的隨機奇遇。
 
-AI職位：人物設定師
-職責：在玩家首次遇到新NPC時，在背景為該NPC生成一套有深度、有秘密的完整個人檔案。
-負責檔案：prompts/npcCreatorPrompt.js
+二、 劇情敘事總監 (Narrative Direction Division)
+----------------------------------------
+[主責：將遊戲中的數據與互動，轉化為生動、連貫、富有沉浸感的小說故事。]
 
-AI職位：世界建築師
-職責：在玩家首次聽聞或抵達新地點時，在背景為該地點生成詳細的地理、經濟、政治等設定檔案。
-負責檔案：prompts/locationGeneratorPrompt.js
+* prompts/storyPrompt.js
+    * 江湖職稱：江湖百曉生 (頂級故事大師)
+    * 核心任務：團隊的絕對核心！整合玩家行動、所有規則與世界狀態，生成主線故事劇情。
 
-AI職位：江湖說書人
-職責：負責撰寫「前情提要」與將遊戲數據轉化為小說旁白，確保遊戲的文學性與沉浸感。
-負責檔案：prompts/prequelPrompt.js, prompts/narrativePrompt.js, prompts/narrativeForGivePrompt.js
+* prompts/summaryPrompt.js
+    * 江湖職稱：故事檔案管理員
+    * 核心任務：將每回合發生的事件，精煉並整合進玩家的長期記憶中，形成AI後續判斷的核心依據。
 
-AI職位：事件史官
-職責：負責記錄與總結，例如將長篇對話總結成一句話的事件摘要，或編纂「江湖百科」。
-負責檔案：prompts/chatSummaryPrompt.js, prompts/encyclopediaPrompt.js
+* prompts/prequelPrompt.js
+    * 江湖職稱：江湖說書人 (前情提要)
+    * 核心任務：在玩家重新登入遊戲時，根據最近的數個回合紀錄，生成一段引人入勝的前情提要。
 
-AI職位：司命星君
-職責：執掌命運，負責生成遊戲中的各種「隨機奇遇」以及決定玩家暴斃時的「最終死因」。
-負責檔案：prompts/randomEventPrompt.js, prompts/deathCausePrompt.js
+* prompts/narrativePrompt.js
+    * 江湖職稱：武俠小說家
+    * 核心任務：將一組結構化的遊戲數據（如戰鬥結果），改寫成一段充滿意境的敘述性小說段落。
 
-AI職位：言情小說家
-職責：專門處理戀愛線，當玩家與NPC的心動值達到門檻時，負責生成觸動心弦的特殊戀愛事件。
-負責檔案：prompts/romanceEventPrompt.js
+* prompts/epiloguePrompt.js
+    * 江湖職稱：史官司馬遷
+    * 核心任務：在玩家角色死亡後，綜合其一生成敗、人際關係與江湖地位，撰寫一篇富有史詩感的「身後事」最終結局。
 
-AI職位：神級工匠
-職責：當遊戲世界需要一種新物品時，由他負責設計該物品的藍圖（屬性、外觀、價值等）。
-負責檔案：prompts/itemGeneratorPrompt.js
+* prompts/deathCausePrompt.js
+    * 江湖職稱：司命星君 (冷酷版)
+    * 核心任務：在玩家選擇「了卻此生」時，根據其最終狀態，賦予一個更具宿命感的合理死因，而非簡單的自盡。
 
-AI職位：任務獎勵官
-職責：當玩家完成懸賞任務並領取獎勵時，由他根據任務難度與玩家狀況，生成一份合理的獎勵包裹。
-負責檔案：prompts/rewardGeneratorPrompt.js
+三、 戰鬥裁決院 (Combat Adjudication Division)
+----------------------------------------
+[主責：處理所有與戰鬥相關的邏輯、推演與結算，確保戰鬥的公平與精彩。]
 
-AI職位：檔案管理員
-職責：在每一回合結束後，將新發生的所有事件，整合成精簡的「長期記憶」，供其他AI參考。
-負責檔案：prompts/summaryPrompt.js
+* prompts/combatSetupPrompt.js
+    * 江湖職稱：戰鬥導演
+    * 核心任務：在戰鬥發生前，根據在場所有人物的立場與關係，快速佈置敵我陣營，並生成他們的開戰反應。
 
-AI職位：關係圖譜師
-職責：讀取玩家的人際關係數據，並將其轉化為可視化的「人物關係圖」。
-負責檔案：prompts/relationGraphPrompt.js
+* prompts/combatPrompt.js
+    * 江湖職稱：戰鬥裁判AI
+    * 核心任務：根據雙方的策略與實力，遵循「策略鐵三角」規則，裁定並描述一回合的完整攻防結果。
 
-AI職位：懸賞發布官
-職責：在背景運作，根據玩家的經歷和世界近況，動態生成新的「懸賞任務」。
-負責檔案：prompts/bountyGeneratorPrompt.js
+* prompts/surrenderPrompt.js
+    * 江湖職稱：江湖公證人
+    * 核心任務：在玩家選擇「認輸」時，根據對手的性格與戰鬥性質，裁定一個合乎邏輯的交涉結果（接受或拒絕）。
+
+* prompts/postCombatPrompt.js
+    * 江湖職稱：戰鬥結果結算AI
+    * 核心任務：在戰鬥結束後，遵循玩家的戰鬥意圖（切磋/教訓/打死），生成合理的戰利品、經驗值與NPC狀態更新。
+
+四、 人物互動閣 (Character Interaction Division)
+----------------------------------------
+[主責：賦予NPC靈魂，處理玩家與NPC之間所有細膩、複雜的社交與情感互動。]
+
+* prompts/npcCreatorPrompt.js
+    * 江湖職稱：人物設定師
+    * 核心任務：為遊戲中首次出現的新NPC，建立一個包含背景、個性、目標、秘密等資訊的完整人物模板。
+
+* prompts/chatMasterPrompt.js
+    * 江湖職稱：角色扮演大師
+    * 核心任務：深度扮演指定的NPC角色，遵循其人設、記憶與當前情境，與玩家進行一對一的沉浸式密談。
+
+* prompts/chatSummaryPrompt.js
+    * 江湖職稱：首席劇作家
+    * 核心任務：在一段密談結束後，將完整的對話紀錄，改寫成一段精彩的「故事劇本」，並提煉出章回標題。
+
+* prompts/npcMemoryPrompt.js
+    * 江湖職稱：角色心理分析師
+    * 核心任務：站在NPC的視角，將對話紀錄整合進他舊有的記憶中，生成一段更個人化、更主觀的「內心記憶摘要」。
+
+* prompts/giveItemPrompt.js
+    * 江湖職稱：江湖交際大師
+    * 核心任務：根據NPC的個性、喜好與玩家的立場，判斷其在收到禮物後最真實的反應、好感度變化，以及是否會回禮。
+
+* prompts/romanceEventPrompt.js
+    * 江湖職稱：言情小說家
+    * 核心任務：當玩家與NPC的心動值達到特殊門檻時，創造一段充滿曖昧氛圍的特殊遭遇或決定性的告白事件。
+
+* prompts/actionClassifierPrompt.js
+    * 江湖職稱：AI總導演
+    * 核心任務：作為所有互動的起點，快速分析玩家輸入的文字，並將其準確地分類到一個行動類別中，以便後續的AI處理。
+
+* prompts/suggestionPrompt.js
+    * 江湖職稱：機靈書僮
+    * 核心任務：根據玩家當前的處境，從三種不同風格（正向、中立、腹黑）中隨機選擇一種，給出一句簡短的行動建議。
