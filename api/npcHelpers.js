@@ -47,14 +47,12 @@ async function getMergedNpcProfile(userId, npcName) {
 }
 
 
-// 【核心修正】此函式現在只負責在背景創建通用模板，不再處理玩家個人狀態
 async function createNpcProfileInBackground(userId, username, npcData, roundData, playerProfile) {
     const npcName = npcData.name;
     try {
         const npcTemplateRef = db.collection('npcs').doc(npcName);
         let templateDoc = await npcTemplateRef.get();
         
-        // 如果通用模板不存在，才在背景繼續執行AI生成
         if (!templateDoc.exists) {
             console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
@@ -85,24 +83,52 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
 }
 
 
-async function updateFriendlinessValues(userId, npcChanges) {
+async function updateFriendlinessValues(userId, npcChanges, roundData) {
     if (!npcChanges || npcChanges.length === 0) return;
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
-    const promises = npcChanges.map(async (change) => {
-        if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) return;
+    const batch = db.batch();
+
+    for (const change of npcChanges) {
+        if (!change.name) continue;
         
-        // 我們不再關心 change.isNew，因為基礎檔案已由 interactionRoutes 創建
         const npcStateDocRef = playerNpcStatesRef.doc(change.name);
-        try {
-            // 直接使用 set + merge 來安全地增加友好度
-            await npcStateDocRef.set({ 
+
+        if (change.isNew) {
+            // 【核心修正】如果是新NPC，直接創建完整的初始狀態檔案
+            console.log(`[友好度系統] 偵測到新NPC「${change.name}」，正在為其創建完整的初始狀態...`);
+            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
+            const encounterTime = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日 ${roundData.timeOfDay || '未知時辰'}`;
+            const initialState = {
+                interactionSummary: `你與${change.name}的交往尚淺。`,
+                currentLocation: encounterLocation,
+                firstMet: {
+                    round: roundData.R,
+                    time: encounterTime,
+                    location: encounterLocation,
+                    event: roundData.EVT || '初次相遇'
+                },
+                isDeceased: false,
+                inventory: {},
+                romanceValue: 0,
+                friendlinessValue: change.friendlinessChange || 0,
+                triggeredRomanceEvents: []
+            };
+            batch.set(npcStateDocRef, initialState);
+
+        } else if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
+            // 對於舊NPC，只更新友好度
+            batch.set(npcStateDocRef, { 
                 friendlinessValue: admin.firestore.FieldValue.increment(change.friendlinessChange) 
             }, { merge: true });
-        } catch (error) {
-            console.error(`[友好度系統] 更新與NPC "${change.name}" 的關係時出錯:`, error);
         }
-    });
-    await Promise.all(promises);
+    }
+    
+    try {
+        await batch.commit();
+        console.log(`[友好度系統] 批次更新了 ${npcChanges.length} 位NPC的友好度狀態。`);
+    } catch (error) {
+        console.error(`[友好度系統] 批次更新NPC關係時出錯:`, error);
+    }
 }
 
 async function updateRomanceValues(userId, romanceChanges) {
