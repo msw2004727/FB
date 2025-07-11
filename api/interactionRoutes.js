@@ -97,32 +97,6 @@ const interactRouteHandler = async (req, res) => {
 
         const newRoundNumber = (player.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
-
-        // --- 【核心修正】新兵報到 - 即時建立基礎檔案 ---
-        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const newNpcs = aiResponse.roundData.NPC.filter(npc => npc.isNew);
-            if (newNpcs.length > 0) {
-                const batch = db.batch();
-                const encounterLocation = aiResponse.roundData.LOC && aiResponse.roundData.LOC.length > 0 ? aiResponse.roundData.LOC[0] : '未知之地';
-                newNpcs.forEach(npc => {
-                    console.log(`[即時建檔] 為新NPC「${npc.name}」建立基礎個人檔案...`);
-                    const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npc.name);
-                    const initialState = {
-                        interactionSummary: `你與${npc.name}的交往尚淺。`,
-                        currentLocation: encounterLocation,
-                        firstMet: { round: newRoundNumber, time: `${aiResponse.roundData.yearName}${aiResponse.roundData.year}-${aiResponse.roundData.month}-${aiResponse.roundData.day} ${aiResponse.roundData.timeOfDay}`, location: encounterLocation, event: aiResponse.roundData.EVT },
-                        isDeceased: false,
-                        inventory: {},
-                        romanceValue: 0,
-                        friendlinessValue: npc.friendlinessChange || 0,
-                    };
-                    batch.set(npcStateRef, initialState, { merge: true });
-                });
-                await batch.commit();
-                console.log(`[即時建檔] ${newNpcs.length} 位新NPC的基礎檔案建立完畢。`);
-            }
-        }
-        // --- 修正結束 ---
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
         
@@ -200,7 +174,8 @@ const interactRouteHandler = async (req, res) => {
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
-            updateFriendlinessValues(userId, aiResponse.roundData.NPC),
+            // 【核心修正】將完整的 roundData 傳遞過去
+            updateFriendlinessValues(userId, aiResponse.roundData.NPC, aiResponse.roundData),
             processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []),
             processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
         ]);
