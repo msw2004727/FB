@@ -7,7 +7,7 @@
  * @param {string} context.location - 物品出現的地點
  * @param {string} context.sourceType - 物品來源類型 (例如: '敵人掉落', '寶箱', '任務獎勵')
  * @param {string} context.sourceName - 物品來源的具體名稱 (例如: '山賊', '精緻的木箱', '村長的委託')
- * @param {number} context.playerLevel - 玩家的綜合實力等級 (例如: 1-100)
+ * @param {number} context.playerLevel - 玩家的綜合實力參考 (例如: 1-100)
  * @returns {string} The complete prompt for the AI.
  */
 const getItemGeneratorPrompt = (itemName, context = {}) => {
@@ -39,9 +39,9 @@ const getItemGeneratorPrompt = (itemName, context = {}) => {
 3.  **名實相符**: 物品的所有屬性，都必須與其名稱「${itemName}」緊密相關。一把「鐵劍」的材質就不可能是「玄鐵」。
 
 4.  **【核心新增】裝備屬性鐵律**: 你必須根據物品的類型，為其設定「equipSlot」、「hands」、「bulk」三個新欄位。
-    * **`equipSlot` (裝備槽位)**: 必須從以下列表中選擇一個： "weapon_right", "weapon_left", "weapon_back", "head", "body", "hands", "feet", "accessory1", "accessory2", "manuscript"。如果物品完全不可裝備（如消耗品、材料），則此欄位值為 `null`。
-    * **`hands` (武器手数)**: **只有**當 `equipSlot` 是 "weapon_right" 或 "weapon_left" 時，才需要設定此欄位。單手武器為 `1`，雙手武器為 `2`。其他類型的裝備此欄位為 `null`。
-    * **`bulk` (份量)**: 描述物品的份量。必須從 "輕", "中", "重", "極重" 四個等級中選擇一個。
+    * **\`equipSlot\` (裝備槽位)**: 必須從以下列表中選擇一個： "weapon_right", "weapon_left", "weapon_back", "head", "body", "hands", "feet", "accessory1", "accessory2", "manuscript"。如果物品完全不可裝備（如消耗品、材料），則此欄位值為 \`null\`。
+    * **\`hands\` (武器手数)**: **只有**當 \`equipSlot\` 是 "weapon_right" 或 "weapon_left" 時，才需要設定此欄位。單手武器為 \`1\`，雙手武器為 \`2\`。其他類型的裝備此欄位為 \`null\`。
+    * **\`bulk\` (份量)**: 描述物品的份量。必須從 "輕", "中", "重", "極重" 四個等級中選擇一個。
 
 5.  **履歷留白**: 你設計的是「模板」，所以**不需要**包含「履歷」資訊。「履歷」是在玩家獲得物品的瞬間，由遊戲主邏輯添加的。
 
