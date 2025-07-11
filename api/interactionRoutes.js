@@ -15,7 +15,7 @@ const {
     updateInventory,
     updateSkills,
     getInventoryState,
-    getPlayerSkills, // 【核心修正】已為您補上遺漏的 getPlayerSkills 引用
+    getPlayerSkills,
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -24,7 +24,8 @@ const {
     updateLibraryNovel,
 } = require('./worldStateHelpers');
 const { triggerBountyGeneration } = require('./worldEngine');
-const { processLocationUpdates } = require('./locationManager');
+// 【核心修正】已為您從 locationManager 補上遺漏的 getMergedLocationData 引用
+const { processLocationUpdates, getMergedLocationData } = require('./locationManager');
 const { buildContext } = require('./contextBuilder');
 
 const db = admin.firestore();
