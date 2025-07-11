@@ -208,65 +208,43 @@ function renderInventory(roundData) {
     itmContent.innerHTML = '';
     if (moneyContent) moneyContent.textContent = `${roundData.money || 0} 文錢`;
 
-    const equipment = roundData.equipment || {};
-    const inventory = roundData.inventory || []; 
+    const inventory = roundData.inventory || []; // 現在這是一個統一的列表
 
-    const equippedItemIds = Object.values(equipment)
-        .filter(item => item && item.instanceId)
-        .map(item => item.instanceId);
-
-    const allItems = [...inventory];
-    
-    const itemMasterList = new Map(allItems.map(item => [item.instanceId, item]));
-
-    const sortedItemIds = [...itemMasterList.keys()].sort((a, b) => {
-        const itemA = itemMasterList.get(a);
-        const itemB = itemMasterList.get(b);
-        if (!itemA || !itemB) return 0;
-
-        const isEquippedA = equippedItemIds.includes(a);
-        const isEquippedB = equippedItemIds.includes(b);
-        
-        if (isEquippedA && !isEquippedB) return -1;
-        if (!isEquippedA && isEquippedB) return 1;
-        if (isEquippedA && isEquippedB) {
-            const slotA = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === a);
-            const slotB = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === b);
-            return equipOrder.indexOf(slotA) - equipOrder.indexOf(slotB);
+    // 【核心修改】直接使用後端傳來的統一列表進行排序
+    inventory.sort((a, b) => {
+        if (a.isEquipped && !b.isEquipped) return -1;
+        if (!a.isEquipped && b.isEquipped) return 1;
+        if (a.isEquipped && b.isEquipped) {
+            return equipOrder.indexOf(a.equipSlot) - equipOrder.indexOf(b.equipSlot);
         }
-        return (itemA.itemName || '').localeCompare(itemB.itemName || '', 'zh-Hant');
+        return (a.itemName || '').localeCompare(b.itemName || '', 'zh-Hant');
     });
 
-    if (sortedItemIds.length === 0) {
+    if (inventory.length === 0) {
         itmContent.textContent = '身無長物';
         return;
     }
 
-    sortedItemIds.forEach(itemId => {
-        const item = itemMasterList.get(itemId);
-        if(!item) return;
-
-        const isEquipped = equippedItemIds.includes(item.instanceId);
-        const itemEl = createItemEntry(item, isEquipped, equipment);
+    inventory.forEach(item => {
+        const itemEl = createItemEntry(item);
         itmContent.appendChild(itemEl);
     });
 }
 
-function createItemEntry(item, isEquipped, equipment) {
+function createItemEntry(item) {
     const entry = document.createElement('div');
-    entry.className = `item-entry ${isEquipped ? 'equipped' : ''}`;
+    entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
     let equipControls = '';
     if (item.equipSlot) {
-        const currentSlot = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === item.instanceId);
-        const slotIcon = currentSlot ? (slotConfig[currentSlot]?.icon || 'fa-question-circle') : '';
+        const slotIcon = item.isEquipped ? (slotConfig[item.equipSlot]?.icon || 'fa-question-circle') : '';
         
         equipControls = `
             <div class="item-controls">
-                <i class="equipped-slot-icon fa-solid ${slotIcon} ${isEquipped ? 'visible' : ''}"></i>
+                <i class="equipped-slot-icon fa-solid ${slotIcon} ${item.isEquipped ? 'visible' : ''}"></i>
                 <label class="switch">
-                    <input type="checkbox" ${isEquipped ? 'checked' : ''} data-slot="${item.equipSlot}">
+                    <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${item.instanceId}" data-slot="${item.equipSlot}">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -286,7 +264,10 @@ function createItemEntry(item, isEquipped, equipment) {
 
     const checkbox = entry.querySelector('input[type="checkbox"]');
     if (checkbox) {
-        checkbox.addEventListener('change', (e) => handleEquipToggle(item.instanceId, e.target.checked, e.target.dataset.slot));
+        checkbox.addEventListener('change', (e) => {
+            const { itemId, slot } = e.target.dataset;
+            handleEquipToggle(itemId, e.target.checked, slot);
+        });
     }
     return entry;
 }
@@ -303,10 +284,10 @@ async function handleEquipToggle(itemId, shouldEquip, slot) {
         const result = await api.equipItem(payload); 
 
         if (result.success && result.playerState) {
+             // 【核心修改】直接使用後端回傳的最新狀態更新gameState
              gameState.roundData.inventory = result.playerState.inventory;
-             gameState.roundData.equipment = result.playerState.equipment;
              gameState.roundData.bulkScore = result.playerState.bulkScore;
-             renderInventory(gameState.roundData);
+             renderInventory(gameState.roundData); // 重新渲染物品欄
              updateBulkStatus(gameState.roundData.bulkScore);
         } else {
             throw new Error(result.message || '操作失敗');
@@ -314,6 +295,7 @@ async function handleEquipToggle(itemId, shouldEquip, slot) {
     } catch (error) {
         console.error('裝備操作失敗:', error);
         handleApiError(error);
+        // 操作失敗時，也重新渲染一次以恢復UI到正確狀態
         renderInventory(gameState.roundData);
     } finally {
         gameState.isRequesting = false;
