@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion } = require('../services/aiService');
-const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
+const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate, getAISummary } = require('./gameHelpers');
 const { getKnownNpcNames } = require('./cacheManager'); // 引入快取函式
 
 const db = admin.firestore();
@@ -376,7 +376,8 @@ router.post('/end-chat', async (req, res) => {
         
         const chatSummary = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
         
-        let newRoundData = { ...lastRoundData, R: lastRoundData.R + 1 };
+        const newRoundNumber = lastRoundData.R + 1;
+        let newRoundData = { ...lastRoundData, R: newRoundNumber };
         newRoundData.EVT = chatSummary;
         newRoundData.story = `你結束了與${npcName}的交談，${chatSummary}。`;
         newRoundData.PC = `你與${npcName}深入交談了一番。`;
