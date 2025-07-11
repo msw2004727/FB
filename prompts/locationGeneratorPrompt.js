@@ -18,6 +18,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ### 1. \`locationHierarchy\` (地點層級陣列)
 * **【層級生成鐵律】**: 如果你要創造的地點（例如一個山寨或一個小門派）在邏輯上應該屬於某個更大的行政區（例如某個「縣」或「府」），但現有摘要中並未提供這個上級地點，你**必須**自行創造一個合理的上級地點。然後，你必須將**所有層級**（從最上級的縣，到最下級的村或山寨）都作為獨立的物件，放入這個 \`locationHierarchy\` 陣列中。
 * **陣列順序**: 陣列中的地點物件順序並不重要。
+* **【新增地理關聯鐵律】**: 你生成的新地點檔案中，其 \`parentLocation\` 欄位**必須**被設定為我提供給你的「世界現況摘要」中的「玩家當前位置」。這將確保新地點與玩家的足跡在地理上是相連的。如果生成的是一個與當前位置平級的地點（如鄰村），則必須在當前位置的檔案中，透過 \`geography.nearbyLocations\` 欄位將新地點標記為鄰居。
 
 ### 2. 地點物件內部結構
 陣列中的每一個地點物件，都**必須**包含以下三個鍵：\`locationName\`, \`staticTemplate\`, 和 \`initialDynamicState\`。
