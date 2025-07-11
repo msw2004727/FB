@@ -50,6 +50,8 @@ export const api = {
     getNovel: () => fetchApi('/api/game/state/get-novel'),
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
+    // 【核心新增】新增裝備物品的API函式
+    equipItem: (body) => fetchApi('/api/game/state/equip', { method: 'POST', body: JSON.stringify(body) }),
 
     // Bounty Route (懸賞任務)
     getBounties: () => fetchApi('/api/bounties'),
