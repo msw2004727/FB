@@ -46,7 +46,7 @@ const aiConfig = {
     encyclopedia: 'deepseek', // 江湖百科生成
     relationGraph: 'deepseek',// 人物關係圖生成
     randomEvent: 'openai',    // 隨機事件生成
-    bounty: 'openai',       // 懸賞任務生成
+    bounty: 'deepseek',       // 懸賞任務生成
     itemTemplate: 'openai', // 新物品的設計圖生成
     location: 'openai',     // 新地點的檔案生成
     reward: 'openai',         // 領取懸賞時的獎勵生成
