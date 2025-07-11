@@ -44,7 +44,6 @@ const slotConfig = {
 const equipOrder = ['weapon_right', 'weapon_left', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
 
 // --- UI 更新核心函式 ---
-
 export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
         const eventDiv = document.createElement('div');
@@ -67,14 +66,16 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateBulkStatus(roundData.bulkScore || 0); 
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData.inventory); 
+    renderInventory(roundData.inventory);
     
+    moneyContent.textContent = `${roundData.money || 0} 文錢`;
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
 }
 
+// (其他輔助函式省略...)
 export function appendMessageToStory(htmlContent, className) {
     const p = document.createElement('p');
     p.innerHTML = typeof htmlContent === 'string' ? htmlContent.replace(/\n/g, '<br>') : htmlContent;
@@ -286,6 +287,10 @@ async function handleEquipToggle(itemId, shouldEquip, slot) {
 
         if (result.success && result.inventory) {
              gameState.roundData.inventory = result.inventory;
+             if (result.bulkScore !== undefined) {
+                 gameState.roundData.bulkScore = result.bulkScore;
+                 updateBulkStatus(gameState.roundData.bulkScore);
+             }
              renderInventory(gameState.roundData.inventory); 
         } else {
             throw new Error(result.message || '操作失敗');
