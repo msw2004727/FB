@@ -241,8 +241,16 @@ body.dark-theme .strategy-btn {
 }
 .strategy-btn:hover { border-color: var(--light-accent); background-color: var(--light-bg); }
 body.dark-theme .strategy-btn:hover { background-color: var(--dark-bg); border-color: var(--dark-accent); }
-.strategy-btn.selected { background: var(--light-accent); color: #fff; border-color: var(--light-accent); }
-body.dark-theme .strategy-btn.selected { background-color: var(--dark-accent); color: var(--dark-bg); }
+.strategy-btn.selected { color: #fff; }
+body.dark-theme .strategy-btn.selected { color: var(--dark-bg); }
+
+/* 【核心修改】為按鈕添加獨特顏色 */
+.strategy-btn[data-strategy="attack"].selected { background: #c92a2a; border-color: #c92a2a; }
+.strategy-btn[data-strategy="defend"].selected { background: #0d6efd; border-color: #0d6efd; }
+.strategy-btn[data-strategy="evade"].selected { background: #6c757d; border-color: #6c757d; }
+.strategy-btn[data-strategy="support"].selected { background: #fd7e14; border-color: #fd7e14; }
+.strategy-btn[data-strategy="heal"].selected { background: #20c997; border-color: #20c997; }
+
 
 .skill-selection {
     flex-grow: 1;
@@ -454,9 +462,11 @@ body.dark-theme .friendliness-bar-indicator { background-color: var(--dark-surfa
     }
     .strategy-buttons { 
         flex-direction: row; 
+        flex-wrap: wrap; /* 【核心修改】允許按鈕換行 */
+        justify-content: center; /* 【核心修改】置中按鈕 */
     }
     .strategy-btn { 
-        flex-grow: 1; 
+        flex-basis: calc(33.33% - 0.25rem); /* 【核心修改】讓按鈕能並排顯示 */
         justify-content: center; 
     }
     .skill-selection { 
