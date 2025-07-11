@@ -10,9 +10,6 @@ const { getKnownNpcNames } = require('./cacheManager');
 
 const db = admin.firestore();
 
-// ... The rest of the file content is identical to the original ...
-// (此檔案的其餘部分與您提供的舊版完全相同，此處省略以節省篇幅)
-// 請直接覆蓋即可。
 // 獲取NPC公開資料的路由
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
@@ -30,6 +27,7 @@ router.get('/npc-profile/:npcName', async (req, res) => {
         }
         const playerLocation = latestSaveSnapshot.docs[0].data().LOC[0];
 
+        // 【位置檢查】
         if (playerLocation !== npcProfile.currentLocation) {
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
         }
@@ -40,7 +38,7 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0),
             romanceValue: npcProfile.romanceValue || 0,
             friendlinessValue: npcProfile.friendlinessValue || 0,
-            age: npcProfile.age || '年齡不詳' // 新增年齡
+            age: npcProfile.age || '年齡不詳'
         };
 
         res.json(publicProfile);
@@ -57,13 +55,23 @@ router.get('/start-trade/:npcName', async (req, res) => {
     const { npcName } = req.params;
 
     try {
-        const [playerInventory, npcProfile] = await Promise.all([
+        const [playerInventory, npcProfile, latestSaveSnapshot] = await Promise.all([
             getRawInventory(userId),
-            getMergedNpcProfile(userId, npcName)
+            getMergedNpcProfile(userId, npcName),
+            db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
 
         if (!npcProfile) {
             return res.status(404).json({ message: '找不到交易對象。' });
+        }
+        
+        // 【核心新增】交易前的位置檢查
+        if (latestSaveSnapshot.empty) {
+            return res.status(404).json({ message: '找不到玩家位置資訊，無法開啟交易。' });
+        }
+        const playerLocation = latestSaveSnapshot.docs[0].data().LOC[0];
+        if (playerLocation !== npcProfile.currentLocation) {
+            return res.status(403).json({ message: `你必須和 ${npcName} 在同一個地方才能與其交易。` });
         }
 
         const playerItems = Object.values(playerInventory);
@@ -387,7 +395,6 @@ router.post('/end-chat', async (req, res) => {
         }
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         
-        // 並行處理兩個摘要的生成
         const [chatSummaryResult, newInteractionSummary] = await Promise.all([
             getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary),
             getAIPerNpcSummary(playerModelChoice, npcName, oldInteractionSummary, fullChatHistory)
@@ -404,7 +411,6 @@ router.post('/end-chat', async (req, res) => {
         const suggestion = await getAISuggestion(newRoundData);
         newRoundData.suggestion = suggestion;
         
-        // 一次性更新所有資料庫
         const updatePromises = [
             db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData),
             summaryDocRef.set({ text: newOverallSummary, lastUpdated: newRoundNumber }),
