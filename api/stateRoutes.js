@@ -3,15 +3,11 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getPlayerSkills, getRawInventory } = require('./playerStateHelpers');
+const { getPlayerSkills, getRawInventory, getInventoryState } = require('./playerStateHelpers');
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
-const { generateAndCacheLocation } = require('../services/worldEngine'); // Assuming this service exists
+const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
-
-// ... The rest of the file content is identical to the original ...
-// (此檔案的其餘部分與您提供的舊版完全相同，此處省略以節省篇幅)
-// 請直接覆蓋即可。
 
 router.get('/inventory', async (req, res) => {
     try {
@@ -113,8 +109,9 @@ router.get('/latest-game', async (req, res) => {
         const locationData = await getMergedLocationData(userId, currentLocationName);
 
         const skills = await getPlayerSkills(userId);
+        const inventoryState = await getInventoryState(userId);
         
-        Object.assign(latestGameData, { ...userData, skills: skills });
+        Object.assign(latestGameData, { ...userData, ...inventoryState, skills: skills });
 
         const [prequelText, suggestion] = await Promise.all([
             getAIPrequel(userData.preferredModel, [latestGameData]),
@@ -184,9 +181,11 @@ router.post('/restart', async (req, res) => {
                 console.warn(`清除集合 ${col} 失敗，可能該集合尚不存在。`, e.message);
             }
         }
-
+        
+        // This should be adapted to use the default user fields from authRoutes
         await userDocRef.set({
-            // Reset to default fields, keeping essential info like username, gender, passwordHash
+            internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
+            timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1
         }, { merge: true });
 
         await invalidateNovelCache(userId);
