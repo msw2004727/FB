@@ -4,7 +4,6 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIStory, getAISummary, getAISuggestion } = require('../services/aiService');
 
-// 【核心修改】從新的、拆分後的輔助檔案中導入所需函式
 const {
     createNpcProfileInBackground,
     updateFriendlinessValues,
@@ -15,7 +14,7 @@ const {
 const {
     updateInventory,
     updateSkills,
-    getInventoryState, // 【核心修正】補上遺漏的 getInventoryState 引用
+    getInventoryState,
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -29,7 +28,6 @@ const { buildContext } = require('./contextBuilder');
 
 const db = admin.firestore();
 
-// 處理玩家主要動作的核心函式
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -179,9 +177,16 @@ const interactRouteHandler = async (req, res) => {
             processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
         ]);
         
+        // --- 【核心修改】將新NPC的建檔過程改為非阻塞式 ---
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            await Promise.all(aiResponse.roundData.NPC.filter(npc => npc.isNew).map(npc => createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, player)));
+            const newNpcs = aiResponse.roundData.NPC.filter(npc => npc.isNew);
+            if (newNpcs.length > 0) {
+                console.log(`[非同步優化] 偵測到 ${newNpcs.length} 位新NPC，已將建檔任務推入背景執行。`);
+                // Fire-and-forget: 啟動任務，但不等待其完成
+                Promise.all(newNpcs.map(npc => createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, player)));
+            }
         }
+        // --- 修改結束 ---
 
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(longTermSummary, aiResponse.roundData),
