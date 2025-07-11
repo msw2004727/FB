@@ -10,7 +10,9 @@ const {
     updateLibraryNovel, 
     getPlayerSkills,
     updateInventory,
-    processNpcUpdates
+    processNpcUpdates,
+    getMergedNpcProfile,
+    getFriendlinessLevel,
 } = require('./gameHelpers');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
 
@@ -29,7 +31,6 @@ const getNpcTags = (skills = []) => {
     };
 
     skills.forEach(skill => {
-        // 【核心修改】增加對 skill 和 skill.name 的有效性檢查
         if (skill && skill.name) {
             if (skill.skillType === '醫術') tags.add('治癒');
             if (skill.skillType === '毒術') tags.add('攻擊');
@@ -42,7 +43,7 @@ const getNpcTags = (skills = []) => {
         }
     });
 
-    if (tags.size === 0) tags.add('攻擊'); // 如果沒有匹配，預設為攻擊
+    if (tags.size === 0) tags.add('攻擊');
 
     const typeMapping = { '攻擊': 'attack', '防禦': 'defend', '治癒': 'heal', '輔助': 'support' };
     return Array.from(tags).map(tagName => ({
@@ -170,7 +171,6 @@ const combatActionRouteHandler = async (req, res) => {
         finalUpdatedState.log.push(combatResult.narrative);
 
         if (combatResult.updatedState) {
-            // 玩家數值修正
             if (combatResult.updatedState.player) {
                 const originalSkills = finalUpdatedState.player.skills;
                 finalUpdatedState.player = { ...finalUpdatedState.player, ...combatResult.updatedState.player };
@@ -178,7 +178,6 @@ const combatActionRouteHandler = async (req, res) => {
                 if (finalUpdatedState.player.hp < 0) finalUpdatedState.player.hp = 0;
                 if (finalUpdatedState.player.mp < 0) finalUpdatedState.player.mp = 0;
             }
-            // 敵人數值修正
             if (combatResult.updatedState.enemies) {
                 finalUpdatedState.enemies = finalUpdatedState.enemies.map(enemy => {
                     const updatedEnemy = combatResult.updatedState.enemies.find(u => u.name === enemy.name);
@@ -191,7 +190,6 @@ const combatActionRouteHandler = async (req, res) => {
                     return enemy;
                 });
             }
-            // 盟友數值修正
             if (combatResult.updatedState.allies) {
                 finalUpdatedState.allies = finalUpdatedState.allies.map(ally => {
                     const updatedAlly = combatResult.updatedState.allies.find(u => u.name === ally.name);
@@ -323,8 +321,140 @@ const surrenderRouteHandler = async (req, res) => {
     }
 };
 
+const finalizeCombatHandler = async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { combatResult, model: playerModelChoice } = req.body;
+
+    if (!combatResult || !combatResult.finalState) {
+        return res.status(400).json({ message: '缺少完整的戰鬥結果數據。' });
+    }
+
+    try {
+        const userDocRef = db.collection('users').doc(userId);
+        const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+
+        const lastSaveSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const preCombatRoundData = lastSaveSnapshot.docs[0].data();
+        
+        const userProfile = (await userDocRef.get()).data();
+        
+        const { finalState } = combatResult;
+        const playerWon = finalState.enemies.every(e => e.hp <= 0);
+        let killerName = null;
+        if (playerWon && finalState.intention === '打死') {
+            killerName = username;
+        }
+
+        const postCombatOutcome = await getAIPostCombatResult(playerModelChoice, { ...userProfile, username }, finalState, combatResult.log, killerName);
+        
+        if (!postCombatOutcome || !postCombatOutcome.outcome) {
+             throw new Error("戰後結算AI未能生成有效回應。");
+        }
+        
+        let { summary, EVT, playerChanges, itemChanges, npcUpdates } = postCombatOutcome.outcome;
+        
+        await updateInventory(userId, itemChanges || [], preCombatRoundData);
+        
+        const updates = {};
+        if (playerChanges && playerChanges.powerChange) {
+            updates.internalPower = admin.firestore.FieldValue.increment(playerChanges.powerChange.internal || 0);
+            updates.externalPower = admin.firestore.FieldValue.increment(playerChanges.powerChange.external || 0);
+            updates.lightness = admin.firestore.FieldValue.increment(playerChanges.powerChange.lightness || 0);
+        }
+        if (playerChanges && playerChanges.moralityChange) {
+            updates.morality = admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0);
+        }
+        
+        const killedNpcNames = (npcUpdates || []).filter(u => u.fieldToUpdate === 'isDeceased' && u.newValue === true).map(u => u.npcName);
+
+        if (killedNpcNames.length > 0) {
+            updates.deathAftermathCooldown = 5;
+            
+            const reputationSummary = await processReputationChangesAfterDeath(
+                userId, 
+                killedNpcNames, 
+                preCombatRoundData.LOC[0], 
+                combatResult.finalState.allies.map(a => a.name), 
+                killerName
+            );
+            if (reputationSummary) {
+                summary += `\n\n**【江湖反應】** ${reputationSummary}`;
+            }
+        }
+        
+        if (Object.keys(updates).length > 0) {
+            await userDocRef.update(updates);
+        }
+        
+        if (npcUpdates && npcUpdates.length > 0) {
+            await processNpcUpdates(userId, npcUpdates);
+        }
+        
+        const newRoundNumber = preCombatRoundData.R + 1;
+        
+        const [updatedUserDoc, inventoryState, updatedSkills] = await Promise.all([
+            userDocRef.get(),
+            getInventoryState(userId),
+            getPlayerSkills(userId)
+        ]);
+        const finalUserProfile = updatedUserDoc.data();
+        
+        const finalRoundData = {
+            ...preCombatRoundData,
+            ...finalUserProfile,
+            ...inventoryState,
+            R: newRoundNumber,
+            story: summary,
+            PC: playerChanges.PC || summary,
+            EVT: EVT || '一場激鬥之後',
+            skills: updatedSkills,
+        };
+        
+        const finalNpcList = [];
+        const sceneNpcNames = new Set(finalState.enemies.map(e => e.name).concat(finalState.allies.map(a => a.name)));
+        
+        for (const npcName of sceneNpcNames) {
+            const profile = await getMergedNpcProfile(userId, npcName);
+            if (profile) {
+                finalNpcList.push({
+                    name: profile.name,
+                    status: profile.isDeceased ? '已無氣息' : (profile.status || '狀態不明'),
+                    friendliness: getFriendlinessLevel(profile.friendlinessValue),
+                    isDeceased: profile.isDeceased || false
+                });
+            }
+        }
+        finalRoundData.NPC = finalNpcList;
+
+        const longTermSummary = (await summaryDocRef.get()).data()?.text || '...';
+        const newSummary = await getAISummary(longTermSummary, finalRoundData);
+        const suggestion = await getAISuggestion(finalRoundData);
+
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
+        
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(戰後):", err));
+
+        res.json({
+            story: finalRoundData.story,
+            roundData: finalRoundData,
+            suggestion: suggestion,
+            locationData: await getMergedLocationData(userId, finalRoundData.LOC)
+        });
+
+    } catch (error) {
+        console.error(`[UserID: ${userId}] /finalize-combat 錯誤:`, error);
+        if (!res.headersSent) {
+            res.status(500).json({ message: error.message || "結算戰鬥時發生未知錯誤" });
+        }
+    }
+};
+
 router.post('/initiate', initiateCombatHandler);
 router.post('/action', combatActionRouteHandler);
 router.post('/surrender', surrenderRouteHandler);
+router.post('/finalize-combat', finalizeCombatHandler);
 
 module.exports = router;
