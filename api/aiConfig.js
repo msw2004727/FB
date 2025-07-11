@@ -35,10 +35,10 @@ const aiConfig = {
     surrender: 'openai',    // 認輸情境裁決
 
     // --- NPC與互動 ---
-    npcProfile: 'openai',   // 新NPC的詳細人設生成
-    npcChat: 'openai',        // NPC密談時的回應
+    npcProfile: 'grok',   // 新NPC的詳細人設生成
+    npcChat: 'grok',        // NPC密談時的回應
     npcChatSummary: 'openai', // 總結密談內容
-    giveItem: 'openai',       // 贈予NPC物品時的反應
+    giveItem: 'grok',       // 贈予NPC物品時的反應
     giveNarrative: 'openai',  // 贈予事件的小說化描述
     proactiveChat: 'openai',// NPC主動發起對話的內容
 
