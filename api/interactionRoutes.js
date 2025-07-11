@@ -49,7 +49,7 @@ const interactRouteHandler = async (req, res) => {
             recentHistory,
             locationContext,
             npcContext,
-            bulkScore,
+            bulkScore, // 【核心修改】從 contextBuilder 獲取負重分數
             isNewGame
         } = context;
         
@@ -226,7 +226,7 @@ const interactRouteHandler = async (req, res) => {
             internalPower: newInternalPower,
             externalPower: newExternalPower,
             lightness: newLightness,
-            bulkScore: bulkScore, // 【核心新增】將計算出的負重分數寫回資料庫
+            bulkScore: bulkScore, // 【核心修改】將計算出的負重分數寫回資料庫
             morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0)
         };
         
@@ -247,7 +247,7 @@ const interactRouteHandler = async (req, res) => {
         finalRoundDataForClient.externalPower = newExternalPower;
         finalRoundDataForClient.lightness = newLightness;
         finalRoundDataForClient.morality = (player.morality || 0) + (aiResponse.roundData.moralityChange || 0);
-        finalRoundDataForClient.bulkScore = bulkScore; // 【核心新增】將負重分數加入要傳回給前端的資料中
+        finalRoundDataForClient.bulkScore = bulkScore; // 【核心修改】將負重分數加入要傳回給前端的資料中
 
         const inventoryState = await getInventoryState(userId);
         finalRoundDataForClient.ITM = inventoryState.itemsString;
