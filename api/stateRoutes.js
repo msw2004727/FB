@@ -10,37 +10,39 @@ const inventoryModel = require('./models/inventoryModel');
 const db = admin.firestore();
 
 /**
- * 獲取玩家統一的物品列表（背包+裝備）
+ * 【核心重構】獲取玩家統一的物品列表（背包+裝備），並標記每個物品的裝備狀態
  * @param {string} userId - 玩家ID
  * @returns {Promise<Array<object>>}
  */
 async function getUnifiedInventory(userId) {
     const userDoc = await db.collection('users').doc(userId).get();
-    const userData = userDoc.data() || {};
+    if (!userDoc.exists) return [];
+
+    const userData = userDoc.data();
     const equipment = userData.equipment || {};
-    const inventory = await getRawInventory(userId);
+    const inventory = await getRawInventory(userId); // 這會返回一個以instanceId為鍵的物件
 
-    const unifiedList = [];
-    const equippedInstanceIds = new Set();
+    const unifiedList = Object.values(inventory); // 先將背包物品轉為陣列
 
-    // 添加已裝備的物品，並標記
-    for (const slot in equipment) {
-        const item = equipment[slot];
-        if (item && item.instanceId) {
-            if (!equippedInstanceIds.has(item.instanceId)) {
-                unifiedList.push({ ...item, isEquipped: true });
-                equippedInstanceIds.add(item.instanceId);
-            }
+    // 創建一個已裝備物品的ID集合，方便查找
+    const equippedInstanceIds = new Set(
+        Object.values(equipment)
+        .filter(item => item && item.instanceId)
+        .map(item => item.instanceId)
+    );
+
+    // 遍歷統一列表，為每一項添加 isEquipped 標記
+    unifiedList.forEach(item => {
+        if (equippedInstanceIds.has(item.instanceId)) {
+            item.isEquipped = true;
+            // 為了排序，把裝備槽位也加上
+            const slot = Object.keys(equipment).find(s => equipment[s] && equipment[s].instanceId === item.instanceId);
+            item.equipSlot = slot;
+        } else {
+            item.isEquipped = false;
         }
-    }
+    });
 
-    // 添加背包中的物品，並標記
-    for (const instanceId in inventory) {
-        if (!equippedInstanceIds.has(instanceId)) {
-            unifiedList.push({ ...inventory[instanceId], isEquipped: false });
-        }
-    }
-    
     return unifiedList;
 }
 
@@ -58,16 +60,12 @@ router.post('/equip', async (req, res) => {
         }
 
         // 操作成功後，回傳最新的完整、統一的玩家狀態給前端
-        const userDoc = await db.collection('users').doc(userId).get();
         const unifiedInventory = await getUnifiedInventory(userId);
         
         res.json({
             success: true,
             message: result.message,
-            playerState: {
-                inventory: unifiedInventory,
-                bulkScore: userDoc.data().bulkScore || 0
-            }
+            inventory: unifiedInventory,
         });
 
     } catch (error) {
@@ -91,7 +89,7 @@ router.get('/latest-game', async (req, res) => {
         const [snapshot, newBountiesSnapshot, unifiedInventory, skills] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
-            getUnifiedInventory(userId), // 【核心修改】直接獲取統一的物品列表
+            getUnifiedInventory(userId),
             getPlayerSkills(userId)
         ]);
         
@@ -103,11 +101,11 @@ router.get('/latest-game', async (req, res) => {
         
         const locationData = await getMergedLocationData(userId, latestGameData.LOC);
         
-        // 【核心修改】將統一的、最新的數據合併到要傳回的物件中
+        // 將統一的、最新的數據合併到要傳回的物件中
         Object.assign(latestGameData, { 
             ...userData, 
             skills: skills,
-            inventory: unifiedInventory, // 直接使用統一後的列表
+            inventory: unifiedInventory, 
         });
         
         const inventoryState = await getInventoryState(userId);
@@ -134,7 +132,6 @@ router.get('/latest-game', async (req, res) => {
 });
 
 
-// 其他未修改的路由...
 router.get('/inventory', async (req, res) => {
     try {
         const inventoryData = await getRawInventory(req.user.id);
