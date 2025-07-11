@@ -8,8 +8,6 @@ const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
-// 【核心修改】建立一個玩家預設欄位的「藍圖」
-// 未來所有新增的玩家欄位，都應該在這裡定義其預設值
 const DEFAULT_USER_FIELDS = {
     internalPower: 5,
     externalPower: 5,
@@ -27,13 +25,8 @@ const DEFAULT_USER_FIELDS = {
         none: 0
     },
     shortActionCounter: 0,
-    // --- 未來可以繼續在這裡往下加，例如：---
-    // reputation: 0,
-    // maritalStatus: '未婚',
 };
 
-
-// API 路由: /api/auth/register
 router.post('/register', async (req, res) => {
     try {
         const { username, gender, password } = req.body;
@@ -49,7 +42,6 @@ router.post('/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
 
         const newUserRef = db.collection('users').doc();
-        // 【核心修改】註冊時直接使用預設欄位藍圖
         await newUserRef.set({
             username,
             gender,
@@ -60,7 +52,7 @@ router.post('/register', async (req, res) => {
             year: 1,
             month: 1,
             day: 1,
-            ...DEFAULT_USER_FIELDS, // 將藍圖中的所有預設欄位展開
+            ...DEFAULT_USER_FIELDS,
         });
         
         const skillsCollectionRef = db.collection('users').doc(newUserRef.id).collection('skills');
@@ -69,7 +61,7 @@ router.post('/register', async (req, res) => {
             type: '拳腳',
             level: 1,
             exp: 0,
-            cost: 0, // 【核心修改】將內力消耗明確設定為0
+            cost: 0,
             description: '來自另一個世界的格鬥技巧，招式直接有效，講求一擊制敵，但似乎缺少內力運轉的法門。',
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -86,7 +78,7 @@ router.post('/register', async (req, res) => {
             moralityChange: 0,
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
             EVT: '從天旋地轉中醒來，靈魂墜入陌生的時代',
-            LOC: ['無名村'],
+            LOC: ['無名村'], // 【核心修改】
             PSY: '頭痛欲裂...我不是在滑手機嗎？這身體不是我的！這裡是哪裡？這是什麼時代？',
             PC: '你身受重傷，氣息虛弱，似乎不久於人世。',
             story: '最後的印象，是指尖在冰冷螢幕上的飛速滑動，社交軟體的資訊流在眼前如瀑布般刷過。下一瞬，難以言喻的暈眩感猛然來襲，世界在你眼前扭曲、碎裂，一陣劇烈的天旋地轉後，意識如風中殘燭般徹底陷入黑暗。\n\n你在一股濃重刺鼻的藥草味中勉強睜開雙眼，映入眼簾的，不再是熟悉的螢幕光，而是一盞昏黃的油燈，照著四周斑駁的牆面與層層疊疊、標示著陌生藥名的木櫃。你正躺在一張簡陋的木板床上，每一次呼吸都牽動著撕心裂肺的劇痛，四肢百骸彷彿不屬於自己。\n\n「我不是在滑手機嗎？」這個念頭在你腦中一閃而過，卻顯得如此荒謬。關於這個世界的記憶一片空白，你是誰？為何在此？無從得知。你只清楚記得自己來自一個截然不同的世界。\n\n身旁，一位年逾五旬、留著山羊鬍的郎中正為你沉聲診脈，他眉頭緊鎖，那雙深邃的眼眸中，除了對你傷勢的憂慮，似乎還隱藏著一絲驚疑與不為人知的秘密。\n\n環顧這間陌生的藥鋪，遠方隱約傳來雞鳴犬吠，你意識到自己被困在了這個名為「無名村」的未知之地。過去已然斷裂，前路一片迷茫，你的人生，就從這副重傷的軀體與滿腹的疑問中，被迫展開了……',
@@ -133,7 +125,6 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// API 路由: /api/auth/login
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -155,14 +146,12 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
 
-        // --- 【核心重構】未來化的舊玩家資料欄位自動補全 ---
         const updates = {};
         let needsUpdate = false;
 
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
                 needsUpdate = true;
-                // 特別處理：如果最高能力值不存在，則以當前能力值為準
                 if (field === 'maxInternalPowerAchieved') {
                     updates[field] = userData.internalPower || defaultValue;
                 } else if (field === 'maxExternalPowerAchieved') {
@@ -180,7 +169,6 @@ router.post('/login', async (req, res) => {
             await userDoc.ref.update(updates);
             console.log(`[資料庫維護] 已成功為 ${username} 自動更新資料結構。`);
         }
-        // --- 重構結束 ---
 
         const token = require('jsonwebtoken').sign(
             { userId: userDoc.id, username: userData.username },
