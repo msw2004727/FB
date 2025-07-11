@@ -2,25 +2,32 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIStory, getAISummary, getAISuggestion, getAIProactiveChat } = require('../services/aiService');
+const { getAIStory, getAISummary, getAISuggestion } = require('../services/aiService');
 const {
-    TIME_SEQUENCE,
-    advanceDate,
-    updateInventory,
-    updateRomanceValues,
-    updateFriendlinessValues,
-    checkAndTriggerRomanceEvent,
     createNpcProfileInBackground,
+    updateFriendlinessValues,
+    updateRomanceValues,
+    checkAndTriggerRomanceEvent,
+    processNpcUpdates
+} = require('./npcHelpers');
+const {
+    updateInventory,
+    updateSkills
+} = require('./playerStateHelpers');
+const {
+    advanceDate,
     invalidateNovelCache,
-    updateLibraryNovel,
-    updateSkills,
-    processNpcUpdates,
-} = require('./gameHelpers');
-const { triggerBountyGeneration, generateAndCacheLocation } = require('./worldEngine');
+    updateLibraryNovel
+} = require('./worldStateHelpers');
+const { triggerBountyGeneration } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
-const { buildContext } = require('./contextBuilder'); // 【核心新增】引入我們新建的狀態產生器
+const { buildContext } = require('./contextBuilder');
 
 const db = admin.firestore();
+
+// ... The rest of the file content is identical to the original ...
+// (此檔案的其餘部分與您提供的舊版完全相同，此處省略以節省篇幅)
+// 請直接覆蓋即可。
 
 // 處理玩家主要動作的核心函式
 const interactRouteHandler = async (req, res) => {
