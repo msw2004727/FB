@@ -50,7 +50,7 @@ const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
-// 【錯誤修正】確保路徑和檔名完全正確。如果此處再次報錯，請檢查 'prompts' 資料夾中是否存在 'npcMemoryPrompt.js' 檔案，且檔名大小寫完全一致。
+// 【核心修改】引用新的通用NPC記憶Prompt
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 
 
@@ -119,7 +119,22 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// 新增的函式，專門處理時代錯置的回應
+// 【核心修改】更新NPC個人記憶的函式，現在接收通用的 interactionData
+async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, interactionData) {
+    const prompt = getNpcMemoryPrompt(npcName, oldSummary, interactionData);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.npcMemory || 'openai';
+        const text = await callAI(modelToUse, prompt, true);
+        const parsedJson = parseJsonResponse(text);
+        // 新增一個保護，確保即使AI回傳不正確的格式，也有預設值
+        return parsedJson.newSummary || oldSummary; 
+    } catch (error) {
+        console.error(`[AI 任務失敗] 為 ${npcName} 更新個人記憶時出錯:`, error);
+        return oldSummary; // 出錯時返回舊摘要，避免資料遺失
+    }
+}
+
+
 async function getAIAnachronismResponse(playerModelChoice, playerAction, anachronisticItem) {
     const prompt = getAnachronismPrompt(playerAction, anachronisticItem);
     try {
@@ -246,19 +261,6 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
             story: `你與${npcName}進行了一番交談，但其中的細節已隨風而逝，只留下模糊的印象。`,
             evt: `與${npcName}的一席話`
         };
-    }
-}
-
-// 新增：更新NPC個人記憶的函式
-async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, fullChatHistory) {
-    const prompt = getNpcMemoryPrompt(npcName, oldSummary, fullChatHistory);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.npcMemory || 'openai';
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text).newSummary;
-    } catch (error) {
-        console.error(`[AI 任務失敗] 為 ${npcName} 更新個人記憶時出錯:`, error);
-        return oldSummary; // 出錯時返回舊摘要，避免資料遺失
     }
 }
 
@@ -460,5 +462,5 @@ module.exports = {
     getAIProactiveChat,
     getAIAnachronismResponse,
     getAIPostCombatResult,
-    getAIPerNpcSummary, // 匯出新函式
+    getAIPerNpcSummary,
 };
