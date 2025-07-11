@@ -2,18 +2,12 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult } = require('../services/aiService');
-const { 
-    updateFriendlinessValues, 
-    getInventoryState, 
-    invalidateNovelCache, 
-    updateLibraryNovel, 
-    getPlayerSkills,
-    updateInventory,
-    processNpcUpdates,
-    getMergedNpcProfile,
-    getFriendlinessLevel,
-} = require('./gameHelpers');
+const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult, getAISummary, getAISuggestion } = require('../services/aiService');
+
+// 【核心修改】從新的、拆分後的輔助檔案中導入所需函式
+const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require('./npcHelpers');
+const { getPlayerSkills, updateInventory, getInventoryState } = require('./playerStateHelpers');
+const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
 
 const db = admin.firestore();
