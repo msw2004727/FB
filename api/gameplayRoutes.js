@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
-// 引用兩個新的路由模組
+// 【核心修改】引用拆分後的 interactionRoutes 和 combatRoutes
 const interactionRoutes = require('./interactionRoutes');
 const combatRoutes = require('./combatRoutes');
 
