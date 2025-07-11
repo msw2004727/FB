@@ -22,7 +22,7 @@ const {
     invalidateNovelCache,
     updateLibraryNovel,
 } = require('./worldStateHelpers');
-const { triggerBountyGeneration } = require('../worldEngine');
+const { triggerBountyGeneration } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 const { buildContext } = require('./contextBuilder'); // 【核心新增】引入我們新建的狀態產生器
 
