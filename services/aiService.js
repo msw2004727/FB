@@ -50,7 +50,7 @@ const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
-const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js'); // 新增
+const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 
 
 // 統一的AI調度中心
