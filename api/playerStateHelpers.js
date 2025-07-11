@@ -2,7 +2,7 @@
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
 const { callAI, aiConfig } = require('../services/aiService');
-const { getItemGeneratorPrompt, getSkillGeneratorPrompt } = require('../prompts/prompts'); // Assumes a central prompt exporter
+const { getItemGeneratorPrompt, getSkillGeneratorPrompt } = require('../prompts/prompts'); // 【路徑修正】
 
 const db = admin.firestore();
 const skillTemplateCache = new Map();
@@ -98,7 +98,7 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
             }
         } else if (action === 'remove') {
             const docRef = userInventoryRef.doc(itemName);
-            const doc = await docRef.get();
+            const doc = await docRef.get(); 
             if (isStackable && doc.exists && doc.data().quantity > quantity) {
                 batch.update(docRef, { quantity: admin.firestore.FieldValue.increment(-quantity) });
             } else {
@@ -148,12 +148,10 @@ async function getRawInventory(userId) {
 
 async function updateSkills(userId, skillChanges, playerProfile) {
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
-
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
     const userDocRef = db.collection('users').doc(userId);
     const levelUpEvents = [];
     let customSkillCreationResult = null;
-
     for (const skillChange of skillChanges) {
         const playerSkillDocRef = playerSkillsRef.doc(skillChange.skillName);
         try {
