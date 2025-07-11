@@ -85,10 +85,20 @@ const interactRouteHandler = async (req, res) => {
             throw new Error("主AI未能生成有效回應。");
         }
         
+        // --- 【核心新增】章回標題 (EVT) 強制修正機制 ---
+        if (!aiResponse.roundData.EVT || aiResponse.roundData.EVT.trim() === '') {
+            console.warn(`[後端修正] AI未能生成有效的章回標題(EVT)。正在從玩家行動「${playerAction}」中自動提取...`);
+            // 從玩家的行動中提取前8個字作為標題，如果行動本身很短，就用整個行動
+            const fallbackEVT = playerAction.length > 8 ? playerAction.substring(0, 8) + '…' : playerAction;
+            aiResponse.roundData.EVT = fallbackEVT;
+            console.log(`[後端修正] 已自動生成後備標題: "${fallbackEVT}"`);
+        }
+        // --- 修正結束 ---
+        
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
         const userDocRef = db.collection('users').doc(userId);
 
-        const newRoundNumber = (player.R || 0) + 1; // 使用從 context 來的回合數
+        const newRoundNumber = (player.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
