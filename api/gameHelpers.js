@@ -243,6 +243,7 @@ const createNpcProfileInBackground = async (userId, username, npcData, roundData
             const initialState = {
                 friendlinessValue: 0,
                 romanceValue: 0,
+                interactionSummary: `你與${npcName}的交往尚淺，還沒有什麼值得一提的共同回憶。`, // 新增欄位
                 currentLocation: roundData.LOC[0],
                 firstMet: {
                     round: roundData.R,
