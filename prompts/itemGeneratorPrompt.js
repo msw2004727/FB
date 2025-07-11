@@ -38,7 +38,10 @@ const getItemGeneratorPrompt = (itemName, context = {}) => {
 
 3.  **名實相符**: 物品的所有屬性，都必須與其名稱「${itemName}」緊密相關。一把「鐵劍」的材質就不可能是「玄鐵」。
 
-4.  **【核心新增】份量設定鐵律**: 你**必須**為每件物品新增一個 "bulk" 欄位，用來描述它的份量。這不是一個精確的數字，而是一個描述性的等級。可選等級為: "輕" (例如: 書信、丹藥、飛鏢), "中" (例如: 單手劍、匕首、普通衣物), "重" (例如: 雙手大刀、鎧甲、鐵錠), "極重" (例如: 一箱財寶、巨大的石碑)。
+4.  **【核心新增】裝備屬性鐵律**: 你必須根據物品的類型，為其設定「equipSlot」、「hands」、「bulk」三個新欄位。
+    * **`equipSlot` (裝備槽位)**: 必須從以下列表中選擇一個： "weapon_right", "weapon_left", "weapon_back", "head", "body", "hands", "feet", "accessory1", "accessory2", "manuscript"。如果物品完全不可裝備（如消耗品、材料），則此欄位值為 `null`。
+    * **`hands` (武器手数)**: **只有**當 `equipSlot` 是 "weapon_right" 或 "weapon_left" 時，才需要設定此欄位。單手武器為 `1`，雙手武器為 `2`。其他類型的裝備此欄位為 `null`。
+    * **`bulk` (份量)**: 描述物品的份量。必須從 "輕", "中", "重", "極重" 四個等級中選擇一個。
 
 5.  **履歷留白**: 你設計的是「模板」，所以**不需要**包含「履歷」資訊。「履歷」是在玩家獲得物品的瞬間，由遊戲主邏輯添加的。
 
@@ -54,7 +57,9 @@ const getItemGeneratorPrompt = (itemName, context = {}) => {
   "material": "構成物品的主要材質，例如：青銅、鐵、棉布、硬木",
   "value": "一個基礎的交易價值（單位：文錢，必須是數字）",
   "rarity": "普通 | 稀有 | 史詩 | 傳說",
-  "bulk": "輕 | 中 | 重 | 極重",
+  "equipSlot": "weapon_right",
+  "hands": 1,
+  "bulk": "中",
   "stats": {
     "attack": 5,
     "defense": 0
