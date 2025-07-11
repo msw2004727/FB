@@ -209,20 +209,14 @@ function renderInventory(roundData) {
     if (moneyContent) moneyContent.textContent = `${roundData.money || 0} 文錢`;
 
     const equipment = roundData.equipment || {};
-    const inventory = roundData.inventory || []; // 現在這是一個包含完整物品物件的陣列
+    const inventory = roundData.inventory || []; 
 
     const equippedItemIds = Object.values(equipment)
         .filter(item => item && item.instanceId)
         .map(item => item.instanceId);
 
     const allItems = [...inventory];
-    // 將裝備中的物品也加入到總列表中，如果它們不在背包裡的話
-    Object.values(equipment).forEach(equippedItem => {
-        if (equippedItem && !allItems.some(invItem => invItem.instanceId === equippedItem.instanceId)) {
-            allItems.push(equippedItem);
-        }
-    });
-
+    
     const itemMasterList = new Map(allItems.map(item => [item.instanceId, item]));
 
     const sortedItemIds = [...itemMasterList.keys()].sort((a, b) => {
@@ -230,12 +224,12 @@ function renderInventory(roundData) {
         const itemB = itemMasterList.get(b);
         if (!itemA || !itemB) return 0;
 
-        const equippedA = equippedItemIds.includes(a);
-        const equippedB = equippedItemIds.includes(b);
+        const isEquippedA = equippedItemIds.includes(a);
+        const isEquippedB = equippedItemIds.includes(b);
         
-        if (equippedA && !equippedB) return -1;
-        if (!equippedA && equippedB) return 1;
-        if (equippedA && equippedB) {
+        if (isEquippedA && !isEquippedB) return -1;
+        if (!isEquippedA && isEquippedB) return 1;
+        if (isEquippedA && isEquippedB) {
             const slotA = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === a);
             const slotB = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === b);
             return equipOrder.indexOf(slotA) - equipOrder.indexOf(slotB);
@@ -258,14 +252,12 @@ function renderInventory(roundData) {
     });
 }
 
-
 function createItemEntry(item, isEquipped, equipment) {
     const entry = document.createElement('div');
     entry.className = `item-entry ${isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
     let equipControls = '';
-    // 只有可裝備的物品才顯示開關
     if (item.equipSlot) {
         const currentSlot = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === item.instanceId);
         const slotIcon = currentSlot ? (slotConfig[currentSlot]?.icon || 'fa-question-circle') : '';
@@ -300,6 +292,7 @@ function createItemEntry(item, isEquipped, equipment) {
 }
 
 async function handleEquipToggle(itemId, shouldEquip, slot) {
+    if (gameState.isRequesting) return;
     gameState.isRequesting = true;
     try {
         const payload = {
