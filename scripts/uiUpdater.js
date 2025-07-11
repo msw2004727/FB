@@ -67,7 +67,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateBulkStatus(roundData.bulkScore || 0); 
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData);
+    renderInventory(roundData.inventory); 
     
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
@@ -89,8 +89,6 @@ export function addRoundTitleToStory(titleText) {
     titleEl.textContent = titleText;
     storyTextContainer.appendChild(titleEl);
 }
-
-// --- UI 更新輔助函式 ---
 
 function updateStatusBar(roundData) {
     const atmosphere = roundData.ATM?.[0] || '未知';
@@ -203,33 +201,35 @@ function highlightNpcNames(text, npcs) {
     return highlightedText;
 }
 
-function renderInventory(roundData) {
+function renderInventory(inventory) {
     if (!itmContent) return;
     itmContent.innerHTML = '';
-    if (moneyContent) moneyContent.textContent = `${roundData.money || 0} 文錢`;
+    
+    const allItems = inventory || [];
 
-    const inventory = roundData.inventory || []; // 現在這是一個統一的列表
+    allItems.sort((a, b) => {
+        const isEquippedA = a.isEquipped;
+        const isEquippedB = b.isEquipped;
 
-    // 【核心修改】直接使用後端傳來的統一列表進行排序
-    inventory.sort((a, b) => {
-        if (a.isEquipped && !b.isEquipped) return -1;
-        if (!a.isEquipped && b.isEquipped) return 1;
-        if (a.isEquipped && b.isEquipped) {
+        if (isEquippedA && !isEquippedB) return -1;
+        if (!isEquippedA && isEquippedB) return 1;
+        if (isEquippedA && isEquippedB) {
             return equipOrder.indexOf(a.equipSlot) - equipOrder.indexOf(b.equipSlot);
         }
         return (a.itemName || '').localeCompare(b.itemName || '', 'zh-Hant');
     });
 
-    if (inventory.length === 0) {
+    if (allItems.length === 0) {
         itmContent.textContent = '身無長物';
         return;
     }
 
-    inventory.forEach(item => {
+    allItems.forEach(item => {
         const itemEl = createItemEntry(item);
         itmContent.appendChild(itemEl);
     });
 }
+
 
 function createItemEntry(item) {
     const entry = document.createElement('div');
@@ -265,7 +265,8 @@ function createItemEntry(item) {
     const checkbox = entry.querySelector('input[type="checkbox"]');
     if (checkbox) {
         checkbox.addEventListener('change', (e) => {
-            const { itemId, slot } = e.target.dataset;
+            const itemId = e.target.dataset.itemId;
+            const slot = e.target.dataset.slot;
             handleEquipToggle(itemId, e.target.checked, slot);
         });
     }
@@ -279,24 +280,20 @@ async function handleEquipToggle(itemId, shouldEquip, slot) {
         const payload = {
             itemId: itemId,
             equip: shouldEquip,
-            slot: slot
+            slot: shouldEquip ? null : slot 
         };
         const result = await api.equipItem(payload); 
 
-        if (result.success && result.playerState) {
-             // 【核心修改】直接使用後端回傳的最新狀態更新gameState
-             gameState.roundData.inventory = result.playerState.inventory;
-             gameState.roundData.bulkScore = result.playerState.bulkScore;
-             renderInventory(gameState.roundData); // 重新渲染物品欄
-             updateBulkStatus(gameState.roundData.bulkScore);
+        if (result.success && result.inventory) {
+             gameState.roundData.inventory = result.inventory;
+             renderInventory(gameState.roundData.inventory); 
         } else {
             throw new Error(result.message || '操作失敗');
         }
     } catch (error) {
         console.error('裝備操作失敗:', error);
         handleApiError(error);
-        // 操作失敗時，也重新渲染一次以恢復UI到正確狀態
-        renderInventory(gameState.roundData);
+        renderInventory(gameState.roundData.inventory); 
     } finally {
         gameState.isRequesting = false;
     }
