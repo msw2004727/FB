@@ -10,6 +10,7 @@ const {
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
     processNpcUpdates,
+    updateNpcMemoryAfterInteraction // 【核心新增】引入記憶更新輔助函式
 } = require('./npcHelpers');
 const {
     updateInventory,
@@ -174,11 +175,21 @@ const interactRouteHandler = async (req, res) => {
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
-            // 【核心修正】將完整的 roundData 傳遞過去
             updateFriendlinessValues(userId, aiResponse.roundData.NPC, aiResponse.roundData),
             processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []),
             processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
         ]);
+        
+        // 【核心新增】為所有互動過的NPC更新記憶
+        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
+            const memoryUpdatePromises = aiResponse.roundData.NPC
+                .filter(npc => npc.friendlinessChange !== 0) // 只為有友好度變化的NPC更新記憶
+                .map(npc => {
+                    const interactionContext = `情境：${aiResponse.roundData.story}\n你的狀態：${npc.status}`;
+                    return updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext);
+                });
+            await Promise.all(memoryUpdatePromises);
+        }
         
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const newNpcs = aiResponse.roundData.NPC.filter(npc => npc.isNew);
