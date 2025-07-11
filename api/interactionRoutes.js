@@ -99,14 +99,12 @@ const interactRouteHandler = async (req, res) => {
         const newRoundNumber = (player.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
-        // 【核心優化】將NPC記憶更新移至背景執行
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcsToUpdate = aiResponse.roundData.NPC.filter(npc => npc.status);
             if (npcsToUpdate.length > 0) {
                 console.log(`[背景任務] 正在為 ${npcsToUpdate.length} 位在場NPC啟動非同步記憶更新...`);
                 npcsToUpdate.forEach(npc => {
                     const interactionContext = `事件：「${aiResponse.roundData.EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
-                    // 直接呼叫，不使用 await，讓它在背景執行
                     updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext)
                         .catch(err => console.error(`[背景記憶更新錯誤] NPC: ${npc.name}, UserID: ${userId}, 錯誤:`, err));
                 });
@@ -186,7 +184,6 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
-        // 這些是需要同步完成的關鍵資料更新
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
@@ -209,14 +206,28 @@ const interactRouteHandler = async (req, res) => {
             getAISuggestion(aiResponse.roundData)
         ]);
         
+        // 【核心修正】屬性下限保護機制
+        const currentInternalPower = player.internalPower || 0;
+        const currentExternalPower = player.externalPower || 0;
+        const currentLightness = player.lightness || 0;
+
+        const internalPowerChange = aiResponse.roundData.powerChange?.internal || 0;
+        const externalPowerChange = aiResponse.roundData.powerChange?.external || 0;
+        const lightnessPowerChange = aiResponse.roundData.powerChange?.lightness || 0;
+
+        // 計算新數值，並使用 Math.max(0, ...) 確保最低為 0
+        const newInternalPower = Math.max(0, currentInternalPower + internalPowerChange);
+        const newExternalPower = Math.max(0, currentExternalPower + externalPowerChange);
+        const newLightness = Math.max(0, currentLightness + lightnessPowerChange);
+        
         const playerUpdatesForDb = {
             timeOfDay: finalTimeOfDay,
             stamina: newStamina,
             shortActionCounter,
             ...finalDate,
-            internalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.internal || 0),
-            externalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.external || 0),
-            lightness: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.lightness || 0),
+            internalPower: newInternalPower,
+            externalPower: newExternalPower,
+            lightness: newLightness,
             morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0)
         };
         
@@ -233,11 +244,12 @@ const interactRouteHandler = async (req, res) => {
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
         
         const finalRoundDataForClient = { ...finalSaveData };
-        const latestPlayerState = (await userDocRef.get()).data();
-        finalRoundDataForClient.internalPower = latestPlayerState.internalPower;
-        finalRoundDataForClient.externalPower = latestPlayerState.externalPower;
-        finalRoundDataForClient.lightness = latestPlayerState.lightness;
-        finalRoundDataForClient.morality = latestPlayerState.morality;
+        // 直接使用計算後的新數值，無需再次讀取資料庫
+        finalRoundDataForClient.internalPower = newInternalPower;
+        finalRoundDataForClient.externalPower = newExternalPower;
+        finalRoundDataForClient.lightness = newLightness;
+        finalRoundDataForClient.morality = (player.morality || 0) + (aiResponse.roundData.moralityChange || 0);
+
         const inventoryState = await getInventoryState(userId);
         finalRoundDataForClient.ITM = inventoryState.itemsString;
         finalRoundDataForClient.money = inventoryState.money;
