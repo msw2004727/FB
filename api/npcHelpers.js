@@ -2,13 +2,13 @@
 const admin = require('firebase-admin');
 const { callAI, aiConfig, getAIPerNpcSummary } = require('../services/aiService'); // 引入 getAIPerNpcSummary
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
-const { getAIRomanceEvent } = require('../prompts/romanceEventPrompt.js');
+const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
 const { processNpcRelationships } = require('./relationshipManager');
 
 const db = admin.firestore();
 
 /**
- * 【核心新增】更新指定NPC的個人記憶摘要
+ * 更新指定NPC的個人記憶摘要
  * @param {string} userId - 玩家ID
  * @param {string} npcName - 要更新記憶的NPC名稱
  * @param {string} interactionData - 本次互動的文字摘要
@@ -29,10 +29,8 @@ async function updateNpcMemoryAfterInteraction(userId, npcName, interactionData)
 
         const oldSummary = doc.data().interactionSummary || `你與${npcName}的交往尚淺。`;
         
-        // 呼叫AI服務生成新的摘要
         const newSummary = await getAIPerNpcSummary('default', npcName, oldSummary, interactionData);
 
-        // 將新摘要寫入資料庫
         await npcStateRef.update({ interactionSummary: newSummary });
         console.log(`[NPC記憶系統] 已成功更新NPC「${npcName}」的個人記憶。`);
 
@@ -92,7 +90,7 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
             const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
-            const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```s*$/g, ''));
+            const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```\s*$/g, ''));
 
             const rand = Math.random();
             newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
@@ -123,6 +121,9 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
 
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const batch = db.batch();
+    
+    // 【核心新增】從回合數據中獲取玩家的當前位置
+    const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
 
     const existingNpcSnapshot = await playerNpcStatesRef.get();
     const existingNpcIds = new Set(existingNpcSnapshot.docs.map(doc => doc.id));
@@ -132,22 +133,24 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
         if (!change.name) continue;
         
         const npcStateDocRef = playerNpcStatesRef.doc(change.name);
-        
         const isTrulyNew = !existingNpcIds.has(change.name);
+
+        const updatePayload = {
+            // 【核心新增】無論是新NPC還是舊NPC，只要出現在本回合，就強制更新其位置
+            currentLocation: playerLocation
+        };
 
         if (isTrulyNew) {
             console.log(`[友好度系統] 資料庫查核確認「${change.name}」為新NPC，強制創建完整檔案...`);
             
-            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
             const encounterTime = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日 ${roundData.timeOfDay || '未知時辰'}`;
             
-            const initialState = {
+            Object.assign(updatePayload, {
                 interactionSummary: `你與${change.name}的交往尚淺。`,
-                currentLocation: encounterLocation,
                 firstMet: {
                     round: roundData.R,
                     time: encounterTime,
-                    location: encounterLocation,
+                    location: playerLocation,
                     event: roundData.EVT || '初次相遇'
                 },
                 isDeceased: false,
@@ -155,20 +158,21 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
                 romanceValue: 0,
                 friendlinessValue: change.friendlinessChange || 0,
                 triggeredRomanceEvents: []
-            };
-            batch.set(npcStateDocRef, initialState);
+            });
+            batch.set(npcStateDocRef, updatePayload);
 
-        } else if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
-            console.log(`[友好度系統] 更新舊識「${change.name}」的友好度: ${change.friendlinessChange > 0 ? '+' : ''}${change.friendlinessChange}`);
-            batch.set(npcStateDocRef, { 
-                friendlinessValue: admin.firestore.FieldValue.increment(change.friendlinessChange) 
-            }, { merge: true });
+        } else {
+             if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
+                console.log(`[友好度系統] 更新舊識「${change.name}」的友好度: ${change.friendlinessChange > 0 ? '+' : ''}${change.friendlinessChange}`);
+                updatePayload.friendlinessValue = admin.firestore.FieldValue.increment(change.friendlinessChange);
+            }
+            batch.set(npcStateDocRef, updatePayload, { merge: true });
         }
     }
     
     try {
         await batch.commit();
-        console.log(`[友好度系統] 批次更新NPC關係完畢。`);
+        console.log(`[友好度系統] 批次更新NPC關係與位置完畢。`);
     } catch (error) {
         console.error(`[友好度系統] 批次更新NPC關係時出錯:`, error);
     }
@@ -206,7 +210,7 @@ async function checkAndTriggerRomanceEvent(userId, playerProfile) {
         for (const trigger of eventTriggers) {
             if (romanceValue >= trigger.threshold && !triggeredRomanceEvents.includes(trigger.level)) {
                 console.log(`[戀愛系統] 偵測到與 ${npcName} 的 ${trigger.level} 事件觸發條件！`);
-                const romanceEventResultText = await getAIRomanceEvent(playerProfile, npcProfile, trigger.level);
+                const romanceEventResultText = await getRomanceEventPrompt(playerProfile, npcProfile, trigger.level);
                 try {
                     const romanceEventResult = JSON.parse(romanceEventResultText);
                     if (romanceEventResult && romanceEventResult.story) {
@@ -258,5 +262,5 @@ module.exports = {
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
     processNpcUpdates,
-    updateNpcMemoryAfterInteraction // 導出新函式
+    updateNpcMemoryAfterInteraction
 };
