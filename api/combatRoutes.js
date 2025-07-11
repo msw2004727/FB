@@ -4,7 +4,6 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult, getAISummary, getAISuggestion } = require('../services/aiService');
 
-// 【核心修改】從新的、拆分後的輔助檔案中導入所需函式
 const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require('./npcHelpers');
 const { getPlayerSkills, updateInventory, getInventoryState } = require('./playerStateHelpers');
 const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
@@ -12,10 +11,8 @@ const { processReputationChangesAfterDeath } = require('./reputationManager');
 
 const db = admin.firestore();
 
-// 輔助函式：根據NPC技能推斷其戰鬥特性標籤
 const getNpcTags = (skills = []) => {
     if (!skills || skills.length === 0) return [{ name: '凡人', type: 'support' }];
-
     const tags = new Set();
     const tagMap = {
         '攻擊': { type: 'attack', keywords: ['劍', '刀', '拳', '掌', '指', '鏢'] },
@@ -23,12 +20,10 @@ const getNpcTags = (skills = []) => {
         '治癒': { type: 'heal', keywords: ['療傷', '回春', '治癒'] },
         '輔助': { type: 'support', keywords: ['陣', '歌', '舞'] }
     };
-
     skills.forEach(skill => {
         if (skill && skill.name) {
             if (skill.skillType === '醫術') tags.add('治癒');
             if (skill.skillType === '毒術') tags.add('攻擊');
-
             for (const [tagName, { type, keywords }] of Object.entries(tagMap)) {
                 if (keywords.some(kw => skill.name.includes(kw))) {
                     tags.add(tagName);
@@ -36,18 +31,11 @@ const getNpcTags = (skills = []) => {
             }
         }
     });
-
     if (tags.size === 0) tags.add('攻擊');
-
     const typeMapping = { '攻擊': 'attack', '防禦': 'defend', '治癒': 'heal', '輔助': 'support' };
-    return Array.from(tags).map(tagName => ({
-        name: tagName,
-        type: typeMapping[tagName] || 'attack'
-    }));
+    return Array.from(tags).map(tagName => ({ name: tagName, type: typeMapping[tagName] || 'attack' }));
 };
 
-
-// 處理戰鬥發起的核心函式
 const initiateCombatHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -64,6 +52,16 @@ const initiateCombatHandler = async (req, res) => {
             return res.status(404).json({ message: "找不到玩家存檔。" });
         }
         const lastSave = savesSnapshot.docs[0].data();
+        const playerLocation = lastSave.LOC[0];
+
+        // 【核心新增】戰鬥前的位置檢查
+        const targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
+        if (!targetNpcProfile) {
+            return res.status(404).json({ message: `找不到名為 ${targetNpcName} 的目標。` });
+        }
+        if (playerLocation !== targetNpcProfile.currentLocation) {
+            return res.status(403).json({ message: `你必須和 ${targetNpcName} 在同一個地方才能對其動手。` });
+        }
 
         const simulatedPlayerAction = `我決定要「${intention}」${targetNpcName}。`;
         
@@ -224,7 +222,6 @@ const combatActionRouteHandler = async (req, res) => {
         res.status(500).json({ message: error.message || "戰鬥中發生未知錯誤" });
     }
 };
-
 
 const surrenderRouteHandler = async (req, res) => {
     const userId = req.user.id;
