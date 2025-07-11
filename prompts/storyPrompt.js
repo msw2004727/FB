@@ -48,7 +48,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         - **移除瀕死狀態**: 只有當玩家透過有效的自救或他人幫助，你才能在其 \`roundData.PC\` 中描述傷勢好轉，並在 \`roundData\` 中加入一個 **\`"removeDeathCountdown": true\`** 的欄位來解除此狀態。否則，絕對不要包含此欄位。`
         : '';
 
-    // 【核心修正】在這裡加入全新的「NPC 位置同步鐵律」
     const npcLocationSyncRule = `
 ## 【NPC 位置同步鐵律 (極高優先級)】
 為了確保遊戲邏輯的正確性，你必須嚴格遵守此規則。
@@ -56,7 +55,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 1.  **偵測位置變化**: 在你撰寫的 \`story\` 中，如果任何一位**已知的NPC**（即在【長期故事摘要】或【重要NPC情境參考】中出現過的人物）的位置發生了變化，或者玩家移動到了某位NPC所在的位置，你**必須**觸發此規則。
 2.  **生成位置更新指令**: 你**必須**在回傳的 \`roundData.npcUpdates\` 陣列中，為每一位位置發生變化的NPC，都加入一個更新其位置的物件。
     - **結構**: \`{ "npcName": "NPC姓名", "fieldToUpdate": "currentLocation", "newValue": "NPC的最新位置", "updateType": "set" }\`
-    - **`newValue` 的值**: 這個值**必須**與你在 \`story\` 中描述的、以及玩家當前的位置（\`roundData.LOC\`）保持絕對一致。
+    - **\`newValue\` 的值**: 這個值**必須**與你在 \`story\` 中描述的、以及玩家當前的位置（\`roundData.LOC[0]\`）保持絕對一致。
 
 ### **場景範例**
 * **玩家指令**: "我前往王大夫的藥鋪"
@@ -65,7 +64,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     1.  在 \`roundData\` 中，將玩家的位置更新為：\`"LOC": ["無名村", "藥鋪"]\`。
     2.  在 \`roundData\` 中，**必須**加入位置同步指令：\`"npcUpdates": [{"npcName": "王大夫", "fieldToUpdate": "currentLocation", "newValue": "藥鋪", "updateType": "set"}]\`
 
-**此規則是為了確保玩家的資料庫 (`game_saves`) 和 NPC 的資料庫 (`npc_states`) 中的位置資訊永遠保持同步，是解決互動邏輯錯誤的關鍵。**`;
+**此規則是為了確保玩家的資料庫 (\`game_saves\`) 和 NPC 的資料庫 (\`npc_states\`) 中的位置資訊永遠保持同步，是解決互動邏輯錯誤的關鍵。**`;
 
 
     const npcContextInstruction = Object.keys(npcContext).length > 0
@@ -137,15 +136,16 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     // 【核心修改】將 getOutputStructureRule 移到此處，並在內部強化 EVT 規則
     const getOutputStructureRuleWithEnforcedEVT = (promptData) => {
         const originalRule = getOutputStructureRule(promptData);
+        // 【核心修正】修正了此處的 정규 표현식 (Regular Expression) 以正確匹配並替換規則
         const enhancedEvtRule = `
     - EVT: (字串) 事件摘要
       - **【強制鐵律】此欄位為必填，絕對不能留空！** 你必須為**任何行動**（包括旅行、對話、戰鬥、發呆）都提煉一個簡潔、有意境的「章回標題」，通常為四到八個字。
       - **【風格鐵律】絕對禁止用玩家姓名「${username}」作為標題的開頭。**
       - **【佳例】**：「初探無名村」、「偶遇黑衣人」、「瀑下習劍」、「丹房竊藥」、「揭榜領懸賞」、「遠赴開封府」。
-      - **【劣例】**：「${username}在瀑布下練習劍法」、「${username}走進了村莊」、「第1回」。`;
+      - **【劣例】**：「${username}在瀑布下練習劍法」、「${username}走進了村莊」。`;
         
         // 使用正則表達式替換掉原有的 EVT 規則
-        return originalRule.replace(/- EVT: \(字串\) 事件摘要[^`]+```/, enhancedEvtRule);
+        return originalRule.replace(/- EVT: \(字串\) 事件摘要[^`]*\s*.*【佳例】\s*.*【劣例】[^`]*/, enhancedEvtRule);
     };
 
     const outputStructureRules = getOutputStructureRuleWithEnforcedEVT({
