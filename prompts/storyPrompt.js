@@ -48,6 +48,26 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         - **移除瀕死狀態**: 只有當玩家透過有效的自救或他人幫助，你才能在其 \`roundData.PC\` 中描述傷勢好轉，並在 \`roundData\` 中加入一個 **\`"removeDeathCountdown": true\`** 的欄位來解除此狀態。否則，絕對不要包含此欄位。`
         : '';
 
+    // 【核心修正】在這裡加入全新的「NPC 位置同步鐵律」
+    const npcLocationSyncRule = `
+## 【NPC 位置同步鐵律 (極高優先級)】
+為了確保遊戲邏輯的正確性，你必須嚴格遵守此規則。
+
+1.  **偵測位置變化**: 在你撰寫的 \`story\` 中，如果任何一位**已知的NPC**（即在【長期故事摘要】或【重要NPC情境參考】中出現過的人物）的位置發生了變化，或者玩家移動到了某位NPC所在的位置，你**必須**觸發此規則。
+2.  **生成位置更新指令**: 你**必須**在回傳的 \`roundData.npcUpdates\` 陣列中，為每一位位置發生變化的NPC，都加入一個更新其位置的物件。
+    - **結構**: \`{ "npcName": "NPC姓名", "fieldToUpdate": "currentLocation", "newValue": "NPC的最新位置", "updateType": "set" }\`
+    - **`newValue` 的值**: 這個值**必須**與你在 \`story\` 中描述的、以及玩家當前的位置（\`roundData.LOC\`）保持絕對一致。
+
+### **場景範例**
+* **玩家指令**: "我前往王大夫的藥鋪"
+* **你的故事**: "你推開藥鋪的門，看見王大夫正在櫃檯後搗藥..."
+* **你必須做的事**:
+    1.  在 \`roundData\` 中，將玩家的位置更新為：\`"LOC": ["無名村", "藥鋪"]\`。
+    2.  在 \`roundData\` 中，**必須**加入位置同步指令：\`"npcUpdates": [{"npcName": "王大夫", "fieldToUpdate": "currentLocation", "newValue": "藥鋪", "updateType": "set"}]\`
+
+**此規則是為了確保玩家的資料庫 (`game_saves`) 和 NPC 的資料庫 (`npc_states`) 中的位置資訊永遠保持同步，是解決互動邏輯錯誤的關鍵。**`;
+
+
     const npcContextInstruction = Object.keys(npcContext).length > 0
         ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的資訊，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！
         ### 【復仇行為鐵律】
@@ -186,6 +206,8 @@ ${anachronismRule}
 ${languageProvocationRule}
 ${itemExistenceRule}
 
+${npcLocationSyncRule}
+
 ## 【性別與人稱鐵律】
 在生成任何故事描述前，你**必須**參考【重要NPC情境參考】中提供的NPC檔案。當你在故事中提及任何一位NPC時，你使用的**所有人稱代名詞（他/她）和稱謂**，都必須與其檔案中記載的 'gender' (性別) 欄位**嚴格保持一致**。此為最高優先級的語言規則，不允許有任何差錯。
 
@@ -240,7 +262,7 @@ ${recentHistory}
 ## 這是玩家的最新行動:
 "${playerAction}"
 
-現在，請根據以上的長期摘要、世界觀、規則（特別是「優先登場鐵律」）、最近發生的事件和玩家的最新行動，生成下一回合的JSON物件。
+現在，請根據以上的長期摘要、世界觀、規則（特別是「優先登場鐵律」），生成下一回合的JSON物件。
 `;
 };
 
