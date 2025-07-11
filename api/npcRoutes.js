@@ -6,7 +6,7 @@ const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAICh
 const { getMergedNpcProfile, getFriendlinessLevel } = require('./npcHelpers');
 const { getRawInventory, getInventoryState, updateInventory, getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
-const { getKnownNpcNames } = require('../cacheManager');
+const { getKnownNpcNames } = require('./cacheManager');
 
 const db = admin.firestore();
 
