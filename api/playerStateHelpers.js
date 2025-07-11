@@ -2,7 +2,8 @@
 const admin = require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
 const { callAI, aiConfig } = require('../services/aiService');
-const { getItemGeneratorPrompt, getSkillGeneratorPrompt } = require('../prompts/prompts'); // 【路徑修正】
+const { getItemGeneratorPrompt } = require('../prompts/itemGeneratorPrompt.js');
+const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js');
 
 const db = admin.firestore();
 const skillTemplateCache = new Map();
