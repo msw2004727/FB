@@ -105,19 +105,32 @@ const interactRouteHandler = async (req, res) => {
         
         const basalMetabolismCost = Math.floor(Math.random() * 5) + 1;
         newStamina -= basalMetabolismCost;
-        console.log(`[精力系統] 行動消耗: ${staminaChange}, 基礎代謝消耗: -${basalMetabolismCost}`);
-
+        
         const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇', '打坐'];
         const isResting = restKeywords.some(kw => playerAction.includes(kw));
         const timeDidAdvance = (aiDaysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
         
+        let staminaLog = `[精力系統] 行動消耗: ${staminaChange}, 基礎代謝消耗: -${basalMetabolismCost}`;
+
         if (isResting && timeDidAdvance) {
             const oldTimeIndex = TIME_SEQUENCE.indexOf(player.currentTimeOfDay);
             const newTimeIndex = TIME_SEQUENCE.indexOf(aiNextTimeOfDay);
             let slotsPassed = (aiDaysToAdvance * TIME_SEQUENCE.length) + (newTimeIndex - oldTimeIndex + TIME_SEQUENCE.length) % TIME_SEQUENCE.length;
-            if (slotsPassed >= 4) newStamina = 100;
-            else newStamina = Math.min(100, (player.stamina || 100) + (25 * slotsPassed));
+            
+            const originalStamina = player.stamina || 100;
+            let recoveredStamina;
+
+            if (slotsPassed >= 4) {
+                newStamina = 100;
+            } else {
+                newStamina = Math.min(100, originalStamina + (25 * slotsPassed));
+            }
+            recoveredStamina = newStamina - originalStamina;
+            // --- 【核心修改】補上日誌記錄 ---
+            staminaLog += `, 休息恢復: +${recoveredStamina > 0 ? recoveredStamina : 0}`;
         }
+        
+        console.log(staminaLog); // 統一打印精力日誌
 
         if (newStamina <= 0) {
             const passOutEvent = { story: "你感到一陣天旋地轉，眼前一黑，便失去了所有知覺...再次醒來時，只覺得頭痛欲裂，不知已過去了多久。", PC: "你因體力不支而昏倒在地。", EVT: "力竭昏迷" };
@@ -203,9 +216,7 @@ const interactRouteHandler = async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
         
-        // --- 【核心修改】讓回傳給前端的 roundData 與存入資料庫的 finalSaveData 內容同步 ---
         const finalRoundDataForClient = { ...finalSaveData };
-        // 從資料庫存檔中補全前端UI需要的、但存檔中可能沒有的資料
         const latestPlayerState = (await userDocRef.get()).data();
         finalRoundDataForClient.internalPower = latestPlayerState.internalPower;
         finalRoundDataForClient.externalPower = latestPlayerState.externalPower;
