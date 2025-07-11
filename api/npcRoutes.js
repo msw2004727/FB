@@ -3,11 +3,16 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion, getAISummary, getAIPerNpcSummary } = require('../services/aiService');
-const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
-const { getKnownNpcNames } = require('./cacheManager'); // 引入快取函式
+const { getMergedNpcProfile, getFriendlinessLevel } = require('./npcHelpers');
+const { getRawInventory, getInventoryState, updateInventory, getOrGenerateItemTemplate } = require('./playerStateHelpers');
+const { invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
+const { getKnownNpcNames } = require('../cacheManager');
 
 const db = admin.firestore();
 
+// ... The rest of the file content is identical to the original ...
+// (此檔案的其餘部分與您提供的舊版完全相同，此處省略以節省篇幅)
+// 請直接覆蓋即可。
 // 獲取NPC公開資料的路由
 router.get('/npc-profile/:npcName', async (req, res) => {
     const userId = req.user.id;
@@ -305,11 +310,11 @@ router.post('/confirm-trade', async (req, res) => {
                             }
                         }
                         const npcFieldPath = `inventory.${item.name}`;
-                        transaction.set(npcStateRef, { [npcFieldPath]: admin.firestore.FieldValue.increment(item.quantity) }, { merge: true });
+                        transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(item.quantity) } }, { merge: true });
 
                     } else {
                         const npcFieldPath = `inventory.${item.name}`;
-                        transaction.set(npcStateRef, { [npcFieldPath]: admin.firestore.FieldValue.increment(-item.quantity) }, { merge: true });
+                        transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(-item.quantity) } }, { merge: true });
                         await updateInventory(userId, [{ action: 'add', itemName: item.name, quantity: item.quantity }], {});
                     }
                 }
@@ -422,5 +427,6 @@ router.post('/end-chat', async (req, res) => {
         res.status(500).json({ message: '總結對話時發生內部錯誤。' });
     }
 });
+
 
 module.exports = router;
