@@ -6,8 +6,45 @@ const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getA
 const { getPlayerSkills, getRawInventory, getInventoryState } = require('./playerStateHelpers');
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
+const inventoryModel = require('./models/inventoryModel'); // 【核心新增】引入新的裝備邏輯模型
 
 const db = admin.firestore();
+
+// 【核心新增】處理裝備/卸下物品的API端點
+router.post('/equip', async (req, res) => {
+    const { itemId, equip, slot } = req.body; // equip是布林值, slot是用於卸下
+    const userId = req.user.id;
+
+    try {
+        let result;
+        if (equip) {
+            result = await inventoryModel.equipItem(userId, itemId);
+        } else {
+            result = await inventoryModel.unequipItem(userId, slot);
+        }
+
+        // 操作成功後，回傳最新的完整玩家狀態給前端
+        const userDoc = await db.collection('users').doc(userId).get();
+        const inventory = await getRawInventory(userId);
+        const equipment = userDoc.data().equipment || {};
+        const bulkScore = userDoc.data().bulkScore || 0;
+
+        res.json({
+            success: true,
+            message: result.message,
+            playerState: {
+                inventory: Object.values(inventory),
+                equipment,
+                bulkScore
+            }
+        });
+
+    } catch (error) {
+        console.error(`[裝備API] 玩家 ${userId} 操作物品時出錯:`, error);
+        res.status(500).json({ success: false, message: error.message || '裝備操作時發生未知錯誤。' });
+    }
+});
+
 
 router.get('/inventory', async (req, res) => {
     try {
