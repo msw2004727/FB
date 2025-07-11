@@ -18,6 +18,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ### 1. \`staticTemplate\` (靜態地點模板)
 這部分定義了地點的**固有屬性**，這些屬性通常**不會**因為玩家的行為而改變。
 
+* **【層級生成鐵律】**: 如果你要創造的地點（例如一個山寨或一個小門派）在邏輯上應該屬於某個更大的行政區（例如某個「縣」或「府」），但現有摘要中並未提供這個上級地點，你**必須**自行創造一個合理的上級地點，並在 \`parentLocation\` 和 \`address\` 欄位中體現出來。你生成的 \`address\` 物件必須包含從 \`country\` (國家) 到 \`town\` (鄉鎮) 的完整層級。
 * **\`locationId\` / \`locationName\`**: 地點的唯一ID和官方名稱。
 * **\`parentLocation\` / \`locationType\`**: 地點的層級關係。
 * **\`address\` / \`coordinates\`**: 地點的絕對與相對位置。
@@ -56,7 +57,8 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
       "country": "大宋",
       "region": "江南西路",
       "city": "洪州",
-      "district": "豐城縣"
+      "district": "豐城縣",
+      "town": "無名村"
     },
     "coordinates": { "x": 78, "y": 65 },
     "geography": {
@@ -121,7 +123,3 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ---
 
 現在，請為「${locationName}」生成一份詳盡的、分離了靜態與動態屬性的JSON檔案。
-`;
-};
-
-module.exports = { getLocationGeneratorPrompt };
