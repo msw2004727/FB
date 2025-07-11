@@ -4,9 +4,9 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 const { getRewardGeneratorPrompt } = require('../prompts/rewardGeneratorPrompt.js');
-// 【核心修改】從 aiService 引入 aiConfig
 const { callAI, aiConfig } = require('../services/aiService');
-const { updateInventory, updateSkills, getInventoryState, invalidateNovelCache, updateLibraryNovel } = require('./gameHelpers');
+const { updateInventory, getInventoryState } = require('./playerStateHelpers');
+const { invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 
 const db = admin.firestore();
 
@@ -72,13 +72,8 @@ router.get('/', async (req, res) => {
  */
 router.post('/claim', async (req, res) => {
     const userId = req.user.id;
-    // 【核心修改】從請求中移除 bountyTitle，因為我們已經不再使用它了
-    // const { bountyTitle } = req.body;
-
-    // 由於我們上一個步驟已經將驗證邏輯移交給主 AI，這裡的獨立驗證可以簡化或移除
-    // 我們假設能進入此路由的請求，都已經由 gameplayRoutes 中的 interactRouteHandler 驗證過
-    // 為了安全，我們還是保留一個基本的檢查
     const { bountyTitle } = req.body;
+
      if (!bountyTitle) {
         return res.status(400).json({ message: '未指定要領取的懸賞。' });
     }
@@ -101,7 +96,6 @@ router.post('/claim', async (req, res) => {
 
         // 3. 呼叫獎勵生成AI
         const rewardPrompt = getRewardGeneratorPrompt(bountyData, playerProfile);
-        // 【核心修改】將寫死的 'gemini' 改為從 aiConfig 讀取
         const rewardJsonString = await callAI(aiConfig.reward, rewardPrompt, true);
         const rewards = JSON.parse(rewardJsonString);
 
