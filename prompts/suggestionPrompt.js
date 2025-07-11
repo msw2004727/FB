@@ -1,10 +1,14 @@
 // prompts/suggestionPrompt.js
 
 const getSuggestionPrompt = (roundData) => {
+    // 【核心修改】在生成建議前，先過濾掉已經死亡的NPC
+    const aliveNpcs = (roundData.NPC || []).filter(npc => !npc.isDeceased);
+    const aliveNpcNames = aliveNpcs.map(npc => npc.name).join('、') || '無';
+
     // 將當前回合的數據轉換為易讀的摘要
     const context = `
 - 玩家狀態: ${roundData.PC}
-- 人物見聞: ${Array.isArray(roundData.NPC) ? roundData.NPC.map(n => n.name).join('、') || '無' : '無'}
+- 人物見聞: ${aliveNpcNames}
 - 隨身物品: ${roundData.ITM || '無'}
 - 任務日誌: ${roundData.QST || '無'}
 - 關鍵線索: ${roundData.CLS || '無'}
