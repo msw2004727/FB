@@ -266,17 +266,31 @@ const updateInventory = async (userId, itemChanges, roundData = {}) => {
     if (!itemChanges || itemChanges.length === 0) return;
     const userInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const batch = db.batch();
+
+    // *** 優化點：並行獲取所有物品模板 ***
+    const uniqueItemNames = [...new Set(itemChanges.map(c => c.itemName).filter(Boolean))];
+    const templatePromises = uniqueItemNames.map(name => getOrGenerateItemTemplate(name, roundData));
+    const templateResults = await Promise.all(templatePromises);
+    
+    const templates = new Map();
+    uniqueItemNames.forEach((name, index) => {
+        if (templateResults[index] && templateResults[index].template) {
+            templates.set(name, templateResults[index].template);
+        }
+    });
+    // *** 優化結束 ***
+
     for (const change of itemChanges) {
         const { action, itemName, quantity = 1 } = change;
         if (!itemName) continue;
         
-        const templateData = await getOrGenerateItemTemplate(itemName, roundData);
-        const template = templateData ? templateData.template : null;
+        const template = templates.get(itemName);
         
         if (!template) {
             console.error(`[物品系統] 無法為 "${itemName}" 獲取或生成設計圖，跳過此物品。`);
             continue;
         }
+
         const isStackable = ['材料', '財寶', '道具', '其他'].includes(template.itemType);
         if (action === 'add') {
             if (isStackable) {
@@ -299,18 +313,21 @@ const updateInventory = async (userId, itemChanges, roundData = {}) => {
                 }
             }
         } else if (action === 'remove') {
+             // 對於移除操作，我們仍然需要讀取一次來確定當前數量，這部分難以完全並行
             if (isStackable) {
                 const stackableItemRef = userInventoryRef.doc(itemName);
-                const currentItemDoc = await stackableItemRef.get();
+                const currentItemDoc = await stackableItemRef.get(); // 這裡的await是必要的
                 if (currentItemDoc.exists) {
                     const currentQuantity = currentItemDoc.data().quantity || 0;
-                    const newQuantity = currentQuantity - quantity;
-                    if (newQuantity > 0) {
-                        batch.update(stackableItemRef, { quantity: newQuantity });
+                    if (currentQuantity > quantity) {
+                        batch.update(stackableItemRef, { quantity: admin.firestore.FieldValue.increment(-quantity) });
                     } else {
                         batch.delete(stackableItemRef);
                     }
                 }
+            } else {
+                // 對於非堆疊物品，隨機或按順序刪除一個，這部分邏輯較複雜，暫時維持原樣
+                 console.warn(`[物品系統] GM工具尚不支援精準移除唯一的非堆疊物品: ${itemName}`);
             }
         } else if (action === 'remove_all' && change.itemType) {
             const itemsToDeleteSnapshot = await userInventoryRef.where('itemType', '==', change.itemType).get();
@@ -320,6 +337,7 @@ const updateInventory = async (userId, itemChanges, roundData = {}) => {
     await batch.commit();
     console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 };
+
 
 const updateFriendlinessValues = async (userId, npcChanges) => {
     if (!npcChanges || npcChanges.length === 0) return;
