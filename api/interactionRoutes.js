@@ -659,7 +659,7 @@ router.post('/end-chat', async (req, res) => {
         const suggestion = await getAISuggestion(newRoundData);
         newRoundData.suggestion = suggestion;
         
-        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundData.R });
         
         await invalidateNovelCache(userId);
