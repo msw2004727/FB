@@ -5,14 +5,12 @@ const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
 const { getPlayerSkills, getRawInventory, getInventoryState } = require('./playerStateHelpers');
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
-const { generateAndCacheLocation } = require('./worldEngine');
-const inventoryModel = require('./models/inventoryModel'); // 【核心新增】引入新的裝備邏輯模型
+const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
-// 【核心新增】處理裝備/卸下物品的API端點
 router.post('/equip', async (req, res) => {
-    const { itemId, equip, slot } = req.body; // equip是布林值, slot是用於卸下
+    const { itemId, equip, slot } = req.body;
     const userId = req.user.id;
 
     try {
@@ -23,7 +21,6 @@ router.post('/equip', async (req, res) => {
             result = await inventoryModel.unequipItem(userId, slot);
         }
 
-        // 操作成功後，回傳最新的完整玩家狀態給前端
         const userDoc = await db.collection('users').doc(userId).get();
         const inventory = await getRawInventory(userId);
         const equipment = userDoc.data().equipment || {};
@@ -44,7 +41,6 @@ router.post('/equip', async (req, res) => {
         res.status(500).json({ success: false, message: error.message || '裝備操作時發生未知錯誤。' });
     }
 });
-
 
 router.get('/inventory', async (req, res) => {
     try {
@@ -131,9 +127,11 @@ router.get('/latest-game', async (req, res) => {
             return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
         }
 
-        const [snapshot, newBountiesSnapshot] = await Promise.all([
+        const [snapshot, newBountiesSnapshot, inventory, skills] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
-            userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get()
+            userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
+            getRawInventory(userId), // 【核心修改】讀取完整物品資料
+            getPlayerSkills(userId)
         ]);
         
         if (snapshot.empty) {
@@ -142,13 +140,19 @@ router.get('/latest-game', async (req, res) => {
 
         let latestGameData = snapshot.docs[0].data();
         
-        const currentLocationName = latestGameData.LOC;
-        const locationData = await getMergedLocationData(userId, currentLocationName);
-
-        const skills = await getPlayerSkills(userId);
-        const inventoryState = await getInventoryState(userId);
+        const locationData = await getMergedLocationData(userId, latestGameData.LOC);
         
-        Object.assign(latestGameData, { ...userData, ...inventoryState, skills: skills });
+        // 【核心修改】將完整的、最新的數據合併到要傳回的物件中
+        Object.assign(latestGameData, { 
+            ...userData, 
+            skills: skills,
+            inventory: Object.values(inventory), // 將物件轉為陣列
+            equipment: userData.equipment || {}
+        });
+        
+        const inventoryState = await getInventoryState(userId);
+        latestGameData.ITM = inventoryState.itemsString;
+        latestGameData.money = inventoryState.money;
 
         const [prequelText, suggestion] = await Promise.all([
             getAIPrequel(userData.preferredModel, [latestGameData]),
@@ -219,10 +223,11 @@ router.post('/restart', async (req, res) => {
             }
         }
         
-        // This should be adapted to use the default user fields from authRoutes
         await userDocRef.set({
             internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
-            timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1
+            timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1,
+            // 重置裝備相關
+            equipment: {}, bulkScore: 0
         }, { merge: true });
 
         await invalidateNovelCache(userId);
