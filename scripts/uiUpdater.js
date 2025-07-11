@@ -1,8 +1,5 @@
 // scripts/uiUpdater.js
 import { MAX_POWER } from './config.js';
-import { api } from './api.js';
-import { gameState } from './gameState.js';
-import * as gameLoop from './gameLoop.js';
 
 // --- 獲取所有和UI更新相關的DOM元素 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
@@ -21,12 +18,14 @@ const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
 const itmContent = document.getElementById('itm-content');
+// 【核心新增】獲取負重顯示的DOM元素
 const bulkStatus = document.getElementById('bulk-status');
 const qstContent = document.getElementById('qst-content');
 const psyContent = document.getElementById('psy-content');
 const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
 const moneyContent = document.getElementById('money-content');
+const skillsContent = document.getElementById('skills-content'); 
 
 
 // --- UI 更新函式 ---
@@ -128,6 +127,7 @@ function updateDeathCountdownUI(countdownValue) {
     }
 }
 
+// 【核心新增】更新負重狀態的函式
 function updateBulkStatus(score) {
     if (!bulkStatus) return;
 
@@ -153,66 +153,6 @@ function updateBulkStatus(score) {
     bulkStatus.className = `bulk-status-display ${colorClass}`;
 }
 
-async function handleEquipToggle(itemId, isChecked) {
-    const action = isChecked ? 'equip' : 'unequip';
-    try {
-        await api.equipItem({ itemId, action });
-        // 操作成功後，重新加載遊戲狀態以刷新整個UI
-        // 這是一種簡單但可靠的方式，確保前後端數據同步
-        gameLoop.loadInitialGame(); 
-    } catch (error) {
-        console.error(`裝備操作失敗:`, error);
-        alert(`操作失敗: ${error.message}`);
-        // 操作失敗時，重新渲染一次以還原開關狀態
-        gameLoop.loadInitialGame();
-    }
-}
-
-function createItemEntry(item, equipment) {
-    const entry = document.createElement('div');
-    const isEquipped = Object.values(equipment).includes(item.instanceId);
-    entry.className = `item-entry p-2 rounded-lg flex items-center justify-between ${isEquipped ? 'equipped' : ''}`;
-    entry.dataset.id = item.instanceId;
-
-    const slotConfig = {
-        head: { icon: 'fa-user-ninja' }, body: { icon: 'fa-user-shield' },
-        hands: { icon: 'fa-hand-rock' }, feet: { icon: 'fa-shoe-prints' },
-        accessory1: { icon: 'fa-ring' }, accessory2: { icon: 'fa-ring' },
-        manuscript: { icon: 'fa-book' }, weapon_right: { icon: 'fa-hand-paper' },
-        weapon_left: { icon: 'fa-hand-paper' }, weapon_back: { icon: 'fa-archive' },
-    };
-
-    let equipControls = '';
-    if (item.equipSlot && item.equipSlot !== 'none') {
-        const currentSlot = Object.keys(equipment).find(key => equipment[key] === item.instanceId);
-        const slotIcon = currentSlot ? slotConfig[currentSlot]?.icon || 'fa-question-circle' : '';
-        
-        equipControls = `
-            <div class="flex items-center gap-2">
-                <i class="equipped-slot-icon fa-solid ${slotIcon} ${isEquipped ? 'opacity-100' : 'opacity-0'}"></i>
-                <label class="switch">
-                    <input type="checkbox" ${isEquipped ? 'checked' : ''}>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        `;
-    }
-
-    entry.innerHTML = `
-        <div class="flex items-center gap-3">
-            <span class="item-name font-semibold">${item.itemName} x${item.quantity || 1}</span>
-        </div>
-        ${equipControls}
-    `;
-
-    const checkbox = entry.querySelector('input[type="checkbox"]');
-    if (checkbox) {
-        checkbox.addEventListener('change', (e) => {
-            handleEquipToggle(item.instanceId, e.target.checked);
-        });
-    }
-    return entry;
-}
 
 export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
@@ -252,6 +192,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
 
     updateMoralityBar(roundData.morality);
     
+    // 【核心新增】在更新UI時呼叫負重更新函式
     updateBulkStatus(roundData.bulkScore || 0);
 
     if (locationInfo) {
@@ -287,33 +228,32 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
         moneyContent.textContent = `${roundData.money || 0} 文錢`;
     }
     
-    // 【核心修改】重寫物品欄的渲染邏輯
-    itmContent.innerHTML = '';
-    const allItems = roundData.inventory || [];
-    const equipment = roundData.equipment || {};
-    const equipOrder = ['weapon_right', 'weapon_left', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
-
-    const sortedItems = allItems.sort((a, b) => {
-        const equippedA = Object.values(equipment).includes(a.instanceId);
-        const equippedB = Object.values(equipment).includes(b.instanceId);
-        if (equippedA && !equippedB) return -1;
-        if (!equippedA && equippedB) return 1;
-        if (equippedA && equippedB) {
-            const slotA = Object.keys(equipment).find(key => equipment[key] === a.instanceId);
-            const slotB = Object.keys(equipment).find(key => equipment[key] === b.instanceId);
-            return equipOrder.indexOf(slotA) - equipOrder.indexOf(slotB);
-        }
-        return a.itemName.localeCompare(b.itemName, 'zh-Hant');
-    });
-
-    if (sortedItems.length > 0) {
-        sortedItems.forEach(item => {
-            itmContent.appendChild(createItemEntry(item, equipment));
+    itmContent.innerHTML = ''; 
+    if (roundData.ITM && roundData.ITM !== '身無長物') {
+        const items = roundData.ITM.split('、'); 
+        items.forEach(itemText => {
+            const itemDiv = document.createElement('div'); 
+            itemDiv.textContent = itemText.trim();
+            itmContent.appendChild(itemDiv); 
         });
     } else {
         itmContent.textContent = '身無長物';
     }
 
+    if (skillsContent) {
+        skillsContent.innerHTML = '';
+        if (roundData.skills && Array.isArray(roundData.skills) && roundData.skills.length > 0) {
+            data.skills.forEach(skill => {
+                const skillLine = document.createElement('div');
+                skillLine.className = 'skill-item';
+                skillLine.innerHTML = `<strong>${skill.name}</strong> <span class="skill-level">(Lv.${skill.level || 0})</span>`;
+                skillLine.title = `類型: ${skill.type}\n描述: ${skill.description}`;
+                skillsContent.appendChild(skillLine);
+            });
+        } else {
+            skillsContent.textContent = '尚未習得任何武學';
+        }
+    }
 
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
