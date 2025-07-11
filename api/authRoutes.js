@@ -14,6 +14,7 @@ const DEFAULT_USER_FIELDS = {
     lightness: 5,
     morality: 0,
     stamina: 100,
+    bulkScore: 0, // 【核心新增】為新玩家加入預設的負重分數
     isDeceased: false,
     maxInternalPowerAchieved: 5,
     maxExternalPowerAchieved: 5,
@@ -147,10 +148,8 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
 
-        // --- 登入時的資料庫健康檢查與修補 ---
         const batch = db.batch();
         
-        // 1. 檢查並修補玩家主檔案
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
                 const updatePayload = {};
@@ -168,7 +167,6 @@ router.post('/login', async (req, res) => {
             }
         }
         
-        // 2. 【核心新增】檢查並修補玩家的所有NPC狀態檔案
         const npcStatesSnapshot = await userDoc.ref.collection('npc_states').get();
         if (!npcStatesSnapshot.empty) {
             console.log(`[資料庫維護] 開始為 ${username} 檢查 ${npcStatesSnapshot.size} 位NPC的舊資料...`);
@@ -178,7 +176,6 @@ router.post('/login', async (req, res) => {
                 const updatePayload = {};
                 let needsNpcUpdate = false;
                 
-                // 逐一檢查所有必要的欄位是否存在，若不存在則加入修補內容
                 if (npcData.interactionSummary === undefined) {
                     needsNpcUpdate = true;
                     updatePayload.interactionSummary = `你與${npcName}的交往尚淺。`;
@@ -189,7 +186,6 @@ router.post('/login', async (req, res) => {
                 }
                  if (npcData.firstMet === undefined) {
                     needsNpcUpdate = true;
-                    // 為舊資料提供一個安全的預設值
                     updatePayload.firstMet = { round: 0, time: '未知時間', location: '未知地點', event: '初次相遇' };
                 }
                 if (npcData.isDeceased === undefined) {
@@ -211,13 +207,11 @@ router.post('/login', async (req, res) => {
 
                 if (needsNpcUpdate) {
                     console.log(`[資料庫維護] NPC「${npcName}」的檔案不完整，已加入批次修補。`);
-                    // 使用 set + merge: true 來安全地新增欄位，而不會覆蓋已有的 friendlinessValue
                     batch.set(npcDoc.ref, updatePayload, { merge: true });
                 }
             }
         }
 
-        // 執行所有修補的批次更新
         await batch.commit();
         console.log(`[資料庫維護] 已成功為 ${username} 的舊資料完成健康檢查與修補。`);
 
