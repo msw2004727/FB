@@ -24,24 +24,24 @@ async function fetchApi(endpoint, options = {}) {
 }
 
 export const api = {
-    // Gameplay Routes
+    // Gameplay Routes (主遊戲循環)
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
-    endChat: (body) => fetchApi('/api/game/play/end-chat', { method: 'POST', body: JSON.stringify(body) }),
-    finalizeCombat: (body) => fetchApi('/api/game/play/finalize-combat', { method: 'POST', body: JSON.stringify(body) }),
 
-    // Combat Routes
-    initiateCombat: (body) => fetchApi('/api/game/play/initiate', { method: 'POST', body: JSON.stringify(body) }),
-    combatAction: (body) => fetchApi('/api/game/play/action', { method: 'POST', body: JSON.stringify(body) }),
-    combatSurrender: (body) => fetchApi('/api/game/play/surrender', { method: 'POST', body: JSON.stringify(body) }),
+    // Combat Routes (戰鬥相關)
+    initiateCombat: (body) => fetchApi('/api/game/combat/initiate', { method: 'POST', body: JSON.stringify(body) }),
+    combatAction: (body) => fetchApi('/api/game/combat/action', { method: 'POST', body: JSON.stringify(body) }),
+    combatSurrender: (body) => fetchApi('/api/game/combat/surrender', { method: 'POST', body: JSON.stringify(body) }),
+    finalizeCombat: (body) => fetchApi('/api/game/combat/finalize-combat', { method: 'POST', body: JSON.stringify(body) }),
 
-    // NPC Routes
+    // NPC Routes (NPC互動)
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc/npc-profile/${npcName}`),
     startTrade: (npcName) => fetchApi(`/api/game/npc/start-trade/${npcName}`),
     confirmTrade: (body) => fetchApi('/api/game/npc/confirm-trade', { method: 'POST', body: JSON.stringify(body) }),
     npcChat: (body) => fetchApi('/api/game/npc/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
     giveItemToNpc: (body) => fetchApi('/api/game/npc/give-item', { method: 'POST', body: JSON.stringify(body) }),
+    endChat: (body) => fetchApi('/api/game/npc/end-chat', { method: 'POST', body: JSON.stringify(body) }),
 
-    // State Routes
+    // State Routes (玩家狀態與資料)
     getLatestGame: () => fetchApi('/api/game/state/latest-game'),
     startNewGame: () => fetchApi('/api/game/state/restart', { method: 'POST' }),
     forceSuicide: (body) => fetchApi('/api/game/state/force-suicide', { method: 'POST', body: JSON.stringify(body) }),
@@ -51,13 +51,13 @@ export const api = {
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
 
-    // Bounty Route
+    // Bounty Route (懸賞任務)
     getBounties: () => fetchApi('/api/bounties'),
 
-    // Epilogue Route
+    // Epilogue Route (結局)
     getEpilogue: () => fetchApi('/api/epilogue'),
 
-    // GM Panel Routes
+    // GM Panel Routes (GM工具)
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
     updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
     rebuildNpcForGM: (body) => fetchApi('/api/gm/rebuild-npc', { method: 'POST', body: JSON.stringify(body) }),
