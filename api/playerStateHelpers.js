@@ -14,8 +14,16 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
     try {
         const doc = await templateRef.get();
         if (doc.exists) {
-            return { template: doc.data(), isNew: false };
+            let templateData = doc.data();
+            // 【核心修正】為舊物品自動修補bulk欄位
+            if (templateData.bulk === undefined) {
+                templateData.bulk = '中'; // 給予一個合理的預設值
+                await templateRef.set({ bulk: '中' }, { merge: true });
+                console.log(`[資料庫維護] 物品「${itemName}」缺少 bulk 欄位，自動修補為 "中"。`);
+            }
+            return { template: templateData, isNew: false };
         }
+        
         console.log(`[物品系統] 物品「${itemName}」的設計圖不存在，啟動AI生成...`);
         const playerLevel = (roundData.internalPower || 0) + (roundData.externalPower || 0) + (roundData.lightness || 0);
         const context = {
@@ -53,20 +61,17 @@ async function getOrGenerateSkillTemplate(skillName) {
             let templateData = doc.data();
             let needsUpdate = false;
 
-            // 【核心修正】資料健康檢查與自動修復機制
             if (templateData.cost === undefined) {
-                templateData.cost = 10; // 為沒有消耗值的舊技能設定一個合理的預設值
+                templateData.cost = 10;
                 needsUpdate = true;
                 console.log(`[資料庫維護] 武學「${skillName}」缺少 cost 欄位，自動修補為 10。`);
             }
             if (templateData.combatCategory === undefined) {
-                // 根據技能類型給予一個合理的預設戰鬥分類
                 templateData.combatCategory = (templateData.skillType === '醫術' || templateData.skillType === '治癒') ? '治癒' : '攻擊';
                 needsUpdate = true;
                 console.log(`[資料庫維護] 武學「${skillName}」缺少 combatCategory 欄位，自動修補為 ${templateData.combatCategory}。`);
             }
             
-            // 如果資料被修復過，則將其寫回資料庫
             if (needsUpdate) {
                 await skillTemplateRef.set(templateData, { merge: true });
                 console.log(`[資料庫維護] 已成功將武學「${skillName}」的模板更新至最新結構。`);
@@ -76,7 +81,6 @@ async function getOrGenerateSkillTemplate(skillName) {
             return { template: templateData, isNew: false };
         }
 
-        // --- 以下為新技能生成邏輯 ---
         console.log(`[武學總綱] 武學「${skillName}」的總綱不存在，啟動AI生成...`);
         const prompt = getSkillGeneratorPrompt(skillName);
         const skillJsonString = await callAI(aiConfig.skillTemplate || 'openai', prompt, true);
