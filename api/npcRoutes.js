@@ -374,12 +374,14 @@ router.post('/end-chat', async (req, res) => {
         }
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         
-        const chatSummary = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
+        const chatSummaryResult = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
         
         const newRoundNumber = lastRoundData.R + 1;
         let newRoundData = { ...lastRoundData, R: newRoundNumber };
-        newRoundData.EVT = chatSummary;
-        newRoundData.story = `你結束了與${npcName}的交談，${chatSummary}。`;
+
+        newRoundData.story = chatSummaryResult.story || `你結束了與${npcName}的交談。`;
+        newRoundData.EVT = chatSummaryResult.evt || `與${npcName}的一席話`;
+        
         newRoundData.PC = `你與${npcName}深入交談了一番。`;
 
         const newSummary = await getAISummary(longTermSummary, newRoundData);
