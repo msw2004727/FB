@@ -49,45 +49,47 @@ async function equipItem(userId, itemId) {
         const itemToEquip = { 
             ...itemTemplateData, 
             ...itemInstanceData,
-            instanceId: itemId // 確保instanceId被正確傳遞
+            instanceId: itemId, 
+            itemName: itemTemplateData.itemName || templateId 
         };
 
-        // 卸下被替換的物品
-        if (hands === 2) { // 裝備雙手武器
+        // --- 核心卸下邏輯 ---
+        if (hands === 2) { 
             const slotsToClear = ['weapon_right', 'weapon_left', 'weapon_back'];
             for (const slot of slotsToClear) {
-                if (equipment[slot] && equipment[slot].instanceId) {
-                    transaction.set(userRef.collection('inventory_items').doc(equipment[slot].instanceId), equipment[slot]);
+                const unequippedItem = equipment[slot];
+                if (unequippedItem && unequippedItem.instanceId) {
+                    const unequippedRef = userRef.collection('inventory_items').doc(unequippedItem.instanceId);
+                    transaction.set(unequippedRef, unequippedItem);
                 }
                 equipment[slot] = null;
             }
             equipment.weapon_right = itemToEquip; 
-        } else { // 裝備單手武器或防具
+        } else { 
             const currentEquippedItem = equipment[equipSlot];
             if (currentEquippedItem && currentEquippedItem.instanceId) {
-                 transaction.set(userRef.collection('inventory_items').doc(currentEquippedItem.instanceId), currentEquippedItem);
+                 const oldItemRef = userRef.collection('inventory_items').doc(currentEquippedItem.instanceId);
+                 transaction.set(oldItemRef, currentEquippedItem);
             }
-            // 如果裝備的是單手武器，且另一隻手是雙手武器，則卸下雙手武器
-            if(equipSlot === 'weapon_left' && equipment.weapon_right?.hands === 2){
-                transaction.set(userRef.collection('inventory_items').doc(equipment.weapon_right.instanceId), equipment.weapon_right);
-                equipment.weapon_right = null;
-            }
-             if(equipSlot === 'weapon_right' && equipment.weapon_right?.hands === 2){
-                transaction.set(userRef.collection('inventory_items').doc(equipment.weapon_right.instanceId), equipment.weapon_right);
+            
+            if(equipSlot.startsWith('weapon') && equipment.weapon_right?.hands === 2){
+                const rightHandItem = equipment.weapon_right;
+                if(rightHandItem && rightHandItem.instanceId) {
+                    transaction.set(userRef.collection('inventory_items').doc(rightHandItem.instanceId), rightHandItem);
+                }
                 equipment.weapon_right = null;
             }
             equipment[equipSlot] = itemToEquip;
         }
 
-        // 從背包中刪除現在要裝備的物品
-        transaction.delete(itemInstanceRef);
-        // 更新玩家的裝備狀態
         transaction.update(userRef, { equipment });
+        transaction.delete(itemInstanceRef); 
 
-        console.log(`[裝備系統] 物品 ${itemName} 已成功裝備至 ${equipSlot}。`);
+        console.log(`[裝備系統] 物品 ${itemName} 已成功從背包移至裝備槽 ${equipSlot}。`);
         return { success: true, message: `${itemName} 已裝備。` };
     });
 }
+
 
 /**
  * 卸下一件裝備
@@ -110,11 +112,9 @@ async function unequipItem(userId, slotToUnequip) {
             return { success: true, message: '該部位沒有裝備。' };
         }
         
-        // 將裝備移回背包
         const inventoryItemRef = userRef.collection('inventory_items').doc(equippedItemData.instanceId);
         transaction.set(inventoryItemRef, equippedItemData);
         
-        // 如果是雙手武器，它只存在於 weapon_right，只需清空該槽位
         if(equippedItemData.hands === 2){
             equipment['weapon_right'] = null;
         } else {
