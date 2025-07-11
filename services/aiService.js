@@ -50,6 +50,7 @@ const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
+// 【錯誤修正】確保路徑和檔名完全正確。如果此處再次報錯，請檢查 'prompts' 資料夾中是否存在 'npcMemoryPrompt.js' 檔案，且檔名大小寫完全一致。
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 
 
