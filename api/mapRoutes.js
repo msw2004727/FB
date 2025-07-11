@@ -7,23 +7,35 @@ const db = admin.firestore();
 
 /**
  * @route   GET /api/map/world-map
- * @desc    獲取整個遊戲世界的地圖資料 (重構版)
- * @access  Public
+ * @desc    獲取玩家個人探索過的地圖資料 (重構版)
+ * @access  Private
  */
 router.get('/world-map', async (req, res) => {
+    const userId = req.user.id;
     try {
-        const locationsSnapshot = await db.collection('locations').get();
+        const playerLocationsRef = db.collection('users').doc(userId).collection('location_states');
+        const playerLocationsSnapshot = await playerLocationsRef.get();
 
-        if (locationsSnapshot.empty) {
-            return res.json({ mermaidSyntax: 'graph TD;\n    A["世界混沌初開"];' });
+        if (playerLocationsSnapshot.empty) {
+            return res.json({ mermaidSyntax: 'graph TD;\n    A["你的足跡尚未踏出第一步"];' });
         }
 
+        const discoveredLocationNames = playerLocationsSnapshot.docs.map(doc => doc.id);
+        
+        // 根據玩家已知的地點名稱，去總表中撈取完整的靜態資料
+        const locationsRef = db.collection('locations');
+        const knownLocationsSnapshot = await locationsRef.where(admin.firestore.FieldPath.documentId(), 'in', discoveredLocationNames).get();
+
+        if (knownLocationsSnapshot.empty) {
+            return res.json({ mermaidSyntax: 'graph TD;\n    A["輿圖遺失，無法繪製"];' });
+        }
+        
         const locations = new Map();
         const idMap = new Map();
         let mermaidIdCounter = 0;
 
-        // 步驟一：遍歷所有地點，為每個地點創建一個安全的內部ID
-        locationsSnapshot.forEach(doc => {
+        // 步驟一：遍歷所有已知地點，為每個地點創建一個安全的內部ID
+        knownLocationsSnapshot.forEach(doc => {
             const originalId = doc.id;
             const safeId = `loc${mermaidIdCounter++}`;
             idMap.set(originalId, safeId);
@@ -48,7 +60,6 @@ router.get('/world-map', async (req, res) => {
         };
 
         locations.forEach((loc) => {
-            // 正確的節點定義語法： safeId["中文名稱"]
             mermaidSyntax += `    ${loc.safeId}["${loc.locationName}"];\n`;
             if (typeStyles[loc.locationType]) {
                 mermaidSyntax += `    style ${loc.safeId} ${typeStyles[loc.locationType]};\n`;
