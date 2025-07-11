@@ -78,7 +78,9 @@ function showFinalConfirmation(event) {
         e.stopPropagation();
         const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
         if (originalTarget) {
-            showNpcInteractionMenu(originalTarget, npcName);
+            // 【核心修正】重新顯示菜單時，也從HTML標籤讀取死亡狀態
+            const isDeceased = originalTarget.dataset.isDeceased === 'true';
+            showNpcInteractionMenu(originalTarget, npcName, isDeceased);
         } else {
             hideNpcInteractionMenu();
         }
@@ -274,8 +276,8 @@ export function handleNpcClick(event) {
 
     if (targetIsNpc) {
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
-        // 直接從 gameState 的「生死簿」中查詢NPC的死亡狀態
-        const isDeceased = gameState.deceasedNpcs.includes(npcName);
+        // 【核心修正】直接從點擊的HTML元素上讀取死亡狀態，這是最可靠的資訊來源
+        const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
         showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
     } else if (!targetIsMenu) {
         hideNpcInteractionMenu();
