@@ -206,7 +206,6 @@ const interactRouteHandler = async (req, res) => {
             getAISuggestion(aiResponse.roundData)
         ]);
         
-        // 【核心修正】屬性下限保護機制
         const currentInternalPower = player.internalPower || 0;
         const currentExternalPower = player.externalPower || 0;
         const currentLightness = player.lightness || 0;
@@ -215,7 +214,6 @@ const interactRouteHandler = async (req, res) => {
         const externalPowerChange = aiResponse.roundData.powerChange?.external || 0;
         const lightnessPowerChange = aiResponse.roundData.powerChange?.lightness || 0;
 
-        // 計算新數值，並使用 Math.max(0, ...) 確保最低為 0
         const newInternalPower = Math.max(0, currentInternalPower + internalPowerChange);
         const newExternalPower = Math.max(0, currentExternalPower + externalPowerChange);
         const newLightness = Math.max(0, currentLightness + lightnessPowerChange);
@@ -228,6 +226,7 @@ const interactRouteHandler = async (req, res) => {
             internalPower: newInternalPower,
             externalPower: newExternalPower,
             lightness: newLightness,
+            bulkScore: bulkScore, // 【核心新增】將計算出的負重分數寫回資料庫
             morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0)
         };
         
@@ -244,11 +243,11 @@ const interactRouteHandler = async (req, res) => {
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
         
         const finalRoundDataForClient = { ...finalSaveData };
-        // 直接使用計算後的新數值，無需再次讀取資料庫
         finalRoundDataForClient.internalPower = newInternalPower;
         finalRoundDataForClient.externalPower = newExternalPower;
         finalRoundDataForClient.lightness = newLightness;
         finalRoundDataForClient.morality = (player.morality || 0) + (aiResponse.roundData.moralityChange || 0);
+        finalRoundDataForClient.bulkScore = bulkScore; // 【核心新增】將負重分數加入要傳回給前端的資料中
 
         const inventoryState = await getInventoryState(userId);
         finalRoundDataForClient.ITM = inventoryState.itemsString;
