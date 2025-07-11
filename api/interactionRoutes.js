@@ -15,6 +15,7 @@ const {
 const {
     updateInventory,
     updateSkills,
+    getInventoryState, // 【核心修正】補上遺漏的 getInventoryState 引用
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -24,7 +25,7 @@ const {
 } = require('./worldStateHelpers');
 const { triggerBountyGeneration } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
-const { buildContext } = require('./contextBuilder'); // 【核心新增】引入我們新建的狀態產生器
+const { buildContext } = require('./contextBuilder');
 
 const db = admin.firestore();
 
@@ -36,7 +37,6 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, model: playerModelChoice } = req.body;
 
-        // --- 所有資料準備工作，現在都由 buildContext 一行搞定 ---
         const context = await buildContext(userId, username);
         if (!context) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
@@ -67,18 +67,18 @@ const interactRouteHandler = async (req, res) => {
             longTermSummary,
             JSON.stringify(recentHistory),
             playerAction,
-            player, // 直接傳遞完整的玩家狀態物件
+            player,
             username,
             player.currentTimeOfDay,
             player.power,
             player.morality,
-            [], // levelUpEvents - 初始化為空
+            [],
             romanceEventData ? romanceEventData.eventStory : null,
-            null, // worldEventToWeave - 暫時保留
+            null,
             locationContext,
             npcContext,
             bulkScore,
-            [] // actorCandidates - 暫時保留
+            []
         );
 
         if (!aiResponse || !aiResponse.roundData) {
@@ -100,7 +100,6 @@ const interactRouteHandler = async (req, res) => {
         
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
         
-        // --- 精力系統邏輯 ---
         let newStamina = (player.stamina || 100) + staminaChange;
         
         const basalMetabolismCost = Math.floor(Math.random() * 5) + 1;
@@ -126,11 +125,10 @@ const interactRouteHandler = async (req, res) => {
                 newStamina = Math.min(100, originalStamina + (25 * slotsPassed));
             }
             recoveredStamina = newStamina - originalStamina;
-            // --- 【核心修改】補上日誌記錄 ---
             staminaLog += `, 休息恢復: +${recoveredStamina > 0 ? recoveredStamina : 0}`;
         }
         
-        console.log(staminaLog); // 統一打印精力日誌
+        console.log(staminaLog);
 
         if (newStamina <= 0) {
             const passOutEvent = { story: "你感到一陣天旋地轉，眼前一黑，便失去了所有知覺...再次醒來時，只覺得頭痛欲裂，不知已過去了多久。", PC: "你因體力不支而昏倒在地。", EVT: "力竭昏迷" };
@@ -142,7 +140,6 @@ const interactRouteHandler = async (req, res) => {
             newStamina = Math.min(100, newStamina);
         }
         
-        // --- 時間推進邏輯 ---
         let shortActionCounter = player.shortActionCounter || 0;
         if (!timeDidAdvance && !isResting) shortActionCounter++;
         else shortActionCounter = 0;
@@ -163,7 +160,6 @@ const interactRouteHandler = async (req, res) => {
             finalDate = advanceDate(finalDate);
         }
 
-        // --- 武學與檔案更新 ---
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, player);
         
         if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -175,7 +171,6 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
-        // --- 並行處理所有資料庫寫入 ---
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
