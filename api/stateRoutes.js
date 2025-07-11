@@ -20,7 +20,7 @@ async function getUnifiedInventory(userId) {
 
     const userData = userDoc.data();
     const equipment = userData.equipment || {};
-    const inventory = await getRawInventory(userId); // 這會返回一個以instanceId為鍵的物件
+    const inventoryItems = await getRawInventory(userId); // 這會返回一個以instanceId為鍵的物件
 
     const unifiedList = [];
     const processedIds = new Set();
@@ -29,18 +29,17 @@ async function getUnifiedInventory(userId) {
     Object.keys(equipment).forEach(slot => {
         const item = equipment[slot];
         if (item && item.instanceId && !processedIds.has(item.instanceId)) {
-            // 合併模板和實例數據
-            const completeItemData = { ...(inventory[item.instanceId] || {}), ...item, isEquipped: true, equipSlot: slot };
-            unifiedList.push(completeItemData);
+            // 從背包數據中獲取最完整的實例數據，然後加上裝備狀態
+            const fullItemData = inventoryItems[item.instanceId] || item;
+            unifiedList.push({ ...fullItemData, isEquipped: true, equipSlot: slot });
             processedIds.add(item.instanceId);
         }
     });
 
-    // 2. 添加背包中的物品
-    Object.keys(inventory).forEach(instanceId => {
+    // 2. 添加背包中未裝備的物品
+    Object.keys(inventoryItems).forEach(instanceId => {
         if (!processedIds.has(instanceId)) {
-            unifiedList.push({ ...inventory[instanceId], isEquipped: false });
-            processedIds.add(instanceId);
+            unifiedList.push({ ...inventoryItems[instanceId], isEquipped: false });
         }
     });
     
