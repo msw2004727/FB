@@ -57,6 +57,9 @@ export const api = {
     // Epilogue Route (結局)
     getEpilogue: () => fetchApi('/api/epilogue'),
 
+    // Map Route (地圖)
+    getMap: () => fetchApi('/api/map/world-map'),
+
     // GM Panel Routes (GM工具)
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
     updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
