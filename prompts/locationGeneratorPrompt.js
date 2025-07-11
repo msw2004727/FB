@@ -27,6 +27,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 * **\`staticTemplate\` (靜態地點模板)**: 定義了地點的**固有屬性**，這些屬性通常**不會**因為玩家的行為而改變。
     * **\`parentLocation\`**: 必須正確設定上級地點的名稱。
     * **\`address\`**: 必須包含從 \`country\` (國家) 到此地點的完整層級。
+    * **【核心新增】\`geography.nearbyLocations\`**: 你可以在此處定義與此地點相鄰的**同級地點**，並標註旅行時間。時間單位應使用「一炷香」、「半個時辰」、「半日」、「一日」等武俠風格的描述。
 * **\`initialDynamicState\` (初始動態狀態)**: 定義了地點的**可變屬性**，這些是玩家未來可以透過行動來影響的。
 
 ---
@@ -50,7 +51,12 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
           "city": "洪州",
           "district": "豐城縣"
         },
-        "geography": { "terrain": "平原與丘陵交錯" },
+        "geography": { 
+            "terrain": "平原與丘陵交錯",
+            "nearbyLocations": [
+                { "name": "豫章鎮", "travelTime": "半日" }
+            ]
+        },
         "economy": { "prosperityPotential": "殷實", "specialty": ["稻米", "瓷器"] },
         "lore": { "history": "自前朝便已存在的古縣，因瓷器貿易而興盛。" }
       },
@@ -74,7 +80,12 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
           "district": "豐城縣",
           "town": "無名村"
         },
-        "geography": { "terrain": "位於丘陵地帶的小平原", "nearbyLocations": [] },
+        "geography": { 
+            "terrain": "位於丘陵地帶的小平原", 
+            "nearbyLocations": [
+                { "name": "黑風寨", "travelTime": "半個時辰" }
+            ] 
+        },
         "economy": { "prosperityPotential": "普通", "specialty": ["翠竹", "草藥"] },
         "lore": { "history": "一個有著數百年歷史的古老村莊，據說祖上是為了躲避戰亂而遷徙至此。" }
       },
@@ -103,7 +114,3 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ---
 
 現在，請為「${locationName}」生成一份詳盡的、包含了所有必要層級的、符合新結構的JSON檔案。
-`;
-};
-
-module.exports = { getLocationGeneratorPrompt };
