@@ -26,12 +26,14 @@
 
     --internal-power-color-light: #0d6efd;
     --external-power-color-light: #198754;
-    --lightness-power-color-light: #fd7e14; /* 【核心新增】輕功顏色 */
-    --stamina-color-light: #ffc107; /* 【核心新增】精力顏色 */
+    --lightness-power-color-light: #fd7e14;
+    --stamina-color-light: #ffc107;
+    --stamina-danger-color-light: #dc3545; /* 【核心新增】精力危險顏色 */
     --internal-power-color-dark: #3b82f6;
     --external-power-color-dark: #22c55e;
-    --lightness-power-color-dark: #fca311; /* 【核心新增】輕功顏色 */
-    --stamina-color-dark: #fcc419; /* 【核心新增】精力顏色 */
+    --lightness-power-color-dark: #fca311;
+    --stamina-color-dark: #fcc419;
+    --stamina-danger-color-dark: #ff5263; /* 【核心新增】精力危險顏色 */
 }
 
 body {
@@ -66,4 +68,28 @@ body.dark-theme {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* 【核心新增】精力警示的脈衝發光動畫 */
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+  }
+}
+body.dark-theme @keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 82, 99, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 82, 99, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 82, 99, 0);
+  }
 }
