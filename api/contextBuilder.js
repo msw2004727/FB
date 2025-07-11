@@ -6,6 +6,14 @@ const { getMergedLocationData } = require('./worldStateHelpers');
 
 const db = admin.firestore();
 
+// 【核心新增】定義負重分數對照表
+const BULK_TO_SCORE_MAP = {
+    '輕': 0,
+    '中': 2,
+    '重': 5,
+    '極重': 10
+};
+
 /**
  * 遊戲狀態產生器 (Context Builder) v2.0
  * @param {string} userId - The user's ID.
@@ -35,7 +43,6 @@ async function buildContext(userId, username) {
         ]);
 
         if (savesSnapshot.empty) {
-            // 處理全新玩家，還沒有任何存檔的情況
             console.log(`[Context Builder] New player detected. Building initial context.`);
             const initialUserData = userDoc.exists ? userDoc.data() : {};
             return {
@@ -53,18 +60,13 @@ async function buildContext(userId, username) {
         const userProfile = userDoc.exists ? userDoc.data() : {};
         const lastSave = savesSnapshot.docs[0].data();
 
-        // 【核心修改】計算全局負重分數
+        // 【核心修改】實現全局負重計算
         let totalBulkScore = 0;
         if (rawInventory && typeof rawInventory === 'object') {
             Object.values(rawInventory).forEach(item => {
                 const quantity = item.quantity || 1;
-                // 根據物品的 bulk 屬性累加分數
-                switch (item.bulk) {
-                    case '中': totalBulkScore += 1 * quantity; break;
-                    case '重': totalBulkScore += 3 * quantity; break;
-                    case '極重': totalBulkScore += 10 * quantity; break;
-                    default: break; // '輕' 或未定義的不增加分數
-                }
+                const bulkValue = item.bulk || '中'; // 如果舊物品沒有bulk，給予預設值
+                totalBulkScore += (BULK_TO_SCORE_MAP[bulkValue] || 0) * quantity;
             });
         }
         
@@ -73,7 +75,7 @@ async function buildContext(userId, username) {
             username,
             R: lastSave.R,
             skills,
-            ...rawInventory, // 將物品詳情合併進來
+            inventory: rawInventory, // 將原始背包數據傳遞下去
             currentLocation: lastSave.LOC,
             stamina: userProfile.stamina === undefined ? 100 : userProfile.stamina,
             morality: userProfile.morality === undefined ? 0 : userProfile.morality,
@@ -126,7 +128,6 @@ async function buildContext(userId, username) {
 
     } catch (error) {
         console.error(`[Context Builder] Error building context for user ${userId}:`, error);
-        // 在錯誤情況下回傳一個安全的空物件或null，防止上游崩潰
         return null;
     }
 }
