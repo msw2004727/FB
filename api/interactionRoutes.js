@@ -103,11 +103,9 @@ const interactRouteHandler = async (req, res) => {
         // --- 精力系統邏輯 ---
         let newStamina = (player.stamina || 100) + staminaChange;
         
-        // --- 【核心新增】基礎代謝精力消耗 ---
-        const basalMetabolismCost = Math.floor(Math.random() * 5) + 1; // 產生 1 到 5 的隨機整數
+        const basalMetabolismCost = Math.floor(Math.random() * 5) + 1;
         newStamina -= basalMetabolismCost;
         console.log(`[精力系統] 行動消耗: ${staminaChange}, 基礎代謝消耗: -${basalMetabolismCost}`);
-        // --- 新增結束 ---
 
         const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇', '打坐'];
         const isResting = restKeywords.some(kw => playerAction.includes(kw));
@@ -205,13 +203,24 @@ const interactRouteHandler = async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
         
-        const finalContext = await buildContext(userId, username);
+        // --- 【核心修改】讓回傳給前端的 roundData 與存入資料庫的 finalSaveData 內容同步 ---
+        const finalRoundDataForClient = { ...finalSaveData };
+        // 從資料庫存檔中補全前端UI需要的、但存檔中可能沒有的資料
+        const latestPlayerState = (await userDocRef.get()).data();
+        finalRoundDataForClient.internalPower = latestPlayerState.internalPower;
+        finalRoundDataForClient.externalPower = latestPlayerState.externalPower;
+        finalRoundDataForClient.lightness = latestPlayerState.lightness;
+        finalRoundDataForClient.morality = latestPlayerState.morality;
+        const inventoryState = await getInventoryState(userId);
+        finalRoundDataForClient.ITM = inventoryState.itemsString;
+        finalRoundDataForClient.money = inventoryState.money;
+        finalRoundDataForClient.skills = await getPlayerSkills(userId);
         
         res.json({
             story: finalSaveData.story,
-            roundData: { ...finalContext.player, R: newRoundNumber, suggestion: suggestion },
+            roundData: { ...finalRoundDataForClient, suggestion: suggestion },
             suggestion: suggestion,
-            locationData: finalContext.locationContext
+            locationData: await getMergedLocationData(userId, finalRoundDataForClient.LOC)
         });
 
     } catch (error) {
