@@ -415,7 +415,6 @@ body.dark-theme #internal-power-bar {
 body.dark-theme #external-power-bar {
     background-color: var(--external-power-color-dark);
 }
-/* 【核心新增】精力條樣式 */
 #stamina-bar {
     background-color: var(--stamina-color-light);
 }
@@ -642,7 +641,7 @@ body.dark-theme .equipped-slot-icon {
     height: 24px;
     flex-shrink: 0; /* 防止開關被壓縮 */
 }
-.switch input { 
+.switch input {
     opacity: 0;
     width: 0;
     height: 0;
@@ -674,4 +673,147 @@ input:checked + .slider {
 }
 input:checked + .slider:before {
     transform: translateX(20px);
+}
+
+
+/* --- 【核心修正】補回NPC互動選單樣式 --- */
+.npc-interaction-menu {
+    position: absolute;
+    background-color: var(--light-surface-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    z-index: 50;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+}
+
+.npc-interaction-menu.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+body.dark-theme .npc-interaction-menu {
+    background-color: #31313a;
+    border-color: var(--dark-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.npc-interaction-btn {
+    background: none;
+    border: 1px solid var(--light-border);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+body.dark-theme .npc-interaction-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn:hover {
+    background-color: var(--light-bg);
+}
+
+body.dark-theme .npc-interaction-btn:hover {
+    background-color: var(--dark-surface-bg);
+}
+
+.npc-interaction-btn.chat {
+    color: var(--light-text-primary);
+}
+body.dark-theme .npc-interaction-btn.chat {
+    color: var(--dark-text-primary);
+}
+
+.npc-interaction-btn.attack {
+    color: #c92a2a;
+}
+body.dark-theme .npc-interaction-btn.attack {
+    color: #ff6b6b;
+}
+
+.npc-interaction-btn.attack:hover {
+    background-color: #fff5f5;
+    border-color: #c92a2a;
+}
+body.dark-theme .npc-interaction-btn.attack:hover {
+    background-color: #4d2b33;
+    border-color: #ff6b6b;
+}
+
+.confirm-prompt-text {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--light-text-secondary);
+    padding: 0 0.5rem;
+}
+body.dark-theme .confirm-prompt-text {
+    color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn.confirm-attack {
+    background-color: #c92a2a;
+    color: #fff;
+    border-color: #c92a2a;
+}
+.npc-interaction-btn.confirm-attack:hover {
+    background-color: #a12222;
+}
+body.dark-theme .npc-interaction-btn.confirm-attack {
+     background-color: #ff6b6b;
+     color: var(--dark-bg);
+     border-color: #ff6b6b;
+}
+body.dark-theme .npc-interaction-btn.confirm-attack:hover {
+    background-color: #e54865;
+}
+
+.npc-interaction-btn.cancel-attack {
+    background-color: transparent;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .npc-interaction-btn.cancel-attack {
+    color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn:disabled {
+    color: #adb5bd;
+    border-color: #dee2e6;
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.npc-interaction-btn:disabled:hover {
+    color: #adb5bd;
+    border-color: #dee2e6;
+    background-color: #f8f9fa;
+}
+
+body.dark-theme .npc-interaction-btn:disabled {
+    color: #6c757d;
+    border-color: #495057;
+    background-color: #343a40;
+}
+
+body.dark-theme .npc-interaction-btn:disabled:hover {
+    color: #6c757d;
+    border-color: #495057;
+    background-color: #343a40;
 }
