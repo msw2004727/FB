@@ -17,7 +17,7 @@ const lightnessPowerValue = document.getElementById('lightness-power-value');
 const staminaBar = document.getElementById('stamina-bar');
 const staminaValue = document.getElementById('stamina-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
-const locationInfo = document.getElementById('location-info'); 
+const locationInfo = document.getElementById('location-info');
 const npcContent = document.getElementById('npc-content');
 const itmContent = document.getElementById('itm-content');
 const bulkStatus = document.getElementById('bulk-status');
@@ -67,7 +67,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateBulkStatus(roundData.bulkScore || 0); // 更新負重
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData); // 【核心修改】使用新的物品渲染函式
+    renderInventory(roundData); // 使用新的物品渲染函式
     
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
@@ -203,7 +203,7 @@ function highlightNpcNames(text, npcs) {
     return highlightedText;
 }
 
-// 【核心新增】物品渲染邏輯
+// 物品渲染邏輯
 function renderInventory(roundData) {
     if (!itmContent) return;
     itmContent.innerHTML = '';
@@ -212,26 +212,24 @@ function renderInventory(roundData) {
     const equipment = roundData.equipment || {};
     const inventory = roundData.inventory || [];
 
-    const allItems = [
-        ...Object.values(equipment).filter(Boolean), // 過濾掉null的已裝備物品
-        ...inventory.map(item => item.instanceId)
-    ];
-    
-    // 簡單地去重，因為雙手武器可能在equipment中出現兩次
-    const uniqueItemIds = [...new Set(allPlayerItems)];
-    
-    // 將所有物品的完整資料存入一個map，方便查找
-    const itemMasterList = {};
-    Object.values(equipment).filter(Boolean).forEach(item => itemMasterList[item.instanceId] = item);
-    inventory.forEach(item => itemMasterList[item.instanceId] = item);
+    // 合併所有物品的ID，並確保唯一性
+    const equippedItemIds = Object.values(equipment).filter(item => item && item.instanceId).map(item => item.instanceId);
+    const inventoryItemIds = inventory.map(item => item.instanceId);
+    const allItemIds = [...new Set([...equippedItemIds, ...inventoryItemIds])];
 
+    // 建立一個包含所有物品完整數據的Map，方便查找
+    const itemMasterList = new Map();
+    Object.values(equipment).filter(item => item && item.instanceId).forEach(item => itemMasterList.set(item.instanceId, item));
+    inventory.forEach(item => itemMasterList.set(item.instanceId, item));
 
     // 排序：已裝備的在前，背包在後
-    const sortedItemIds = uniqueItemIds.sort((a, b) => {
-        const itemA = itemMasterList[a];
-        const itemB = itemMasterList[b];
-        const equippedA = Object.values(equipment).some(eq => eq && eq.instanceId === a);
-        const equippedB = Object.values(equipment).some(eq => eq && eq.instanceId === b);
+    const sortedItemIds = allItemIds.sort((a, b) => {
+        const itemA = itemMasterList.get(a);
+        const itemB = itemMasterList.get(b);
+        if (!itemA || !itemB) return 0;
+
+        const equippedA = equippedItemIds.includes(a);
+        const equippedB = equippedItemIds.includes(b);
         
         if (equippedA && !equippedB) return -1;
         if (!equippedA && equippedB) return 1;
@@ -249,14 +247,15 @@ function renderInventory(roundData) {
     }
 
     sortedItemIds.forEach(itemId => {
-        const item = itemMasterList[itemId];
+        const item = itemMasterList.get(itemId);
         if(!item) return;
 
-        const isEquipped = Object.values(equipment).some(eq => eq && eq.instanceId === item.instanceId);
+        const isEquipped = equippedItemIds.includes(item.instanceId);
         const itemEl = createItemEntry(item, isEquipped, equipment);
         itmContent.appendChild(itemEl);
     });
 }
+
 
 function createItemEntry(item, isEquipped, equipment) {
     const entry = document.createElement('div');
@@ -295,39 +294,34 @@ function createItemEntry(item, isEquipped, equipment) {
 }
 
 async function handleEquipToggle(itemId, shouldEquip, slot) {
-    gameState.isRequesting = true; // 開始請求
+    gameState.isRequesting = true;
     try {
         const payload = {
             itemId: itemId,
             equip: shouldEquip,
-            slot: slot // 卸下時需要槽位資訊
+            slot: slot
         };
-        // 注意：這裡我們直接呼叫api.js中的函式
         const result = await api.equipItem(payload); 
 
         if (result.success && result.playerState) {
-            // 成功後，使用回傳的最新狀態重新渲染UI
-            // 這裡需要一個方法來更新整個玩家的 roundData.inventory 和 equipment
-            // 為了簡化，我們先重新渲染物品列表
              gameState.roundData.inventory = result.playerState.inventory;
              gameState.roundData.equipment = result.playerState.equipment;
              gameState.roundData.bulkScore = result.playerState.bulkScore;
              renderInventory(gameState.roundData);
              updateBulkStatus(gameState.roundData.bulkScore);
-
         } else {
             throw new Error(result.message || '操作失敗');
         }
     } catch (error) {
         console.error('裝備操作失敗:', error);
-        // 操作失敗，可能需要將開關恢復原狀或提示使用者
         handleApiError(error);
+        // 操作失敗時，重新渲染一次以恢復UI到正確狀態
+        renderInventory(gameState.roundData);
     } finally {
-        gameState.isRequesting = false; // 結束請求
+        gameState.isRequesting = false;
     }
 }
 
-// 錯誤處理
 export function handleApiError(error) {
     console.error('API 錯誤:', error);
     appendMessageToStory(`[系統] 連接失敗... (${error.message})`, 'system-message');
