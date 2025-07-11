@@ -74,6 +74,7 @@ router.get('/world-map', async (req, res) => {
                 else if(loc.address.region && loc.address.country) parentName = loc.address.country;
             }
 
+            // 處理父子層級關係
             if (parentName && idMap.has(parentName)) {
                 const parentSafeId = idMap.get(parentName);
                 const childSafeId = loc.safeId;
@@ -84,11 +85,14 @@ router.get('/world-map', async (req, res) => {
                 }
             }
 
+            // 【核心新增】處理同級地點連接關係
             if (loc.geography && Array.isArray(loc.geography.nearbyLocations)) {
                 loc.geography.nearbyLocations.forEach(neighbor => {
                     if (neighbor.name && idMap.has(neighbor.name)) {
                         const sourceSafeId = loc.safeId;
                         const targetSafeId = idMap.get(neighbor.name);
+                        
+                        // 確保連接線不重複繪製 (A-B 和 B-A 視為同一條)
                         const sortedIds = [sourceSafeId, targetSafeId].sort();
                         const linkKey = `${sortedIds[0]}---${sortedIds[1]}`;
 
