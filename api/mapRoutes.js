@@ -40,7 +40,7 @@ router.get('/world-map', async (req, res) => {
         };
 
         locations.forEach(loc => {
-            mermaidSyntax += `    ${loc.id}("${loc.locationName}");\n`;
+            mermaidSyntax += `    ${loc.id}["${loc.locationName}"];\n`;
             if (typeStyles[loc.locationType]) {
                 mermaidSyntax += `    style ${loc.id} ${typeStyles[loc.locationType]};\n`;
             }
