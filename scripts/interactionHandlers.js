@@ -48,7 +48,6 @@ function showNpcInteractionMenu(targetElement, npcName, isDeceased = false) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
-// 第一層：顯示戰鬥意圖選項
 function showAttackIntention(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
@@ -62,7 +61,6 @@ function showAttackIntention(event) {
     });
 }
 
-// 第二層：顯示最終確認
 function showFinalConfirmation(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
@@ -78,7 +76,6 @@ function showFinalConfirmation(event) {
         e.stopPropagation();
         const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
         if (originalTarget) {
-            // 【核心修正】重新顯示菜單時，也從HTML標籤讀取死亡狀態
             const isDeceased = originalTarget.dataset.isDeceased === 'true';
             showNpcInteractionMenu(originalTarget, npcName, isDeceased);
         } else {
@@ -104,7 +101,14 @@ function handleStrategySelection(strategy) {
 
     const playerSkills = gameState.combat.state?.player?.skills || [];
     
-    const categoryMap = { 'attack': '攻擊', 'defend': '防禦', 'evade': '迴避' };
+    // 【核心修改】擴充對應表，加入輔助和治癒
+    const categoryMap = { 
+        'attack': '攻擊', 
+        'defend': '防禦', 
+        'evade': '迴避',
+        'support': '輔助',
+        'heal': '治癒'
+    };
     const targetCategory = categoryMap[strategy];
 
     const relevantSkills = playerSkills.filter(skill => skill.combatCategory === targetCategory);
@@ -125,6 +129,7 @@ function handleStrategySelection(strategy) {
          skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
     }
     
+    // 迴避策略不需要選擇技能，可以直接確認
     if (strategy === 'evade') {
          if (confirmBtn) confirmBtn.disabled = false;
     }
@@ -276,7 +281,6 @@ export function handleNpcClick(event) {
 
     if (targetIsNpc) {
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
-        // 【核心修正】直接從點擊的HTML元素上讀取死亡狀態，這是最可靠的資訊來源
         const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
         showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
     } else if (!targetIsMenu) {
@@ -398,7 +402,7 @@ export async function handleConfirmCombatAction() {
         return;
     }
     
-    const hasRelevantSkills = (gameState.combat.state?.player?.skills || []).some(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避'}[gameState.combat.selectedStrategy]);
+    const hasRelevantSkills = (gameState.combat.state?.player?.skills || []).some(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避', support: '輔助', heal: '治癒'}[gameState.combat.selectedStrategy]);
 
     if (gameState.combat.selectedStrategy !== 'evade' && hasRelevantSkills && !gameState.combat.selectedSkill) {
         alert('請選擇一門武學！');
