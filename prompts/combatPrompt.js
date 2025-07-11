@@ -1,9 +1,9 @@
 // prompts/combatPrompt.js
 
 const getCombatPrompt = (playerProfile, combatState, playerAction) => {
-    const { strategy, skill: selectedSkillName } = playerAction;
+    const { strategy, skill: selectedSkillName, powerLevel } = playerAction;
     const skillsString = playerProfile.skills && playerProfile.skills.length > 0
-        ? playerProfile.skills.map(s => `${s.skillName} (等級: ${s.level}, 消耗內力: ${s.cost || 5})`).join('、')
+        ? playerProfile.skills.map(s => `${s.skillName} (等級: ${s.level}, 基礎消耗: ${s.cost || 5})`).join('、')
         : '無';
 
     const alliesString = combatState.allies && combatState.allies.length > 0
@@ -22,16 +22,15 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 你的首要職責是精準計算並更新所有參戰者的HP與MP。
 
 1.  **MP消耗計算 (玩家)**:
-    * 如果玩家使用了武學 (playerAction.skill 不為空)，你**必須**從玩家的MP中扣除該武學的 \`cost\`。你可以在 \`playerProfile.skills\` 陣列中找到每個武學的詳細資料，包括 \`cost\`。
-    * 如果玩家的MP不足以施展該武學，你必須在 \`narrative\` 中描述招式施展失敗，且玩家的HP和MP**不應**有任何變化。
+    * 如果玩家使用了武學 (playerAction.skill 不為空)，你**必須**根據玩家選擇的「成數(powerLevel)」來計算總消耗。
+    * **總消耗 = 該武學的基礎 \`cost\` * 玩家選擇的 \`powerLevel\`**。你可以在 \`playerProfile.skills\` 陣列中找到每個武學的基礎 \`cost\`。
+    * 如果玩家的MP不足以支付「總消耗」，你必須在 \`narrative\` 中描述招式因內力不濟而施展失敗，且玩家的HP和MP**不應**有任何變化。
     * 如果玩家沒有使用武學，則MP不變。
 
 2.  **傷害/治療計算 (Damage/Healing)**:
-    * 你必須根據策略互動的結果、雙方的武學等級與實力差距，估算一個**合理的數值**。
-    * **高屬性/高等級武學** 對 **低屬性/無防禦對手** 應造成**顯著傷害** (例如：HP減少30-50%)。
-    * **高屬性/高等級治療** 應提供**可觀的恢復** (例如：HP恢復25-40%)。
-    * **實力相當的對抗**，傷害應較為**溫和** (例如：HP減少10-20%)。
-    * **策略被克制** (如攻擊被防禦) 或 **無效行動** (如迴避對迴避)，傷害應為**零或極低** (例如：HP減少0-5%)。
+    * 招式的威力與玩家使用的「成數(powerLevel)」成正比。你必須根據策略互動的結果、雙方的實力差距、以及玩家投入的**成數**，估算一個合理的數值。
+    * **高成數**的招式應對低防禦對手造成**毀滅性傷害**。
+    * **低成數**的招式，即使克制對方，也只會造成**輕微傷害**。
 
 3.  **HP結算**:
     * 根據你計算出的數值，更新所有受影響角色的 \`hp\` 欄位。
@@ -56,7 +55,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     * **防禦 vs 防禦**: 雙方對峙，無事發生。
     * **迴避 vs 迴避**: 雙方互相試探，拉開距離，無事發生。
 
-### 【核心新增】戰略行動規則 (治癒與輔助):
+### 戰略行動規則 (治癒與輔助):
 「治癒(Heal)」和「輔助(Support)」是獨立於三角克制之外的戰略行動。它們不克制任何行動，也不被任何行動克制，其結果由對手的行動決定。
 
 5.  **治癒/輔助 vs 攻擊**:
@@ -76,16 +75,8 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 1.  **禁止直接提及遊戲機制**: 絕對不要在 narrative 中提到「策略鐵三角」、「克制」、「HP」、「MP」、「造成了XX點傷害」等遊戲術語。
 2.  **生動描述動作**: 描述角色是如何移動、出招、防禦或閃避的。
-    * **劣例**: 玩家使用了「攻擊」策略。
-    * **佳例**: 「你眼神一凜，踏步向前，攻勢如虹！」
-3.  **融入數據於描述中**: 將數值變化巧妙地融入故事描述。
-    * **劣例**: "王大夫的HP從80降至40，總共減少了40點。"
-    * **佳例**: 「王大夫胸口如遭重擊，踉蹌退了數步，臉色瞬間蒼白了幾分（氣血從80降至40）。」
-    * **劣例**: "你消耗了5點MP。"
-    * **佳例**: 「你運起「現代搏擊」的心法，頓時感到丹田一空（內力消耗5點）。」
-4.  **結果導向的描述**: 根據「策略鐵三角」的結果來描述劇情，而不是解釋規則。
-    * **劣例**: "因為攻擊克制迴避，所以你的攻擊命中了。"
-    * **佳例**: 「王大夫雖想閃避，但你的攻勢早已封鎖了他所有退路，他只能眼睜睜看著拳風襲來！」
+3.  **融入數據於描述中**: 將數值變化巧妙地融入故事描述。例如：「王大夫胸口如遭重擊，踉蹌退了數步，臉色瞬間蒼白了幾分（氣血從80降至40）。」
+4.  **結果導向的描述**: 根據策略互動的結果來描述劇情，而不是解釋規則。例如：「王大夫雖想閃避，但你的攻勢早已封鎖了他所有退路，他只能眼睜睜看著拳風襲來！」
 5.  **保持簡潔有力**: 每回合的描述應控制在100-150字左右，保持戰鬥節奏。
 
 
@@ -110,6 +101,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 * **玩家決策**:
     * 策略: **${strategy}**
     * 使用武學: **${selectedSkillName || '無'}**
+    * **使用成數: ${powerLevel} 成**
 * **敵人應對策略 (由你隨機決定)**:
     * 策略: **${enemyStrategy}**
 
