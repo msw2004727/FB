@@ -47,48 +47,14 @@ async function getMergedNpcProfile(userId, npcName) {
 }
 
 
+// 【核心修正】此函式現在只負責在背景創建通用模板，不再處理玩家個人狀態
 async function createNpcProfileInBackground(userId, username, npcData, roundData, playerProfile) {
     const npcName = npcData.name;
-    console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動建檔程序...`);
     try {
         const npcTemplateRef = db.collection('npcs').doc(npcName);
-        const playerNpcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
-
-        // --- 【核心修正】無論文件是否存在，都嘗試寫入基礎欄位，以修復競爭條件 ---
-        // 使用 { merge: true } 可以確保我們只添加缺失的欄位，而不會覆蓋已有的欄位（如 friendlinessValue）。
-        const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
-        const initialOrMissingState = {
-            friendlinessValue: admin.firestore.FieldValue.increment(0), // 確保欄位存在，但不改變現有值
-            romanceValue: admin.firestore.FieldValue.increment(0),
-            interactionSummary: `你與${npcName}的交往尚淺。`,
-            currentLocation: encounterLocation,
-            firstMet: { round: roundData.R, time: `${roundData.yearName}${roundData.year}-${roundData.month}-${roundData.day} ${roundData.timeOfDay}`, location: encounterLocation, event: roundData.EVT },
-            isDeceased: false,
-            inventory: {}
-        };
-        
-        const stateDoc = await playerNpcStateRef.get();
-        if (stateDoc.exists) {
-            // 如果文件已存在，我們只更新那些可能缺失的欄位
-            const updates = {};
-            if (stateDoc.data().interactionSummary === undefined) updates.interactionSummary = initialOrMissingState.interactionSummary;
-            if (stateDoc.data().currentLocation === undefined) updates.currentLocation = initialOrMissingState.currentLocation;
-            if (stateDoc.data().firstMet === undefined) updates.firstMet = initialOrMissingState.firstMet;
-            if (stateDoc.data().isDeceased === undefined) updates.isDeceased = initialOrMissingState.isDeceased;
-            if (stateDoc.data().inventory === undefined) updates.inventory = initialOrMissingState.inventory;
-            
-            if (Object.keys(updates).length > 0) {
-                await playerNpcStateRef.update(updates);
-                console.log(`[NPC系統] 已為玩家 ${userId} 的現有NPC「${npcName}」補全了基礎檔案。`);
-            }
-        } else {
-            // 如果文件不存在，則創建完整的初始檔案
-            await playerNpcStateRef.set(initialOrMissingState);
-            console.log(`[NPC系統] 已為玩家 ${userId} 即時初始化了與「${npcName}」的完整關係檔案，地點設為: ${encounterLocation}`);
-        }
-        // --- 修正結束 ---
-
         let templateDoc = await npcTemplateRef.get();
+        
+        // 如果通用模板不存在，才在背景繼續執行AI生成
         if (!templateDoc.exists) {
             console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
@@ -99,6 +65,7 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
             newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             
+            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
             if (!newTemplateData.currentLocation) {
                  newTemplateData.currentLocation = encounterLocation;
             }
@@ -109,6 +76,8 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             if (newTemplateData.relationships) {
                 await processNpcRelationships(userId, npcName, newTemplateData.relationships);
             }
+        } else {
+             console.log(`[NPC系統] 「${npcName}」的通用模板已存在，跳過背景生成。`);
         }
     } catch (error) {
         console.error(`[NPC系統] 為 "${npcName}" 進行背景建檔時發生錯誤:`, error);
@@ -121,9 +90,14 @@ async function updateFriendlinessValues(userId, npcChanges) {
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const promises = npcChanges.map(async (change) => {
         if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) return;
+        
+        // 我們不再關心 change.isNew，因為基礎檔案已由 interactionRoutes 創建
         const npcStateDocRef = playerNpcStatesRef.doc(change.name);
         try {
-            await npcStateDocRef.set({ friendlinessValue: admin.firestore.FieldValue.increment(change.friendlinessChange) }, { merge: true });
+            // 直接使用 set + merge 來安全地增加友好度
+            await npcStateDocRef.set({ 
+                friendlinessValue: admin.firestore.FieldValue.increment(change.friendlinessChange) 
+            }, { merge: true });
         } catch (error) {
             console.error(`[友好度系統] 更新與NPC "${change.name}" 的關係時出錯:`, error);
         }
