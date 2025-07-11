@@ -117,22 +117,6 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// 【核心修改】getAIStory 現在只接收 playerModelChoice 和一個 context 物件
-async function getAIStory(playerModelChoice, context, playerAction) {
-    // 【核心修改】所有需要的資料都從 context 物件中傳遞給 storyPrompt
-    const prompt = getStoryPrompt(context, playerAction);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.story;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 故事大師任務:", error);
-        return null;
-    }
-}
-
-// (其他函式保持不變，此處為求完整性全部列出)
-
 // 新增的函式，專門處理時代錯置的回應
 async function getAIAnachronismResponse(playerModelChoice, playerAction, anachronisticItem) {
     const prompt = getAnachronismPrompt(playerAction, anachronisticItem);
@@ -165,6 +149,18 @@ async function getAISummary(oldSummary, newRoundData) {
     } catch (error) {
         console.error("[AI 任務失敗] 檔案管理員任務:", error);
         return oldSummary;
+    }
+}
+
+async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, worldEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates) {
+    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, worldEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.story;
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error("[AI 任務失敗] 故事大師任務:", error);
+        return null;
     }
 }
 
@@ -240,17 +236,13 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
     const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChatSummary;
-        // 【核心修改】接收AI回傳的JSON字串
-        const text = await callAI(modelToUse, prompt, true);
-        // 【核心修改】解析JSON後再回傳
-        return parseJsonResponse(text);
+        const summary = await callAI(modelToUse, prompt, false);
+        return summary.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 摘要師任務:", error);
-        // 【核心修改】回傳一個符合新格式的預設值
-        return { story: `你與${npcName}進行了一番交談。`, evt: `與${npcName}的一席話` };
+        return `我與${npcName}進行了一番交談。`;
     }
 }
-
 
 async function getAICombatAction(playerModelChoice, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
