@@ -17,7 +17,7 @@ const lightnessPowerValue = document.getElementById('lightness-power-value');
 const staminaBar = document.getElementById('stamina-bar');
 const staminaValue = document.getElementById('stamina-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
-const locationInfo = document.getElementById('location-info');
+const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
 const itmContent = document.getElementById('itm-content');
 const bulkStatus = document.getElementById('bulk-status');
@@ -64,10 +64,10 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateDeathCountdownUI(roundData.deathCountdown);
     updatePowerBars(roundData);
     updateMoralityBar(roundData.morality);
-    updateBulkStatus(roundData.bulkScore || 0); // 更新負重
+    updateBulkStatus(roundData.bulkScore || 0); 
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData); // 使用新的物品渲染函式
+    renderInventory(roundData);
     
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
@@ -203,27 +203,29 @@ function highlightNpcNames(text, npcs) {
     return highlightedText;
 }
 
-// 物品渲染邏輯
 function renderInventory(roundData) {
     if (!itmContent) return;
     itmContent.innerHTML = '';
     if (moneyContent) moneyContent.textContent = `${roundData.money || 0} 文錢`;
 
     const equipment = roundData.equipment || {};
-    const inventory = roundData.inventory || [];
+    const inventory = roundData.inventory || []; // 現在這是一個包含完整物品物件的陣列
 
-    // 合併所有物品的ID，並確保唯一性
-    const equippedItemIds = Object.values(equipment).filter(item => item && item.instanceId).map(item => item.instanceId);
-    const inventoryItemIds = inventory.map(item => item.instanceId);
-    const allItemIds = [...new Set([...equippedItemIds, ...inventoryItemIds])];
+    const equippedItemIds = Object.values(equipment)
+        .filter(item => item && item.instanceId)
+        .map(item => item.instanceId);
 
-    // 建立一個包含所有物品完整數據的Map，方便查找
-    const itemMasterList = new Map();
-    Object.values(equipment).filter(item => item && item.instanceId).forEach(item => itemMasterList.set(item.instanceId, item));
-    inventory.forEach(item => itemMasterList.set(item.instanceId, item));
+    const allItems = [...inventory];
+    // 將裝備中的物品也加入到總列表中，如果它們不在背包裡的話
+    Object.values(equipment).forEach(equippedItem => {
+        if (equippedItem && !allItems.some(invItem => invItem.instanceId === equippedItem.instanceId)) {
+            allItems.push(equippedItem);
+        }
+    });
 
-    // 排序：已裝備的在前，背包在後
-    const sortedItemIds = allItemIds.sort((a, b) => {
+    const itemMasterList = new Map(allItems.map(item => [item.instanceId, item]));
+
+    const sortedItemIds = [...itemMasterList.keys()].sort((a, b) => {
         const itemA = itemMasterList.get(a);
         const itemB = itemMasterList.get(b);
         if (!itemA || !itemB) return 0;
@@ -263,6 +265,7 @@ function createItemEntry(item, isEquipped, equipment) {
     entry.dataset.id = item.instanceId;
 
     let equipControls = '';
+    // 只有可裝備的物品才顯示開關
     if (item.equipSlot) {
         const currentSlot = Object.keys(equipment).find(key => equipment[key] && equipment[key].instanceId === item.instanceId);
         const slotIcon = currentSlot ? (slotConfig[currentSlot]?.icon || 'fa-question-circle') : '';
@@ -280,8 +283,11 @@ function createItemEntry(item, isEquipped, equipment) {
 
     entry.innerHTML = `
         <div class="item-info">
-            <span class="item-name">${item.itemName}</span>
-            ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
+             <i class="item-icon fa-solid ${item.icon || 'fa-box'}"></i>
+            <div>
+                 <span class="item-name">${item.itemName}</span>
+                 ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
+            </div>
         </div>
         ${equipControls}
     `;
@@ -315,7 +321,6 @@ async function handleEquipToggle(itemId, shouldEquip, slot) {
     } catch (error) {
         console.error('裝備操作失敗:', error);
         handleApiError(error);
-        // 操作失敗時，重新渲染一次以恢復UI到正確狀態
         renderInventory(gameState.roundData);
     } finally {
         gameState.isRequesting = false;
