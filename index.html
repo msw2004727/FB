@@ -121,7 +121,7 @@
                 
                 <div class="info-card">
                     <div class="card-header-flex">
-                        <h4><i class="fas fa-map"></i> 當前地區</h4>
+                        <h4><i class="fas fa-map"></i> 當前地区</h4>
                         <div class="header-action-group">
                             <span class="header-prompt-text">世界地圖→</span>
                             <a href="map.html" target="_blank" id="map-btn" class="header-icon-btn" title="查看世界地圖">
@@ -231,10 +231,15 @@
                     <div class="combat-actions-container">
                         <div id="combat-turn-counter" class="combat-turn-counter"></div>
                         <div id="combat-actions-panel" class="combat-actions-panel">
-                            <div id="strategy-buttons" class="strategy-buttons"></div>
+                            <div id="strategy-buttons" class="strategy-buttons">
+                                <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
+                                <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
+                                <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
+                                <button class="strategy-btn" data-strategy="support"><i class="fas fa-hands-helping"></i> 輔助</button>
+                                <button class="strategy-btn" data-strategy="heal"><i class="fas fa-briefcase-medical"></i> 治癒</button>
+                            </div>
                             <div id="skill-selection" class="skill-selection"></div>
-                            <div id="confirm-action" class="confirm-action">
-                                 </div>
+                            <div id="confirm-action" class="confirm-action"></div>
                         </div>
                     </div>
                 </div>
