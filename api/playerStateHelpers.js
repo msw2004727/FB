@@ -98,10 +98,10 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
             }
         } else if (action === 'remove') {
             const docRef = userInventoryRef.doc(itemName);
-            const doc = await docRef.get(); // Must read before write in transaction/batch for stackable
+            const doc = await docRef.get();
             if (isStackable && doc.exists && doc.data().quantity > quantity) {
                 batch.update(docRef, { quantity: admin.firestore.FieldValue.increment(-quantity) });
-            } else { // Remove completely if not stackable or quantity becomes <= 0
+            } else {
                 batch.delete(docRef);
             }
         }
@@ -116,7 +116,7 @@ async function getInventoryState(userId) {
     if (snapshot.empty) return { money: 0, itemsString: '身無長物' };
     let money = 0;
     const itemCounts = {};
-    for (const doc of snapshot.docs) {
+    for(const doc of snapshot.docs){
         const item = doc.data();
         const itemName = item.templateId;
         if (itemName === '銀兩' || itemName === '賞金') {
@@ -147,20 +147,80 @@ async function getRawInventory(userId) {
 }
 
 async function updateSkills(userId, skillChanges, playerProfile) {
-    // ... (rest of the function is identical to the one in gameHelpers.js)
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
+
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
     const userDocRef = db.collection('users').doc(userId);
     const levelUpEvents = [];
     let customSkillCreationResult = null;
+
     for (const skillChange of skillChanges) {
         const playerSkillDocRef = playerSkillsRef.doc(skillChange.skillName);
         try {
             await db.runTransaction(async (transaction) => {
+                const latestPlayerProfile = (await transaction.get(userDocRef)).data();
+
                 if (skillChange.isNewlyAcquired) {
-                    // Complex logic for skill creation and learning...
+                    const acquisitionMethod = skillChange.acquisitionMethod || 'created'; 
+
+                    if (acquisitionMethod === 'created') {
+                        const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                        if (!templateResult || !templateResult.template) {
+                            console.error(`無法為「${skillChange.skillName}」獲取或生成模板，跳過。`);
+                            return;
+                        }
+
+                        if (templateResult.isNew) {
+                            const powerType = templateResult.template.power_type || 'none';
+                            const maxPowerAchieved = latestPlayerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
+                            const createdSkillsCount = latestPlayerProfile.customSkillsCreated?.[powerType] || 0;
+                            const totalCreatedSkills = Object.values(latestPlayerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
+                            const availableSlots = Math.floor(maxPowerAchieved / 100);
+
+                            if (totalCreatedSkills >= 10) {
+                                customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
+                                return;
+                            }
+
+                            if (createdSkillsCount >= availableSlots) {
+                                customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                                return;
+                            }
+
+                            transaction.update(userDocRef, { [`customSkillsCreated.${powerType}`]: admin.firestore.FieldValue.increment(1) });
+                            customSkillCreationResult = { success: true };
+                        }
+                    }
+                    
+                    if (customSkillCreationResult === null || customSkillCreationResult.success) {
+                        const playerSkillData = { level: skillChange.level || 0, exp: skillChange.exp || 0, lastPractice: admin.firestore.FieldValue.serverTimestamp() };
+                        transaction.set(playerSkillDocRef, playerSkillData);
+                        console.log(`[武學系統] 玩家 ${userId} 習得新武學: ${skillChange.skillName}`);
+                    }
+
                 } else if (skillChange.expChange > 0) {
-                    // Complex logic for skill EXP and level up...
+                    const playerSkillDoc = await transaction.get(playerSkillDocRef);
+                    if (!playerSkillDoc.exists) return;
+                    
+                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                    if (!templateResult?.template) return;
+                    
+                    let { level = 0, exp = 0 } = playerSkillDoc.data();
+                    const { max_level = 10 } = templateResult.template;
+
+                    if (level >= max_level) return;
+
+                    exp += skillChange.expChange;
+                    let requiredExp = level * 100 + 100;
+
+                    while (exp >= requiredExp && level < max_level) {
+                        level++;
+                        exp -= requiredExp;
+                        levelUpEvents.push({ skillName: skillChange.skillName, levelUpTo: level });
+                        requiredExp = level * 100 + 100;
+                    }
+                    transaction.update(playerSkillDocRef, { level, exp });
+                    console.log(`[武學系統] 玩家 ${userId} 修練 ${skillChange.skillName}，熟練度增加 ${skillChange.expChange}。`);
                 }
             });
         } catch (error) {
@@ -169,6 +229,7 @@ async function updateSkills(userId, skillChanges, playerProfile) {
     }
     return { levelUpEvents, customSkillCreationResult };
 }
+
 
 async function getPlayerSkills(userId) {
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
