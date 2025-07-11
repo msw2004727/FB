@@ -374,7 +374,7 @@ router.post('/end-chat', async (req, res) => {
         }
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         
-        const chatSummaryResult = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
+        const chatSummaryResult = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary);
         
         const newRoundNumber = lastRoundData.R + 1;
         let newRoundData = { ...lastRoundData, R: newRoundNumber };
