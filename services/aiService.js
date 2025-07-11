@@ -232,17 +232,21 @@ async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, pla
     }
 }
 
-async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory) {
-    const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory);
+async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary) {
+    const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory, longTermSummary);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChatSummary;
-        const summary = await callAI(modelToUse, prompt, false);
-        return summary.replace(/["“”]/g, '');
+        const text = await callAI(modelToUse, prompt, true); // 要求回傳JSON
+        return parseJsonResponse(text); // 解析JSON
     } catch (error) {
         console.error("[AI 任務失敗] 摘要師任務:", error);
-        return `我與${npcName}進行了一番交談。`;
+        return {
+            story: `你與${npcName}進行了一番交談，但其中的細節已隨風而逝，只留下模糊的印象。`,
+            evt: `與${npcName}的一席話`
+        };
     }
 }
+
 
 async function getAICombatAction(playerModelChoice, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
