@@ -22,10 +22,20 @@ router.get('/world-map', async (req, res) => {
 
         const discoveredLocationNames = playerLocationsSnapshot.docs.map(doc => doc.id);
         
+        // 【核心修正】將單次查詢改為分塊查詢，以突破30個地點的限制
         const locationsRef = db.collection('locations');
-        const knownLocationsSnapshot = await locationsRef.where(admin.firestore.FieldPath.documentId(), 'in', discoveredLocationNames).get();
+        const allKnownDocs = [];
+        const chunkSize = 30; // Firestore 'in' 查詢的上限是30
 
-        if (knownLocationsSnapshot.empty) {
+        for (let i = 0; i < discoveredLocationNames.length; i += chunkSize) {
+            const chunk = discoveredLocationNames.slice(i, i + chunkSize);
+            if (chunk.length > 0) {
+                const chunkSnapshot = await locationsRef.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+                chunkSnapshot.forEach(doc => allKnownDocs.push(doc));
+            }
+        }
+        
+        if (allKnownDocs.length === 0) {
             return res.json({ mermaidSyntax: 'graph TD;\n    A["輿圖遺失，無法繪製"];' });
         }
         
@@ -33,7 +43,7 @@ router.get('/world-map', async (req, res) => {
         const idMap = new Map();
         let mermaidIdCounter = 0;
 
-        knownLocationsSnapshot.forEach(doc => {
+        allKnownDocs.forEach(doc => {
             const originalId = doc.id;
             const safeId = `loc${mermaidIdCounter++}`;
             idMap.set(originalId, safeId);
@@ -65,7 +75,6 @@ router.get('/world-map', async (req, res) => {
         mermaidSyntax += '\n    %% --- Link Definitions ---\n';
         const definedLinks = new Set();
         locations.forEach((loc) => {
-            // 【核心修改】增加從 address 推斷 parent 的後備邏輯
             let parentName = loc.parentLocation;
             if (!parentName && loc.address) {
                 if(loc.address.town && loc.address.district) parentName = loc.address.district;
@@ -74,7 +83,6 @@ router.get('/world-map', async (req, res) => {
                 else if(loc.address.region && loc.address.country) parentName = loc.address.country;
             }
 
-            // 處理父子層級關係
             if (parentName && idMap.has(parentName)) {
                 const parentSafeId = idMap.get(parentName);
                 const childSafeId = loc.safeId;
@@ -85,14 +93,12 @@ router.get('/world-map', async (req, res) => {
                 }
             }
 
-            // 【核心新增】處理同級地點連接關係
             if (loc.geography && Array.isArray(loc.geography.nearbyLocations)) {
                 loc.geography.nearbyLocations.forEach(neighbor => {
                     if (neighbor.name && idMap.has(neighbor.name)) {
                         const sourceSafeId = loc.safeId;
                         const targetSafeId = idMap.get(neighbor.name);
                         
-                        // 確保連接線不重複繪製 (A-B 和 B-A 視為同一條)
                         const sortedIds = [sourceSafeId, targetSafeId].sort();
                         const linkKey = `${sortedIds[0]}---${sortedIds[1]}`;
 
