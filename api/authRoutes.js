@@ -78,7 +78,7 @@ router.post('/register', async (req, res) => {
             moralityChange: 0,
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
             EVT: '從天旋地轉中醒來，靈魂墜入陌生的時代',
-            LOC: ['無名村'], // 【核心修改】
+            LOC: ['無名村'],
             PSY: '頭痛欲裂...我不是在滑手機嗎？這身體不是我的！這裡是哪裡？這是什麼時代？',
             PC: '你身受重傷，氣息虛弱，似乎不久於人世。',
             story: '最後的印象，是指尖在冰冷螢幕上的飛速滑動，社交軟體的資訊流在眼前如瀑布般刷過。下一瞬，難以言喻的暈眩感猛然來襲，世界在你眼前扭曲、碎裂，一陣劇烈的天旋地轉後，意識如風中殘燭般徹底陷入黑暗。\n\n你在一股濃重刺鼻的藥草味中勉強睜開雙眼，映入眼簾的，不再是熟悉的螢幕光，而是一盞昏黃的油燈，照著四周斑駁的牆面與層層疊疊、標示著陌生藥名的木櫃。你正躺在一張簡陋的木板床上，每一次呼吸都牽動著撕心裂肺的劇痛，四肢百骸彷彿不屬於自己。\n\n「我不是在滑手機嗎？」這個念頭在你腦中一閃而過，卻顯得如此荒謬。關於這個世界的記憶一片空白，你是誰？為何在此？無從得知。你只清楚記得自己來自一個截然不同的世界。\n\n身旁，一位年逾五旬、留著山羊鬍的郎中正為你沉聲診脈，他眉頭緊鎖，那雙深邃的眼眸中，除了對你傷勢的憂慮，似乎還隱藏著一絲驚疑與不為人知的秘密。\n\n環顧這間陌生的藥鋪，遠方隱約傳來雞鳴犬吠，你意識到自己被困在了這個名為「無名村」的未知之地。過去已然斷裂，前路一片迷茫，你的人生，就從這副重傷的軀體與滿腹的疑問中，被迫展開了……',
@@ -136,6 +136,7 @@ router.post('/login', async (req, res) => {
 
         const userDoc = userSnapshot.docs[0];
         const userData = userDoc.data();
+        const userId = userDoc.id;
 
         if (userData.isDeceased === true) {
             return res.status(403).json({ message: '此名號的主人已身故，其傳奇已載入史冊。請另創名號再戰江湖。' });
@@ -146,32 +147,80 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
 
-        const updates = {};
-        let needsUpdate = false;
+        // --- 登入時的資料庫健康檢查與修補 ---
+        const batch = db.batch();
+        let needsMainDocUpdate = false;
 
+        // 1. 檢查並修補玩家主檔案
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
-                needsUpdate = true;
+                needsMainDocUpdate = true;
+                const updatePayload = {};
                 if (field === 'maxInternalPowerAchieved') {
-                    updates[field] = userData.internalPower || defaultValue;
+                    updatePayload[field] = userData.internalPower || defaultValue;
                 } else if (field === 'maxExternalPowerAchieved') {
-                    updates[field] = userData.externalPower || defaultValue;
+                    updatePayload[field] = userData.externalPower || defaultValue;
                 } else if (field === 'maxLightnessAchieved') {
-                    updates[field] = userData.lightness || defaultValue;
+                    updatePayload[field] = userData.lightness || defaultValue;
                 } else {
-                    updates[field] = defaultValue;
+                    updatePayload[field] = defaultValue;
                 }
-                console.log(`[資料庫維護] 玩家 ${username} 缺少欄位 [${field}]，將自動補全為預設值。`);
+                batch.update(userDoc.ref, updatePayload);
+                console.log(`[資料庫維護] 玩家 ${username} 缺少欄位 [${field}]，已加入批次更新。`);
+            }
+        }
+        
+        // 2. 【核心新增】檢查並修補玩家的所有NPC狀態檔案
+        const npcStatesSnapshot = await userDoc.ref.collection('npc_states').get();
+        if (!npcStatesSnapshot.empty) {
+            console.log(`[資料庫維護] 開始為 ${username} 檢查 ${npcStatesSnapshot.size} 位NPC的舊資料...`);
+            for (const npcDoc of npcStatesSnapshot.docs) {
+                const npcData = npcDoc.data();
+                const npcName = npcDoc.id;
+                const updatePayload = {};
+                let needsNpcUpdate = false;
+                
+                // 檢查是否缺少關鍵欄位
+                if (npcData.interactionSummary === undefined) {
+                    needsNpcUpdate = true;
+                    updatePayload.interactionSummary = `你與${npcName}的交往尚淺。`;
+                }
+                if (npcData.currentLocation === undefined) {
+                    needsNpcUpdate = true;
+                    updatePayload.currentLocation = '未知之地'; // 提供一個安全的預設值
+                }
+                 if (npcData.firstMet === undefined) {
+                    needsNpcUpdate = true;
+                    updatePayload.firstMet = { round: 0, time: '未知時間', location: '未知地點', event: '初次相遇' };
+                }
+                if (npcData.isDeceased === undefined) {
+                    needsNpcUpdate = true;
+                    updatePayload.isDeceased = false;
+                }
+                 if (npcData.inventory === undefined) {
+                    needsNpcUpdate = true;
+                    updatePayload.inventory = {};
+                }
+                if (npcData.romanceValue === undefined) {
+                    needsNpcUpdate = true;
+                    updatePayload.romanceValue = 0;
+                }
+
+                if (needsNpcUpdate) {
+                    console.log(`[資料庫維護] NPC「${npcName}」的檔案不完整，已加入批次修補。`);
+                    batch.set(npcDoc.ref, updatePayload, { merge: true });
+                }
             }
         }
 
-        if (needsUpdate) {
-            await userDoc.ref.update(updates);
-            console.log(`[資料庫維護] 已成功為 ${username} 自動更新資料結構。`);
+        // 執行所有批次更新
+        await batch.commit();
+        if (needsMainDocUpdate || !npcStatesSnapshot.empty) {
+            console.log(`[資料庫維護] 已成功為 ${username} 自動更新並修補資料結構。`);
         }
 
         const token = require('jsonwebtoken').sign(
-            { userId: userDoc.id, username: userData.username },
+            { userId: userId, username: userData.username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
