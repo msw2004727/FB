@@ -30,7 +30,6 @@ const skillsContent = document.getElementById('skills-content');
 
 export function appendMessageToStory(htmlContent, className) {
     const p = document.createElement('p');
-    // 【核心修改】在設定HTML內容前，先將換行符 \n 替換為 <br> 標籤
     if (typeof htmlContent === 'string') {
         p.innerHTML = htmlContent.replace(/\n/g, '<br>');
     } else {
@@ -92,11 +91,20 @@ function updateMoralityBar(moralityValue) {
     }
 }
 
-function updatePowerBar(barElement, valueElement, currentValue, maxValue) {
+function updatePowerBar(barElement, valueElement, currentValue, maxValue, barId = '') {
     if (barElement && valueElement) {
         const percentage = Math.min(((currentValue || 0) / maxValue) * 100, 100);
         barElement.style.width = `${percentage}%`;
         valueElement.textContent = `${currentValue || 0}/${maxValue}`;
+
+        // 【核心修正】在這裡加入精力警示的邏輯
+        if (barId === 'stamina-bar') {
+            if (currentValue < 30) {
+                barElement.classList.add('low-stamina');
+            } else {
+                barElement.classList.remove('low-stamina');
+            }
+        }
     }
 }
 
@@ -153,7 +161,8 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
-    updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100);
+    // 傳入第四個參數以識別精力條
+    updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100, 'stamina-bar');
 
     updateMoralityBar(roundData.morality);
 
@@ -171,7 +180,6 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
 
     npcContent.innerHTML = '';
     if (roundData.NPC && Array.isArray(roundData.NPC)) {
-        // 過濾掉已死亡的NPC，再渲染到側邊欄
         const aliveNpcs = roundData.NPC.filter(npc => !npc.isDeceased);
 
         if (aliveNpcs.length > 0) {
