@@ -2,8 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion } = require('../services/aiService');
-const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate, getAISummary } = require('./gameHelpers');
+const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion, getAISummary } = require('../services/aiService');
+const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
 const { getKnownNpcNames } = require('./cacheManager'); // 引入快取函式
 
 const db = admin.firestore();
@@ -387,7 +387,7 @@ router.post('/end-chat', async (req, res) => {
         newRoundData.suggestion = suggestion;
         
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
-        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundData.R });
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
