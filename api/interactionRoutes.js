@@ -85,15 +85,12 @@ const interactRouteHandler = async (req, res) => {
             throw new Error("主AI未能生成有效回應。");
         }
         
-        // --- 【核心新增】章回標題 (EVT) 強制修正機制 ---
         if (!aiResponse.roundData.EVT || aiResponse.roundData.EVT.trim() === '') {
             console.warn(`[後端修正] AI未能生成有效的章回標題(EVT)。正在從玩家行動「${playerAction}」中自動提取...`);
-            // 從玩家的行動中提取前8個字作為標題，如果行動本身很短，就用整個行動
             const fallbackEVT = playerAction.length > 8 ? playerAction.substring(0, 8) + '…' : playerAction;
             aiResponse.roundData.EVT = fallbackEVT;
             console.log(`[後端修正] 已自動生成後備標題: "${fallbackEVT}"`);
         }
-        // --- 修正結束 ---
         
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
         const userDocRef = db.collection('users').doc(userId);
@@ -105,6 +102,13 @@ const interactRouteHandler = async (req, res) => {
         
         // --- 精力系統邏輯 ---
         let newStamina = (player.stamina || 100) + staminaChange;
+        
+        // --- 【核心新增】基礎代謝精力消耗 ---
+        const basalMetabolismCost = Math.floor(Math.random() * 5) + 1; // 產生 1 到 5 的隨機整數
+        newStamina -= basalMetabolismCost;
+        console.log(`[精力系統] 行動消耗: ${staminaChange}, 基礎代謝消耗: -${basalMetabolismCost}`);
+        // --- 新增結束 ---
+
         const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇', '打坐'];
         const isResting = restKeywords.some(kw => playerAction.includes(kw));
         const timeDidAdvance = (aiDaysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
