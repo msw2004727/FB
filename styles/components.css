@@ -50,7 +50,7 @@ body.dark-theme .welcome-card {
     color: var(--light-accent);
     border-bottom: 1px solid var(--light-border);
     padding-bottom: 0.5rem;
-    font-weight: bold;
+    font-weight: bold; /* 【核心修正】重新將粗體樣式加回來 */
 }
 body.dark-theme .info-card h4 {
     color: var(--dark-accent);
@@ -137,9 +137,6 @@ body.dark-theme .card-header-flex {
     margin: 0;
     border-bottom: none;
     padding-bottom: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 /* --- 按鈕 --- */
@@ -300,7 +297,7 @@ body.dark-theme .action-suggestion {
     color: var(--dark-text-secondary);
 }
 
-/* --- NPC 姓名高亮樣式 --- */
+/* --- NPC 姓名高亮樣式 (7級友好度) --- */
 .npc-name {
     font-weight: bold;
     transition: color 0.3s ease;
@@ -418,26 +415,13 @@ body.dark-theme #internal-power-bar {
 body.dark-theme #external-power-bar {
     background-color: var(--external-power-color-dark);
 }
-#lightness-power-bar {
-    background-color: var(--lightness-power-color-light);
-}
-body.dark-theme #lightness-power-bar {
-    background-color: var(--lightness-power-color-dark);
-}
+/* 【核心新增】精力條樣式 */
 #stamina-bar {
     background-color: var(--stamina-color-light);
 }
 body.dark-theme #stamina-bar {
     background-color: var(--stamina-color-dark);
 }
-#stamina-bar.low-stamina {
-    background-color: var(--stamina-danger-color-light) !important;
-    animation: pulse-red 2s infinite ease-in-out;
-}
-body.dark-theme #stamina-bar.low-stamina {
-    background-color: var(--stamina-danger-color-dark) !important;
-}
-
 
 .power-value {
     font-size: 0.8rem;
@@ -543,39 +527,69 @@ body.dark-theme .header-prompt-text {
     color: var(--dark-text-secondary);
 }
 
-/* --- NPC 見聞 & 物品 卡片樣式 --- */
-#npc-content > div, #itm-content > div {
+/* --- 人物見聞卡片樣式 --- */
+#npc-content > div {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-left: 3px solid var(--light-accent);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem; /* 卡片之間的細縫 */
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+#npc-content > div:last-child {
+    margin-bottom: 0;
+}
+
+body.dark-theme #npc-content > div {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+    border-left-color: var(--dark-accent);
+}
+
+/* --- 隨身物品卡片樣式 --- */
+#itm-content > div {
     background-color: var(--light-bg);
     border: 1px solid var(--light-border);
     border-radius: 6px;
     padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem; /* 卡片之間的細縫 */
     transition: background-color 0.2s, border-color 0.2s;
 }
 
-#npc-content > div {
-    border-left: 3px solid var(--light-accent);
-}
-body.dark-theme #npc-content > div {
-    border-left-color: var(--dark-accent);
+#itm-content > div:last-child {
+    margin-bottom: 0;
 }
 
-
-body.dark-theme #npc-content > div, body.dark-theme #itm-content > div {
+body.dark-theme #itm-content > div {
     background-color: var(--dark-surface-bg);
     border-color: var(--dark-border);
 }
 
 /* --- 懸賞按鈕發光提示 --- */
 @keyframes pulse-glow {
-    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
 }
 
 body.dark-theme @keyframes pulse-glow {
-    0% { box-shadow: 0 0 0 0 rgba(255, 204, 102, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(255, 204, 102, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 204, 102, 0); }
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 204, 102, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 204, 102, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 204, 102, 0);
+    }
 }
 
 #bounties-btn.has-new-bounty {
@@ -599,8 +613,8 @@ body.dark-theme #bounties-btn.has-new-bounty {
     padding: 0.5rem;
     display: flex;
     gap: 0.5rem;
-    align-items: center;
-    z-index: 50;
+    align-items: center; /* 【核心新增】垂直置中按鈕與文字 */
+    z-index: 50; /* 確保在故事文字之上 */
     opacity: 0;
     visibility: hidden;
     transform: translateY(10px);
@@ -670,6 +684,7 @@ body.dark-theme .npc-interaction-btn.attack:hover {
     border-color: #ff6b6b;
 }
 
+/* 【核心新增】確認流程的專屬樣式 */
 .confirm-prompt-text {
     font-size: 0.9rem;
     font-weight: bold;
@@ -705,6 +720,9 @@ body.dark-theme .npc-interaction-btn.cancel-attack {
     color: var(--dark-text-secondary);
 }
 
+/* 【核心修改】刪除了之前為 mobile 添加的固定定位規則 */
+
+/* --- 【本次新增】禁用按鈕的樣式 --- */
 .npc-interaction-btn:disabled {
     color: #adb5bd;
     border-color: #dee2e6;
