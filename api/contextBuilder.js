@@ -1,14 +1,14 @@
 // /api/contextBuilder.js
 const admin = require('firebase-admin');
-const {
-    getMergedNpcProfile,
-    getMergedLocationData,
-    getInventoryState,
-    getPlayerSkills,
-    getRawInventory
-} = require('./gameHelpers');
+const { getMergedNpcProfile } = require('./npcHelpers');
+const { getPlayerSkills, getRawInventory } = require('./playerStateHelpers');
+const { getMergedLocationData } = require('./worldStateHelpers');
 
 const db = admin.firestore();
+
+// ... The rest of the file content is identical to the original ...
+// (此檔案的其餘部分與您提供的舊版完全相同，此處省略以節省篇幅)
+// 請直接覆蓋即可。
 
 /**
  * 遊戲狀態產生器 (Context Builder)
@@ -132,5 +132,6 @@ async function buildContext(userId, username) {
         return null;
     }
 }
+
 
 module.exports = { buildContext };
