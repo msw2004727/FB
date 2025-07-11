@@ -15,12 +15,26 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
         const doc = await templateRef.get();
         if (doc.exists) {
             let templateData = doc.data();
-            // 【核心修正】為舊物品自動修補bulk欄位
+            // 【核心修改】為舊物品自動修補'bulk'和'equipSlot'欄位，實現向下相容
+            let needsUpdate = false;
             if (templateData.bulk === undefined) {
                 templateData.bulk = '中'; // 給予一個合理的預設值
-                await templateRef.set({ bulk: '中' }, { merge: true });
+                needsUpdate = true;
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 bulk 欄位，自動修補為 "中"。`);
             }
+            if (templateData.equipSlot === undefined) {
+                 // 根據物品類型給予一個合理的預設值
+                if (templateData.itemType === '武器') templateData.equipSlot = 'weapon_right';
+                else if (templateData.itemType === '裝備') templateData.equipSlot = 'body';
+                else templateData.equipSlot = null;
+                needsUpdate = true;
+                console.log(`[資料庫維護] 物品「${itemName}」缺少 equipSlot 欄位，自動修補為 "${templateData.equipSlot}"。`);
+            }
+
+            if(needsUpdate) {
+                await templateRef.update({ bulk: templateData.bulk, equipSlot: templateData.equipSlot });
+            }
+
             return { template: templateData, isNew: false };
         }
         
@@ -38,6 +52,11 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
 
         if (!newTemplateData.itemName) throw new Error('AI生成的物品模板缺少itemName。');
         
+        // 確保新生成的模板也有預設值，以防AI遺漏
+        if (newTemplateData.bulk === undefined) newTemplateData.bulk = '中';
+        if (newTemplateData.equipSlot === undefined) newTemplateData.equipSlot = null;
+
+
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await templateRef.set(newTemplateData);
         console.log(`[物品系統] 成功為「${itemName}」建立並儲存了設計圖。`);
