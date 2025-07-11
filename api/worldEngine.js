@@ -7,7 +7,42 @@ const { callAI, aiConfig } = require('../services/aiService');
 const db = admin.firestore();
 
 /**
- * 【核心修改 2.0】採納全新的靜態/動態分離架構。
+ * 【核心新增 2.1】遞迴處理地點層級，確保父級地點存在
+ * @param {object} locationData - 從AI獲取到的完整地點設定檔
+ */
+async function handleLocationHierarchy(locationData) {
+    if (!locationData || !locationData.staticTemplate || !locationData.staticTemplate.parentLocation) {
+        // 如果沒有父級，就不用處理了
+        return;
+    }
+
+    const parentLocationName = locationData.staticTemplate.parentLocation;
+    const parentDocRef = db.collection('locations').doc(parentLocationName);
+    const parentDoc = await parentDocRef.get();
+
+    if (!parentDoc.exists) {
+        // 如果父級地點不存在，則為其生成
+        console.log(`[世界引擎 2.1] 偵測到不存在的父級地點:「${parentLocationName}」，正在為其遞迴建檔...`);
+        // 我們假設父級地點的類型是根據子地點推斷的，例如村莊的上級是縣城
+        const parentLocationType = locationData.staticTemplate.locationType === '村莊' ? '縣城' : '地區';
+        
+        // 再次呼叫AI生成父級地點的檔案
+        const parentPrompt = getLocationGeneratorPrompt(parentLocationName, parentLocationType, `需要為「${locationData.staticTemplate.locationName}」創建一個名為「${parentLocationName}」的上級地點。`);
+        const parentJsonString = await callAI(aiConfig.location, parentPrompt, true);
+        const parentLocationData = JSON.parse(parentJsonString);
+
+        // 遞迴呼叫，以處理更上層的父級（例如縣城的上級是府）
+        await handleLocationHierarchy(parentLocationData);
+
+        // 儲存這個新生成的父級地點
+        await db.collection('locations').doc(parentLocationName).set(parentLocationData.staticTemplate);
+        console.log(`[世界引擎 2.1] 成功創建父級地點:「${parentLocationName}」`);
+    }
+}
+
+
+/**
+ * 【核心修改 2.0 & 2.1】採納全新的靜態/動態分離架構，並整合層級處理
  * @param {string} userId - 玩家的ID.
  * @param {string} locationName - 新地點的名稱.
  * @param {string} locationType - 新地點的類型.
@@ -22,12 +57,9 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
 
     try {
         const staticDoc = await staticLocationRef.get();
-        let staticData;
 
-        // 步驟 1: 處理靜態地點模板
         if (staticDoc.exists) {
             console.log(`[世界引擎 2.0] 地點「${locationName}」的共享模板已存在，跳過AI生成。`);
-            staticData = staticDoc.data();
         } else {
             console.log(`[世界引擎 2.0] 為「${locationName}」啟動共享模板生成程序...`);
             const prompt = getLocationGeneratorPrompt(locationName, locationType, worldSummary);
@@ -38,18 +70,20 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
                 throw new Error("AI生成的地點資料結構不完整，缺少靜態或動態部分。");
             }
             
+            // 【核心修改 2.1】在儲存前，先處理其父級地點是否存在
+            await handleLocationHierarchy(newLocationData);
+
             // 將靜態模板存入 'locations' 集合
-            staticData = newLocationData.staticTemplate;
-            await staticLocationRef.set(staticData);
+            await staticLocationRef.set(newLocationData.staticTemplate);
             console.log(`[世界引擎 2.0] 成功為「${locationName}」建立共享模板。`);
 
             // 直接將對應的初始動態狀態存給當前玩家
             await dynamicLocationRef.set(newLocationData.initialDynamicState);
             console.log(`[世界引擎 2.0] 已為玩家 ${userId} 初始化了「${locationName}」的初始動態狀態。`);
-            return; // 完成後直接返回，因為動態部分已在此處處理
+            return; 
         }
 
-        // 步驟 2: 處理玩家專屬的動態地點狀態
+        // 如果模板存在，但玩家的動態狀態不存在，則為其建立
         const dynamicDoc = await dynamicLocationRef.get();
         if (!dynamicDoc.exists) {
             console.log(`[世界引擎 2.0] 模板已存在，但玩家 ${userId} 的動態狀態不存在，正在為其建立...`);
