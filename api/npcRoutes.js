@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion, getAISummary } = require('../services/aiService');
+const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion, getAISummary, getAIPerNpcSummary } = require('../services/aiService');
 const { getFriendlinessLevel, getInventoryState, updateInventory, invalidateNovelCache, updateLibraryNovel, getMergedNpcProfile, getRawInventory, getOrGenerateItemTemplate } = require('./gameHelpers');
 const { getKnownNpcNames } = require('./cacheManager'); // 引入快取函式
 
@@ -34,7 +34,8 @@ router.get('/npc-profile/:npcName', async (req, res) => {
             appearance: npcProfile.appearance,
             friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0),
             romanceValue: npcProfile.romanceValue || 0,
-            friendlinessValue: npcProfile.friendlinessValue || 0
+            friendlinessValue: npcProfile.friendlinessValue || 0,
+            age: npcProfile.age || '年齡不詳' // 新增年齡
         };
 
         res.json(publicProfile);
@@ -365,31 +366,47 @@ router.post('/end-chat', async (req, res) => {
 
     try {
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
-        const summaryDoc = await summaryDocRef.get();
-        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "對話發生在一個未知的時間點。";
+        const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+
+        const [summaryDoc, npcStateDoc, lastSaveSnapshot] = await Promise.all([
+            summaryDocRef.get(),
+            npcStateRef.get(),
+            db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
+        ]);
         
-        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "對話發生在一個未知的時間點。";
+        const oldInteractionSummary = npcStateDoc.exists ? npcStateDoc.data().interactionSummary : `你與${npcName}的交往尚淺。`;
+        
         if (lastSaveSnapshot.empty) {
             return res.status(404).json({ message: "找不到玩家存檔。" });
         }
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         
-        const chatSummaryResult = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary);
+        // 並行處理兩個摘要的生成
+        const [chatSummaryResult, newInteractionSummary] = await Promise.all([
+            getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary),
+            getAIPerNpcSummary(playerModelChoice, npcName, oldInteractionSummary, fullChatHistory)
+        ]);
         
         const newRoundNumber = lastRoundData.R + 1;
         let newRoundData = { ...lastRoundData, R: newRoundNumber };
 
         newRoundData.story = chatSummaryResult.story || `你結束了與${npcName}的交談。`;
         newRoundData.EVT = chatSummaryResult.evt || `與${npcName}的一席話`;
-        
         newRoundData.PC = `你與${npcName}深入交談了一番。`;
 
-        const newSummary = await getAISummary(longTermSummary, newRoundData);
+        const newOverallSummary = await getAISummary(longTermSummary, newRoundData);
         const suggestion = await getAISuggestion(newRoundData);
         newRoundData.suggestion = suggestion;
         
-        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
-        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
+        // 一次性更新所有資料庫
+        const updatePromises = [
+            db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData),
+            summaryDocRef.set({ text: newOverallSummary, lastUpdated: newRoundNumber }),
+            npcStateRef.set({ interactionSummary: newInteractionSummary }, { merge: true })
+        ];
+        
+        await Promise.all(updatePromises);
         
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
