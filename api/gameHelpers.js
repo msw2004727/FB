@@ -10,6 +10,7 @@ const { processNpcRelationships } = require('./relationshipManager');
 
 const db = admin.firestore();
 
+// --- 【核心修改】新增伺服器層級的武學模板快取 ---
 const skillTemplateCache = new Map();
 
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
@@ -44,22 +45,26 @@ async function getMergedNpcProfile(userId, npcName) {
     }
 }
 
+// --- 【核心修改】重寫此函式，加入快取邏輯 ---
 async function getOrGenerateSkillTemplate(skillName) {
     if (!skillName) return null;
 
+    // 1. 優先從快取讀取
     if (skillTemplateCache.has(skillName)) {
         return { template: skillTemplateCache.get(skillName), isNew: false };
     }
     
+    // 2. 快取沒有，再讀取資料庫
     const skillTemplateRef = db.collection('skills').doc(skillName);
     try {
         const doc = await skillTemplateRef.get();
         if (doc.exists) {
             const templateData = doc.data();
-            skillTemplateCache.set(skillName, templateData);
+            skillTemplateCache.set(skillName, templateData); // 存入快取
             return { template: templateData, isNew: false };
         }
         
+        // 3. 資料庫沒有，才呼叫AI生成
         console.log(`[武學總綱] 武學「${skillName}」的總綱不存在，啟動AI生成...`);
         const prompt = getSkillGeneratorPrompt(skillName);
         const skillJsonString = await callAI(aiConfig.skillTemplate || 'openai', prompt, true);
@@ -74,7 +79,7 @@ async function getOrGenerateSkillTemplate(skillName) {
         
         const newDoc = await skillTemplateRef.get();
         const finalTemplateData = newDoc.data();
-        skillTemplateCache.set(skillName, finalTemplateData);
+        skillTemplateCache.set(skillName, finalTemplateData); // 將新生成的模板存入快取
         
         console.log(`[武學總綱] 成功為「${skillName}」建立並儲存了總綱模板。`);
         return { template: finalTemplateData, isNew: true };
@@ -346,8 +351,285 @@ const updateInventory = async (userId, itemChanges, roundData = {}) => {
     console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 };
 
-// ... a lot of other functions are omitted for brevity ...
-// (The rest of the file remains unchanged from the previous version)
+const updateFriendlinessValues = async (userId, npcChanges) => {
+    if (!npcChanges || npcChanges.length === 0) return;
+    const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
+    const promises = npcChanges.map(async (change) => {
+        if (!change.name || typeof change.friendlinessChange !== 'number' || change.friendlinessChange === 0) {
+            return;
+        }
+        const npcStateDocRef = playerNpcStatesRef.doc(change.name);
+        try {
+            await db.runTransaction(async (transaction) => {
+                const npcStateDoc = await transaction.get(npcStateDocRef);
+                if (!npcStateDoc.exists) {
+                    transaction.set(npcStateDocRef, { friendlinessValue: change.friendlinessChange });
+                    return;
+                }
+                const currentFriendliness = npcStateDoc.data().friendlinessValue || 0;
+                const newFriendlinessValue = currentFriendliness + change.friendlinessChange;
+                transaction.update(npcStateDocRef, { 
+                    friendlinessValue: newFriendlinessValue,
+                });
+            });
+        } catch (error) {
+            console.error(`[友好度系統] 更新與NPC "${change.name}" 的關係時出錯:`, error);
+        }
+    });
+    await Promise.all(promises);
+};
+
+const updateRomanceValues = async (userId, romanceChanges) => {
+    if (!romanceChanges || romanceChanges.length === 0) return;
+    const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
+    const promises = romanceChanges.map(async ({ npcName, valueChange }) => {
+        if (!npcName || typeof valueChange !== 'number' || valueChange === 0) return;
+        const npcStateDocRef = playerNpcStatesRef.doc(npcName);
+        try {
+            await npcStateDocRef.set({ 
+                romanceValue: admin.firestore.FieldValue.increment(valueChange) 
+            }, { merge: true });
+        } catch (error) {
+            console.error(`[戀愛系統] 更新與NPC "${npcName}" 的心動值時出錯:`, error);
+        }
+    });
+    await Promise.all(promises);
+};
+
+const checkAndTriggerRomanceEvent = async (userId, playerProfile) => {
+    const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
+    const statesSnapshot = await playerNpcStatesRef.where('romanceValue', '>=', 50).get();
+    if (statesSnapshot.empty) return null;
+
+    for (const stateDoc of statesSnapshot.docs) {
+        const npcName = stateDoc.id;
+        const npcState = stateDoc.data();
+        const npcProfile = await getMergedNpcProfile(userId, npcName);
+        if (!npcProfile) continue;
+
+        const { romanceValue = 0, triggeredRomanceEvents = [] } = npcState;
+        const eventTriggers = [ { level: 'level_2_confession', threshold: 150 } ];
+        
+        for (const trigger of eventTriggers) {
+            if (romanceValue >= trigger.threshold && !triggeredRomanceEvents.includes(trigger.level)) {
+                console.log(`[戀愛系統] 偵測到與 ${npcName} 的 ${trigger.level} 事件觸發條件！`);
+                const romanceEventResultText = await getAIRomanceEvent(playerProfile, npcProfile, trigger.level);
+                try {
+                    const romanceEventResult = JSON.parse(romanceEventResultText);
+                    if (romanceEventResult && romanceEventResult.story) {
+                        await stateDoc.ref.update({
+                            triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion(trigger.level)
+                        });
+                        return {
+                            eventStory: romanceEventResult.story,
+                            npcUpdates: romanceEventResult.npcUpdates || []
+                        };
+                    }
+                } catch(e){
+                     console.error('[戀愛系統] 解析AI回傳的戀愛事件JSON時出錯:', e);
+                     return null;
+                }
+            }
+        }
+    }
+    return null; 
+};
+
+const getInventoryState = async (userId) => {
+    const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
+    const snapshot = await playerInventoryRef.get();
+    if (snapshot.empty) return { money: 0, itemsString: '身無長物' };
+    let money = 0;
+    const itemCounts = {};
+    snapshot.forEach(doc => {
+        const item = doc.data();
+        const itemName = item.templateId; 
+        const quantity = item.quantity || 1;
+        if (itemName === '銀兩') {
+            money += quantity;
+        } else {
+            itemCounts[itemName] = (itemCounts[itemName] || 0) + quantity;
+        }
+    });
+    const otherItems = Object.entries(itemCounts).map(([name, count]) => `${name} x${count}`);
+    return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
+};
+
+const getRawInventory = async (userId) => {
+    const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
+    const snapshot = await playerInventoryRef.get();
+    if (snapshot.empty) return {};
+    const inventoryData = {};
+    for (const doc of snapshot.docs) {
+        const playerData = doc.data();
+        const templateId = playerData.templateId;
+        if (!templateId) continue;
+        const templateData = await getOrGenerateItemTemplate(templateId);
+        if (templateData && templateData.template) {
+            inventoryData[doc.id] = { ...templateData.template, ...playerData };
+        }
+    }
+    return inventoryData;
+};
+
+const updateSkills = async (userId, skillChanges, playerProfile) => {
+    if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
+
+    const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
+    const userDocRef = db.collection('users').doc(userId);
+    const levelUpEvents = [];
+    let customSkillCreationResult = null;
+
+    for (const skillChange of skillChanges) {
+        const playerSkillDocRef = playerSkillsRef.doc(skillChange.skillName);
+        try {
+            await db.runTransaction(async (transaction) => {
+                if (skillChange.isNewlyAcquired) {
+                    const acquisitionMethod = skillChange.acquisitionMethod || 'created'; 
+
+                    if (acquisitionMethod === 'created') {
+                        const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                        
+                        if (!templateResult || !templateResult.template) {
+                            console.error(`無法為「${skillChange.skillName}」獲取或生成模板，跳過此武學。`);
+                            return;
+                        }
+
+                        if (templateResult.isNew) {
+                            const powerType = templateResult.template.power_type || 'none';
+                            const maxPowerAchieved = playerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
+                            const createdSkillsCount = playerProfile.customSkillsCreated?.[powerType] || 0;
+                            const totalCreatedSkills = Object.values(playerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
+                            const availableSlots = Math.floor(maxPowerAchieved / 100);
+
+                            console.log(`[自創武學] 驗證: ${skillChange.skillName} (${powerType})`);
+                            console.log(`[自創武學] 總上限: ${totalCreatedSkills}/10, 類別上限: ${createdSkillsCount}/${availableSlots}`);
+                            
+                            if (totalCreatedSkills >= 10) {
+                                customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
+                                console.log(`[自創武學] 失敗：已達總上限10門。`);
+                                return; 
+                            }
+
+                            if (createdSkillsCount >= availableSlots) {
+                                customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                                 console.log(`[自創武學] 失敗：${powerType}類別名額不足。`);
+                                return; 
+                            }
+
+                            const skillCountUpdate = {};
+                            skillCountUpdate[`customSkillsCreated.${powerType}`] = admin.firestore.FieldValue.increment(1);
+                            transaction.update(userDocRef, skillCountUpdate);
+                            customSkillCreationResult = { success: true };
+                            console.log(`[自創武學] 成功：驗證通過，計數增加。`);
+                        }
+                    } else {
+                        console.log(`[武學系統] 偵測到「學習」行為 (learned)，跳過自創數量檢查。`);
+                    }
+
+                    const playerSkillData = {
+                        level: skillChange.level || 0,
+                        exp: skillChange.exp || 0,
+                        lastPractice: admin.firestore.FieldValue.serverTimestamp()
+                    };
+                    transaction.set(playerSkillDocRef, playerSkillData);
+                    console.log(`[武學系統] 玩家 ${userId} 習得新武學: ${skillChange.skillName}，初始等級: ${playerSkillData.level}`);
+
+                } else if (skillChange.expChange > 0) {
+                    const playerSkillDoc = await transaction.get(playerSkillDocRef);
+                    if (!playerSkillDoc.exists) {
+                        console.warn(`[武學系統] 玩家 ${userId} 試圖修練不存在的武學: ${skillChange.skillName}`);
+                        return;
+                    }
+                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                    if (!templateResult || !templateResult.template) return;
+                    
+                    let currentData = playerSkillDoc.data();
+                    let currentLevel = currentData.level || 0;
+                    let currentExp = currentData.exp || 0;
+                    const maxLevel = templateResult.template.max_level || 10;
+
+                    if (currentLevel >= maxLevel) {
+                         console.log(`[武學系統] 武學 ${skillChange.skillName} 已達最高等級(${maxLevel})。`);
+                         return;
+                    }
+
+                    currentExp += skillChange.expChange;
+                    let requiredExp = (currentLevel === 0) ? 100 : currentLevel * 100;
+
+                    while (currentExp >= requiredExp && currentLevel < maxLevel) {
+                        currentLevel++;
+                        currentExp -= requiredExp;
+                        levelUpEvents.push({ skillName: skillChange.skillName, levelUpTo: currentLevel });
+                        if(currentLevel < maxLevel) {
+                            requiredExp = currentLevel * 100;
+                        } else {
+                            currentExp = 0;
+                        }
+                    }
+                    transaction.update(playerSkillDocRef, { level: currentLevel, exp: currentExp });
+                    console.log(`[武學系統] 玩家 ${userId} 修練 ${skillChange.skillName}，熟練度增加 ${skillChange.expChange}。等級: ${currentLevel}, 熟練度: ${currentExp}`);
+                }
+            });
+        } catch (error) {
+            console.error(`[武學系統] 更新武學 ${skillChange.skillName} 時發生錯誤:`, error);
+        }
+    }
+    return { levelUpEvents, customSkillCreationResult };
+};
+
+async function getPlayerSkills(userId) {
+    const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
+    const playerSkillsSnapshot = await playerSkillsRef.get();
+    if (playerSkillsSnapshot.empty) return [];
+    
+    const mergedSkills = [];
+    const skillPromises = playerSkillsSnapshot.docs.map(async (playerSkillDoc) => {
+        const skillName = playerSkillDoc.id;
+        const playerData = playerSkillDoc.data();
+        
+        const templateResult = await getOrGenerateSkillTemplate(skillName);
+        
+        if (templateResult && templateResult.template) {
+            return {
+                ...templateResult.template,
+                level: playerData.level,
+                exp: playerData.exp
+            };
+        }
+        return null;
+    });
+
+    const results = await Promise.all(skillPromises);
+    return results.filter(skill => skill !== null);
+}
+
+const processNpcUpdates = async (userId, updates) => {
+    if (!updates || !Array.isArray(updates) || updates.length === 0) return;
+    const batch = db.batch();
+    const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
+    for (const update of updates) {
+        const { npcName, fieldToUpdate, newValue, updateType } = update;
+        if (!npcName || !fieldToUpdate || newValue === undefined) continue;
+        const npcStateDocRef = playerNpcStatesRef.doc(npcName);
+        let updatePayload = {};
+        if (updateType === 'arrayUnion') {
+            updatePayload[fieldToUpdate] = admin.firestore.FieldValue.arrayUnion(newValue);
+        } else if (updateType === 'arrayRemove') {
+            updatePayload[fieldToUpdate] = admin.firestore.FieldValue.arrayRemove(newValue);
+        } else { 
+            updatePayload[fieldToUpdate] = newValue;
+        }
+        batch.set(npcStateDocRef, updatePayload, { merge: true });
+        console.log(`[NPC關係系統] 已將玩家 ${userId} 與「${npcName}」的關係欄位「${fieldToUpdate}」更新為：`, newValue);
+    }
+    try {
+        await batch.commit();
+        console.log(`[NPC關係系統] 玩家與NPC的關係狀態已批次更新。`);
+    } catch (error) {
+        console.error(`[NPC關係系統] 為玩家 ${userId} 更新NPC關係時發生錯誤:`, error);
+    }
+};
 
 module.exports = {
     TIME_SEQUENCE,
