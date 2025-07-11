@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 
-// 引用三個新的路由模組
+// 【核心修正】修正了所有子路由模組的引用路徑，移除了多餘的 './api'
 const gameplayRoutes = require('./gameplayRoutes');
 const npcRoutes = require('./npcRoutes');
 const combatRoutes = require('./combatRoutes');
