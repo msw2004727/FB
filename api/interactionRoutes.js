@@ -15,7 +15,7 @@ const {
     updateInventory,
     updateSkills,
     getInventoryState,
-    getPlayerSkills, // 【核心修正】補上遺漏的 getPlayerSkills 引用
+    getPlayerSkills, // 【核心修正】已為您補上遺漏的 getPlayerSkills 引用
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
