@@ -114,3 +114,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ---
 
 現在，請為「${locationName}」生成一份詳盡的、包含了所有必要層級的、符合新結構的JSON檔案。
+`;
+};
+
+module.exports = { getLocationGeneratorPrompt };
