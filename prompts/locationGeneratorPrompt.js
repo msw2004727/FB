@@ -123,3 +123,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
 ---
 
 現在，請為「${locationName}」生成一份詳盡的、分離了靜態與動態屬性的JSON檔案。
+`;
+};
+
+module.exports = { getLocationGeneratorPrompt };
