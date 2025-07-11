@@ -65,7 +65,7 @@ app.use('/api/library', libraryRoutes);
 app.use('/api/epilogue', authMiddleware, epilogueRoutes);
 app.use('/api/bounties', bountyRoutes);
 app.use('/api/gm', gmRoutes);
-app.use('/api/map', mapRoutes); // 【核心新增】
+app.use('/api/map', authMiddleware, mapRoutes); // 【核心新增】
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
