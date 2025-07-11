@@ -6,12 +6,8 @@ const { getMergedLocationData } = require('./worldStateHelpers');
 
 const db = admin.firestore();
 
-// ... The rest of the file content is identical to the original ...
-// (此檔案的其餘部分與您提供的舊版完全相同，此處省略以節省篇幅)
-// 請直接覆蓋即可。
-
 /**
- * 遊戲狀態產生器 (Context Builder)
+ * 遊戲狀態產生器 (Context Builder) v2.0
  * @param {string} userId - The user's ID.
  * @param {string} username - The user's name.
  * @returns {Promise<object>} A comprehensive context object for the current game state.
@@ -57,16 +53,17 @@ async function buildContext(userId, username) {
         const userProfile = userDoc.exists ? userDoc.data() : {};
         const lastSave = savesSnapshot.docs[0].data();
 
-        // 計算負重分數
+        // 【核心修改】計算全局負重分數
         let totalBulkScore = 0;
-        if (rawInventory) {
+        if (rawInventory && typeof rawInventory === 'object') {
             Object.values(rawInventory).forEach(item => {
                 const quantity = item.quantity || 1;
+                // 根據物品的 bulk 屬性累加分數
                 switch (item.bulk) {
                     case '中': totalBulkScore += 1 * quantity; break;
                     case '重': totalBulkScore += 3 * quantity; break;
                     case '極重': totalBulkScore += 10 * quantity; break;
-                    default: break;
+                    default: break; // '輕' 或未定義的不增加分數
                 }
             });
         }
@@ -120,11 +117,11 @@ async function buildContext(userId, username) {
             recentHistory: savesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.R - b.R),
             locationContext: locationContext,
             npcContext: npcContext,
-            bulkScore: totalBulkScore,
+            bulkScore: totalBulkScore, // 將計算好的負重分數放入最終上下文
             isNewGame: false
         };
 
-        console.log(`[Context Builder] Context build completed successfully for ${username}.`);
+        console.log(`[Context Builder] Context build completed successfully for ${username}. Bulk Score: ${totalBulkScore}`);
         return finalContext;
 
     } catch (error) {
