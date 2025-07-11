@@ -36,7 +36,6 @@ async function getMergedNpcProfile(userId, npcName) {
         const templateData = templateDoc.exists ? templateDoc.data() : {};
         const stateData = stateDoc.exists ? stateDoc.data() : {};
         
-        // 確保即使只有 stateDoc 存在也能回傳基本資料
         const mergedProfile = { ...templateData, ...stateData, name: templateData.name || npcName };
         if (!mergedProfile.name) mergedProfile.name = npcName;
 
@@ -55,27 +54,41 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
         const npcTemplateRef = db.collection('npcs').doc(npcName);
         const playerNpcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
-        // --- 【核心修改】在此處立即同步寫入基礎狀態，確保位置正確 ---
+        // --- 【核心修正】無論文件是否存在，都嘗試寫入基礎欄位，以修復競爭條件 ---
+        // 使用 { merge: true } 可以確保我們只添加缺失的欄位，而不會覆蓋已有的欄位（如 friendlinessValue）。
+        const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
+        const initialOrMissingState = {
+            friendlinessValue: admin.firestore.FieldValue.increment(0), // 確保欄位存在，但不改變現有值
+            romanceValue: admin.firestore.FieldValue.increment(0),
+            interactionSummary: `你與${npcName}的交往尚淺。`,
+            currentLocation: encounterLocation,
+            firstMet: { round: roundData.R, time: `${roundData.yearName}${roundData.year}-${roundData.month}-${roundData.day} ${roundData.timeOfDay}`, location: encounterLocation, event: roundData.EVT },
+            isDeceased: false,
+            inventory: {}
+        };
+        
         const stateDoc = await playerNpcStateRef.get();
-        if (!stateDoc.exists) {
-            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
-            const initialState = {
-                friendlinessValue: npcData.friendlinessChange || 0,
-                romanceValue: 0,
-                interactionSummary: `你與${npcName}的交往尚淺。`,
-                currentLocation: encounterLocation, // <-- 關鍵：立即寫入相遇時的地點
-                firstMet: { round: roundData.R, time: `${roundData.yearName}${roundData.year}-${roundData.month}-${roundData.day} ${roundData.timeOfDay}`, location: encounterLocation, event: roundData.EVT },
-                isDeceased: false,
-                inventory: {}
-            };
-            await playerNpcStateRef.set(initialState);
-            console.log(`[NPC系統] 已為玩家 ${userId} 即時初始化了與「${npcName}」的關係檔案，地點設為: ${encounterLocation}`);
+        if (stateDoc.exists) {
+            // 如果文件已存在，我們只更新那些可能缺失的欄位
+            const updates = {};
+            if (stateDoc.data().interactionSummary === undefined) updates.interactionSummary = initialOrMissingState.interactionSummary;
+            if (stateDoc.data().currentLocation === undefined) updates.currentLocation = initialOrMissingState.currentLocation;
+            if (stateDoc.data().firstMet === undefined) updates.firstMet = initialOrMissingState.firstMet;
+            if (stateDoc.data().isDeceased === undefined) updates.isDeceased = initialOrMissingState.isDeceased;
+            if (stateDoc.data().inventory === undefined) updates.inventory = initialOrMissingState.inventory;
+            
+            if (Object.keys(updates).length > 0) {
+                await playerNpcStateRef.update(updates);
+                console.log(`[NPC系統] 已為玩家 ${userId} 的現有NPC「${npcName}」補全了基礎檔案。`);
+            }
+        } else {
+            // 如果文件不存在，則創建完整的初始檔案
+            await playerNpcStateRef.set(initialOrMissingState);
+            console.log(`[NPC系統] 已為玩家 ${userId} 即時初始化了與「${npcName}」的完整關係檔案，地點設為: ${encounterLocation}`);
         }
-        // --- 同步寫入結束 ---
-
+        // --- 修正結束 ---
 
         let templateDoc = await npcTemplateRef.get();
-        // 如果通用模板不存在，才在背景繼續執行AI生成
         if (!templateDoc.exists) {
             console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
@@ -86,8 +99,6 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
             newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             
-            // 在設定模板時，也確保其 currentLocation 與初見時一致
-            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
             if (!newTemplateData.currentLocation) {
                  newTemplateData.currentLocation = encounterLocation;
             }
