@@ -17,29 +17,56 @@ router.get('/world-map', async (req, res) => {
         if (locationsSnapshot.empty) {
             return res.json({ mermaidSyntax: 'graph TD;\nA[世界混沌初開，尚無人踏足];' });
         }
-        
-        const nodes = new Set();
-        const links = new Set();
 
+        const subgraphs = [];
+        const links = new Set();
+        const locationNodeIds = new Map();
+
+        // 第一次遍歷：定義所有節點和子圖
         locationsSnapshot.forEach(doc => {
             const data = doc.data();
-            const currentLocation = data.locationName || doc.id;
-            nodes.add(currentLocation); // 將當前地點加入節點
+            const locName = data.locationName || doc.id;
+            const facilities = data.facilities || [];
+            
+            // 為每個地點名稱創建一個唯一的ID，避免特殊字元問題
+            const locId = locName.replace(/[\s\W]/g, '_');
+            locationNodeIds.set(locName, locId);
+
+            let subgraphSyntax = `    subgraph ${locId} ["${locName}"]\n`;
+            
+            if (facilities.length > 0) {
+                 facilities.forEach((facility, index) => {
+                    const facilityId = `${locId}_facility_${index}`;
+                    subgraphSyntax += `        ${facilityId}("${facility.facilityName}");\n`;
+                });
+            } else {
+                // 如果沒有設施，則子圖內只有一個代表地點本身的節點
+                // 為了能讓連結指向這個子圖，我們還是使用 locId 作為代表
+            }
+            subgraphSyntax += `    end\n`;
+            subgraphs.push(subgraphSyntax);
+        });
+
+        // 第二次遍歷：建立所有連結
+        locationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const currentLocationName = data.locationName || doc.id;
+            const currentLocationId = locationNodeIds.get(currentLocationName);
 
             if (data.geography && Array.isArray(data.geography.nearbyLocations)) {
                 data.geography.nearbyLocations.forEach(neighbor => {
-                    if (neighbor.name) {
-                        nodes.add(neighbor.name); // 將相鄰地點也加入節點
+                    if (neighbor.name && locationNodeIds.has(neighbor.name)) {
+                        const neighborId = locationNodeIds.get(neighbor.name);
                         
-                        // 為了避免重複連線 (A->B 和 B->A)，我們將地點名稱排序後作為唯一鍵
-                        const relationshipKey = [currentLocation, neighbor.name].sort().join('<-->');
+                        // 為了避免重複連線 (A->B 和 B->A)，我們將ID排序後作為唯一鍵
+                        const relationshipKey = [currentLocationId, neighborId].sort().join('<-->');
                         
-                        // 只有當這個關係尚未被記錄時，才新增連線
                         if (!links.has(relationshipKey)) {
                             const travelTime = neighbor.travelTime || '路途未知';
-                            const linkSyntax = `    ${currentLocation} -- "${travelTime}" --- ${neighbor.name};`;
-                            links.add(linkSyntax);
-                            links.add(relationshipKey); // 將鍵也加入，用於檢查重複
+                            // 使用 "---" 讓 Mermaid 自動決定最佳路徑
+                            const linkSyntax = `    ${currentLocationId} -- "${travelTime}" --- ${neighborId};`;
+                            links.add(relationshipKey); // 將鍵加入，用於檢查重複
+                            links.add(linkSyntax);      // 將語法加入
                         }
                     }
                 });
@@ -50,7 +77,7 @@ router.get('/world-map', async (req, res) => {
         const finalLinks = [...links].filter(link => !link.includes('<-->'));
 
         // 組合最終的 Mermaid 語法
-        const mermaidSyntax = `graph TD;\n${[...nodes].map(node => `    ${node};`).join('\n')}\n\n${finalLinks.join('\n')}`;
+        const mermaidSyntax = `graph TD;\n${subgraphs.join('\n')}\n\n${finalLinks.join('\n')}`;
 
         res.json({ mermaidSyntax });
 
