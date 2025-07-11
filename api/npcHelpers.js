@@ -1,11 +1,46 @@
 // api/npcHelpers.js
 const admin = require('firebase-admin');
-const { callAI, aiConfig } = require('../services/aiService');
+const { callAI, aiConfig, getAIPerNpcSummary } = require('../services/aiService'); // 引入 getAIPerNpcSummary
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getAIRomanceEvent } = require('../prompts/romanceEventPrompt.js');
 const { processNpcRelationships } = require('./relationshipManager');
 
 const db = admin.firestore();
+
+/**
+ * 【核心新增】更新指定NPC的個人記憶摘要
+ * @param {string} userId - 玩家ID
+ * @param {string} npcName - 要更新記憶的NPC名稱
+ * @param {string} interactionData - 本次互動的文字摘要
+ */
+async function updateNpcMemoryAfterInteraction(userId, npcName, interactionData) {
+    if (!userId || !npcName || !interactionData) {
+        console.warn(`[NPC記憶系統] 因缺少必要參數，跳過為 ${npcName} 的記憶更新。`);
+        return;
+    }
+    try {
+        const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+        const doc = await npcStateRef.get();
+        
+        if (!doc.exists) {
+            console.warn(`[NPC記憶系統] 找不到 ${npcName} 的個人狀態檔案，無法更新記憶。`);
+            return;
+        }
+
+        const oldSummary = doc.data().interactionSummary || `你與${npcName}的交往尚淺。`;
+        
+        // 呼叫AI服務生成新的摘要
+        const newSummary = await getAIPerNpcSummary('default', npcName, oldSummary, interactionData);
+
+        // 將新摘要寫入資料庫
+        await npcStateRef.update({ interactionSummary: newSummary });
+        console.log(`[NPC記憶系統] 已成功更新NPC「${npcName}」的個人記憶。`);
+
+    } catch (error) {
+        console.error(`[NPC記憶系統] 在更新NPC「${npcName}」的記憶時發生錯誤:`, error);
+    }
+}
+
 
 function getFriendlinessLevel(value) {
     if (value >= 100) return 'devoted';
@@ -57,7 +92,7 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
             const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
-            const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```\s*$/g, ''));
+            const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```s*$/g, ''));
 
             const rand = Math.random();
             newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
@@ -89,7 +124,6 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const batch = db.batch();
 
-    // 【核心修正】主動防禦機制：先獲取已存在的NPC名單
     const existingNpcSnapshot = await playerNpcStatesRef.get();
     const existingNpcIds = new Set(existingNpcSnapshot.docs.map(doc => doc.id));
     console.log('[友好度系統] 已建立玩家的現存NPC名單:', Array.from(existingNpcIds));
@@ -99,7 +133,6 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
         
         const npcStateDocRef = playerNpcStatesRef.doc(change.name);
         
-        // 判斷是否為新NPC的最終依據：資料庫裡到底有沒有這個人
         const isTrulyNew = !existingNpcIds.has(change.name);
 
         if (isTrulyNew) {
@@ -126,7 +159,6 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
             batch.set(npcStateDocRef, initialState);
 
         } else if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
-            // 對於舊NPC，只更新友好度
             console.log(`[友好度系統] 更新舊識「${change.name}」的友好度: ${change.friendlinessChange > 0 ? '+' : ''}${change.friendlinessChange}`);
             batch.set(npcStateDocRef, { 
                 friendlinessValue: admin.firestore.FieldValue.increment(change.friendlinessChange) 
@@ -225,5 +257,6 @@ module.exports = {
     updateFriendlinessValues,
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
-    processNpcUpdates
+    processNpcUpdates,
+    updateNpcMemoryAfterInteraction // 導出新函式
 };
