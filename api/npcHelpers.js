@@ -28,29 +28,56 @@ async function getMergedNpcProfile(userId, npcName) {
             playerNpcStateRef.get()
         ]);
 
-        if (!templateDoc.exists) {
-            if (stateDoc.exists) return { name: npcName, ...stateDoc.data() };
+        if (!templateDoc.exists && !stateDoc.exists) {
             console.warn(`[NPC系統] 找不到名為「${npcName}」的通用模板和玩家狀態。`);
             return null;
         }
 
-        const templateData = templateDoc.data();
+        const templateData = templateDoc.exists ? templateDoc.data() : {};
         const stateData = stateDoc.exists ? stateDoc.data() : {};
-        return { ...templateData, ...stateData, name: templateData.name || npcName };
+        
+        // 確保即使只有 stateDoc 存在也能回傳基本資料
+        const mergedProfile = { ...templateData, ...stateData, name: templateData.name || npcName };
+        if (!mergedProfile.name) mergedProfile.name = npcName;
+
+        return mergedProfile;
     } catch (error) {
         console.error(`[NPC系統] 合併NPC「${npcName}」的資料時出錯:`, error);
         return null;
     }
 }
 
+
 async function createNpcProfileInBackground(userId, username, npcData, roundData, playerProfile) {
     const npcName = npcData.name;
-    console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動背景建檔程序...`);
+    console.log(`[NPC系統] UserId: ${userId}。偵測到新NPC: "${npcName}"，已啟動建檔程序...`);
     try {
         const npcTemplateRef = db.collection('npcs').doc(npcName);
-        let templateDoc = await npcTemplateRef.get();
+        const playerNpcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
+        // --- 【核心修改】在此處立即同步寫入基礎狀態，確保位置正確 ---
+        const stateDoc = await playerNpcStateRef.get();
+        if (!stateDoc.exists) {
+            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
+            const initialState = {
+                friendlinessValue: npcData.friendlinessChange || 0,
+                romanceValue: 0,
+                interactionSummary: `你與${npcName}的交往尚淺。`,
+                currentLocation: encounterLocation, // <-- 關鍵：立即寫入相遇時的地點
+                firstMet: { round: roundData.R, time: `${roundData.yearName}${roundData.year}-${roundData.month}-${roundData.day} ${roundData.timeOfDay}`, location: encounterLocation, event: roundData.EVT },
+                isDeceased: false,
+                inventory: {}
+            };
+            await playerNpcStateRef.set(initialState);
+            console.log(`[NPC系統] 已為玩家 ${userId} 即時初始化了與「${npcName}」的關係檔案，地點設為: ${encounterLocation}`);
+        }
+        // --- 同步寫入結束 ---
+
+
+        let templateDoc = await npcTemplateRef.get();
+        // 如果通用模板不存在，才在背景繼續執行AI生成
         if (!templateDoc.exists) {
+            console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
             const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
             const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```\s*$/g, ''));
@@ -58,33 +85,25 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             const rand = Math.random();
             newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
             newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+            
+            // 在設定模板時，也確保其 currentLocation 與初見時一致
+            const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
+            if (!newTemplateData.currentLocation) {
+                 newTemplateData.currentLocation = encounterLocation;
+            }
+
             await npcTemplateRef.set(newTemplateData);
-            console.log(`[NPC系統] 成功為「${npcName}」建立並儲存了通用模板。`);
+            console.log(`[NPC系統] 成功在背景為「${npcName}」建立並儲存了通用模板。`);
+
             if (newTemplateData.relationships) {
                 await processNpcRelationships(userId, npcName, newTemplateData.relationships);
             }
-        }
-
-        const playerNpcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
-        const stateDoc = await playerNpcStateRef.get();
-        if (!stateDoc.exists) {
-            const templateData = (await npcTemplateRef.get()).data();
-            const initialState = {
-                friendlinessValue: npcData.friendlinessChange || 0,
-                romanceValue: 0,
-                interactionSummary: `你與${npcName}的交往尚淺。`,
-                currentLocation: templateData.currentLocation || roundData.LOC[0],
-                firstMet: { round: roundData.R, time: `${roundData.yearName}${roundData.year}-${roundData.month}-${roundData.day} ${roundData.timeOfDay}`, location: roundData.LOC[0], event: roundData.EVT },
-                isDeceased: false,
-                inventory: {}
-            };
-            await playerNpcStateRef.set(initialState);
-            console.log(`[NPC系統] 成功為玩家 ${userId} 初始化了與「${npcName}」的關係檔案。`);
         }
     } catch (error) {
         console.error(`[NPC系統] 為 "${npcName}" 進行背景建檔時發生錯誤:`, error);
     }
 }
+
 
 async function updateFriendlinessValues(userId, npcChanges) {
     if (!npcChanges || npcChanges.length === 0) return;
