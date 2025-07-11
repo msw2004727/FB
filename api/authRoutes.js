@@ -3,19 +3,32 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
-const jwt = 'jsonwebtoken';
+const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
+// 預設的玩家欄位，包含新的 equipment 和 bulkScore
 const DEFAULT_USER_FIELDS = {
     internalPower: 5,
     externalPower: 5,
     lightness: 5,
     morality: 0,
     stamina: 100,
-    bulkScore: 0, // 【核心新增】為新玩家加入預設的負重分數
+    bulkScore: 0,
     isDeceased: false,
+    equipment: {
+        head: null,
+        body: null,
+        hands: null,
+        feet: null,
+        weapon_right: null,
+        weapon_left: null,
+        weapon_back: null,
+        accessory1: null,
+        accessory2: null,
+        manuscript: null,
+    },
     maxInternalPowerAchieved: 5,
     maxExternalPowerAchieved: 5,
     maxLightnessAchieved: 5,
@@ -43,6 +56,7 @@ router.post('/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
 
         const newUserRef = db.collection('users').doc();
+        // 為新玩家設定所有預設欄位
         await newUserRef.set({
             username,
             gender,
@@ -56,7 +70,7 @@ router.post('/register', async (req, res) => {
             ...DEFAULT_USER_FIELDS,
         });
         
-        const skillsCollectionRef = db.collection('users').doc(newUserRef.id).collection('skills');
+        const skillsCollectionRef = newUserRef.collection('skills');
         await skillsCollectionRef.doc('現代搏擊').set({
             name: '現代搏擊',
             type: '拳腳',
@@ -106,9 +120,9 @@ router.post('/register', async (req, res) => {
             month: 1,
             day: 1
         };
-        await db.collection('users').doc(newUserRef.id).collection('game_saves').doc('R0').set(roundZeroData);
+        await newUserRef.collection('game_saves').doc('R0').set(roundZeroData);
 
-        const token = require('jsonwebtoken').sign(
+        const token = jwt.sign(
             { userId: newUserRef.id, username: username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
@@ -150,9 +164,11 @@ router.post('/login', async (req, res) => {
 
         const batch = db.batch();
         
+        // 【核心修改】為老玩家自動修補資料庫結構
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
                 const updatePayload = {};
+                // 特殊處理，確保最大值成就不會被重置
                 if (field === 'maxInternalPowerAchieved') {
                     updatePayload[field] = userData.internalPower || defaultValue;
                 } else if (field === 'maxExternalPowerAchieved') {
@@ -215,7 +231,7 @@ router.post('/login', async (req, res) => {
         await batch.commit();
         console.log(`[資料庫維護] 已成功為 ${username} 的舊資料完成健康檢查與修補。`);
 
-        const token = require('jsonwebtoken').sign(
+        const token = jwt.sign(
             { userId: userId, username: userData.username },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
