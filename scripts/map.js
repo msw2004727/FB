@@ -1,17 +1,20 @@
 // scripts/map.js
-import { backendBaseUrl } from './config.js';
+import { api } from './api.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const mapContent = document.getElementById('map-content');
-    const API_URL = `${backendBaseUrl}/api/map/world-map`;
+    
+    // 【核心修改】登入守衛，確保在發送請求前有token
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+        mapContent.innerHTML = '<p class="loading-text">請先登入，才能查看您的個人輿圖。</p>';
+        setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+        return;
+    }
 
     try {
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || '無法從輿圖司獲取地圖資料。');
-        }
-        const data = await response.json();
+        // 【核心修改】使用 api 物件發起請求，它會自動攜帶 token
+        const data = await api.getMap();
 
         if (data && data.mermaidSyntax) {
             // 清空載入中提示
@@ -25,7 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             mapContent.appendChild(mermaidContainer);
             
             // 執行渲染
-            // Mermaid.js 會自動找到 class="mermaid" 的元素並將其轉換為SVG圖表
             await window.mermaid.run();
 
         } else {
