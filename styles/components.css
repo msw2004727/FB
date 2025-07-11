@@ -50,7 +50,7 @@ body.dark-theme .welcome-card {
     color: var(--light-accent);
     border-bottom: 1px solid var(--light-border);
     padding-bottom: 0.5rem;
-    font-weight: bold; /* 【核心修正】重新將粗體樣式加回來 */
+    font-weight: bold;
 }
 body.dark-theme .info-card h4 {
     color: var(--dark-accent);
@@ -65,18 +65,9 @@ body.dark-theme .info-card h4 {
 
 /* 瀕死倒數計時器樣式 */
 @keyframes pulse-red {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.05);
-        opacity: 0.7;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
 }
 .death-countdown {
     margin-top: 0.75rem;
@@ -94,7 +85,6 @@ body.dark-theme .death-countdown {
     color: #f5c6cb;
     border-color: #8c2a34;
 }
-
 
 /* 地點資訊欄的專屬樣式 */
 #location-info .location-ruler {
@@ -119,7 +109,6 @@ body.dark-theme #location-info .location-desc {
     color: var(--dark-text-secondary);
 }
 
-
 /* 卡片標題 Flex 容器 */
 .card-header-flex {
     display: flex;
@@ -132,7 +121,6 @@ body.dark-theme #location-info .location-desc {
 body.dark-theme .card-header-flex {
     border-bottom-color: var(--dark-border);
 }
-
 .card-header-flex h4 {
     margin: 0;
     border-bottom: none;
@@ -224,7 +212,6 @@ body.dark-theme .header-icon-btn:hover {
 .header-icon-btn .fas {
     margin: 0;
 }
-
 
 /* --- AI 模型選擇器 --- */
 .select-wrapper {
@@ -334,18 +321,10 @@ body.dark-theme .npc-sworn_enemy { color: #ff2424; }
     font-size: 0.85rem;
     font-weight: bold;
 }
-.morality-label.evil {
-    color: var(--morality-evil-light);
-}
-body.dark-theme .morality-label.evil {
-    color: var(--morality-evil-dark);
-}
-.morality-label.justice {
-    color: var(--morality-justice-light);
-}
-body.dark-theme .morality-label.justice {
-    color: var(--morality-justice-dark);
-}
+.morality-label.evil { color: var(--morality-evil-light); }
+body.dark-theme .morality-label.evil { color: var(--morality-evil-dark); }
+.morality-label.justice { color: var(--morality-justice-light); }
+body.dark-theme .morality-label.justice { color: var(--morality-justice-dark); }
 .morality-bar-background {
     flex-grow: 1;
     height: 8px;
@@ -354,9 +333,7 @@ body.dark-theme .morality-label.justice {
     position: relative;
     overflow: hidden;
 }
-body.dark-theme .morality-bar-background {
-    background-color: var(--dark-border);
-}
+body.dark-theme .morality-bar-background { background-color: var(--dark-border); }
 .morality-bar-indicator {
     position: absolute;
     top: 0;
@@ -369,9 +346,7 @@ body.dark-theme .morality-bar-background {
     transform: translateX(-50%);
     transition: left 0.5s ease-out, background-color 0.5s ease;
 }
-body.dark-theme .morality-bar-indicator {
-    background-color: var(--morality-neutral-dark);
-}
+body.dark-theme .morality-bar-indicator { background-color: var(--morality-neutral-dark); }
 
 /* --- 內功外功進度條樣式 --- */
 .power-display {
@@ -385,43 +360,26 @@ body.dark-theme .morality-bar-indicator {
     width: 3em;
     color: var(--light-text-secondary);
 }
-body.dark-theme .power-label {
-    color: var(--dark-text-secondary);
-}
+body.dark-theme .power-label { color: var(--dark-text-secondary); }
 .power-bar-container {
     flex-grow: 1;
     height: 10px;
     background-color: var(--light-border);
     border-radius: 5px;
 }
-body.dark-theme .power-bar-container {
-    background-color: var(--dark-border);
-}
+body.dark-theme .power-bar-container { background-color: var(--dark-border); }
 .power-bar {
     height: 100%;
     width: 0%;
     border-radius: 5px;
     transition: width 0.5s ease-out;
 }
-#internal-power-bar {
-    background-color: var(--internal-power-color-light);
-}
-body.dark-theme #internal-power-bar {
-    background-color: var(--internal-power-color-dark);
-}
-#external-power-bar {
-    background-color: var(--external-power-color-light);
-}
-body.dark-theme #external-power-bar {
-    background-color: var(--external-power-color-dark);
-}
-/* 【核心新增】精力條樣式 */
-#stamina-bar {
-    background-color: var(--stamina-color-light);
-}
-body.dark-theme #stamina-bar {
-    background-color: var(--stamina-color-dark);
-}
+#internal-power-bar { background-color: var(--internal-power-color-light); }
+body.dark-theme #internal-power-bar { background-color: var(--internal-power-color-dark); }
+#external-power-bar { background-color: var(--external-power-color-light); }
+body.dark-theme #external-power-bar { background-color: var(--external-power-color-dark); }
+#stamina-bar { background-color: var(--stamina-color-light); }
+body.dark-theme #stamina-bar { background-color: var(--stamina-color-dark); }
 
 .power-value {
     font-size: 0.8rem;
@@ -430,9 +388,7 @@ body.dark-theme #stamina-bar {
     min-width: 50px;
     text-align: right;
 }
-body.dark-theme .power-value {
-    color: var(--dark-text-secondary);
-}
+body.dark-theme .power-value { color: var(--dark-text-secondary); }
 
 /* --- 隨機事件訊息 --- */
 .random-event-message {
@@ -448,13 +404,11 @@ body.dark-theme .power-value {
     font-style: italic;
     animation: fadeIn 0.5s ease-in-out;
 }
-
 body.dark-theme .random-event-message {
     border-color: var(--dark-accent);
     background-color: var(--dark-surface-bg);
     color: var(--dark-text-primary);
 }
-
 
 /* --- AI 核心切換提示樣式 --- */
 .ai-switch-notification {
@@ -469,16 +423,12 @@ body.dark-theme .random-event-message {
     font-weight: bold;
     transition: opacity 0.5s ease-in-out;
 }
-
 body.dark-theme .ai-switch-notification {
     color: #a3e6b8;
     background-color: #2e4b37;
     border-color: #3f684e;
 }
-
-.ai-switch-notification.fading-out {
-    opacity: 0;
-}
+.ai-switch-notification.fading-out { opacity: 0; }
 
 /* --- 戀愛事件特殊樣式 --- */
 .romance-event {
@@ -488,263 +438,125 @@ body.dark-theme .ai-switch-notification {
     color: #a6324a;
     font-weight: 600;
 }
-
 body.dark-theme .romance-event {
     border-color: #ff6b81;
     background-color: #4d2b33;
     color: #ffb3c1;
 }
 
-.dashboard-header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 1rem 3.5rem 1rem 1.5rem;
-    border-bottom: 1px solid var(--light-border);
-    flex-shrink: 0;
-}
-body.dark-theme .dashboard-header {
-    border-bottom: 1px solid var(--dark-border);
-}
-.dashboard-header .header-buttons {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.header-action-group {
-    display: flex;
-    align-items: center;
-}
-
-.header-prompt-text {
-    font-size: 0.75rem;
-    color: var(--light-text-secondary);
-    margin-right: 0.5rem;
-}
-
-body.dark-theme .header-prompt-text {
-    color: var(--dark-text-secondary);
-}
-
-/* --- 人物見聞卡片樣式 --- */
-#npc-content > div {
-    background-color: var(--light-bg);
-    border: 1px solid var(--light-border);
-    border-left: 3px solid var(--light-accent);
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem; /* 卡片之間的細縫 */
-    transition: background-color 0.2s, border-color 0.2s;
-}
-
-#npc-content > div:last-child {
-    margin-bottom: 0;
-}
-
-body.dark-theme #npc-content > div {
-    background-color: var(--dark-surface-bg);
-    border-color: var(--dark-border);
-    border-left-color: var(--dark-accent);
-}
-
-/* --- 隨身物品卡片樣式 --- */
-#itm-content > div {
-    background-color: var(--light-bg);
-    border: 1px solid var(--light-border);
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem; /* 卡片之間的細縫 */
-    transition: background-color 0.2s, border-color 0.2s;
-}
-
-#itm-content > div:last-child {
-    margin-bottom: 0;
-}
-
-body.dark-theme #itm-content > div {
-    background-color: var(--dark-surface-bg);
-    border-color: var(--dark-border);
-}
-
-/* --- 懸賞按鈕發光提示 --- */
-@keyframes pulse-glow {
-    0% {
-        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
-    }
-}
-
-body.dark-theme @keyframes pulse-glow {
-    0% {
-        box-shadow: 0 0 0 0 rgba(255, 204, 102, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(255, 204, 102, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(255, 204, 102, 0);
-    }
-}
-
-#bounties-btn.has-new-bounty {
-    animation: pulse-glow 2s infinite;
-    border-color: #ffc107;
-    color: #ffc107;
-}
-
-body.dark-theme #bounties-btn.has-new-bounty {
-    border-color: #ffca2c;
-    color: #ffca2c;
-}
-
-/* --- NPC 互動選單樣式 --- */
-.npc-interaction-menu {
-    position: absolute;
-    background-color: var(--light-surface-bg);
-    border: 1px solid var(--light-border);
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    padding: 0.5rem;
-    display: flex;
-    gap: 0.5rem;
-    align-items: center; /* 【核心新增】垂直置中按鈕與文字 */
-    z-index: 50; /* 確保在故事文字之上 */
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(10px);
-    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
-}
-
-.npc-interaction-menu.visible {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-body.dark-theme .npc-interaction-menu {
-    background-color: #31313a;
-    border-color: var(--dark-border);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-}
-
-.npc-interaction-btn {
-    background: none;
-    border: 1px solid var(--light-border);
-    border-radius: 6px;
-    padding: 0.6rem 1rem;
+/* --- 【核心新增】負重狀態樣式 --- */
+.bulk-status-display {
     font-family: var(--font-sans);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: bold;
-    cursor: pointer;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+}
+.bulk-light { background-color: #e7f5ff; color: #1c7ed6; }
+.bulk-medium { background-color: #fff9db; color: #f59f00; }
+.bulk-heavy { background-color: #fff5f5; color: #c92a2a; }
+.bulk-extreme { background-color: #343a40; color: #fff; }
+body.dark-theme .bulk-light { background-color: #223a54; color: #74c0fc; }
+body.dark-theme .bulk-medium { background-color: #5d4d1c; color: #ffd43b; }
+body.dark-theme .bulk-heavy { background-color: #5c2b30; color: #ff8787; }
+body.dark-theme .bulk-extreme { background-color: #c92a2a; color: #fff; }
+
+
+/* --- 【核心新增】物品卡片樣式 --- */
+.item-entry {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease-in-out;
+}
+body.dark-theme .item-entry {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+}
+.item-entry.equipped {
+    border-left: 4px solid var(--light-accent);
+    background-color: var(--light-surface-bg);
+}
+body.dark-theme .item-entry.equipped {
+    border-left-color: var(--dark-accent);
+    background-color: var(--dark-bg);
+}
+
+.item-info {
+    display: flex;
+    flex-direction: column;
+}
+.item-name {
+    font-weight: bold;
+}
+.item-quantity {
+    font-size: 0.8rem;
+    color: var(--light-text-secondary);
+}
+
+.item-controls {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    transition: background-color 0.2s, color 0.2s;
 }
 
-body.dark-theme .npc-interaction-btn {
-    border-color: var(--dark-border);
-    color: var(--dark-text-secondary);
+/* 裝備部位圖示 */
+.equipped-slot-icon {
+    color: var(--light-accent);
+    font-size: 1rem;
+    width: 1.2em;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.equipped-slot-icon.visible {
+    opacity: 1;
+}
+body.dark-theme .equipped-slot-icon {
+    color: var(--dark-accent);
 }
 
-.npc-interaction-btn:hover {
-    background-color: var(--light-bg);
+/* 開關樣式 */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
 }
-
-body.dark-theme .npc-interaction-btn:hover {
-    background-color: var(--dark-surface-bg);
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
 }
-
-.npc-interaction-btn.chat {
-    color: var(--light-text-primary);
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
 }
-body.dark-theme .npc-interaction-btn.chat {
-    color: var(--dark-text-primary);
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
 }
-
-.npc-interaction-btn.attack {
-    color: #c92a2a;
+input:checked + .slider {
+    background-color: #28a745; /* 綠色 */
 }
-body.dark-theme .npc-interaction-btn.attack {
-    color: #ff6b6b;
-}
-
-.npc-interaction-btn.attack:hover {
-    background-color: #fff5f5;
-    border-color: #c92a2a;
-}
-body.dark-theme .npc-interaction-btn.attack:hover {
-    background-color: #4d2b33;
-    border-color: #ff6b6b;
-}
-
-/* 【核心新增】確認流程的專屬樣式 */
-.confirm-prompt-text {
-    font-size: 0.9rem;
-    font-weight: bold;
-    color: var(--light-text-secondary);
-    padding: 0 0.5rem;
-}
-body.dark-theme .confirm-prompt-text {
-    color: var(--dark-text-secondary);
-}
-
-.npc-interaction-btn.confirm-attack {
-    background-color: #c92a2a;
-    color: #fff;
-    border-color: #c92a2a;
-}
-.npc-interaction-btn.confirm-attack:hover {
-    background-color: #a12222;
-}
-body.dark-theme .npc-interaction-btn.confirm-attack {
-     background-color: #ff6b6b;
-     color: var(--dark-bg);
-     border-color: #ff6b6b;
-}
-body.dark-theme .npc-interaction-btn.confirm-attack:hover {
-    background-color: #e54865;
-}
-
-.npc-interaction-btn.cancel-attack {
-    background-color: transparent;
-    color: var(--light-text-secondary);
-}
-body.dark-theme .npc-interaction-btn.cancel-attack {
-    color: var(--dark-text-secondary);
-}
-
-/* 【核心修改】刪除了之前為 mobile 添加的固定定位規則 */
-
-/* --- 【本次新增】禁用按鈕的樣式 --- */
-.npc-interaction-btn:disabled {
-    color: #adb5bd;
-    border-color: #dee2e6;
-    background-color: #f8f9fa;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-.npc-interaction-btn:disabled:hover {
-    color: #adb5bd;
-    border-color: #dee2e6;
-    background-color: #f8f9fa;
-}
-
-body.dark-theme .npc-interaction-btn:disabled {
-    color: #6c757d;
-    border-color: #495057;
-    background-color: #343a40;
-}
-
-body.dark-theme .npc-interaction-btn:disabled:hover {
-    color: #6c757d;
-    border-color: #495057;
-    background-color: #343a40;
+input:checked + .slider:before {
+    transform: translateX(20px);
 }
