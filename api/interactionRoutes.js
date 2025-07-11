@@ -628,6 +628,55 @@ const finalizeCombatHandler = async (req, res) => {
     }
 };
 
+router.post('/end-chat', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { npcName, fullChatHistory, model: playerModelChoice } = req.body;
+
+    if (!npcName || !fullChatHistory) {
+        return res.status(400).json({ message: '缺少必要的對話數據。' });
+    }
+
+    try {
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+        const summaryDoc = await summaryDocRef.get();
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "對話發生在一個未知的時間點。";
+        
+        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        if (lastSaveSnapshot.empty) {
+            return res.status(404).json({ message: "找不到玩家存檔。" });
+        }
+        let lastRoundData = lastSaveSnapshot.docs[0].data();
+        
+        const chatSummary = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory);
+        
+        let newRoundData = { ...lastRoundData, R: lastRoundData.R + 1 };
+        newRoundData.EVT = chatSummary;
+        newRoundData.story = `你結束了與${npcName}的交談，${chatSummary}。`;
+        newRoundData.PC = `你與${npcName}深入交談了一番。`;
+
+        const newSummary = await getAISummary(longTermSummary, newRoundData);
+        const suggestion = await getAISuggestion(newRoundData);
+        newRoundData.suggestion = suggestion;
+        
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+        await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundData.R });
+        
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
+
+        res.json({
+            story: newRoundData.story,
+            roundData: newRoundData,
+            suggestion: newRoundData.suggestion,
+        });
+
+    } catch (error) {
+        console.error(`[結束對話系統] 替玩家 ${username} 總結與 ${npcName} 的對話時出錯:`, error);
+        res.status(500).json({ message: '總結對話時發生內部錯誤。' });
+    }
+});
+
 router.post('/finalize-combat', finalizeCombatHandler);
 
 module.exports = router;
