@@ -113,8 +113,22 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const systemInteractionRules = getSystemInteractionRule({
         locationName: locationContext?.locationName
     });
+    
+    // 【核心修改】將 getOutputStructureRule 移到此處，並在內部強化 EVT 規則
+    const getOutputStructureRuleWithEnforcedEVT = (promptData) => {
+        const originalRule = getOutputStructureRule(promptData);
+        const enhancedEvtRule = `
+    - EVT: (字串) 事件摘要
+      - **【強制鐵律】此欄位為必填，絕對不能留空！** 你必須為**任何行動**（包括旅行、對話、戰鬥、發呆）都提煉一個簡潔、有意境的「章回標題」，通常為四到八個字。
+      - **【風格鐵律】絕對禁止用玩家姓名「${username}」作為標題的開頭。**
+      - **【佳例】**：「初探無名村」、「偶遇黑衣人」、「瀑下習劍」、「丹房竊藥」、「揭榜領懸賞」、「遠赴開封府」。
+      - **【劣例】**：「${username}在瀑布下練習劍法」、「${username}走進了村莊」、「第1回」。`;
+        
+        // 使用正則表達式替換掉原有的 EVT 規則
+        return originalRule.replace(/- EVT: \(字串\) 事件摘要[^`]+```/, enhancedEvtRule);
+    };
 
-    const outputStructureRules = getOutputStructureRule({
+    const outputStructureRules = getOutputStructureRuleWithEnforcedEVT({
         username,
         timeSequence
     });
