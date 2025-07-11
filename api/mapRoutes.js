@@ -7,7 +7,7 @@ const db = admin.firestore();
 
 /**
  * @route   GET /api/map/world-map
- * @desc    獲取整個遊戲世界的地圖資料 (支援多層級結構)
+ * @desc    獲取整個遊戲世界的地圖資料 (重構版)
  * @access  Public
  */
 router.get('/world-map', async (req, res) => {
@@ -19,16 +19,24 @@ router.get('/world-map', async (req, res) => {
         }
 
         const locations = new Map();
+        const idMap = new Map();
+        let mermaidIdCounter = 0;
+
+        // 步驟一：遍歷所有地點，為每個地點創建一個安全的內部ID
         locationsSnapshot.forEach(doc => {
-            const data = doc.data();
-            const id = (data.locationId || doc.id).replace(/[^a-zA-Z0-9_]/g, ''); // 淨化ID，避免特殊字元
-            locations.set(doc.id, { id: id, originalId: doc.id, ...data });
+            const originalId = doc.id;
+            const safeId = `loc${mermaidIdCounter++}`;
+            idMap.set(originalId, safeId);
+            locations.set(originalId, {
+                safeId: safeId,
+                ...doc.data()
+            });
         });
 
-        // 1. 開始建構語法
+        // 步驟二：開始建構Mermaid語法
         let mermaidSyntax = 'graph TD;\n';
 
-        // 2. 定義所有節點及其樣式
+        // 步驟三：使用安全ID定義所有節點和樣式
         mermaidSyntax += '    %% --- Node Definitions & Styles ---\n';
         const typeStyles = {
             '城市': 'fill:#ffe8d6,stroke:#8c6f54,stroke-width:2px,color:#3a2d21',
@@ -39,39 +47,40 @@ router.get('/world-map', async (req, res) => {
             '自然景觀': 'fill:#e6fcf5,stroke:#20c997,stroke-width:1px,color:#000',
         };
 
-        locations.forEach(loc => {
-            mermaidSyntax += `    ${loc.id}["${loc.locationName}"];\n`;
+        locations.forEach((loc) => {
+            // 正確的節點定義語法： safeId["中文名稱"]
+            mermaidSyntax += `    ${loc.safeId}["${loc.locationName}"];\n`;
             if (typeStyles[loc.locationType]) {
-                mermaidSyntax += `    style ${loc.id} ${typeStyles[loc.locationType]};\n`;
+                mermaidSyntax += `    style ${loc.safeId} ${typeStyles[loc.locationType]};\n`;
             }
         });
 
-        // 3. 定義所有連結
+        // 步驟四：使用安全ID定義所有連結
         mermaidSyntax += '\n    %% --- Link Definitions ---\n';
         const definedLinks = new Set();
-        locations.forEach(loc => {
+        locations.forEach((loc, originalId) => {
             // 層級關係連結
-            if (loc.parentLocation && locations.has(loc.parentLocation)) {
-                const parentId = locations.get(loc.parentLocation).id;
-                const childId = loc.id;
-                const linkKey = `${parentId}-->${childId}`;
+            if (loc.parentLocation && idMap.has(loc.parentLocation)) {
+                const parentSafeId = idMap.get(loc.parentLocation);
+                const childSafeId = loc.safeId;
+                const linkKey = `${parentSafeId}-->${childSafeId}`;
                 if (!definedLinks.has(linkKey)) {
-                    mermaidSyntax += `    ${parentId} -->|包含| ${childId};\n`;
+                    mermaidSyntax += `    ${parentSafeId} -->|包含| ${childSafeId};\n`;
                     definedLinks.add(linkKey);
                 }
             }
             // 鄰近地點連結
             if (loc.geography && Array.isArray(loc.geography.nearbyLocations)) {
                 loc.geography.nearbyLocations.forEach(neighbor => {
-                    if (neighbor.name && locations.has(neighbor.name)) {
-                        const sourceId = loc.id;
-                        const targetId = locations.get(neighbor.name).id;
-                        const sortedIds = [sourceId, targetId].sort();
+                    if (neighbor.name && idMap.has(neighbor.name)) {
+                        const sourceSafeId = loc.safeId;
+                        const targetSafeId = idMap.get(neighbor.name);
+                        const sortedIds = [sourceSafeId, targetSafeId].sort();
                         const linkKey = `${sortedIds[0]}---${sortedIds[1]}`;
 
                         if (!definedLinks.has(linkKey)) {
                             const travelTime = neighbor.travelTime || '...';
-                            mermaidSyntax += `    ${sourceId} -.-|"${travelTime}"| ${targetId};\n`; // 使用虛線表示鄰近
+                            mermaidSyntax += `    ${sourceSafeId} -.-|"${travelTime}"| ${targetSafeId};\n`;
                             definedLinks.add(linkKey);
                         }
                     }
