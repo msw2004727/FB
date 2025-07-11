@@ -48,6 +48,7 @@ function showNpcInteractionMenu(targetElement, npcName, isDeceased = false) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
+// 第一層：顯示戰鬥意圖選項
 function showAttackIntention(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
@@ -61,6 +62,7 @@ function showAttackIntention(event) {
     });
 }
 
+// 第二層：顯示最終確認
 function showFinalConfirmation(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
@@ -89,6 +91,7 @@ function showFinalConfirmation(event) {
 function handleStrategySelection(strategy) {
     gameState.combat.selectedStrategy = strategy;
     gameState.combat.selectedSkill = null; 
+    gameState.combat.selectedPowerLevel = 1;
 
     document.querySelectorAll('.strategy-btn').forEach(btn => {
         btn.classList.toggle('selected', btn.dataset.strategy === strategy);
@@ -101,7 +104,6 @@ function handleStrategySelection(strategy) {
 
     const playerSkills = gameState.combat.state?.player?.skills || [];
     
-    // 【核心修改】擴充對應表，加入輔助和治癒
     const categoryMap = { 
         'attack': '攻擊', 
         'defend': '防禦', 
@@ -115,31 +117,76 @@ function handleStrategySelection(strategy) {
 
     if (relevantSkills.length > 0) {
         relevantSkills.forEach(skill => {
-            const skillBtn = document.createElement('button');
-            skillBtn.className = 'skill-btn';
-            skillBtn.dataset.skillName = skill.skillName;
-            skillBtn.innerHTML = `
-                <span class="skill-name">${skill.skillName} (L${skill.level})</span>
-                <span class="skill-cost">內力 ${skill.cost || 5}</span>
+            const skillControl = document.createElement('div');
+            skillControl.className = 'skill-controls';
+            skillControl.dataset.skillName = skill.skillName;
+
+            skillControl.innerHTML = `
+                <button class="skill-btn">
+                    <span class="skill-name">${skill.skillName} (L${skill.level})</span>
+                    <span class="skill-cost" data-base-cost="${skill.cost || 5}">內力 ${skill.cost || 5}</span>
+                </button>
+                <div class="power-level-adjuster">
+                    <input type="range" class="power-level-slider" min="1" max="${skill.level}" value="1" step="1">
+                    <span class="power-level-display">1 成</span>
+                </div>
             `;
-            skillBtn.addEventListener('click', () => handleSkillSelection(skill.skillName));
-            skillSelectionContainer.appendChild(skillBtn);
+            
+            skillControl.querySelector('.skill-btn').addEventListener('click', () => handleSkillSelection(skill.skillName));
+            
+            const slider = skillControl.querySelector('.power-level-slider');
+            slider.addEventListener('input', () => {
+                const powerLevel = slider.value;
+                skillControl.querySelector('.power-level-display').textContent = `${powerLevel} 成`;
+                
+                const costSpan = skillControl.querySelector('.skill-cost');
+                const baseCost = parseInt(costSpan.dataset.baseCost, 10);
+                costSpan.textContent = `內力 ${baseCost * powerLevel}`;
+
+                if (gameState.combat.selectedSkill === skill.skillName) {
+                    gameState.combat.selectedPowerLevel = parseInt(powerLevel, 10);
+                }
+            });
+
+            skillSelectionContainer.appendChild(skillControl);
         });
     } else {
          skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
     }
     
-    // 迴避策略不需要選擇技能，可以直接確認
-    if (strategy === 'evade') {
+    if (strategy === 'evade' || relevantSkills.length === 0) {
          if (confirmBtn) confirmBtn.disabled = false;
     }
 }
 
 function handleSkillSelection(skillName) {
+    // 如果點擊的是已經選中的技能，則取消選取
+    if (gameState.combat.selectedSkill === skillName) {
+        gameState.combat.selectedSkill = null;
+        gameState.combat.selectedPowerLevel = null;
+        document.querySelector(`.skill-controls[data-skill-name="${skillName}"]`)?.classList.remove('selected');
+        document.getElementById('combat-confirm-btn').disabled = true;
+        return;
+    }
+
     gameState.combat.selectedSkill = skillName;
-    document.querySelectorAll('.skill-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.skillName === skillName);
+    gameState.combat.selectedPowerLevel = 1; 
+
+    document.querySelectorAll('.skill-controls').forEach(control => {
+        const isSelected = control.dataset.skillName === skillName;
+        control.classList.toggle('selected', isSelected);
+        if (isSelected) {
+            const slider = control.querySelector('.power-level-slider');
+            const display = control.querySelector('.power-level-display');
+            const costSpan = control.querySelector('.skill-cost');
+            const baseCost = parseInt(costSpan.dataset.baseCost, 10);
+            
+            if(slider) slider.value = 1;
+            if(display) display.textContent = `1 成`;
+            if(costSpan) costSpan.textContent = `內力 ${baseCost}`;
+        }
     });
+    
     const confirmBtn = document.getElementById('combat-confirm-btn');
     if (confirmBtn) confirmBtn.disabled = false;
 }
@@ -402,9 +449,9 @@ export async function handleConfirmCombatAction() {
         return;
     }
     
-    const hasRelevantSkills = (gameState.combat.state?.player?.skills || []).some(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避', support: '輔助', heal: '治癒'}[gameState.combat.selectedStrategy]);
+    const relevantSkills = (gameState.combat.state?.player?.skills || []).filter(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避', support: '輔助', heal: '治癒'}[gameState.combat.selectedStrategy]);
 
-    if (gameState.combat.selectedStrategy !== 'evade' && hasRelevantSkills && !gameState.combat.selectedSkill) {
+    if (gameState.combat.selectedStrategy !== 'evade' && relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
         alert('請選擇一門武學！');
         return;
     }
@@ -415,6 +462,7 @@ export async function handleConfirmCombatAction() {
         const combatActionPayload = {
             strategy: gameState.combat.selectedStrategy,
             skill: gameState.combat.selectedSkill,
+            powerLevel: gameState.combat.selectedPowerLevel || 1, 
             target: gameState.combat.selectedTarget, 
             model: dom.aiModelSelector.value
         };
@@ -429,11 +477,12 @@ export async function handleConfirmCombatAction() {
         if (data.status === 'COMBAT_END') {
             setTimeout(() => endCombat(data.combatResult), 1500);
         } else {
-            document.querySelectorAll('.strategy-btn.selected, .skill-btn.selected').forEach(el => el.classList.remove('selected'));
+            document.querySelectorAll('.strategy-btn.selected, .skill-controls.selected').forEach(el => el.classList.remove('selected'));
             document.getElementById('skill-selection').innerHTML = '<p class="system-message">請先選擇一個策略</p>';
             document.getElementById('combat-confirm-btn').disabled = true;
             gameState.combat.selectedStrategy = null;
             gameState.combat.selectedSkill = null;
+            gameState.combat.selectedPowerLevel = null;
             gameLoop.setLoading(false);
         }
 
