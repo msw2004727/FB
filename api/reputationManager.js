@@ -3,7 +3,7 @@ const admin = require('firebase-admin');
 const db = admin.firestore();
 
 // 定義哪些關係類型是正面的
-const POSITIVE_RELATIONSHIP_TYPES = ['父親', '母親', '兒子', '女兒', '妻子', '丈夫', '兄弟', '姊妹', '師父', '徒弟', '摯友', '愛人', '盟友', '恩人'];
+const POSITIVE_RELATIONSHIP_TYPES = ['父親', '母親', '兒子', '女兒', '妻子', '丈夫', '兄弟', '姊妹', '師父', '徒弟', '摯友', '愛人', '盟友', '恩人', '祖父', '祖母', '孫子', '孫女', '外公', '外婆', '外孫', '外孫女', '堂兄弟', '表兄弟', '堂姊妹', '表姊妹', '族人'];
 // 定義哪些關係類型是負面的
 const NEGATIVE_RELATIONSHIP_TYPES = ['殺父仇人', '殺母仇人', '宿敵', '仇人', '死敵', '叛徒'];
 
@@ -42,12 +42,19 @@ async function processReputationChangesAfterDeath(userId, deceasedNpcNames, murd
             const relatedNpcs = {};
             for (const type of POSITIVE_RELATIONSHIP_TYPES) {
                 if (deceasedRelationships[type]) {
-                    relatedNpcs[deceasedRelationships[type]] = { type: 'friend', relationship: type, source: deceasedNpcName };
+                    // 如果一個關係類型有多個NPC（例如多個'兒子'），則處理陣列
+                    const names = Array.isArray(deceasedRelationships[type]) ? deceasedRelationships[type] : [deceasedRelationships[type]];
+                    for (const name of names) {
+                        relatedNpcs[name] = { type: 'friend', relationship: type, source: deceasedNpcName };
+                    }
                 }
             }
             for (const type of NEGATIVE_RELATIONSHIP_TYPES) {
                 if (deceasedRelationships[type]) {
-                    relatedNpcs[deceasedRelationships[type]] = { type: 'enemy', relationship: type, source: deceasedNpcName };
+                    const names = Array.isArray(deceasedRelationships[type]) ? deceasedRelationships[type] : [deceasedRelationships[type]];
+                     for (const name of names) {
+                        relatedNpcs[name] = { type: 'enemy', relationship: type, source: deceasedNpcName };
+                    }
                 }
             }
 
