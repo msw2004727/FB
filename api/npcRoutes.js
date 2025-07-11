@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion, getAISummary, getAIPerNpcSummary } = require('../services/aiService');
-const { getMergedNpcProfile, getFriendlinessLevel } = require('./npcHelpers');
+const { getMergedNpcProfile, getFriendlinessLevel, updateNpcMemoryAfterInteraction } = require('./npcHelpers');
 const { getRawInventory, getInventoryState, updateInventory, getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const { getKnownNpcNames } = require('./cacheManager');
@@ -65,7 +65,6 @@ router.get('/start-trade/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到交易對象。' });
         }
         
-        // 【核心新增】交易前的位置檢查
         if (latestSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到玩家位置資訊，無法開啟交易。' });
         }
@@ -263,6 +262,9 @@ router.post('/give-item', async (req, res) => {
         const baseNarrative = await getAINarrativeForGive(lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
         newRoundData.story = baseNarrative + giftNarrative;
         
+        // 【核心新增】在贈予物品後，更新NPC的記憶
+        await updateNpcMemoryAfterInteraction(userId, npcName, `你贈予了我「${itemName || amount + '文錢'}」，我的反應是：「${npc_response}」。`);
+        
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(longTermSummary, newRoundData),
             getAISuggestion(newRoundData)
@@ -299,16 +301,18 @@ router.post('/confirm-trade', async (req, res) => {
     }
     
     try {
+        // 使用Firestore事務來確保數據一致性，這是此路由的核心。
         await db.runTransaction(async (transaction) => {
             const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
+            // 處理物品交換的內部函式
             const handleItems = async (items, owner) => {
                 for (const item of items) {
                     const docRef = owner === 'player' ? playerInventoryRef.doc(item.id) : null;
                     const doc = docRef ? await transaction.get(docRef) : null;
                     
-                    if (owner === 'player') {
+                    if (owner === 'player') { // 從玩家移動到NPC
                         if (doc && doc.exists) {
                             const currentQty = doc.data().quantity || 0;
                             if (currentQty > item.quantity) {
@@ -320,9 +324,12 @@ router.post('/confirm-trade', async (req, res) => {
                         const npcFieldPath = `inventory.${item.name}`;
                         transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(item.quantity) } }, { merge: true });
 
-                    } else {
+                    } else { // 從NPC移動到玩家
                         const npcFieldPath = `inventory.${item.name}`;
                         transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(-item.quantity) } }, { merge: true });
+                        // 注意：因為 updateInventory 內部有自己的資料庫操作，它不能被直接包在事務中。
+                        // 這是一個設計上的權衡，假設玩家獲得物品的失敗率遠低於失去物品。
+                        // 在更複雜的系統中，這裡可能需要更精細的處理。
                         await updateInventory(userId, [{ action: 'add', itemName: item.name, quantity: item.quantity }], {});
                     }
                 }
@@ -339,6 +346,9 @@ router.post('/confirm-trade', async (req, res) => {
         const newRoundNumber = lastRoundData.R + 1;
 
         const inventoryState = await getInventoryState(userId);
+        const playerItems = tradeState.player.offer.items.map(i => i.name).join('、') || '無';
+        const npcItems = tradeState.npc.offer.items.map(i => i.name).join('、') || '無';
+        const tradeNarrative = `我用「${playerItems}」換來了你的「${npcItems}」。`;
 
         const finalRoundData = {
             ...lastRoundData,
@@ -352,6 +362,8 @@ router.post('/confirm-trade', async (req, res) => {
 
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);
         await invalidateNovelCache(userId);
+        
+        await updateNpcMemoryAfterInteraction(userId, npcName, tradeNarrative);
 
         res.json({
             message: '交易成功！',
@@ -379,27 +391,24 @@ router.post('/end-chat', async (req, res) => {
 
     try {
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
-        const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
-
-        const [summaryDoc, npcStateDoc, lastSaveSnapshot] = await Promise.all([
+        
+        const [summaryDoc, lastSaveSnapshot] = await Promise.all([
             summaryDocRef.get(),
-            npcStateRef.get(),
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
         
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : "對話發生在一個未知的時間點。";
-        const oldInteractionSummary = npcStateDoc.exists ? npcStateDoc.data().interactionSummary : `你與${npcName}的交往尚淺。`;
         
         if (lastSaveSnapshot.empty) {
             return res.status(404).json({ message: "找不到玩家存檔。" });
         }
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         
-        const [chatSummaryResult, newInteractionSummary] = await Promise.all([
-            getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary),
-            getAIPerNpcSummary(playerModelChoice, npcName, oldInteractionSummary, fullChatHistory)
-        ]);
+        const chatSummaryResult = await getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary);
         
+        const formattedHistory = fullChatHistory.map(line => `${line.speaker}: "${line.message}"`).join('\n');
+        await updateNpcMemoryAfterInteraction(userId, npcName, formattedHistory);
+
         const newRoundNumber = lastRoundData.R + 1;
         let newRoundData = { ...lastRoundData, R: newRoundNumber };
 
@@ -414,7 +423,6 @@ router.post('/end-chat', async (req, res) => {
         const updatePromises = [
             db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData),
             summaryDocRef.set({ text: newOverallSummary, lastUpdated: newRoundNumber }),
-            npcStateRef.set({ interactionSummary: newInteractionSummary }, { merge: true })
         ];
         
         await Promise.all(updatePromises);
