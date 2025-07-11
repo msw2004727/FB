@@ -15,6 +15,7 @@ const {
     updateInventory,
     updateSkills,
     getInventoryState,
+    getPlayerSkills, // 【核心修正】補上遺漏的 getPlayerSkills 引用
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -177,16 +178,13 @@ const interactRouteHandler = async (req, res) => {
             processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
         ]);
         
-        // --- 【核心修改】將新NPC的建檔過程改為非阻塞式 ---
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const newNpcs = aiResponse.roundData.NPC.filter(npc => npc.isNew);
             if (newNpcs.length > 0) {
                 console.log(`[非同步優化] 偵測到 ${newNpcs.length} 位新NPC，已將建檔任務推入背景執行。`);
-                // Fire-and-forget: 啟動任務，但不等待其完成
                 Promise.all(newNpcs.map(npc => createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, player)));
             }
         }
-        // --- 修改結束 ---
 
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(longTermSummary, aiResponse.roundData),
