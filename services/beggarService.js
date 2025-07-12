@@ -16,36 +16,40 @@ function generateBeggarName() {
     return `${surname}${givenName}`;
 }
 
+// 【核心修改】提供多種隨機登場的劇情描述
+const APPEARANCE_STORIES = [
+    "話音剛落，一個身影如同鬼魅般從你身後的暗巷中閃出，那人衣衫襤褸，一股酸臭味撲面而來，正是丐幫弟子——{beggarName}。",
+    "你正思索間，只覺得衣角被人輕輕一拉。你回頭一看，一個蓬頭垢面的小乞丐正對你擠眉弄眼，壓低聲音說：『客官，可是在找我們？』此人正是丐幫的{beggarName}。",
+    "就在此時，人群中一個不起眼的角落裡，一個看似昏昏欲睡的乞丐突然睜開了眼，徑直向你走來。他身上那股獨特的味道讓你立刻明白，這便是你要找的人——丐幫弟子{beggarName}。",
+    "一陣風吹過，你似乎聞到了一股熟悉的、不太好聞的氣味。下一刻，{beggarName}已經悄無聲息地出現在你三步之外，朝你抱了抱拳，算是打了招呼。"
+];
+
 
 /**
- * 處理玩家呼叫丐幫的請求
+ * 【核心修改】處理玩家呼叫丐幫的請求 (即時處理版)
  * @param {string} userId - 玩家ID
- * @returns {Promise<object>} - 返回一個包含事件標記的物件
+ * @returns {Promise<object>} - 返回包含丐幫弟子姓名和登場故事的物件
  */
 async function handleBeggarSummon(userId) {
-    const userStateRef = db.collection('users').doc(userId).collection('game_state').doc('player_temp_flags');
-    
     const beggarName = generateBeggarName();
-    const summonData = {
-        eventName: 'BEGGAR_SUMMONED',
-        beggarName: beggarName,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
-    };
     
-    await userStateRef.set({ beggarSummon: summonData }, { merge: true });
+    // 從預設的登場故事中隨機選擇一個
+    const randomStoryTemplate = APPEARANCE_STORIES[Math.floor(Math.random() * APPEARANCE_STORIES.length)];
+    const appearanceStory = randomStoryTemplate.replace('{beggarName}', beggarName);
+
+    console.log(`[丐幫服務-即時] 為玩家 ${userId} 生成了臨時丐幫弟子「${beggarName}」。`);
     
-    console.log(`[丐幫服務] 玩家 ${userId} 成功呼叫丐幫，弟子「${beggarName}」將在下一回合出現。`);
-    
+    // 不再操作資料庫，只回傳生成的資訊
     return { 
         success: true, 
-        message: '你發出了丐幫的暗號，靜待回音...',
-        beggarName: beggarName 
+        beggarName: beggarName,
+        appearanceStory: appearanceStory
     };
 }
 
 
 /**
- * 【核心修改】處理玩家向丐幫弟子打聽情報的請求
+ * 處理玩家向丐幫弟子打聽情報的請求
  * @param {string} userId - 玩家ID
  * @param {object} playerProfile - 玩家的完整檔案
  * @param {string} beggarName - 丐幫弟子的名字
@@ -56,7 +60,6 @@ async function handleBeggarSummon(userId) {
 async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery, model) {
     const userDocRef = db.collection('users').doc(userId);
 
-    // 1. 【核心修改】驗證並扣除費用
     const currentMoney = playerProfile.money || 0;
     if (currentMoney < 100) {
         return {
@@ -66,9 +69,7 @@ async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery,
     }
     await userDocRef.update({ money: admin.firestore.FieldValue.increment(-100) });
     console.log(`[丐幫服務] 已從玩家 ${userId} 帳戶扣除100文錢情報費。`);
-    // --- 扣款結束 ---
 
-    // 2. 從玩家的問題中，嘗試找出他想問的目標NPC是誰
     const allNpcNames = getKnownNpcNames();
     const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name) && name !== beggarName);
     
@@ -77,12 +78,10 @@ async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery,
         targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
     }
     
-    // 3. 呼叫AI扮演丐幫弟子
     const prompt = getBeggarInquiryPrompt(playerProfile, targetNpcProfile, userQuery);
     const aiResponseString = await callAI(model || aiConfig.npcChat, prompt, true);
     const inquiryResult = JSON.parse(aiResponseString);
 
-    // 4. 如果情報為真，且有具體目標，可以考慮更新玩家的線索(CLS)
     if (inquiryResult.isTrue && targetNpcName) {
         const userSaveRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R','desc').limit(1);
         const lastSave = (await userSaveRef.get()).docs[0];
