@@ -262,7 +262,6 @@ router.post('/give-item', async (req, res) => {
         const baseNarrative = await getAINarrativeForGive(lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
         newRoundData.story = baseNarrative + giftNarrative;
         
-        // 【核心新增】在贈予物品後，更新NPC的記憶
         await updateNpcMemoryAfterInteraction(userId, npcName, `你贈予了我「${itemName || amount + '文錢'}」，我的反應是：「${npc_response}」。`);
         
         const [newSummary, suggestion] = await Promise.all([
@@ -301,20 +300,37 @@ router.post('/confirm-trade', async (req, res) => {
     }
     
     try {
-        // 使用Firestore事務來確保數據一致性，這是此路由的核心。
         await db.runTransaction(async (transaction) => {
             const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+            const playerMoneyRef = playerInventoryRef.doc('銀兩');
+
+            // --- 【核心修正】開始：處理金錢交換 ---
+            const playerMoneyChange = (tradeState.npc.offer.money || 0) - (tradeState.player.offer.money || 0);
+            
+            if (playerMoneyChange !== 0) {
+                transaction.set(playerMoneyRef, { 
+                    quantity: admin.firestore.FieldValue.increment(playerMoneyChange) 
+                }, { merge: true });
+                
+                // NPC 的金錢是存在 npc_states 文件中的 inventory 物件裡
+                const npcMoneyField = `inventory.銀兩`;
+                transaction.set(npcStateRef, {
+                    inventory: {
+                        '銀兩': admin.firestore.FieldValue.increment(-playerMoneyChange)
+                    }
+                }, { merge: true });
+            }
+            // --- 【核心修正】結束：處理金錢交換 ---
 
             // 處理物品交換的內部函式
             const handleItems = async (items, owner) => {
                 for (const item of items) {
-                    const docRef = owner === 'player' ? playerInventoryRef.doc(item.id) : null;
-                    const doc = docRef ? await transaction.get(docRef) : null;
-                    
                     if (owner === 'player') { // 從玩家移動到NPC
-                        if (doc && doc.exists) {
-                            const currentQty = doc.data().quantity || 0;
+                        const docRef = playerInventoryRef.doc(item.id);
+                        const doc = await transaction.get(docRef);
+                        if (doc.exists) {
+                            const currentQty = doc.data().quantity || 1;
                             if (currentQty > item.quantity) {
                                 transaction.update(docRef, { quantity: admin.firestore.FieldValue.increment(-item.quantity) });
                             } else {
@@ -323,21 +339,28 @@ router.post('/confirm-trade', async (req, res) => {
                         }
                         const npcFieldPath = `inventory.${item.name}`;
                         transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(item.quantity) } }, { merge: true });
-
                     } else { // 從NPC移動到玩家
                         const npcFieldPath = `inventory.${item.name}`;
                         transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(-item.quantity) } }, { merge: true });
-                        // 注意：因為 updateInventory 內部有自己的資料庫操作，它不能被直接包在事務中。
-                        // 這是一個設計上的權衡，假設玩家獲得物品的失敗率遠低於失去物品。
-                        // 在更複雜的系統中，這裡可能需要更精細的處理。
-                        await updateInventory(userId, [{ action: 'add', itemName: item.name, quantity: item.quantity }], {});
+                        // 這裡不能直接在事務中呼叫 updateInventory，我們在外面處理
                     }
                 }
             };
-
+            
             await handleItems(tradeState.player.offer.items, 'player');
             await handleItems(tradeState.npc.offer.items, 'npc');
         });
+
+        // 在事務之外處理玩家獲得NPC物品的邏輯
+        if (tradeState.npc.offer.items.length > 0) {
+            const itemsToAdd = tradeState.npc.offer.items.map(item => ({
+                action: 'add',
+                itemName: item.name,
+                quantity: item.quantity
+            }));
+            await updateInventory(userId, itemsToAdd, {});
+        }
+
 
         console.log(`[交易系統] 玩家 ${username} 與 ${npcName} 的交易成功完成。`);
 
@@ -348,7 +371,11 @@ router.post('/confirm-trade', async (req, res) => {
         const inventoryState = await getInventoryState(userId);
         const playerItems = tradeState.player.offer.items.map(i => i.name).join('、') || '無';
         const npcItems = tradeState.npc.offer.items.map(i => i.name).join('、') || '無';
-        const tradeNarrative = `我用「${playerItems}」換來了你的「${npcItems}」。`;
+        const playerMoneyOffer = tradeState.player.offer.money || 0;
+        const npcMoneyOffer = tradeState.npc.offer.money || 0;
+        
+        let tradeNarrative = `我用「${playerItems}」` + (playerMoneyOffer > 0 ? `和 ${playerMoneyOffer} 文錢` : '') + `換來了你的「${npcItems}」` + (npcMoneyOffer > 0 ? `和 ${npcMoneyOffer} 文錢` : '') + `。`;
+
 
         const finalRoundData = {
             ...lastRoundData,
