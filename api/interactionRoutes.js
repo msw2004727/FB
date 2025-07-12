@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIStory, getAISummary, getAISuggestion } = require('../services/aiService');
-const beggarService = require('../services/beggarService'); // 【核心新增】引入丐幫服務
+const beggarService = require('../services/beggarService'); 
 
 const {
     updateFriendlinessValues,
@@ -39,7 +39,6 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, model: playerModelChoice } = req.body;
 
-        // --- 【核心修改】丐幫關鍵字檢測 ---
         const beggarKeywords = ['丐幫', '乞丐', '打聽', '消息', '情報'];
         const isSummoningBeggar = beggarKeywords.some(keyword => playerAction.includes(keyword));
 
@@ -47,8 +46,6 @@ const interactRouteHandler = async (req, res) => {
             console.log(`[互動路由] 偵測到玩家的丐幫呼叫意圖: "${playerAction}"`);
             const summonResult = await beggarService.handleBeggarSummon(userId);
             
-            // 直接返回一個簡單的回應，告知玩家已發出信號
-            // 主故事AI將在下一回合根據這個信號，安排NPC登場
             const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
             if (lastSaveSnapshot.empty) {
                 return res.status(404).json({ message: '找不到存檔紀錄，無法呼叫丐幫。' });
@@ -72,10 +69,7 @@ const interactRouteHandler = async (req, res) => {
                 locationData: await getMergedLocationData(userId, newRoundData.LOC)
             });
         }
-        // --- 丐幫關鍵字檢測結束 ---
 
-
-        // 如果不是呼叫丐幫，則執行原有的主線劇情邏輯
         const context = await buildContext(userId, username);
         if (!context) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
@@ -101,10 +95,8 @@ const interactRouteHandler = async (req, res) => {
 
         const romanceEventData = await checkAndTriggerRomanceEvent(userId, player);
         
-        // 【核心修改】獲取玩家的臨時狀態，看是否有丐幫弟子要登場
         const playerTempFlagsDoc = await db.collection('users').doc(userId).collection('game_state').doc('player_temp_flags').get();
         const beggarSummonFlag = playerTempFlagsDoc.exists ? playerTempFlagsDoc.data().beggarSummon : null;
-
 
         const aiResponse = await getAIStory(
             playerModelChoice,
@@ -118,7 +110,7 @@ const interactRouteHandler = async (req, res) => {
             player.morality,
             [],
             romanceEventData ? romanceEventData.eventStory : null,
-            beggarSummonFlag, // <-- 將丐幫事件標記傳給AI
+            beggarSummonFlag,
             locationContext,
             npcContext,
             bulkScore,
@@ -126,17 +118,43 @@ const interactRouteHandler = async (req, res) => {
         );
 
         if (!aiResponse || !aiResponse.roundData) {
+            // 在拋出錯誤前記錄更多上下文信息
+            console.error('[互動路由] AI生成失敗！上下文:', {
+                playerAction,
+                model: playerModelChoice,
+                beggarSummonFlag,
+                romanceEventData
+            });
             throw new Error("主AI未能生成有效回應。");
         }
-        
-        // 如果丐幫弟子已經成功登場，則清除標記
-        const arrivedNpcNames = aiResponse.roundData.NPC.map(npc => npc.name);
-        if (beggarSummonFlag && arrivedNpcNames.includes(beggarSummonFlag.beggarName)) {
+
+        // --- 【核心修正】後端主動創建丐幫弟子 ---
+        if (beggarSummonFlag) {
+            const beggarName = beggarSummonFlag.beggarName;
+            // 檢查AI是否已經在NPC列表中創建了該角色
+            const beggarAlreadyExists = aiResponse.roundData.NPC.some(npc => npc.name === beggarName);
+            
+            if (!beggarAlreadyExists) {
+                console.log(`[後端修補] AI未能在JSON中創建丐幫弟子，後端正在手動添加「${beggarName}」...`);
+                aiResponse.roundData.NPC.push({
+                    name: beggarName,
+                    status: `一個衣衫襤褸、渾身散發酸臭味的乞丐悄悄湊到你身邊，低聲道：「客官，是您叫的我？」`,
+                    status_title: "丐幫弟子", // 關鍵的身份標記
+                    friendliness: 'neutral',
+                    friendlinessChange: 0,
+                    isNew: true
+                });
+            } else {
+                 console.log(`[互動路由] AI已成功按指令生成丐幫弟子「${beggarName}」。`);
+            }
+            
+            // 無論AI是否已創建，都清除標記
             await playerTempFlagsDoc.ref.update({
                 beggarSummon: admin.firestore.FieldValue.delete()
             });
-            console.log(`[互動路由] 丐幫弟子 ${beggarSummonFlag.beggarName} 已成功登場，清除召喚標記。`);
+            console.log(`[互動路由] 已清除玩家 ${userId} 的丐幫召喚標記。`);
         }
+        // --- 修正結束 ---
         
         if (!aiResponse.roundData.EVT || aiResponse.roundData.EVT.trim() === '') {
             const fallbackEVT = playerAction.length > 8 ? playerAction.substring(0, 8) + '…' : playerAction;
