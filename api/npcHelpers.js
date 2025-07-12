@@ -314,7 +314,7 @@ module.exports = {
     getMoneyForNpc,
     getFriendlinessLevel,
     getMergedNpcProfile,
-    createNpcProfileInBackground: generateNpcTemplateData, // 將舊函式名指向新的生成函式
+    createNpcProfileInBackground: generateNpcTemplateData, // 讓舊的GM工具呼叫指向新的生成函式
     updateFriendlinessValues,
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
