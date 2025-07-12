@@ -209,8 +209,10 @@ body.dark-theme .offer-money-input input {
 /* --- 【新增】全新交易彈窗樣式 (江湖貨棧版) --- */
 
 #trade-modal {
-    /* 預設隱藏，使用 .visible class 來控制顯示 */
+    /* 預設隱藏，由 .visible 或 Tailwind 的 'hidden'/'flex' class 來控制顯示 */
     display: none; 
+    /* 【核心修正】設定一個非常高的 Z 軸層級，確保它能覆蓋頁面上所有其他元素 */
+    z-index: 1020; 
 }
 
 #trade-modal.visible {
