@@ -135,6 +135,7 @@ async function createNewNpc(userId, username, npcDataFromStory, roundData, playe
         },
         isDeceased: false,
         inventory: { '銀兩': initialMoney },
+        equipment: npcTemplateData.initialEquipment || [], 
         romanceValue: 0,
         friendlinessValue: npcDataFromStory.friendlinessChange || 0,
         triggeredRomanceEvents: []
