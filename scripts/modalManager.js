@@ -38,18 +38,10 @@ const closeSkillsBtn = document.getElementById('close-skills-btn');
 const skillsTabsContainer = document.getElementById('skills-tabs-container');
 const skillsBodyContainer = document.getElementById('skills-body-container');
 
-// --- 【核心新增】丐幫探訪彈窗相關元素 ---
-const beggarInquiryModal = document.getElementById('beggar-inquiry-modal');
-const beggarInquiryConfirmBtn = document.getElementById('beggar-inquiry-confirm');
-const beggarInquiryCancelBtn = document.getElementById('beggar-inquiry-cancel');
-
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
-    console.log("【偵錯點 2】: 收到打開交易視窗的指令！(位於 modalManager.js)");
     const tradeModalEl = document.getElementById('trade-modal');
-    
-    console.log("【偵錯點 2.1】: 抓取到的 #trade-modal 元素是:", tradeModalEl);
     if (!tradeModalEl) {
         console.error("【嚴重錯誤】: 找不到 ID 為 'trade-modal' 的 HTML 元素！請檢查 index.html。");
         return;
@@ -58,12 +50,8 @@ export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallbac
         console.error("【嚴重錯誤】: 傳入的 tradeData 為空！");
         return;
     }
-
     initializeTrade(tradeData, npcName, onTradeComplete, closeCallback);
-    
     tradeModalEl.classList.add('visible'); 
-    
-    console.log("【偵錯點 2.2】: 已將交易視窗設為可見 (已添加 .visible class)。");
 }
 
 export function closeTradeModal() {
@@ -71,45 +59,8 @@ export function closeTradeModal() {
     if (tradeModalEl) {
         tradeModalEl.classList.remove('visible');
         closeTradeUI();
-        console.log("【偵錯】: 交易視窗已關閉 (已移除 .visible class)。");
     }
 }
-
-// --- 【核心新增】丐幫探訪彈窗函式 ---
-/**
- * 開啟丐幫情報探詢確認彈窗
- * @param {function} onConfirm - 當玩家點擊確認後要執行的回呼函式
- */
-export function openBeggarInquiryModal(onConfirm) {
-    if (!beggarInquiryModal) return;
-    
-    beggarInquiryModal.classList.add('visible');
-
-    const confirmHandler = () => {
-        if (typeof onConfirm === 'function') {
-            onConfirm();
-        }
-        closeBeggarInquiryModal();
-    };
-
-    beggarInquiryConfirmBtn.onclick = confirmHandler;
-    beggarInquiryCancelBtn.onclick = closeBeggarInquiryModal;
-}
-
-
-/**
- * 關閉丐幫情報探詢確認彈窗
- */
-export function closeBeggarInquiryModal() {
-    if (beggarInquiryModal) {
-        beggarInquiryModal.classList.remove('visible');
-        // 清理事件監聽器，避免記憶體洩漏
-        beggarInquiryConfirmBtn.onclick = null;
-        beggarInquiryCancelBtn.onclick = null;
-    }
-}
-// --- 新增結束 ---
-
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
@@ -321,15 +272,35 @@ export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.cla
 
 
 // --- 對話彈窗 ---
-export function openChatModalUI(profile) {
-    chatNpcName.textContent = `與 ${profile.name} 交談`;
-    chatNpcInfo.innerHTML = profile.appearance || '';
-    displayRomanceValue(profile.romanceValue);
-    displayFriendlinessBar(profile.friendlinessValue);
+
+/**
+ * 【核心修改】通用聊天彈窗開啟函式
+ * @param {object} profile - NPC的公開資料
+ * @param {string} mode - 'chat' (預設) 或 'inquiry' (情報模式)
+ */
+export function openChatModalUI(profile, mode = 'chat') {
+    if (mode === 'inquiry') {
+        chatNpcName.textContent = `向 ${profile.name} 探聽秘聞`;
+        chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 花費100文錢</span>`;
+    } else {
+        chatNpcName.textContent = `與 ${profile.name} 交談`;
+        chatNpcInfo.innerHTML = profile.appearance || '';
+        displayRomanceValue(profile.romanceValue);
+        displayFriendlinessBar(profile.friendlinessValue);
+    }
+    
+    // 根據模式顯示/隱藏贈禮按鈕和結束交談按鈕
+    giveItemBtn.style.display = mode === 'inquiry' ? 'none' : 'inline-flex';
+    document.querySelector('.chat-footer').style.display = mode === 'inquiry' ? 'none' : 'block';
+
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
     chatModal.classList.add('visible');
+    chatModal.dataset.mode = mode; // 將模式儲存在DOM上
 }
-export function closeChatModal() { chatModal.classList.remove('visible'); }
+
+export function closeChatModal() { 
+    chatModal.classList.remove('visible'); 
+}
 export function appendChatMessage(speaker, message) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `${speaker}-message`;
@@ -344,14 +315,13 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
     try {
-        const inventory = await api.getInventory(); // 獲取物品陣列
+        const inventory = await api.getInventory(); 
         giveInventoryList.innerHTML = '';
         
-        // 【核心修改】直接遍歷陣列
         if (inventory && inventory.length > 0) {
             inventory.forEach(itemData => {
                 if (itemData.quantity > 0) {
-                    const itemName = itemData.itemName || itemData.templateId; // 確保有名字
+                    const itemName = itemData.itemName || itemData.templateId;
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'give-item';
                     itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
@@ -365,7 +335,6 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
                                 alert('請輸入有效的數量。');
                             }
                         } else {
-                            // 對於普通物品，我們傳遞它的唯一實例ID
                             giveItemCallback({ type: 'item', itemId: itemData.instanceId, itemName: itemName });
                         }
                     });
