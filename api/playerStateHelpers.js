@@ -15,15 +15,13 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
         const doc = await templateRef.get();
         if (doc.exists) {
             let templateData = doc.data();
-            // 【核心修改】為舊物品自動修補'bulk'和'equipSlot'欄位，實現向下相容
             let needsUpdate = false;
             if (templateData.bulk === undefined) {
-                templateData.bulk = '中'; // 給予一個合理的預設值
+                templateData.bulk = '中'; 
                 needsUpdate = true;
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 bulk 欄位，自動修補為 "中"。`);
             }
             if (templateData.equipSlot === undefined) {
-                 // 根據物品類型給予一個合理的預設值
                 if (templateData.itemType === '武器') templateData.equipSlot = 'weapon_right';
                 else if (templateData.itemType === '裝備') templateData.equipSlot = 'body';
                 else templateData.equipSlot = null;
@@ -52,10 +50,8 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
 
         if (!newTemplateData.itemName) throw new Error('AI生成的物品模板缺少itemName。');
         
-        // 確保新生成的模板也有預設值，以防AI遺漏
         if (newTemplateData.bulk === undefined) newTemplateData.bulk = '中';
         if (newTemplateData.equipSlot === undefined) newTemplateData.equipSlot = null;
-
 
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await templateRef.set(newTemplateData);
@@ -133,17 +129,24 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
         const isStackable = ['材料', '財寶', '道具', '其他', '秘笈', '書籍'].includes(template.itemType);
 
         if (action === 'add') {
+            const newItemData = {
+                templateId: itemName,
+                isEquipped: false,
+                equipSlot: null,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            };
             if (isStackable) {
                 batch.set(userInventoryRef.doc(itemName), {
-                    templateId: itemName,
+                    ...newItemData,
                     quantity: admin.firestore.FieldValue.increment(quantity)
                 }, { merge: true });
             } else {
                 for (let i = 0; i < quantity; i++) {
-                    batch.set(userInventoryRef.doc(uuidv4()), { templateId: itemName, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+                    batch.set(userInventoryRef.doc(uuidv4()), newItemData);
                 }
             }
         } else if (action === 'remove') {
+            // 注意：簡化版的移除邏輯，先不處理精確移除某個instanceId
             const docRef = userInventoryRef.doc(itemName);
             const doc = await docRef.get(); 
             if (isStackable && doc.exists && doc.data().quantity > quantity) {
@@ -176,22 +179,38 @@ async function getInventoryState(userId) {
     return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
 }
 
+/**
+ * 【重構版 v2】直接獲取完整的物品列表，包含裝備狀態
+ * @param {string} userId - 玩家ID
+ * @returns {Promise<Array<object>>}
+ */
 async function getRawInventory(userId) {
     const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const snapshot = await playerInventoryRef.get();
-    if (snapshot.empty) return {};
-    const inventoryData = {};
-    for (const doc of snapshot.docs) {
+    if (snapshot.empty) return [];
+
+    const inventoryList = [];
+    const itemPromises = snapshot.docs.map(async (doc) => {
         const playerData = doc.data();
         const templateId = playerData.templateId;
-        if (!templateId) continue;
+        if (!templateId) return null;
+
         const templateDataResult = await getOrGenerateItemTemplate(templateId);
         if (templateDataResult?.template) {
-            inventoryData[doc.id] = { ...templateDataResult.template, ...playerData, instanceId: doc.id };
+            return {
+                ...templateDataResult.template, // 模板數據 (名稱, 類型, 數值...)
+                ...playerData,                // 實例數據 (是否裝備, 裝備槽位...)
+                instanceId: doc.id,           // 實例的唯一ID
+                itemName: templateDataResult.template.itemName, // 確保名稱正確
+            };
         }
-    }
-    return inventoryData;
+        return null;
+    });
+
+    const results = await Promise.all(itemPromises);
+    return results.filter(item => item !== null);
 }
+
 
 async function updateSkills(userId, skillChanges, playerProfile) {
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
@@ -274,7 +293,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
     }
     return { levelUpEvents, customSkillCreationResult };
 }
-
 
 async function getPlayerSkills(userId) {
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
