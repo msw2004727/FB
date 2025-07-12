@@ -158,6 +158,7 @@ const interactRouteHandler = async (req, res) => {
             stamina: newStamina,
             shortActionCounter,
             ...finalDate,
+            currentLocation: aiResponse.roundData.LOC || player.currentLocation,
             internalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.internal || 0),
             externalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.external || 0),
             lightness: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.lightness || 0),
