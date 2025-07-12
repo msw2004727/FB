@@ -13,8 +13,9 @@ const {
 } = require('./npcHelpers');
 const {
     updateSkills,
-    getInventoryState,
-    getPlayerSkills,
+    // 【核心修改】引入 getRawInventory 和 calculateBulkScore
+    getRawInventory,
+    calculateBulkScore,
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -106,8 +107,6 @@ const interactRouteHandler = async (req, res) => {
             }
         }
         
-        // 【核心修正】將 updateSkills 從 Promise.all 中移出，並在批次處理前獨立執行。
-        // 因為它內部有自己的獨立事務(Transaction)，不能與批次(Batch)混用。
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, player);
         
         if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -179,15 +178,26 @@ const interactRouteHandler = async (req, res) => {
         invalidateNovelCache(userId);
         updateLibraryNovel(userId, username);
         
-        const [inventoryState, updatedSkills, finalPlayerProfile] = await Promise.all([
-            getInventoryState(userId),
+        // 【核心修改】重新從資料庫獲取最完整的最終狀態，以回傳給前端
+        const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
+            getRawInventory(userId),
             getPlayerSkills(userId),
             userDocRef.get().then(doc => doc.data())
         ]);
         
         const suggestion = await getAISuggestion(finalSaveData);
+        const finalBulkScore = calculateBulkScore(fullInventory);
         
-        const finalRoundDataForClient = { ...finalSaveData, ...finalPlayerProfile, skills: updatedSkills, ...inventoryState, suggestion };
+        // 【核心修改】組合一個包含完整物品陣列的回應物件
+        const finalRoundDataForClient = { 
+            ...finalSaveData, 
+            ...finalPlayerProfile, 
+            skills: updatedSkills, 
+            inventory: fullInventory, // <-- 傳回完整的物品陣列
+            money: finalPlayerProfile.money || 0,
+            bulkScore: finalBulkScore, // <-- 傳回最新的負重分數
+            suggestion: suggestion 
+        };
 
         res.json({
             story: finalSaveData.story,
