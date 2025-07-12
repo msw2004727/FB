@@ -24,17 +24,16 @@ async function fetchApi(endpoint, options = {}) {
 }
 
 export const api = {
-    // Gameplay Routes (主遊戲循環)
+    // Gameplay Routes
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
 
-    // Combat Routes (戰鬥相關)
+    // Combat Routes
     initiateCombat: (body) => fetchApi('/api/game/combat/initiate', { method: 'POST', body: JSON.stringify(body) }),
     combatAction: (body) => fetchApi('/api/game/combat/action', { method: 'POST', body: JSON.stringify(body) }),
     combatSurrender: (body) => fetchApi('/api/game/combat/surrender', { method: 'POST', body: JSON.stringify(body) }),
     finalizeCombat: (body) => fetchApi('/api/game/combat/finalize-combat', { method: 'POST', body: JSON.stringify(body) }),
 
-    // NPC Routes (NPC互動)
-    // 【核心修正】修正了 getNpcProfile 的路徑，移除了多餘的 "npc-"
+    // NPC Routes
     getNpcProfile: (npcName) => fetchApi(`/api/game/npc/profile/${npcName}`),
     startTrade: (npcName) => fetchApi(`/api/game/npc/start-trade/${npcName}`),
     confirmTrade: (body) => fetchApi('/api/game/npc/confirm-trade', { method: 'POST', body: JSON.stringify(body) }),
@@ -42,7 +41,7 @@ export const api = {
     giveItemToNpc: (body) => fetchApi('/api/game/npc/give-item', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/npc/end-chat', { method: 'POST', body: JSON.stringify(body) }),
 
-    // State Routes (玩家狀態與資料)
+    // State Routes
     getLatestGame: () => fetchApi('/api/game/state/latest-game'),
     startNewGame: () => fetchApi('/api/game/state/restart', { method: 'POST' }),
     forceSuicide: (body) => fetchApi('/api/game/state/force-suicide', { method: 'POST', body: JSON.stringify(body) }),
@@ -53,16 +52,20 @@ export const api = {
     getSkills: () => fetchApi('/api/game/state/skills'),
     equipItem: (body) => fetchApi('/api/game/state/equip', { method: 'POST', body: JSON.stringify(body) }),
 
-    // Bounty Route (懸賞任務)
+    // Bounty Route
     getBounties: () => fetchApi('/api/bounties'),
 
-    // Epilogue Route (結局)
+    // Epilogue Route
     getEpilogue: () => fetchApi('/api/epilogue'),
 
-    // Map Route (地圖)
+    // Map Route
     getMap: () => fetchApi('/api/map/world-map'),
+    
+    // 【核心新增】Beggar (丐幫) Routes
+    summonBeggar: (body) => fetchApi('/api/beggar/summon', { method: 'POST', body: JSON.stringify(body) }),
+    inquireBeggar: (body) => fetchApi('/api/beggar/inquire', { method: 'POST', body: JSON.stringify(body) }),
 
-    // GM Panel Routes (GM工具)
+    // GM Panel Routes
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
     updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
     rebuildNpcForGM: (body) => fetchApi('/api/gm/rebuild-npc', { method: 'POST', body: JSON.stringify(body) }),
@@ -75,8 +78,6 @@ export const api = {
     teleportPlayer: (body) => fetchApi('/api/gm/teleport', { method: 'POST', body: JSON.stringify(body) }),
     getCharactersForGM: () => fetchApi('/api/gm/characters'),
     updateNpcRelationship: (body) => fetchApi('/api/gm/update-npc-relationship', { method: 'POST', body: JSON.stringify(body) }),
-
-    // --- 【新增】GM創世API ---
     gmCreateItemTemplate: (body) => fetchApi('/api/gm/create-item-template', { method: 'POST', body: JSON.stringify(body) }),
     gmCreateNpcTemplate: (body) => fetchApi('/api/gm/create-npc-template', { method: 'POST', body: JSON.stringify(body) }),
 };
