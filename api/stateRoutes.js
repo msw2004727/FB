@@ -3,7 +3,6 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-// 【核心修改】直接引用 getRawInventory，不再需要 getInventoryState 和 getUnifiedInventory
 const { getPlayerSkills, getRawInventory } = require('./playerStateHelpers'); 
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
@@ -12,11 +11,6 @@ const db = admin.firestore();
 
 const BULK_TO_SCORE_MAP = { '輕': 0, '中': 2, '重': 5, '極重': 10 };
 
-/**
- * 【新增】計算總負重分數的輔助函式
- * @param {Array<object>} inventoryList - 完整的物品列表
- * @returns {number}
- */
 function calculateBulkScore(inventoryList) {
     return inventoryList.reduce((score, item) => {
         const quantity = item.quantity || 1;
@@ -25,24 +19,26 @@ function calculateBulkScore(inventoryList) {
     }, 0);
 }
 
+// 【核心修改】裝備/卸下邏輯現在更簡潔，只傳送物品ID和操作意圖
 router.post('/equip', async (req, res) => {
-    const { itemId, equip, slot } = req.body;
+    const { itemId, equip } = req.body;
     const userId = req.user.id;
+
+    if (!itemId) {
+        return res.status(400).json({ success: false, message: '未提供操作的物品ID。' });
+    }
 
     try {
         let result;
-        // 【核心修改】unequip現在也需要物品的instanceId
         if (equip) {
             result = await inventoryModel.equipItem(userId, itemId);
         } else {
             result = await inventoryModel.unequipItem(userId, itemId);
         }
 
-        // 操作成功後，回傳最新的完整、統一的玩家狀態給前端
         const fullInventory = await getRawInventory(userId);
         const newBulkScore = calculateBulkScore(fullInventory);
         
-        // 【BUG修復】在回傳中補上最新的 bulkScore
         res.json({
             success: true,
             message: result.message,
@@ -68,7 +64,6 @@ router.get('/latest-game', async (req, res) => {
             return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
         }
         
-        // 【核心修改】直接使用 getRawInventory
         const [snapshot, newBountiesSnapshot, fullInventory, skills] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
@@ -89,11 +84,10 @@ router.get('/latest-game', async (req, res) => {
         Object.assign(latestGameData, { 
             ...userData, 
             skills: skills,
-            inventory: fullInventory, // 直接使用完整的物品列表
-            bulkScore: bulkScore,     // 加入負重分數
+            inventory: fullInventory,
+            bulkScore: bulkScore,     
         });
         
-        // 不再需要 getInventoryState，因為錢的資訊也從 getRawInventory 間接處理
         const moneyItem = fullInventory.find(item => item.templateId === '銀兩' || item.templateId === '賞金');
         latestGameData.money = moneyItem ? moneyItem.quantity : 0;
 
@@ -126,7 +120,6 @@ router.get('/inventory', async (req, res) => {
     }
 });
 
-// 其他路由... (get-skills, get-relations 等保持不變)
 router.get('/skills', async (req, res) => {
     try {
         const skills = await getPlayerSkills(req.user.id);
@@ -227,10 +220,6 @@ router.post('/restart', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
         
-        // 刪除玩家主文檔，這會級聯刪除所有子集合
-        // 注意：這是一個破壞性操作，但在重啟遊戲的邏輯中是合理的。
-        // 如果要保留用戶名等資訊，需要先讀取再刪除，然後重新創建。
-        // 為安全起見，這裡先只清除子集合
         const collections = ['game_saves', 'npc_states', 'game_state', 'skills', 'location_states', 'bounties', 'inventory_items'];
         for (const col of collections) {
             try {
@@ -245,11 +234,9 @@ router.post('/restart', async (req, res) => {
             }
         }
         
-        // 重置玩家核心屬性
         await userDocRef.set({
             internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
             timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1,
-            // 【核心修改】移除 equipment，因為狀態已存儲在物品自身
             bulkScore: 0 
         }, { merge: true });
 
