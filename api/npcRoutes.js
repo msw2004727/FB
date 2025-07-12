@@ -304,19 +304,33 @@ router.post('/confirm-trade', async (req, res) => {
             const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
             const playerMoneyRef = playerInventoryRef.doc('銀兩');
-
-            // --- 處理金錢交換 ---
+            
+            // --- 1. 所有讀取操作 ---
             const playerMoneyOffer = tradeState.player.offer.money || 0;
             const npcMoneyOffer = tradeState.npc.offer.money || 0;
             
-            // 驗證玩家是否有足夠的錢
+            let playerMoneyDoc;
             if (playerMoneyOffer > 0) {
-                 const playerMoneyDoc = await transaction.get(playerMoneyRef);
-                 if (!playerMoneyDoc.exists || (playerMoneyDoc.data().quantity || 0) < playerMoneyOffer) {
-                     throw new Error('你的錢不夠！');
-                 }
+                playerMoneyDoc = await transaction.get(playerMoneyRef);
             }
 
+            // 讀取所有玩家要交易的物品
+            const playerOfferedItemRefs = tradeState.player.offer.items.map(item => playerInventoryRef.doc(item.id));
+            const playerOfferedItemDocs = playerOfferedItemRefs.length > 0 ? await transaction.getAll(...playerOfferedItemRefs) : [];
+
+            // --- 2. 驗證 (讀取之後，寫入之前) ---
+            if (playerMoneyDoc && (!playerMoneyDoc.exists || (playerMoneyDoc.data().quantity || 0) < playerMoneyOffer)) {
+                throw new Error('你的錢不夠！');
+            }
+            playerOfferedItemDocs.forEach((doc, index) => {
+                if (!doc.exists) {
+                    throw new Error(`找不到你背包中的物品「${tradeState.player.offer.items[index].name}」`);
+                }
+            });
+            // 可以在此處添加對NPC物品和金錢的驗證，如果需要的話。
+
+            // --- 3. 所有寫入操作 ---
+            
             // 更新玩家金錢
             if (playerMoneyOffer > 0 || npcMoneyOffer > 0) {
                 const totalMoneyChange = npcMoneyOffer - playerMoneyOffer;
@@ -332,14 +346,12 @@ router.post('/confirm-trade', async (req, res) => {
                 inventory: { '銀兩': admin.firestore.FieldValue.increment(playerMoneyOffer - npcMoneyOffer) }
             }, { merge: true });
 
-
-            // --- 處理玩家給予NPC的物品 ---
-            for (const item of tradeState.player.offer.items) {
+            // 處理玩家給予NPC的物品
+            playerOfferedItemDocs.forEach((doc, index) => {
+                const item = tradeState.player.offer.items[index];
                 const docRef = playerInventoryRef.doc(item.id);
-                const doc = await transaction.get(docRef);
-                if (!doc.exists) throw new Error(`找不到你背包中的物品「${item.name}」`);
-                
                 const currentQty = doc.data().quantity || 1;
+                
                 if (currentQty > item.quantity) {
                     transaction.update(docRef, { quantity: admin.firestore.FieldValue.increment(-item.quantity) });
                 } else {
@@ -348,19 +360,17 @@ router.post('/confirm-trade', async (req, res) => {
 
                 const npcItemField = `inventory.${item.name}`;
                 transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(item.quantity) } }, { merge: true });
-            }
+            });
             
-            // --- 處理NPC給予玩家的物品 ---
+            // 處理NPC給予玩家的物品
             for (const item of tradeState.npc.offer.items) {
                  const npcItemField = `inventory.${item.name}`;
                  transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(-item.quantity) } }, { merge: true });
                  
-                 // 因為 templateId 和 itemName 相同，可以直接用
-                 const playerItemRef = playerInventoryRef.doc(item.name);
+                 const playerItemRef = playerInventoryRef.doc(item.templateId); // 使用 templateId 作為玩家背包中的文件ID
                  transaction.set(playerItemRef, { 
                      quantity: admin.firestore.FieldValue.increment(item.quantity),
-                     templateId: item.name,
-                     // 這裡可以從物品模板中獲取更多資訊，但為簡化，先這樣處理
+                     templateId: item.templateId,
                  }, { merge: true });
             }
         });
@@ -409,6 +419,7 @@ router.post('/confirm-trade', async (req, res) => {
         res.status(500).json({ message: error.message || '交易過程中發生意外，交換失敗。' });
     }
 });
+
 
 router.post('/end-chat', async (req, res) => {
     const userId = req.user.id;
