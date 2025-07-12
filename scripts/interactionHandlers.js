@@ -153,7 +153,6 @@ async function handleChatButtonClick(event) {
         gameState.isInChat = true;
         gameState.currentChatNpc = profile.name;
         gameState.chatHistory = [];
-        // 【核心修改】呼叫通用聊天窗口，模式為 'chat'
         modal.openChatModalUI(profile, 'chat'); 
         dom.chatInput.focus();
     } catch (error) {
@@ -313,19 +312,28 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-// --- 【核心修改】處理丐幫情報探詢的流程 ---
 async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-    
-    gameState.isInChat = true;
-    gameState.currentChatNpc = npcName;
-    gameState.chatHistory = [];
-    
-    // 直接開啟特殊模式的聊天彈窗
-    modal.openChatModalUI(npcProfile, 'inquiry'); 
-    modal.appendChatMessage('npc', "客官想打聽點什麼？小的知無不言，言無不盡...只要價錢合適。");
-    dom.chatInput.focus();
+
+    // 【核心修正】將 setLoading(true) 移至實際異步操作之前
+    gameLoop.setLoading(true, `正在與 ${npcName} 交談...`);
+
+    try {
+        // 先打開聊天視窗，提供即時反饋
+        gameState.isInChat = true;
+        gameState.currentChatNpc = npcName;
+        gameState.chatHistory = [];
+        
+        modal.openChatModalUI(npcProfile, 'inquiry'); 
+        modal.appendChatMessage('npc', "客官想打聽點什麼？小的知無不言，言無不盡...只要價錢合適。");
+        dom.chatInput.focus();
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        // 無論如何，確保在打開視窗後解除鎖定
+        gameLoop.setLoading(false);
+    }
 }
 
 
@@ -346,19 +354,21 @@ export async function handleNpcClick(event) {
     const targetIsNpc = event.target.closest('.npc-name');
     const targetIsMenu = event.target.closest('.npc-interaction-menu');
 
+    if (!targetIsNpc && !targetIsMenu) {
+        hideNpcInteractionMenu();
+        return;
+    }
+
     if (targetIsNpc) {
         event.stopPropagation();
-        const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
+        const npcName = targetIsNpc.dataset.npcName;
         const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
 
-        // --- 【核心修改】優先從本地 gameState 檢查 NPC 身份 ---
         const localNpcData = gameState.roundData?.NPC?.find(npc => npc.name === npcName);
 
         if (localNpcData && (localNpcData.status_title === '丐幫弟子' || localNpcData.isTemp)) {
-            // 如果是本地的臨時丐幫弟子，直接觸發探詢流程
             await handleBeggarInquiry(npcName, localNpcData);
         } else {
-            // 否則，向後端請求資料來判斷
             try {
                 targetIsNpc.style.cursor = 'wait';
                 hideNpcInteractionMenu();
@@ -375,8 +385,6 @@ export async function handleNpcClick(event) {
                 handleApiError(error);
             }
         }
-    } else if (!targetIsMenu) {
-        hideNpcInteractionMenu();
     }
 }
 
@@ -392,18 +400,19 @@ export async function sendChatMessage() {
         const chatMode = dom.chatModal.dataset.mode || 'chat';
         let data;
 
-        // 【核心修改】根據聊天模式，呼叫不同的API
         if (chatMode === 'inquiry') {
             data = await api.inquireBeggar({
                 beggarName: gameState.currentChatNpc,
                 userQuery: message,
                 model: dom.aiModelSelector.value
             });
-            // 丐幫的回覆直接顯示，不需要再推入 history，因為它是一次性的
              if (data.success === false) {
                  modal.appendChatMessage('npc', data.response);
-                 // 錢不夠，直接關閉視窗
-                 setTimeout(() => modal.closeChatModal(), 2000);
+                 // 【核心修正】錢不夠時，2秒後自動關閉彈窗
+                 setTimeout(() => {
+                    modal.closeChatModal();
+                    gameState.isInChat = false; // 重設狀態
+                 }, 2000);
              } else {
                  modal.appendChatMessage('npc', data.response);
              }
