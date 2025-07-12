@@ -393,31 +393,30 @@ export async function sendChatMessage() {
     gameState.chatHistory.push({ speaker: 'player', message: message });
     gameLoop.setLoading(true);
 
+    let inquiryFailed = false; // 添加一個標記
+
     try {
         const chatMode = dom.chatModal.dataset.mode || 'chat';
-        let data;
-
+        
         if (chatMode === 'inquiry') {
-            data = await api.inquireBeggar({
+            const data = await api.inquireBeggar({
                 beggarName: gameState.currentChatNpc,
                 userQuery: message,
                 model: dom.aiModelSelector.value
             });
              if (data.success === false) {
+                 inquiryFailed = true; // 標記為失敗
                  modal.appendChatMessage('npc', data.response);
-                 // 【核心修正】錢不夠時，2秒後自動關閉彈窗並解鎖UI
                  setTimeout(() => {
                     modal.closeChatModal();
                     gameState.isInChat = false; 
-                    gameLoop.setLoading(false); // 在這裡確保UI解鎖
+                    gameLoop.setLoading(false); 
                  }, 2000);
-                 return; // 提前返回，不再執行 finally 中的 setLoading
              } else {
                  modal.appendChatMessage('npc', data.response);
              }
-
         } else {
-             data = await api.npcChat({
+            const data = await api.npcChat({
                 npcName: gameState.currentChatNpc,
                 chatHistory: gameState.chatHistory,
                 playerMessage: message,
@@ -426,12 +425,11 @@ export async function sendChatMessage() {
             modal.appendChatMessage('npc', data.npcMessage);
             gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
         }
-
     } catch (error) {
         modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
     } finally {
-        // 【核心修正】只有在非「錢不夠」的情況下，才由 finally 來解鎖
-        if (!(dom.chatModal.dataset.mode === 'inquiry' && data && data.success === false)) {
+        // 【核心修正】只有在探詢不是因為錢不夠而失敗時，才由 finally 來解鎖UI
+        if (!inquiryFailed) {
             gameLoop.setLoading(false);
         }
     }
