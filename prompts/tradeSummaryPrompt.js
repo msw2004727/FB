@@ -1,11 +1,15 @@
 // prompts/tradeSummaryPrompt.js
 
 const getTradeSummaryPrompt = (username, npcName, tradeDetails, longTermSummary) => {
-    // 格式化交易細節，讓AI更容易理解
-    const playerGave = tradeDetails.player.items.map(i => `${i.name}x${i.quantity}`).join('、') || '無';
-    const playerGaveMoney = tradeDetails.player.money > 0 ? `${tradeDetails.player.money}文錢` : '無';
-    const npcGave = tradeDetails.npc.items.map(i => `${i.name}x${i.quantity}`).join('、') || '無';
-    const npcGaveMoney = tradeDetails.npc.money > 0 ? `${tradeDetails.npc.money}文錢` : '無';
+    // 【核心修復】增加對 tradeDetails 和其內部屬性的健壯性檢查，防止因數據不完整導致崩潰
+    const playerItems = tradeDetails?.player?.offer?.items;
+    const npcItems = tradeDetails?.npc?.offer?.items;
+
+    const playerGave = playerItems && playerItems.length > 0 ? playerItems.map(i => `${i.name}x${i.quantity}`).join('、') : '無';
+    const playerGaveMoney = tradeDetails?.player?.offer?.money > 0 ? `${tradeDetails.player.offer.money}文錢` : '無';
+    
+    const npcGave = npcItems && npcItems.length > 0 ? npcItems.map(i => `${i.name}x${i.quantity}`).join('、') : '無';
+    const npcGaveMoney = tradeDetails?.npc?.offer?.money > 0 ? `${tradeDetails.npc.offer.money}文錢` : '無';
 
     return `
 你是一位功力深厚的「江湖書記官」。你的任務是將一段結構化的「交易紀錄」，結合當前的「江湖時事」，改寫成一段精彩的「故事劇本」，並為其提煉一句畫龍點睛的「章回標題」。
