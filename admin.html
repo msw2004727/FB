@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI文字江湖 - 後台管理</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="styles/admin.css">
+</head>
+<body>
+
+    <div id="login-container" class="login-container">
+        <div class="login-box">
+            <i class="fas fa-user-shield login-icon"></i>
+            <h2>後台登入</h2>
+            <p>請輸入管理密碼以繼續</p>
+            <input type="password" id="admin-password" placeholder="管理密碼...">
+            <button id="login-btn">登入</button>
+            <p id="login-error" class="login-error-message"></p>
+        </div>
+    </div>
+
+    <div id="admin-dashboard" class="admin-dashboard hidden">
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-toolbox"></i> 管理面板</h3>
+                <button id="menu-toggle-close" class="menu-toggle-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <ul class="menu-list">
+                <li><a href="#dashboard" class="menu-link active"><i class="fas fa-chart-line"></i> API儀表板</a></li>
+                <li><a href="#logs" class="menu-link"><i class="fas fa-file-alt"></i> 系統日誌</a></li>
+            </ul>
+        </nav>
+
+        <main id="main-content" class="main-content">
+            <header class="main-header">
+                <button id="menu-toggle-open" class="menu-toggle-btn"><i class="fas fa-bars"></i></button>
+                <h1>歡迎來到後台管理系統</h1>
+            </header>
+
+            <div id="page-dashboard" class="page-content active">
+                <div id="balance-cards-container" class="balance-cards-container">
+                    <p class="loading-text">正在獲取API餘額資訊...</p>
+                </div>
+            </div>
+
+            <div id="page-logs" class="page-content">
+                <div class="log-controls">
+                    <select id="player-filter">
+                        <option value="">所有玩家</option>
+                        </select>
+                    <button id="refresh-logs-btn"><i class="fas fa-sync-alt"></i> 重新整理</button>
+                </div>
+                <div class="log-table-container">
+                    <table id="log-table">
+                        <thead>
+                            <tr>
+                                <th>時間</th>
+                                <th>等級</th>
+                                <th>玩家ID</th>
+                                <th>訊息</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                     <p id="logs-loading-text" class="loading-text">正在載入日誌...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="scripts/admin.js" type="module"></script>
+</body>
+</html>
