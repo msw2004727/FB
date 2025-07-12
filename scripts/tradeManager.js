@@ -4,18 +4,17 @@ import { api } from './api.js';
 // 全域變數，用於儲存當前交易的狀態
 let state = {};
 let onTradeCompleteCallback = null;
+let closeTradeModalCallback = null; // 【新增】儲存關閉視窗的回呼函式
 let currentNpcName = '';
 
 // DOM 元素快取
 const DOMElements = {};
-let areDOMsCached = false; // 添加一個標誌來判斷是否已快取
+let areDOMsCached = false;
 
-/**
- * 【核心修正】首次獲取或更新DOM元素引用
- * 只在第一次初始化時執行
- */
 function cacheDOMElements() {
     if (areDOMsCached) return;
+    DOMElements.tradeModal = document.getElementById('trade-modal'); // 【新增】獲取最外層容器
+    DOMElements.closeBtn = document.getElementById('close-trade-btn'); // 【新增】獲取關閉按鈕
     DOMElements.playerInventory = document.querySelector('#trade-player-inventory');
     DOMElements.playerOffer = document.querySelector('#trade-player-offer');
     DOMElements.npcInventory = document.querySelector('#trade-npc-inventory');
@@ -33,13 +32,9 @@ function cacheDOMElements() {
     areDOMsCached = true;
 }
 
-/**
- * 渲染整個交易介面
- */
 function render() {
-    if (!DOMElements.playerInventory) return; // 如果元素不存在則不執行
+    if (!DOMElements.playerInventory) return; 
 
-    // 渲染玩家和NPC的背包與出價區
     ['player', 'npc'].forEach(owner => {
         const inventoryEl = DOMElements[`${owner}Inventory`];
         const offerEl = DOMElements[`${owner}Offer`];
@@ -49,7 +44,6 @@ function render() {
         state[owner].offer.items.forEach(item => offerEl.appendChild(createItemElement(item, owner, 'offer')));
     });
 
-    // 更新介面上的文字資訊
     DOMElements.playerMoney.textContent = state.player.money;
     DOMElements.npcMoney.textContent = state.npc.money;
     DOMElements.npcHeaderName.textContent = currentNpcName;
@@ -58,13 +52,6 @@ function render() {
     calculateSummary();
 }
 
-/**
- * 創建單個物品的HTML元素
- * @param {object} item - 物品資料
- * @param {string} owner - 擁有者 ('player' or 'npc')
- * @param {string} area - 當前區域 ('inventory' or 'offer')
- * @returns {HTMLLIElement}
- */
 function createItemElement(item, owner, area) {
     const li = document.createElement('li');
     li.className = 'bg-amber-50/50 border border-amber-200 p-1.5 rounded-md cursor-pointer flex justify-between items-center text-sm hover:border-amber-400 hover:bg-amber-50 transform hover:-translate-y-px transition-all';
@@ -74,12 +61,6 @@ function createItemElement(item, owner, area) {
     return li;
 }
 
-/**
- * 移動物品的邏輯
- * @param {string} itemId - 物品的唯一ID
- * @param {string} owner - 擁有者
- * @param {string} currentArea - 當前區域
- */
 function moveItem(itemId, owner, currentArea) {
     const sourceList = currentArea === 'inventory' ? state[owner].inventory : state[owner].offer.items;
     const targetList = currentArea === 'inventory' ? state[owner].offer.items : state[owner].inventory;
@@ -93,9 +74,6 @@ function moveItem(itemId, owner, currentArea) {
     }
 }
 
-/**
- * 計算價值差並更新UI
- */
 function calculateSummary() {
     if (!DOMElements.valueDiff) return;
 
@@ -105,18 +83,17 @@ function calculateSummary() {
 
     DOMElements.valueDiff.textContent = diff;
     
-    // 重置樣式和光暈
     DOMElements.valueDiff.classList.remove('text-green-400', 'text-red-400');
     DOMElements.playerPanel.classList.remove('glow-negative');
     DOMElements.npcPanel.classList.remove('glow-positive');
     DOMElements.playerOfferPanel.classList.remove('glow-negative');
     DOMElements.npcOfferPanel.classList.remove('glow-positive');
 
-    if (diff < 0) { // 玩家虧了 (需補償的價值為正)
+    if (diff < 0) { 
         DOMElements.valueDiff.classList.add('text-red-400');
         DOMElements.playerPanel.classList.add('glow-negative');
         DOMElements.playerOfferPanel.classList.add('glow-negative');
-    } else if (diff > 0) { // 玩家賺了
+    } else if (diff > 0) { 
         DOMElements.valueDiff.classList.add('text-green-400');
         DOMElements.npcPanel.classList.add('glow-positive');
         DOMElements.npcOfferPanel.classList.add('glow-positive');
@@ -126,9 +103,6 @@ function calculateSummary() {
     DOMElements.confirmBtn.disabled = !isTradeable;
 }
 
-/**
- * 處理最終交易確認
- */
 async function handleConfirmTrade() {
     DOMElements.confirmBtn.disabled = true;
     DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
@@ -138,7 +112,7 @@ async function handleConfirmTrade() {
             player: {
                 offer: {
                     items: state.player.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
-                    money: 0 // 當前模型不處理金錢，設為0
+                    money: 0
                 }
             },
             npc: {
@@ -166,20 +140,20 @@ async function handleConfirmTrade() {
     }
 }
 
-
 /**
- * 交易系統的總入口和初始化函式
+ * 【核心修正】交易系統的總入口和初始化函式
  * @param {object} tradeData - 從API獲取的初始交易數據
  * @param {string} npcName - 正在交易的NPC名稱
  * @param {function} onTradeComplete - 交易成功後的回調
+ * @param {function} closeCallback - 關閉彈窗的回調
  */
-export function initializeTrade(tradeData, npcName, onTradeComplete) {
+export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallback) {
     cacheDOMElements();
     
     currentNpcName = npcName;
     onTradeCompleteCallback = onTradeComplete;
-    
-    // 重置交易狀態
+    closeTradeModalCallback = closeCallback; // 【新增】儲存關閉回呼
+
     state = {
         player: {
             inventory: Object.values(tradeData.player.items),
@@ -193,20 +167,27 @@ export function initializeTrade(tradeData, npcName, onTradeComplete) {
         }
     };
     
-    // 綁定事件監聽器
+    // 【新增】為關閉按鈕和背景點擊添加事件監聽
+    if (DOMElements.closeBtn) {
+        DOMElements.closeBtn.onclick = closeTradeModalCallback;
+    }
+    if (DOMElements.tradeModal) {
+        DOMElements.tradeModal.onclick = (event) => {
+            if (event.target === DOMElements.tradeModal) {
+                closeTradeModalCallback();
+            }
+        };
+    }
+
     if (DOMElements.confirmBtn) {
         DOMElements.confirmBtn.onclick = handleConfirmTrade;
     }
     
-    // 初始渲染
     render();
 }
 
-/**
- * 【新增】在關閉彈窗時，清理事件監聽器
- */
 export function closeTradeUI() {
-    if (DOMElements.confirmBtn) {
-        DOMElements.confirmBtn.onclick = null;
-    }
+    if (DOMElements.confirmBtn) DOMElements.confirmBtn.onclick = null;
+    if (DOMElements.closeBtn) DOMElements.closeBtn.onclick = null;
+    if (DOMElements.tradeModal) DOMElements.tradeModal.onclick = null;
 }
