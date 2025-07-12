@@ -15,28 +15,25 @@ router.get('/profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
     try {
-        const [npcProfile, userDoc] = await Promise.all([
+        const [npcProfile, lastSaveSnapshot] = await Promise.all([
             getMergedNpcProfile(userId, npcName),
-            db.collection('users').doc(userId).get()
+            db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
 
         if (!npcProfile) {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        if (!userDoc.exists || !userDoc.data().currentLocation) {
+        if (lastSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到玩家位置資訊。' });
         }
         
-        // 【核心修改】採用更靈活的地點判定邏輯
-        const playerLocationHierarchy = userDoc.data().currentLocation; // 这是一个陣列，例如 ["無名村", "街道"]
-        const npcLocation = npcProfile.currentLocation; // 这是一个字串，例如 "街道"
+        const playerLocationHierarchy = lastSaveSnapshot.docs[0].data().LOC;
+        const npcLocation = npcProfile.currentLocation;
 
-        // 新規則：只要NPC的單一地點，存在於玩家的層級地點中，就視為在同一地點。
         if (!Array.isArray(playerLocationHierarchy) || !playerLocationHierarchy.includes(npcLocation)) {
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
         }
-        // --- 修改結束 ---
 
         const publicProfile = {
             name: npcProfile.name,
@@ -44,7 +41,9 @@ router.get('/profile/:npcName', async (req, res) => {
             friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0),
             romanceValue: npcProfile.romanceValue || 0,
             friendlinessValue: npcProfile.friendlinessValue || 0,
-            age: npcProfile.age || '年齡不詳'
+            age: npcProfile.age || '年齡不詳',
+            // 【核心修正】將NPC的身份稱謂(status_title)回傳給前端
+            status_title: npcProfile.status_title || '身份不明' 
         };
 
         res.json(publicProfile);
