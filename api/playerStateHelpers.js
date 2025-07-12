@@ -132,7 +132,7 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
             const newItemData = {
                 templateId: itemName,
                 isEquipped: false,
-                equipSlot: null,
+                equipSlot: null, // 初始狀態下，equipSlot 為 null
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
             if (isStackable) {
@@ -146,7 +146,6 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
                 }
             }
         } else if (action === 'remove') {
-            // 注意：簡化版的移除邏輯，先不處理精確移除某個instanceId
             const docRef = userInventoryRef.doc(itemName);
             const doc = await docRef.get(); 
             if (isStackable && doc.exists && doc.data().quantity > quantity) {
@@ -180,7 +179,7 @@ async function getInventoryState(userId) {
 }
 
 /**
- * 【重構版 v2】直接獲取完整的物品列表，包含裝備狀態
+ * 【v3 修復版】修正數據合併邏輯，確保UI能正確判斷可裝備性
  * @param {string} userId - 玩家ID
  * @returns {Promise<Array<object>>}
  */
@@ -189,28 +188,36 @@ async function getRawInventory(userId) {
     const snapshot = await playerInventoryRef.get();
     if (snapshot.empty) return [];
 
-    const inventoryList = [];
     const itemPromises = snapshot.docs.map(async (doc) => {
-        const playerData = doc.data();
-        const templateId = playerData.templateId;
+        const instanceData = doc.data();
+        const templateId = instanceData.templateId;
         if (!templateId) return null;
 
         const templateDataResult = await getOrGenerateItemTemplate(templateId);
         if (templateDataResult?.template) {
-            return {
-                ...templateDataResult.template, // 模板數據 (名稱, 類型, 數值...)
-                ...playerData,                // 實例數據 (是否裝備, 裝備槽位...)
-                instanceId: doc.id,           // 實例的唯一ID
-                itemName: templateDataResult.template.itemName, // 確保名稱正確
+            const templateData = templateDataResult.template;
+            // 【核心修正】在這裡解決數據覆蓋問題
+            const finalItem = {
+                ...templateData, // 先鋪上模板的預設值 (包含潛在的equipSlot)
+                ...instanceData,  // 再用實例數據覆蓋 (包含isEquipped和當前的equipSlot)
+                instanceId: doc.id,
+                itemName: templateData.itemName, // 確保名稱總是來自模板，避免出錯
             };
+            
+            // 為了讓UI能正確顯示開關，如果物品本身可裝備，但當前未裝備(equipSlot為null)，
+            // 我們把模板的潛在槽位資訊補回去，這樣UI的 `if (item.equipSlot)` 判斷才能通過。
+            if (templateData.equipSlot && !instanceData.equipSlot) {
+                finalItem.equipSlot = templateData.equipSlot;
+            }
+
+            return finalItem;
         }
         return null;
     });
-
+    
     const results = await Promise.all(itemPromises);
     return results.filter(item => item !== null);
 }
-
 
 async function updateSkills(userId, skillChanges, playerProfile) {
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
