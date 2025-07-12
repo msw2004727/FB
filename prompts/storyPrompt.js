@@ -72,9 +72,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
 1.  **情境判斷**: 在你撰寫完 \`story\` 文字後，你必須判斷這段故事是否發生在「當下現實」。如果故事內容明確是關於「回憶」、「幻想」、「夢境」、「追憶」或角色的「內心思考」，則**跳過**此規則。
 2.  **掃描在場NPC**: 如果故事發生在「當下現實」，你必須掃描你寫的 \`story\` 文字，找出所有被提及的、且存在於【重要NPC情境參考】中的NPC姓名。
-3.  **自動更新位置**: 對於每一位在「當下現實」故事中被提及的NPC，你都**必須**在回傳的 \`roundData.npcUpdates\` 陣列中，為其加入一個更新位置的指令，將其位置同步到玩家的當前位置 (即 \`roundData.LOC[0]\`)。
-    * **結構**: \`{ "npcName": "被提及的NPC姓名", "fieldToUpdate": "currentLocation", "newValue": roundData.LOC[0], "updateType": "set" }\`
-    * **範例**: 玩家在「開封府」的街道上，故事提到「你遠遠看到林捕頭正與人爭論」。你必須在 \`npcUpdates\` 中加入 \`{"npcName": "林捕頭", "fieldToUpdate": "currentLocation", "newValue": "街道", "updateType": "set"}\`。
+3.  **自動更新位置**: 對於每一位在「當下現實」故事中被提及的NPC，你都**必須**在回傳的 \`roundData.npcUpdates\` 陣列中，為其加入一個更新位置的指令，將其位置同步到玩家的當前位置 (即 \`roundData.LOC\` 陣列中的**最後一個元素**)。
+    * **結構**: \`{ "npcName": "被提及的NPC姓名", "fieldToUpdate": "currentLocation", "newValue": roundData.LOC[roundData.LOC.length - 1], "updateType": "set" }\`
+    * **範例**: 玩家在「開封府」的「大相國寺」，故事提到「你看到魯智深正與人喝酒」。你的 \`roundData.LOC\` 應為 \`["開封府", "大相國寺"]\`。此時，你**必須**在 \`npcUpdates\` 中加入 \`{"npcName": "魯智深", "fieldToUpdate": "currentLocation", "newValue": "大相國寺", "updateType": "set"}\`。
 
 此規則是為了解決玩家與NPC因劇情推進而身處同一場景、但數據庫位置卻未同步的問題，是保障後續互動（如交談、戰鬥）能夠順利進行的關鍵。`;
 
