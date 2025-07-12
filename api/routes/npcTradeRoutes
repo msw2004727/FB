@@ -187,7 +187,8 @@ router.post('/confirm-trade', async (req, res) => {
         await updateNpcMemoryAfterInteraction(userId, npcName, memoryText);
 
         const newRoundNumber = lastRoundData.R + 1;
-        const inventoryState = await getInventoryState(userId);
+        // 【核心修正】在所有資料庫操作後，重新獲取最新的背包狀態
+        const inventoryState = await getInventoryState(userId); 
         
         const newRoundData = {
             ...lastRoundData,
@@ -195,8 +196,8 @@ router.post('/confirm-trade', async (req, res) => {
             story: tradeNarrativeResult.story,
             PC: '完成了一筆交易。',
             EVT: tradeNarrativeResult.evt,
-            ITM: inventoryState.itemsString,
-            money: inventoryState.money,
+            ITM: inventoryState.itemsString, // 【核心修正】使用最新的物品欄字串
+            money: inventoryState.money,       // 【核心修正】使用最新的金錢數量
             itemChanges: [],
         };
         
