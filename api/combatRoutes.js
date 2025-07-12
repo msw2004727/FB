@@ -52,16 +52,21 @@ const initiateCombatHandler = async (req, res) => {
             return res.status(404).json({ message: "找不到玩家存檔。" });
         }
         const lastSave = savesSnapshot.docs[0].data();
-        const playerLocation = lastSave.LOC[0];
-
-        // 【核心新增】戰鬥前的位置檢查
+        
+        // 【核心修改】採用更靈活的地點判定邏輯
+        const playerLocationHierarchy = lastSave.LOC; // 这是一个陣列
         const targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
+        
         if (!targetNpcProfile) {
             return res.status(404).json({ message: `找不到名為 ${targetNpcName} 的目標。` });
         }
-        if (playerLocation !== targetNpcProfile.currentLocation) {
+        
+        const npcLocation = targetNpcProfile.currentLocation; // 这是一个字串
+
+        if (!Array.isArray(playerLocationHierarchy) || !playerLocationHierarchy.includes(npcLocation)) {
             return res.status(403).json({ message: `你必須和 ${targetNpcName} 在同一個地方才能對其動手。` });
         }
+        // --- 修改結束 ---
 
         const simulatedPlayerAction = `我決定要「${intention}」${targetNpcName}。`;
         
