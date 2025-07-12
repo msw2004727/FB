@@ -34,10 +34,11 @@ export const api = {
     finalizeCombat: (body) => fetchApi('/api/game/combat/finalize-combat', { method: 'POST', body: JSON.stringify(body) }),
 
     // NPC Routes (NPC互動)
-    getNpcProfile: (npcName) => fetchApi(`/api/game/npc/npc-profile/${npcName}`),
+    // 【核心修正】修正了 getNpcProfile 的路徑，移除了多餘的 "npc-"
+    getNpcProfile: (npcName) => fetchApi(`/api/game/npc/profile/${npcName}`),
     startTrade: (npcName) => fetchApi(`/api/game/npc/start-trade/${npcName}`),
     confirmTrade: (body) => fetchApi('/api/game/npc/confirm-trade', { method: 'POST', body: JSON.stringify(body) }),
-    npcChat: (body) => fetchApi('/api/game/npc/npc-chat', { method: 'POST', body: JSON.stringify(body) }),
+    npcChat: (body) => fetchApi('/api/game/npc/chat', { method: 'POST', body: JSON.stringify(body) }),
     giveItemToNpc: (body) => fetchApi('/api/game/npc/give-item', { method: 'POST', body: JSON.stringify(body) }),
     endChat: (body) => fetchApi('/api/game/npc/end-chat', { method: 'POST', body: JSON.stringify(body) }),
 
