@@ -49,7 +49,7 @@ const interactRouteHandler = async (req, res) => {
             recentHistory,
             locationContext,
             npcContext,
-            bulkScore, // 【核心修改】從 contextBuilder 獲取負重分數
+            bulkScore,
             isNewGame
         } = context;
         
@@ -226,8 +226,9 @@ const interactRouteHandler = async (req, res) => {
             internalPower: newInternalPower,
             externalPower: newExternalPower,
             lightness: newLightness,
-            bulkScore: bulkScore, // 【核心修改】將計算出的負重分數寫回資料庫
-            morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0)
+            bulkScore: bulkScore,
+            morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0),
+            money: admin.firestore.FieldValue.increment(aiResponse.roundData.moneyChange || 0) // 【核心修改】
         };
         
         const finalSaveData = { ...aiResponse.roundData, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
@@ -242,21 +243,25 @@ const interactRouteHandler = async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
         
-        const finalRoundDataForClient = { ...finalSaveData };
-        finalRoundDataForClient.internalPower = newInternalPower;
-        finalRoundDataForClient.externalPower = newExternalPower;
-        finalRoundDataForClient.lightness = newLightness;
-        finalRoundDataForClient.morality = (player.morality || 0) + (aiResponse.roundData.moralityChange || 0);
-        finalRoundDataForClient.bulkScore = bulkScore; // 【核心修改】將負重分數加入要傳回給前端的資料中
-
         const inventoryState = await getInventoryState(userId);
-        finalRoundDataForClient.ITM = inventoryState.itemsString;
-        finalRoundDataForClient.money = inventoryState.money;
-        finalRoundDataForClient.skills = await getPlayerSkills(userId);
         
+        const finalRoundDataForClient = { 
+            ...finalSaveData,
+            internalPower: newInternalPower,
+            externalPower: newExternalPower,
+            lightness: newLightness,
+            morality: (player.morality || 0) + (aiResponse.roundData.moralityChange || 0),
+            bulkScore: bulkScore,
+            ITM: inventoryState.itemsString,
+            money: inventoryState.money,
+            silver: inventoryState.silver, // 【核心新增】
+            skills: await getPlayerSkills(userId),
+            suggestion: suggestion
+        };
+
         res.json({
             story: finalSaveData.story,
-            roundData: { ...finalRoundDataForClient, suggestion: suggestion },
+            roundData: finalRoundDataForClient,
             suggestion: suggestion,
             locationData: await getMergedLocationData(userId, finalRoundDataForClient.LOC)
         });
