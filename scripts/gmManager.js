@@ -1,9 +1,44 @@
 // scripts/gmManager.js
 import { api } from './api.js';
 
-// 將所有GM相關的函式都集中到這裡
+// --- 【新增】物品生成頁面渲染函式 ---
+function loadItemSpawnerData(page) {
+    page.innerHTML = `
+        <h3><i class="fa-solid fa-box-archive"></i> 物品模板生成</h3>
+        <div class="gm-form-section">
+            <h4><i class="fa-solid fa-lightbulb"></i> AI 創世</h4>
+            <p class="gm-note">輸入一個物品的名稱，AI將會為其生成一套完整的屬性、外觀和背景故事，並將其加入遊戲的公用模板庫中。如果該物品已存在，則不會重複創建。</p>
+            <div class="gm-input-group">
+                <label for="gm-new-item-name">物品名稱</label>
+                <input type="text" id="gm-new-item-name" class="gm-input" placeholder="例如：玄鐵重劍、九轉還魂丹...">
+                <button id="gm-create-item-btn" class="gm-button rebuild"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 生成</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('gm-create-item-btn').addEventListener('click', gmHandleCreateItem);
+}
+
+// --- 【新增】NPC生成頁面渲染函式 ---
+function loadNpcCreatorData(page) {
+    page.innerHTML = `
+        <h3><i class="fa-solid fa-user-plus"></i> 創建新人物</h3>
+        <div class="gm-form-section">
+            <h4><i class="fa-solid fa-hat-wizard"></i> AI 捏臉</h4>
+            <p class="gm-note">輸入一個您想創建的人物姓名，AI將會為其生成獨特的背景故事、個性、人際關係等，並將其加入遊戲世界的公用角色池中，未來可在故事中登場。</p>
+            <div class="gm-input-group">
+                <label for="gm-new-npc-name">人物姓名</label>
+                <input type="text" id="gm-new-npc-name" class="gm-input" placeholder="例如：東方未明、沈湘芸...">
+                <button id="gm-create-npc-btn" class="gm-button rebuild"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 生成</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('gm-create-npc-btn').addEventListener('click', gmHandleCreateNpc);
+}
+
+
+// --- 玩家屬性頁面 ---
 async function loadPlayerStatsData(page) {
-    page.innerHTML = '<h3>玩家屬性編輯</h3><p>正在載入數據...</p>';
+    page.innerHTML = '<h3><i class="fa-solid fa-user-pen"></i> 玩家屬性編輯</h3><p class="loading-text">正在載入數據...</p>';
     try {
         const [playerState, itemTemplates] = await Promise.all([
             api.getPlayerStateForGM(),
@@ -16,7 +51,7 @@ async function loadPlayerStatsData(page) {
         });
 
         page.innerHTML = `
-            <h3>玩家屬性編輯</h3>
+            <h3><i class="fa-solid fa-user-pen"></i> 玩家屬性編輯</h3>
             <div class="gm-form-section">
                 <h4><i class="fa-solid fa-user-ninja"></i> 核心屬性</h4>
                 <div class="gm-grid-container stat-grid">
@@ -67,12 +102,13 @@ async function loadPlayerStatsData(page) {
         document.getElementById('gm-remove-item').addEventListener('click', () => gmHandleItemChange('remove'));
 
     } catch (error) {
-         page.innerHTML = `<h3>玩家屬性編輯</h3><p>載入數據失敗: ${error.message}</p>`;
+         page.innerHTML = `<h3>玩家屬性編輯</h3><p class="error-message">載入數據失敗: ${error.message}</p>`;
     }
 }
 
+// --- 地區編輯頁面 ---
 async function loadLocationManagementData(page) {
-    page.innerHTML = '<h3>地區編輯與瞬移</h3><p>正在從後端獲取地區列表...</p>';
+    page.innerHTML = '<h3><i class="fa-solid fa-map-location-dot"></i> 地區編輯與瞬移</h3><p class="loading-text">正在從後端獲取地區列表...</p>';
     try {
         const locList = await api.getLocationsForGM();
         let optionsHtml = '<option value="">-- 請選擇目標地點 --</option>';
@@ -81,7 +117,7 @@ async function loadLocationManagementData(page) {
         });
 
         page.innerHTML = `
-             <h3>地區編輯與瞬移</h3>
+             <h3><i class="fa-solid fa-map-location-dot"></i> 地區編輯與瞬移</h3>
             <div class="gm-form-section">
                  <h4><i class="fa-solid fa-person-falling-burst"></i> 乾坤大挪移</h4>
                  <div class="gm-input-group">
@@ -121,12 +157,13 @@ async function loadLocationManagementData(page) {
         document.getElementById('gm-teleport-btn').addEventListener('click', gmTeleport);
 
     } catch (error) {
-        page.innerHTML = `<h3>地區編輯</h3><p>獲取資料失敗: ${error.message}</p>`;
+        page.innerHTML = `<h3>地區編輯</h3><p class="error-message">獲取資料失敗: ${error.message}</p>`;
     }
 }
 
+// --- NPC管理頁面 ---
 async function loadNpcManagementData(page) {
-    page.innerHTML = '<h3>NPC關係管理</h3><p>正在獲取人物數據...</p>';
+    page.innerHTML = '<h3><i class="fa-solid fa-users-gear"></i> NPC關係管理</h3><p class="loading-text">正在獲取人物數據...</p>';
     try {
         const [npcList, characterList] = await Promise.all([
             api.getNpcsForGM(),
@@ -198,15 +235,18 @@ async function loadNpcManagementData(page) {
             container.appendChild(card);
         });
 
-        page.innerHTML = '<h3>NPC關係管理</h3>';
+        page.innerHTML = '<h3><i class="fa-solid fa-users-gear"></i> NPC關係管理</h3>';
         page.appendChild(container);
         
         bindGmCardEvents(container);
 
     } catch (error) {
-        page.innerHTML = `<h3>NPC關係管理</h3><p>獲取資料失敗: ${error.message}</p>`;
+        page.innerHTML = `<h3>NPC關係管理</h3><p class="error-message">獲取資料失敗: ${error.message}</p>`;
     }
 }
+
+
+// --- 事件處理函式 ---
 
 async function gmSavePlayerStats(e) {
     const button = e.target.closest('button');
@@ -219,9 +259,11 @@ async function gmSavePlayerStats(e) {
             lightness: document.getElementById('gm-lightness').value,
             morality: document.getElementById('gm-morality').value
         };
-        await api.updatePlayerStateForGM(payload);
+        const result = await api.updatePlayerStateForGM(payload);
+        alert(result.message);
         button.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功!`;
     } catch (error) {
+        alert(`儲存失敗: ${error.message}`);
         button.innerHTML = `<i class="fa-solid fa-xmark"></i> 儲存失敗`;
     } finally {
         setTimeout(() => {
@@ -239,9 +281,11 @@ async function gmSavePlayerMoney(e) {
     button.textContent = '設定中...';
     button.disabled = true;
     try {
-        await api.updatePlayerResourcesForGM({ money: Number(money) });
+        const result = await api.updatePlayerResourcesForGM({ money: Number(money) });
+        alert(result.message);
         button.textContent = '設定成功!';
     } catch (error) {
+        alert(`設定失敗: ${error.message}`);
         button.textContent = '錯誤';
     } finally {
         setTimeout(() => { button.textContent = '設定'; button.disabled = false; }, 2000);
@@ -260,11 +304,13 @@ async function gmHandleItemChange(action) {
     button.disabled = true;
 
     try {
-        await api.updatePlayerResourcesForGM({
+        const result = await api.updatePlayerResourcesForGM({
             itemChange: { action, itemName, quantity: Number(quantity) }
         });
+        alert(result.message);
         button.innerHTML = `<i class="fa-solid fa-check"></i> 操作成功!`;
     } catch (error) {
+        alert(`操作失敗: ${error.message}`);
         button.innerHTML = `<i class="fa-solid fa-xmark"></i> 錯誤`;
     } finally {
         setTimeout(() => { 
@@ -272,7 +318,7 @@ async function gmHandleItemChange(action) {
             button.disabled = false; 
         }, 2000);
     }
-};
+}
 
 async function gmTeleport(e) {
     const button = e.target.closest('button');
@@ -305,12 +351,12 @@ async function gmTeleport(e) {
 function bindGmCardEvents(container) {
     container.querySelectorAll('.gm-button.save').forEach(button => {
         button.addEventListener('click', async (e) => {
-            const button = e.target.closest('button');
-            const npcId = button.dataset.npcId;
+            const cardButton = e.target.closest('button');
+            const npcId = cardButton.dataset.npcId;
             if (!npcId) return;
 
-            button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
-            button.disabled = true;
+            cardButton.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
+            cardButton.disabled = true;
             
             try {
                 const promises = [];
@@ -323,15 +369,17 @@ function bindGmCardEvents(container) {
                 const relTarget = document.getElementById(`rel-target-${npcId}`).value;
                 promises.push(api.updateNpcRelationship({ npcId, relationshipType: relType, targetName: relTarget }));
                 
-                await Promise.all(promises);
-                button.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功`;
+                const results = await Promise.all(promises);
+                cardButton.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功`;
+                alert(results.map(r => r.message).join('\n'));
 
             } catch (error) {
-                button.innerHTML = `<i class="fa-solid fa-xmark"></i> 儲存失敗`;
+                cardButton.innerHTML = `<i class="fa-solid fa-xmark"></i> 儲存失敗`;
+                alert(`儲存失敗: ${error.message}`);
             } finally {
                 setTimeout(() => {
-                   button.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存所有變更`;
-                   button.disabled = false;
+                   cardButton.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存所有變更`;
+                   cardButton.disabled = false;
                 }, 2000);
             }
         });
@@ -339,36 +387,96 @@ function bindGmCardEvents(container) {
 
     container.querySelectorAll('.gm-button.rebuild').forEach(button => {
         button.addEventListener('click', async (e) => {
-            e.target.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 重建中...`;
-            e.target.disabled = true;
+            const cardButton = e.target.closest('button');
+            cardButton.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 重建中...`;
+            cardButton.disabled = true;
             try {
                 let result;
-                if (e.target.dataset.npcName) {
-                    result = await api.rebuildNpcForGM({ npcName: e.target.dataset.npcName });
-                } else if (e.target.dataset.locationName) {
-                    result = await api.rebuildLocationForGM({ locationName: e.target.dataset.locationName });
+                if (cardButton.dataset.npcName) {
+                    result = await api.rebuildNpcForGM({ npcName: cardButton.dataset.npcName });
+                } else if (cardButton.dataset.locationName) {
+                    result = await api.rebuildLocationForGM({ locationName: cardButton.dataset.locationName });
                 }
-                e.target.innerHTML = `<i class="fa-solid fa-check"></i> ${result.message}`;
+                alert(result.message);
+                cardButton.innerHTML = `<i class="fa-solid fa-check"></i> ${result.message}`;
             } catch (error) {
-                 e.target.innerHTML = `<i class="fa-solid fa-xmark"></i> 錯誤`;
+                 cardButton.innerHTML = `<i class="fa-solid fa-xmark"></i> 錯誤`;
+                 alert(`重建失敗: ${error.message}`);
             } finally {
                  setTimeout(() => {
-                    const activeMenu = document.getElementById('gm-menu').querySelector('a.active');
-                    if (activeMenu.getAttribute('href') === '#npc-management') loadNpcManagementData(document.getElementById('npc-management'));
-                    if (activeMenu.getAttribute('href') === '#location-editor') loadLocationManagementData(document.getElementById('location-editor'));
+                    const activeMenu = document.querySelector('#gm-menu a.active');
+                    if(activeMenu) {
+                       const pageId = activeMenu.getAttribute('href').substring(1);
+                       loadPageContent(pageId);
+                    }
                  }, 2000);
             }
         });
     });
 }
 
-/**
- * 初始化 GM 面板的事件監聽器和功能
- * @param {HTMLElement} gmPanel - GM 面板的頂層容器
- * @param {HTMLElement} gmCloseBtn - 關閉按鈕
- * @param {HTMLElement} gmMenu - 左側導航菜單
- * @param {HTMLElement} gmContent - 右側內容區域
- */
+// --- 【新增】物品/NPC生成事件處理函式 ---
+async function gmHandleCreateItem(e) {
+    const button = e.target.closest('button');
+    const itemName = document.getElementById('gm-new-item-name').value.trim();
+    if (!itemName) {
+        alert('請輸入物品名稱！');
+        return;
+    }
+    button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 生成中...`;
+    button.disabled = true;
+    try {
+        const result = await api.gmCreateItemTemplate({ itemName });
+        alert(result.message);
+        document.getElementById('gm-new-item-name').value = '';
+    } catch (error) {
+        alert(`生成失敗: ${error.message}`);
+    } finally {
+        button.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> AI 生成`;
+        button.disabled = false;
+    }
+}
+
+async function gmHandleCreateNpc(e) {
+    const button = e.target.closest('button');
+    const npcName = document.getElementById('gm-new-npc-name').value.trim();
+    if (!npcName) {
+        alert('請輸入人物姓名！');
+        return;
+    }
+    button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 生成中...`;
+    button.disabled = true;
+    try {
+        const result = await api.gmCreateNpcTemplate({ npcName });
+        alert(result.message);
+        document.getElementById('gm-new-npc-name').value = '';
+    } catch (error) {
+        alert(`生成失敗: ${error.message}`);
+    } finally {
+        button.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> AI 生成`;
+        button.disabled = false;
+    }
+}
+
+
+// --- 頁面載入與初始化 ---
+
+const pageLoaders = {
+    'player-stats': loadPlayerStatsData,
+    'npc-management': loadNpcManagementData,
+    'location-editor': loadLocationManagementData,
+    'item-spawner': loadItemSpawnerData,
+    'npc-creator': loadNpcCreatorData,
+};
+
+function loadPageContent(pageId) {
+    const targetPage = document.getElementById(`page-${pageId}`);
+    const loader = pageLoaders[pageId];
+    if (targetPage && loader) {
+        loader(targetPage);
+    }
+}
+
 export function initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent) {
     if (!gmPanel || !gmCloseBtn || !gmMenu || !gmContent) return;
 
@@ -389,16 +497,13 @@ export function initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent) {
         link.classList.add('active');
 
         const targetPageId = link.getAttribute('href').substring(1);
-        const targetPage = document.getElementById(targetPageId);
-
-        gmContent.querySelectorAll('.gm-page').forEach(page => page.classList.remove('active'));
         
+        gmContent.querySelectorAll('.page-content').forEach(page => page.style.display = 'none');
+        
+        const targetPage = document.getElementById(`page-${targetPageId}`);
         if (targetPage) {
-            targetPage.classList.add('active');
-            // 根據點擊的頁籤載入對應的資料
-            if (targetPageId === 'player-stats') loadPlayerStatsData(targetPage);
-            if (targetPageId === 'npc-management') loadNpcManagementData(targetPage);
-            if (targetPageId === 'location-editor') loadLocationManagementData(targetPage);
+            targetPage.style.display = 'block';
+            loadPageContent(targetPageId);
         }
     });
 }
