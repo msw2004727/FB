@@ -56,7 +56,8 @@ const libraryRoutes = require('./api/libraryRoutes');
 const epilogueRoutes = require('./api/epilogue.js');
 const bountyRoutes = require('./api/bountyRoutes');
 const gmRoutes = require('./api/gmRoutes');
-const mapRoutes = require('./api/mapRoutes'); // 【核心新增】
+const mapRoutes = require('./api/mapRoutes');
+const adminRoutes = require('./api/adminRoutes'); // 【***新***】 引入後台路由
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -65,7 +66,8 @@ app.use('/api/library', libraryRoutes);
 app.use('/api/epilogue', authMiddleware, epilogueRoutes);
 app.use('/api/bounties', bountyRoutes);
 app.use('/api/gm', gmRoutes);
-app.use('/api/map', authMiddleware, mapRoutes); // 【核心新增】
+app.use('/api/map', authMiddleware, mapRoutes);
+app.use('/api/admin', adminRoutes); // 【***新***】 使用後台路由
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
