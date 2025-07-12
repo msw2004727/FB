@@ -241,11 +241,19 @@ async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, pla
     const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChat;
-        const reply = await callAI(modelToUse, prompt, false);
-        return reply.replace(/["“”]/g, '');
+        // 【第一處核心修改】明確要求AI回傳JSON格式
+        const reply = await callAI(modelToUse, prompt, true);
+        // 【第二處核心修改】直接回傳AI給的JSON字串，不再進行任何破壞性修改
+        return reply;
     } catch (error) {
         console.error("[AI 任務失敗] 聊天大師任務:", error);
-        return "（他似乎心事重重，沒有回答你。）";
+        // 【第三處核心修改】如果呼叫失敗，也回傳一個符合結構的JSON字串，而不是純文字
+        return JSON.stringify({
+            response: "（他似乎心事重重，沒有回答你。）",
+            friendlinessChange: 0,
+            romanceChange: 0,
+            itemChanges: []
+        });
     }
 }
 
