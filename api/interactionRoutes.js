@@ -17,7 +17,7 @@ const {
     getRawInventory,
     calculateBulkScore,
     getPlayerSkills,
-    getInventoryState // 【核心修正】引入 getInventoryState
+    getInventoryState
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -48,10 +48,11 @@ const interactRouteHandler = async (req, res) => {
             
             const summonResult = await beggarService.handleBeggarSummon(userId);
             
-            // 【核心修正】改為使用 getInventoryState 來獲取最準確的金錢數量
-            const [lastSaveSnapshot, inventoryState] = await Promise.all([
+            // 【核心修正】同時獲取存檔、金錢與完整的背包物品列表
+            const [lastSaveSnapshot, inventoryState, fullInventory] = await Promise.all([
                 db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
-                getInventoryState(userId)
+                getInventoryState(userId),
+                getRawInventory(userId)
             ]);
 
             if (lastSaveSnapshot.empty) {
@@ -61,8 +62,10 @@ const interactRouteHandler = async (req, res) => {
 
             const tempRoundData = {
                 ...lastRoundData,
-                money: inventoryState.money || 0, // 【核心修正】使用來自 inventory 的金錢數據
-                ITM: inventoryState.itemsString,  // 同步更新物品顯示
+                money: inventoryState.money || 0,
+                ITM: inventoryState.itemsString,
+                inventory: fullInventory, // 【核心修正】將完整的背包數據帶入臨時回合
+                bulkScore: calculateBulkScore(fullInventory), // 同步更新負重
                 story: summonResult.appearanceStory,
                 PC: '你發出的暗號得到了回應，一個丐幫弟子出現在你面前。',
                 EVT: '丐幫弟子現身',
