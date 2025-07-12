@@ -1,11 +1,38 @@
 // api/npcHelpers.js
 const admin = require('firebase-admin');
-const { callAI, aiConfig, getAIPerNpcSummary } = require('../services/aiService'); // 引入 getAIPerNpcSummary
+const { callAI, aiConfig, getAIPerNpcSummary } = require('../services/aiService'); 
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
 const { processNpcRelationships } = require('./relationshipManager');
 
 const db = admin.firestore();
+
+/**
+ * 【核心新增】根據NPC的職業和地位，為其生成一個合理的初始金錢。
+ * @param {object} npcProfile - NPC的通用模板資料
+ * @returns {number} - 應有的金錢數量
+ */
+function getMoneyForNpc(npcProfile) {
+    if (!npcProfile) return 10; // 如果沒有資料，給一個保底值
+    const occupation = npcProfile.occupation || '';
+    const status = npcProfile.status_title || '';
+    let money = Math.floor(Math.random() * 50) + 10; // 基礎平民: 10-60文
+
+    if (['富商', '老闆', '掌櫃', '員外'].some(kw => occupation.includes(kw) || status.includes(kw))) {
+        money = Math.floor(Math.random() * 5000) + 1000; // 富裕階層: 1000-6000文
+    } else if (['官', '捕頭', '將軍', '知府', '縣令'].some(kw => occupation.includes(kw) || status.includes(kw))) {
+        money = Math.floor(Math.random() * 2000) + 500; // 公職人員: 500-2500文
+    } else if (['殺手', '遊俠', '鏢頭', '刺客'].some(kw => occupation.includes(kw) || status.includes(kw))) {
+        money = Math.floor(Math.random() * 800) + 200; // 江湖人士: 200-1000文
+    } else if (['鐵匠', '郎中', '教頭', '工匠', '廚師'].some(kw => occupation.includes(kw) || status.includes(kw))) {
+        money = Math.floor(Math.random() * 400) + 100; // 專業人士: 100-500文
+    } else if (['乞丐', '難民', '流民'].some(kw => occupation.includes(kw) || status.includes(kw))) {
+        money = Math.floor(Math.random() * 10); // 赤貧階層: 0-9文
+    }
+    
+    console.log(`[NPC經濟系統] 根據身份 [${occupation}/${status}]，為NPC生成了 ${money} 文錢。`);
+    return money;
+}
 
 /**
  * 更新指定NPC的個人記憶摘要
@@ -85,12 +112,13 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
     try {
         const npcTemplateRef = db.collection('npcs').doc(npcName);
         let templateDoc = await npcTemplateRef.get();
+        let newTemplateData = null; // 【修正】宣告變數
         
         if (!templateDoc.exists) {
             console.log(`[NPC系統] 「${npcName}」的通用模板不存在，啟動背景AI生成...`);
             const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
             const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
-            const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```\s*$/g, ''));
+            newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```\s*$/g, ''));
 
             const rand = Math.random();
             newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
@@ -109,7 +137,20 @@ async function createNpcProfileInBackground(userId, username, npcData, roundData
             }
         } else {
              console.log(`[NPC系統] 「${npcName}」的通用模板已存在，跳過背景生成。`);
+             newTemplateData = templateDoc.data(); // 【修正】如果模板存在，也要獲取其資料
         }
+        
+        // 【核心新增】為新NPC設定初始金錢
+        const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+        const initialMoney = getMoneyForNpc(newTemplateData);
+        await npcStateRef.set({
+            inventory: {
+                '銀兩': initialMoney
+            }
+        }, { merge: true });
+        console.log(`[NPC經濟系統] 已為新NPC「${npcName}」設定初始資金。`);
+
+
     } catch (error) {
         console.error(`[NPC系統] 為 "${npcName}" 進行背景建檔時發生錯誤:`, error);
     }
@@ -122,7 +163,6 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const batch = db.batch();
     
-    // 【核心新增】從回合數據中獲取玩家的當前位置
     const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
 
     const existingNpcSnapshot = await playerNpcStatesRef.get();
@@ -136,7 +176,6 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
         const isTrulyNew = !existingNpcIds.has(change.name);
 
         const updatePayload = {
-            // 【核心新增】無論是新NPC還是舊NPC，只要出現在本回合，就強制更新其位置
             currentLocation: playerLocation
         };
 
@@ -154,7 +193,7 @@ async function updateFriendlinessValues(userId, npcChanges, roundData) {
                     event: roundData.EVT || '初次相遇'
                 },
                 isDeceased: false,
-                inventory: {},
+                inventory: {}, // 【注意】這裡先創建空的 inventory，金錢在 createNpcProfileInBackground 中添加
                 romanceValue: 0,
                 friendlinessValue: change.friendlinessChange || 0,
                 triggeredRomanceEvents: []
@@ -255,6 +294,7 @@ async function processNpcUpdates(userId, updates) {
 }
 
 module.exports = {
+    getMoneyForNpc,
     getFriendlinessLevel,
     getMergedNpcProfile,
     createNpcProfileInBackground,
