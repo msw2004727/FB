@@ -642,21 +642,8 @@ body.dark-theme .item-entry.equipped {
     gap: 0.5rem;
 }
 
-/* 裝備部位圖示 */
-.equipped-slot-icon {
-    color: var(--light-accent);
-    font-size: 1rem;
-    width: 1.2em;
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-.equipped-slot-icon.visible {
-    opacity: 1;
-}
-body.dark-theme .equipped-slot-icon {
-    color: var(--dark-accent);
-}
+/* 【核心修改】移除舊的裝備圖示樣式 */
+
 
 /* 開關樣式 */
 .switch {
