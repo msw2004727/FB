@@ -316,6 +316,7 @@ async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
     
+    // 【核心修正】將 setLoading 移到實際的異步操作前
     gameLoop.setLoading(true, `正在與 ${npcName} 交談...`);
 
     try {
@@ -404,7 +405,7 @@ export async function sendChatMessage() {
             });
              if (data.success === false) {
                  modal.appendChatMessage('npc', data.response);
-                 dom.chatActionBtn.disabled = true; // 【核心修正】禁用按鈕
+                 dom.chatActionBtn.disabled = true;
              } else {
                  modal.appendChatMessage('npc', data.response);
              }
@@ -427,6 +428,17 @@ export async function sendChatMessage() {
 
 export async function endChatSession() {
     if (gameState.isRequesting || !gameState.currentChatNpc) return;
+    
+    // 【核心修正】如果是在情報模式下，關閉彈窗不觸發存檔
+    const chatMode = dom.chatModal.dataset.mode || 'chat';
+    if (chatMode === 'inquiry') {
+        modal.closeChatModal();
+        gameState.isInChat = false; 
+        gameState.currentChatNpc = null;
+        gameState.chatHistory = [];
+        return;
+    }
+
     const npcNameToSummarize = gameState.currentChatNpc;
     
     modal.closeChatModal();
