@@ -76,6 +76,16 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
+    	
+    // 【核心新增】根據是否為臨時事件，更新輸入框和按鈕狀態
+    const isTempEvent = roundData.NPC && roundData.NPC.some(npc => npc.isTemp);
+    if (isTempEvent) {
+        dom.playerInput.disabled = true;
+        dom.submitButton.textContent = '離開';
+    } else {
+        dom.playerInput.disabled = gameState.isRequesting;
+        dom.submitButton.textContent = '動作';
+    }
 }
 
 export function appendMessageToStory(htmlContent, className) {
