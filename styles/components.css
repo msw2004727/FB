@@ -829,3 +829,12 @@ body.dark-theme .npc-interaction-btn:disabled:hover {
     border-color: #495057;
     background-color: #343a40;
 }
+/* --- 【核心新增】精力條危險狀態 --- */
+#stamina-bar.pulsing-danger {
+    background-color: var(--stamina-danger-color-light); /* 切換為危險紅色 */
+    animation: pulse-red 1.5s infinite ease-in-out; /* 應用脈衝動畫 */
+}
+
+body.dark-theme #stamina-bar.pulsing-danger {
+    background-color: var(--stamina-danger-color-dark);
+}
