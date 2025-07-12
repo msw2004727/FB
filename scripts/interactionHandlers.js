@@ -312,26 +312,44 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
+// 【核心修改】處理丐幫情報探詢的完整流程
 async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
     
-    // 【核心修正】將 setLoading 移到實際的異步操作前
-    gameLoop.setLoading(true, `正在與 ${npcName} 交談...`);
+    const onConfirm = async () => {
+        gameLoop.setLoading(true, "正在支付情報費用...");
+        try {
+            const result = await api.startBeggarInquiry();
+            // 付款成功，更新本地的錢錢顯示
+            if (gameState.roundData) {
+                gameState.roundData.money = result.newBalance;
+                // 直接調用 updateUI 來刷新儀表板，而不是整個重繪
+                updateUI(null, gameState.roundData, null, null); 
+            }
+            
+            // 開啟聊天視窗
+            gameState.isInChat = true;
+            gameState.currentChatNpc = npcName;
+            gameState.chatHistory = [];
+            modal.openChatModalUI(npcProfile, 'inquiry');
+            modal.appendChatMessage('npc', "錢已收到。客官想打聽點什麼？小的知無不言...");
+            dom.chatInput.focus();
 
-    try {
-        gameState.isInChat = true;
-        gameState.currentChatNpc = npcName;
-        gameState.chatHistory = [];
-        
-        modal.openChatModalUI(npcProfile, 'inquiry'); 
-        modal.appendChatMessage('npc', "客官想打聽點什麼？小的知無不言，言無不盡...只要價錢合適。");
-        dom.chatInput.focus();
-    } catch (error) {
-        handleApiError(error);
-    } finally {
-        gameLoop.setLoading(false);
-    }
+        } catch (error) {
+            // 處理錢不夠的狀況
+            if(error.message.includes('銀兩不足')) {
+                alert('你的銀兩不足以支付100文的情報費用！');
+            } else {
+                handleApiError(error);
+            }
+        } finally {
+            gameLoop.setLoading(false);
+        }
+    };
+    
+    // 開啟付費確認彈窗
+    modal.openBeggarInquiryModal(onConfirm);
 }
 
 
@@ -391,26 +409,24 @@ export async function sendChatMessage() {
     if (!message || gameState.isRequesting || dom.chatActionBtn.disabled) return;
     dom.chatInput.value = '';
     modal.appendChatMessage('player', message);
-    gameState.chatHistory.push({ speaker: 'player', message: message });
     gameLoop.setLoading(true);
 
     try {
         const chatMode = dom.chatModal.dataset.mode || 'chat';
-        
+        let data;
+
         if (chatMode === 'inquiry') {
-            const data = await api.inquireBeggar({
+            // 【核心修改】呼叫新的、只負責提問的API
+            data = await api.askBeggarQuestion({
                 beggarName: gameState.currentChatNpc,
                 userQuery: message,
                 model: dom.aiModelSelector.value
             });
-             if (data.success === false) {
-                 modal.appendChatMessage('npc', data.response);
-                 dom.chatActionBtn.disabled = true;
-             } else {
-                 modal.appendChatMessage('npc', data.response);
-             }
+            modal.appendChatMessage('npc', data.response);
+
         } else {
-            const data = await api.npcChat({
+            gameState.chatHistory.push({ speaker: 'player', message: message });
+            data = await api.npcChat({
                 npcName: gameState.currentChatNpc,
                 chatHistory: gameState.chatHistory,
                 playerMessage: message,
