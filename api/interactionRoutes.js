@@ -26,7 +26,6 @@ const {
 const { triggerBountyGeneration } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 const { buildContext } = require('./contextBuilder');
-// 【核心新增】引入全新的物品管理器
 const { processItemChanges } = require('./itemManager');
 
 const db = admin.firestore();
@@ -107,11 +106,8 @@ const interactRouteHandler = async (req, res) => {
             }
         }
         
-        const batch = db.batch();
-
-        // 【核心修改】統一使用物品管理器處理物品變更
-        await processItemChanges(userId, aiResponse.roundData.itemChanges, batch, aiResponse.roundData);
-        
+        // 【核心修正】將 updateSkills 從 Promise.all 中移出，並在批次處理前獨立執行。
+        // 因為它內部有自己的獨立事務(Transaction)，不能與批次(Batch)混用。
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, player);
         
         if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -123,9 +119,13 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
+        const batch = db.batch();
+        
+        await processItemChanges(userId, aiResponse.roundData.itemChanges, batch, aiResponse.roundData);
         await updateFriendlinessValues(userId, username, aiResponse.roundData.NPC, aiResponse.roundData, player);
         await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
         await processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []);
+        
         if (aiResponse.roundData.locationUpdates) {
             await processLocationUpdates(userId, locationContext.locationName, aiResponse.roundData.locationUpdates);
         }
@@ -197,10 +197,8 @@ const interactRouteHandler = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[UserID: ${userId}] /interact 錯誤:`, error);
-        if (!res.headersSent) {
-            res.status(500).json({ message: error.message || "互動時發生未知錯誤" });
-        }
+        console.error(`[互動路由] /interact 錯誤:`, error);
+        res.status(500).json({ message: error.message || "處理您的動作時發生了未知的伺服器錯誤。" });
     }
 };
 
