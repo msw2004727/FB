@@ -53,20 +53,18 @@ const initiateCombatHandler = async (req, res) => {
         }
         const lastSave = savesSnapshot.docs[0].data();
         
-        // 【核心修改】採用更靈活的地點判定邏輯
-        const playerLocationHierarchy = lastSave.LOC; // 这是一个陣列
+        const playerLocationHierarchy = lastSave.LOC;
         const targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
         
         if (!targetNpcProfile) {
             return res.status(404).json({ message: `找不到名為 ${targetNpcName} 的目標。` });
         }
         
-        const npcLocation = targetNpcProfile.currentLocation; // 这是一个字串
+        const npcLocation = targetNpcProfile.currentLocation;
 
         if (!Array.isArray(playerLocationHierarchy) || !playerLocationHierarchy.includes(npcLocation)) {
             return res.status(403).json({ message: `你必須和 ${targetNpcName} 在同一個地方才能對其動手。` });
         }
-        // --- 修改結束 ---
 
         const simulatedPlayerAction = `我決定要「${intention}」${targetNpcName}。`;
         
@@ -266,15 +264,28 @@ const surrenderRouteHandler = async (req, res) => {
         const lastRoundData = lastSaveSnapshot.docs[0].data();
         const playerChanges = surrenderResult.outcome.playerChanges || {};
         
-        const powerChange = playerChanges.powerChange || {};
-        const finalPowerUpdate = {
-            internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
-            externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
-            lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
-            morality: admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0)
-        };
-        await userDocRef.update(finalPowerUpdate);
-        
+        // 【核心修改】使用 Transaction 來更新玩家數值
+        await db.runTransaction(async (transaction) => {
+            const currentUserDoc = await transaction.get(userDocRef);
+            if (!currentUserDoc.exists) throw "Document does not exist!";
+            
+            const currentData = currentUserDoc.data();
+            const powerChange = playerChanges.powerChange || {};
+
+            const newInternal = Math.max(0, (currentData.internalPower || 0) + (powerChange.internal || 0));
+            const newExternal = Math.max(0, (currentData.externalPower || 0) + (powerChange.external || 0));
+            const newLightness = Math.max(0, (currentData.lightness || 0) + (powerChange.lightness || 0));
+            const newMorality = (currentData.morality || 0) + (playerChanges.moralityChange || 0);
+
+            const finalPowerUpdate = {
+                internalPower: newInternal,
+                externalPower: newExternal,
+                lightness: newLightness,
+                morality: newMorality
+            };
+            transaction.update(userDocRef, finalPowerUpdate);
+        });
+
         if (playerChanges.itemChanges) {
             await updateInventory(userId, playerChanges.itemChanges, lastRoundData);
         }
@@ -352,21 +363,35 @@ const finalizeCombatHandler = async (req, res) => {
         
         await updateInventory(userId, itemChanges || [], preCombatRoundData);
         
-        const updates = {};
-        if (playerChanges && playerChanges.powerChange) {
-            updates.internalPower = admin.firestore.FieldValue.increment(playerChanges.powerChange.internal || 0);
-            updates.externalPower = admin.firestore.FieldValue.increment(playerChanges.powerChange.external || 0);
-            updates.lightness = admin.firestore.FieldValue.increment(playerChanges.powerChange.lightness || 0);
-        }
-        if (playerChanges && playerChanges.moralityChange) {
-            updates.morality = admin.firestore.FieldValue.increment(playerChanges.moralityChange || 0);
+        // 【核心修改】使用 Transaction 來更新玩家數值
+        if (playerChanges && (playerChanges.powerChange || playerChanges.moralityChange)) {
+            await db.runTransaction(async (transaction) => {
+                const currentUserDoc = await transaction.get(userDocRef);
+                if (!currentUserDoc.exists) throw "Document does not exist!";
+                
+                const currentData = currentUserDoc.data();
+                const powerChange = playerChanges.powerChange || {};
+                
+                const updates = {};
+                updates.internalPower = Math.max(0, (currentData.internalPower || 0) + (powerChange.internal || 0));
+                updates.externalPower = Math.max(0, (currentData.externalPower || 0) + (powerChange.external || 0));
+                updates.lightness = Math.max(0, (currentData.lightness || 0) + (powerChange.lightness || 0));
+                
+                if (playerChanges.moralityChange) {
+                    updates.morality = (currentData.morality || 0) + playerChanges.moralityChange;
+                }
+                
+                if (killedNpcNames.length > 0) {
+                    updates.deathAftermathCooldown = 5;
+                }
+
+                transaction.update(userDocRef, updates);
+            });
         }
         
         const killedNpcNames = (npcUpdates || []).filter(u => u.fieldToUpdate === 'isDeceased' && u.newValue === true).map(u => u.npcName);
 
         if (killedNpcNames.length > 0) {
-            updates.deathAftermathCooldown = 5;
-            
             const reputationSummary = await processReputationChangesAfterDeath(
                 userId, 
                 killedNpcNames, 
@@ -377,10 +402,6 @@ const finalizeCombatHandler = async (req, res) => {
             if (reputationSummary) {
                 summary += `\n\n**【江湖反應】** ${reputationSummary}`;
             }
-        }
-        
-        if (Object.keys(updates).length > 0) {
-            await userDocRef.update(updates);
         }
         
         if (npcUpdates && npcUpdates.length > 0) {
