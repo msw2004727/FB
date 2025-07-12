@@ -3,6 +3,16 @@
 const getChatMasterPrompt = (npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext) => {
     const formattedHistory = chatHistory.map(line => `${line.speaker}: "${line.message}"`).join('\n');
 
+    // 【核心修改】將 inventory 和 equipment 組合起來，成為一個統一的 possessions 列表給 AI 看
+    const inventoryItems = Object.entries(npcProfile.inventory || {})
+        .map(([name, quantity]) => `${name} (數量: ${quantity})`)
+        .join('、');
+    const equipmentItems = (npcProfile.equipment || [])
+        .map(item => `${item.templateId} (裝備中)`)
+        .join('、');
+    const possessionsString = [inventoryItems, equipmentItems].filter(Boolean).join('；');
+
+
     const context = {
         worldSummary: longTermSummary,
         location: localLocationContext ? {
@@ -26,6 +36,9 @@ const getChatMasterPrompt = (npcProfile, chatHistory, playerMessage, longTermSum
 ${JSON.stringify(npcProfile, null, 2)}
 \`\`\`
 
+---
+## 【核心修改】你的隨身物品 (你可贈予的全部物品)
+${possessionsString || '你目前身無長物。'}
 ---
 
 ## 你的記憶 (你與玩家的互動歷史摘要):
@@ -84,13 +97,13 @@ ${formattedHistory}
 
 1.  **觸發時機**：你必須根據你的**個性**和**對玩家的態度**，來決定是否以及何時贈予物品。
     * 一個「慷慨」且友好度高的角色，在玩家表達困難時，可能會主動贈送金錢或藥品。
-    * 一個「重情義」的角色，在友好度達到頂點時，可能會將珍藏的傳家寶贈予玩家。
+    * 一個「重情義」的角色，在友好度達到頂點時，可能會將珍藏的傳家寶或**身上的佩劍**贈予玩家。
     * 一個「神秘」的角色，可能會在對話中給予玩家一個關鍵的信物來觸發後續劇情。
 
 2.  **執行方式**：當你決定要給予物品時，你**必須**在你回傳的JSON中，使用 **\`itemChanges\`** 陣列來記錄這次贈予。
     * **格式**：\`"itemChanges": [{"action": "add", "itemName": "你要給的物品的準確名稱", "quantity": 1}]\`
-    * **庫存檢查**：你贈送的物品**必須**是你 \`inventory\` 中確實擁有的。你不能憑空變出東西。
-    * **對話配合**：你的 \`response\` 對話內容，必須與你的贈予行為相匹配。例如：\`"response": "我看你臉色蒼白，這瓶『金瘡藥』你且拿去用吧。"\`
+    * **庫存檢查**：你贈送的物品**必須**是你「隨身物品」清單中確實擁有的。你不能憑空變出東西。
+    * **對話配合**：你的 \`response\` 對話內容，必須與你的贈予行為相匹配。例如：\`"response": "我看你兩手空空，我這把舊的鐵劍你先拿去用吧。"\`
 
 **範例**：你是一個慷慨的鐵匠，對玩家好感度很高。玩家說：「最近手頭有點緊。」
 你的正確回傳應該是：
