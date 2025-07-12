@@ -319,6 +319,58 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
+// --- 【核心新增】處理丐幫情報探詢的邏輯 ---
+async function handleBeggarInquiry(npcName) {
+    hideNpcInteractionMenu();
+    
+    const onConfirm = async () => {
+        const userQuery = prompt(`你想向「${npcName}」打聽什麼消息？`);
+        if (!userQuery) return;
+
+        gameLoop.setLoading(true, `正在向 ${npcName} 打聽消息...`);
+        try {
+            const result = await api.inquireBeggar({
+                beggarName: npcName,
+                userQuery: userQuery,
+                model: dom.aiModelSelector.value
+            });
+
+            const inquiryResultText = `你向${npcName}打聽消息，他收下你的錢後，賊眉鼠眼地湊到你耳邊說道：「${result.response}」`;
+            
+            const lastRoundData = gameState.roundData;
+            const newRoundNumber = lastRoundData.R + 1;
+            const newRoundData = {
+                ...lastRoundData,
+                R: newRoundNumber,
+                money: (lastRoundData.money || 0) - 100,
+                story: inquiryResultText,
+                PC: `你花費了100文錢，從丐幫弟子口中得到一條情報。`,
+                EVT: `探聽江湖秘聞`,
+                suggestion: `這條消息是真是假？得靠你自己判斷了。`
+            };
+            
+            if (result.isTrue) {
+                newRoundData.CLS = result.response;
+            }
+
+            // 這裡直接模擬一個新回合，並更新UI
+            addRoundTitleToStory(newRoundData.EVT);
+            updateUI(newRoundData.story, newRoundData, null, null);
+            gameState.currentRound = newRoundNumber;
+            gameState.roundData = newRoundData;
+
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            gameLoop.setLoading(false);
+        }
+    };
+    
+    // 開啟確認彈窗
+    modal.openBeggarInquiryModal(onConfirm);
+}
+
+
 // --- Exported Functions ---
 
 export function setGameLoop(loop) {
@@ -332,18 +384,32 @@ export function hideNpcInteractionMenu() {
     }
 }
 
-export function handleNpcClick(event) {
+export async function handleNpcClick(event) {
     const targetIsNpc = event.target.closest('.npc-name');
     const targetIsMenu = event.target.closest('.npc-interaction-menu');
 
     if (targetIsNpc) {
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
         const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
-        showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
+        
+        // --- 【核心修改】檢查NPC身份 ---
+        // 嘗試從 gameState 中獲取NPC的詳細資料
+        const npcData = gameState.roundData?.NPC?.find(npc => npc.name === npcName);
+
+        if (npcData && npcData.status_title === '丐幫弟子') {
+            // 如果是丐幫弟子，執行專屬的情報探詢流程
+            await handleBeggarInquiry(npcName);
+        } else {
+            // 否則，顯示通用的互動選單
+            showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
+        }
+        // --- 修改結束 ---
+
     } else if (!targetIsMenu) {
         hideNpcInteractionMenu();
     }
 }
+
 
 export async function sendChatMessage() {
     const message = dom.chatInput.value.trim();
