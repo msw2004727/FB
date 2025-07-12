@@ -2,7 +2,8 @@
 
 const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     const { type, amount, itemName } = itemInfo;
-    const itemGiven = type === 'money' ? `${amount}文錢` : itemName;
+    // 【核心修正】將單位從 "文錢" 改為 "銀兩"
+    const itemGiven = type === 'money' ? `${amount}兩銀子` : itemName;
 
     return `
 你是一位精通人情世故的「江湖交際大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和友好度變化的JSON物件。
@@ -16,7 +17,7 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     * 檢查NPC的 "likes" 和 "dislikes"，如果送的東西正好投其所好或正是其所厭惡，反應和友好度變化會非常劇烈。
 
 2.  **物品價值與情境**：
-    * 物品的價值是重要參考。贈送「一文錢」和「一百兩黃金」所引起的反應天差地別。
+    * 物品的價值是重要參考。贈送「一兩銀子」和「一百兩黃金」所引起的反應天差地別。
     * 考慮情境。如果NPC正急需某樣東西（例如身受重傷時收到「金瘡藥」），友好度的提升會遠超物品本身的價值。
 
 3.  **玩家立場影響**：
