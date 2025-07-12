@@ -48,7 +48,6 @@ function showNpcInteractionMenu(targetElement, npcName, isDeceased = false) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
-// 第一層：顯示戰鬥意圖選項
 function showAttackIntention(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
@@ -62,7 +61,6 @@ function showAttackIntention(event) {
     });
 }
 
-// 第二層：顯示最終確認
 function showFinalConfirmation(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
@@ -160,7 +158,6 @@ function handleStrategySelection(strategy) {
 }
 
 function handleSkillSelection(skillName) {
-    // 如果點擊的是已經選中的技能，則取消選取
     if (gameState.combat.selectedSkill === skillName) {
         gameState.combat.selectedSkill = null;
         gameState.combat.selectedPowerLevel = null;
@@ -225,7 +222,7 @@ async function handleTradeButtonClick(event) {
     gameLoop.setLoading(true, `正在與 ${npcName} 準備交易...`);
     try {
         const tradeData = await api.startTrade(npcName);
-        modal.openTradeModal(tradeData, npcName, (newRound) => {
+        const onTradeComplete = (newRound) => {
             modal.closeTradeModal();
             if (newRound && newRound.roundData) {
                 addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
@@ -233,7 +230,8 @@ async function handleTradeButtonClick(event) {
                 gameState.currentRound = newRound.roundData.R;
                 gameState.roundData = newRound.roundData;
             }
-        });
+        };
+        modal.openTradeModal(tradeData, npcName, onTradeComplete);
     } catch (error) {
         handleApiError(error);
     } finally {
