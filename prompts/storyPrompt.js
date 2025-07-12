@@ -19,7 +19,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心修改】為貨幣系統新增規則
     const currencyRule = `
 ## 【核心經濟系統鐵律：雙貨幣系統】
 你現在必須嚴格區分兩種資產：「文錢」和「銀兩」。
@@ -152,10 +151,8 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         locationName: locationContext?.locationName
     });
     
-    // 【核心修改】將 getOutputStructureRule 移到此處，並在內部強化 EVT 規則
     const getOutputStructureRuleWithEnforcedEVT = (promptData) => {
         const originalRule = getOutputStructureRule(promptData);
-        // 【核心修正】修正了此處的 정규 표현식 (Regular Expression) 以正確匹配並替換規則
         const enhancedEvtRule = `
     - EVT: (字串) 事件摘要
       - **【強制鐵律】此欄位為必填，絕對不能留空！** 你必須為**任何行動**（包括旅行、對話、戰鬥、發呆）都提煉一個簡潔、有意境的「章回標題」，通常為四到八個字。
@@ -163,8 +160,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
       - **【佳例】**：「初探無名村」、「偶遇黑衣人」、「瀑下習劍」、「丹房竊藥」、「揭榜領懸賞」、「遠赴開封府」。
       - **【劣例】**：「${username}在瀑布下練習劍法」、「${username}走進了村莊」。`;
         
-        // 使用正則表達式替換掉原有的 EVT 規則
-        // 同時在此處加入新的 moneyChange 欄位說明
         return originalRule.replace(/- EVT: \(字串\) 事件摘要[^`]*\s*.*【佳例】\s*.*【劣例】[^`]*/, enhancedEvtRule)
                          .replace("- itemChanges: (陣列) 根據最新的「物品帳本系統」規則生成。", "- moneyChange: (數字) 基礎貨幣「文錢」的變化。\n    - itemChanges: (陣列) 所有「實體物品」（包含銀兩）的變化。");
     };
@@ -199,7 +194,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         * **友好度高 & 心動值低**: NPC會將挑釁視為**朋友間的誤會或玩笑**，反應應為**困惑與不解**。("兄弟，你沒事吧？為何說這種話？")
         * **友好度低 & 心動值低**: NPC會將其視為**赤裸裸的敵意**，並準備戰鬥。
     * **第三層：個性(風格渲染)**: 在確定了核心反應（如：憤怒）後，使用NPC的\`personality\`來決定他**如何表達**這種情緒。
-        * **範例**: 在確定NPC應為「敵意」後，如果他個性是\`[暴躁]\`，他會直接罵道「找死！」並動手；如果個性是\`[高傲]\`，他會先冷笑「哼，就憑你？」；如果個性是\`[謹慎]\`，他會先擺出防禦架式「閣下此話何意？」。
+        * **範例**: 在確定NPC應為「敵意」後，如果他個性是\`[暴躁]\`，他會直接罵道「找死！」並動手；如果個性是\`[謹慎]\`，他會先擺出防禦架式「閣下此話何意？」。
 * **觸發戰鬥**: 只有在NPC被激怒並決定主動攻擊時，你才可以在回傳的JSON中觸發戰鬥系統。你的 "story" 敘述必須描寫NPC被激怒並發起攻擊的過程，然後在\`roundData\`中加入\`"enterCombat": true\`以及相應的戰鬥設定。
 `;
 
@@ -219,6 +214,24 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 4.  **AI自身行為準則**：你在生成故事，描述環境中有什麼物品時，也必須考慮遊戲的平衡性。**絕對禁止**在遊戲初期或普通場景中，無緣無故地放置極其強大或稀有的物品。所有強力物品的出現，都必須有合理的劇情鋪陳。
 `;
     
+    // 【核心修改】將 npcUpdates 系統的規則，增加一條「NPC死亡處理鐵律」。
+    const npcUpdatesRule = `
+## 【核心新增規則】NPC檔案更新系統 (npcUpdates)
+與「地點更新」類似，如果你的故事中，發生了足以**永久性改變**某位NPC狀態的重大事件，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 \`"npcUpdates"\` 的**物件陣列**。
+
+- **【NPC死亡處理鐵律 (最重要)】**: 如果你的故事中，有任何NPC因**劇情原因**死亡（例如被暗殺、病死、被墜石砸死等非戰鬥系統導致的死亡），你**必須**使用此系統，生成一個將其 \`isDeceased\` 狀態更新為 \`true\` 的指令。這將確保該NPC被永久性地從遊戲中移除。
+
+- **時機**: 只有在發生了足以影響NPC檔案的**關鍵事件**時才觸發。例如：NPC更換了裝備、失去了親人、改變了人生目標、習得了新技能，或是與他人的關係發生了根本性轉變（例如與心上人分手）。
+- **結構**: \`{ "npcName": "要更新的NPC姓名", "fieldToUpdate": "要更新的欄位路徑", "newValue": "新的值", "updateType": "set | arrayUnion | arrayRemove" }\`
+- **欄位路徑**: 使用點表示法，例如 \`equipment\`、\`relationships.lover\`、\`goals\`、\`isDeceased\`。
+- **更新類型**: \`set\` 用於直接覆蓋欄位值，\`arrayUnion\` 用于向陣列欄位中添加新元素，\`arrayRemove\` 用於從陣列中移除元素。
+- **範例**:
+    - 故事中李鐵匠為你打造了一把新劍並自己裝備了：\`"npcUpdates": [{ "npcName": "李鐵匠", "fieldToUpdate": "equipment", "newValue": "精鋼劍", "updateType": "arrayUnion" }]\`
+    - 故事中王大夫的心上人不幸去世：\`"npcUpdates": [{ "npcName": "王大夫", "fieldToUpdate": "relationships.lover", "newValue": "已故的妻子", "updateType": "set" }]\`
+    - **【死亡範例】** 故事中林婉兒為了保護你，被暗箭射殺：\`"npcUpdates": [{ "npcName": "林婉兒", "fieldToUpdate": "isDeceased", "newValue": true, "updateType": "set" }]\`
+- **注意**: 這只適用於**重大且永久**的改變。普通的對話或情緒變化**不應**觸發此系統。如果沒有此類事件，則**不要**包含此欄位。
+`;
+
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
 
@@ -236,7 +249,8 @@ ${npcLocationSyncRule}
 ${actorCandidatesInstruction}
 
 ---
-
+${npcUpdatesRule}
+---
 ${currencyRule}
 ---
 ${staminaSystemRule}
@@ -246,17 +260,6 @@ ${encumbranceInstruction}
 ${locationContextInstruction}
 ${npcContextInstruction}
 ${systemInteractionRules}
-
-## 【核心新增】NPC檔案更新系統 (npcUpdates)
-與「地點更新」類似，如果你的故事中，發生了足以**永久性改變**某位NPC狀態的重大事件，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 \`"npcUpdates"\` 的**物件陣列**。
-- **時機**: 只有在發生了足以影響NPC檔案的**關鍵事件**時才觸發。例如：NPC更換了裝備、失去了親人、改變了人生目標、習得了新技能，或是與他人的關係發生了根本性轉變（例如與心上人分手）。
-- **結構**: \`{ "npcName": "要更新的NPC姓名", "fieldToUpdate": "要更新的欄位路徑", "newValue": "新的值", "updateType": "set | arrayUnion | arrayRemove" }\`
-- **欄位路徑**: 使用點表示法，例如 \`equipment\`、\`relationships.lover\`、\`goals\`。
-- **更新類型**: \`set\` 用於直接覆蓋欄位值，\`arrayUnion\` 用于向陣列欄位中添加新元素，\`arrayRemove\` 用於從陣列中移除元素。
-- **範例**:
-    - 故事中李鐵匠為你打造了一把新劍並自己裝備了：\`"npcUpdates": [{ "npcName": "李鐵匠", "fieldToUpdate": "equipment", "newValue": "精鋼劍", "updateType": "arrayUnion" }]\`
-    - 故事中王大夫的心上人不幸去世：\`"npcUpdates": [{ "npcName": "王大夫", "fieldToUpdate": "relationships.lover", "newValue": "已故的妻子", "updateType": "set" }]\`
-- **注意**: 這只適用於**重大且永久**的改變。普通的對話或情緒變化**不應**觸發此系統。如果沒有此類事件，則**不要**包含此欄位。
 
 ## 長期故事摘要 (世界核心記憶):
 ${longTermSummary}
