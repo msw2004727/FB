@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const logsLoadingText = document.getElementById('logs-loading-text');
 
     // --- 全局變數 ---
-    // 注意：您後端部署在Render上，網址是 'https://ai-novel-final.onrender.com'
     const API_BASE_URL = 'https://ai-novel-final.onrender.com/api/admin';
     let adminToken = sessionStorage.getItem('admin_token');
 
@@ -41,7 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     menuToggleOpen.addEventListener('click', () => sidebar.classList.add('open'));
     menuToggleClose.addEventListener('click', () => sidebar.classList.remove('open'));
-    mainContent.addEventListener('click', () => sidebar.classList.remove('open'));
+    mainContent.addEventListener('click', (e) => {
+        // 如果側邊欄是打開的，並且點擊的不是側邊欄本身或打開按鈕，則關閉它
+        if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && e.target !== menuToggleOpen) {
+            sidebar.classList.remove('open');
+        }
+    });
+
 
     menuLinks.forEach(link => {
         link.addEventListener('click', (e) => {
@@ -65,14 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 在前端，我們簡單地將密碼作為令牌使用
         adminToken = password; 
         
-        // 嘗試呼叫一個受保護的API端點來驗證密碼
         try {
-            await fetchApi('/balances'); // 選擇一個輕量的API來測試
+            await fetchApi('/balances'); 
             sessionStorage.setItem('admin_token', adminToken);
             showDashboard();
+            loginError.textContent = '';
         } catch (error) {
             loginError.textContent = '密碼錯誤或後台無法連線。';
             adminToken = null;
@@ -82,14 +86,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDashboard() {
         loginContainer.classList.add('hidden');
         adminDashboard.classList.remove('hidden');
-        loadBalances();
-        loadPlayers();
-        loadLogs();
+        // 【修正】確保在顯示儀表板時，自動載入第一個頁面的資料
+        switchPage('dashboard');
     }
     
     function switchPage(pageId) {
         pages.forEach(page => page.classList.toggle('active', page.id === `page-${pageId}`));
         menuLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${pageId}`));
+
+        // 【修正】根據切換的頁面載入對應的資料
+        if (pageId === 'dashboard') {
+            loadBalances();
+        } else if (pageId === 'logs') {
+            loadPlayers(); // 載入玩家列表以供篩選
+            loadLogs();    // 載入日誌
+        }
     }
 
     async function fetchApi(endpoint) {
@@ -125,19 +136,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 balanceContainer.appendChild(card);
             }
         } catch (error) {
-            balanceContainer.innerHTML = `<p class="error-message">無法載入餘額資訊: ${error.message}</p>`;
+            balanceContainer.innerHTML = `<p class="error-message" style="color: var(--error-color);">無法載入餘額資訊: ${error.message}</p>`;
         }
     }
 
     async function loadPlayers() {
         try {
             const players = await fetchApi('/players');
-            playerFilter.innerHTML = '<option value="">所有玩家</option>'; // Reset
+            // 避免重複添加選項
+            const existingPlayers = new Set(Array.from(playerFilter.options).map(opt => opt.value));
             players.forEach(playerId => {
-                const option = document.createElement('option');
-                option.value = playerId;
-                option.textContent = playerId;
-                playerFilter.appendChild(option);
+                if (!existingPlayers.has(playerId)) {
+                    const option = document.createElement('option');
+                    option.value = playerId;
+                    option.textContent = playerId.substring(0, 10) + '...'; // 顯示部分ID即可
+                    playerFilter.appendChild(option);
+                }
             });
         } catch (error) {
             console.error('無法載入玩家列表:', error);
@@ -146,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     async function loadLogs() {
         logTableBody.innerHTML = '';
+        logsLoadingText.textContent = '正在載入日誌...';
         logsLoadingText.classList.remove('hidden');
         try {
             const playerId = playerFilter.value;
@@ -158,11 +173,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             logs.forEach(log => {
                 const row = document.createElement('tr');
+                // 【修正】確保即使某些欄位缺失也不會報錯
+                const messageText = typeof log.message === 'object' ? JSON.stringify(log.message, null, 2) : log.message;
                 row.innerHTML = `
-                    <td>${new Date(log.timestamp).toLocaleString()}</td>
-                    <td>${log.level || 'INFO'}</td>
-                    <td>${log.userId || 'N/A'}</td>
-                    <td class="log-message">${log.message}</td>
+                    <td>${log.timestamp ? new Date(log.timestamp).toLocaleString() : '未知時間'}</td>
+                    <td><span class="log-level log-level-${(log.level || 'info').toLowerCase()}">${log.level || 'INFO'}</span></td>
+                    <td>${log.userId ? (log.userId.substring(0, 10) + '...') : 'N/A'}</td>
+                    <td class="log-message"><pre>${messageText || ''}</pre></td>
                 `;
                 logTableBody.appendChild(row);
             });
@@ -170,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             logsLoadingText.textContent = `無法載入日誌: ${error.message}`;
+            logsLoadingText.style.color = 'var(--error-color)';
         }
     }
 });
