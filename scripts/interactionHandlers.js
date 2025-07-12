@@ -319,7 +319,7 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-// --- 【核心新增】處理丐幫情報探詢的邏輯 ---
+// --- 【核心修改】處理丐幫情報探詢的邏輯 ---
 async function handleBeggarInquiry(npcName) {
     hideNpcInteractionMenu();
     
@@ -334,30 +334,38 @@ async function handleBeggarInquiry(npcName) {
                 userQuery: userQuery,
                 model: dom.aiModelSelector.value
             });
+            
+            // 根據後端回傳的 success 標記來決定下一步
+            if (result.success === false) {
+                 // 如果失敗 (例如錢不夠)，只顯示NPC的拒絕訊息
+                 appendMessageToStory(`${npcName}對你說：「${result.response}」`, 'system-message');
 
-            const inquiryResultText = `你向${npcName}打聽消息，他收下你的錢後，賊眉鼠眼地湊到你耳邊說道：「${result.response}」`;
-            
-            const lastRoundData = gameState.roundData;
-            const newRoundNumber = lastRoundData.R + 1;
-            const newRoundData = {
-                ...lastRoundData,
-                R: newRoundNumber,
-                money: (lastRoundData.money || 0) - 100,
-                story: inquiryResultText,
-                PC: `你花費了100文錢，從丐幫弟子口中得到一條情報。`,
-                EVT: `探聽江湖秘聞`,
-                suggestion: `這條消息是真是假？得靠你自己判斷了。`
-            };
-            
-            if (result.isTrue) {
-                newRoundData.CLS = result.response;
+            } else {
+                // 如果成功，則構造一個完整的新回合
+                const inquiryResultText = `你向${npcName}打聽消息，他收下你的錢後，賊眉鼠眼地湊到你耳邊說道：「${result.response}」`;
+                
+                const lastRoundData = gameState.roundData;
+                const newRoundNumber = lastRoundData.R + 1;
+                const newRoundData = {
+                    ...lastRoundData,
+                    R: newRoundNumber,
+                    money: (lastRoundData.money || 0) - 100,
+                    story: inquiryResultText,
+                    PC: `你花費了100文錢，從丐幫弟子口中得到一條情報。`,
+                    EVT: `探聽江湖秘聞`,
+                    suggestion: `這條消息是真是假？得靠你自己判斷了。`
+                };
+                
+                if (result.isTrue) {
+                    newRoundData.CLS = result.response;
+                }
+
+                // 更新UI並結束loading
+                addRoundTitleToStory(newRoundData.EVT);
+                updateUI(newRoundData.story, newRoundData, null, null);
+                gameState.currentRound = newRoundNumber;
+                gameState.roundData = newRoundData;
             }
-
-            // 這裡直接模擬一個新回合，並更新UI
-            addRoundTitleToStory(newRoundData.EVT);
-            updateUI(newRoundData.story, newRoundData, null, null);
-            gameState.currentRound = newRoundNumber;
-            gameState.roundData = newRoundData;
 
         } catch (error) {
             handleApiError(error);
@@ -391,17 +399,26 @@ export async function handleNpcClick(event) {
     if (targetIsNpc) {
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
         const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
-        
-        // --- 【核心修改】檢查NPC身份 ---
-        // 嘗試從 gameState 中獲取NPC的詳細資料
-        const npcData = gameState.roundData?.NPC?.find(npc => npc.name === npcName);
 
-        if (npcData && npcData.status_title === '丐幫弟子') {
-            // 如果是丐幫弟子，執行專屬的情報探詢流程
-            await handleBeggarInquiry(npcName);
-        } else {
-            // 否則，顯示通用的互動選單
-            showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
+        // --- 【核心修改】先呼叫API獲取NPC檔案，再根據身份決定互動方式 ---
+        try {
+            // 顯示一個小的讀取提示
+            targetIsNpc.style.cursor = 'wait';
+            hideNpcInteractionMenu();
+            
+            const profile = await api.getNpcProfile(npcName);
+            
+            if (profile.status_title === '丐幫弟子') {
+                await handleBeggarInquiry(npcName);
+            } else {
+                showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
+            }
+        } catch (error) {
+            // 如果API出錯（例如NPC不在附近），則顯示錯誤訊息
+            appendMessageToStory(error.message, 'system-message');
+        } finally {
+            // 恢復滑鼠指標
+            targetIsNpc.style.cursor = 'pointer';
         }
         // --- 修改結束 ---
 
@@ -426,7 +443,6 @@ export async function sendChatMessage() {
             playerMessage: message,
             model: dom.aiModelSelector.value
         });
-        // 【核心修正】將 data.reply 改為 data.npcMessage
         modal.appendChatMessage('npc', data.npcMessage);
         gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
     } catch (error) {
