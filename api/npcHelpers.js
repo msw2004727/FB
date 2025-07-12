@@ -193,7 +193,12 @@ async function processNpcUpdates(userId, updates) {
             updatePayload[fieldToUpdate] = newValue;
         }
         batch.set(npcStateDocRef, updatePayload, { merge: true });
-        console.log(`[NPC檔案更新] 已將玩家 ${userId} 的NPC「${npcName}」欄位「${fieldToUpdate}」更新為：`, newValue);
+        // 【核心新增】增加死亡日誌記錄
+        if (fieldToUpdate === 'isDeceased' && newValue === true) {
+            console.log(`[生死簿系統] 偵測到NPC「${npcName}」的死亡指令，已加入批次處理佇列。`);
+        } else {
+            console.log(`[NPC檔案更新] 已將玩家 ${userId} 的NPC「${npcName}」欄位「${fieldToUpdate}」更新為：`, newValue);
+        }
     }
     try {
         await batch.commit();
