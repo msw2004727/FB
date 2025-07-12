@@ -13,7 +13,7 @@ const db = admin.firestore();
 
 /**
  * @route   GET /api/game/npc/start-trade/:npcName
- * @desc    獲取交易初始化數據
+ * @desc    獲取交易初始化數據 (v2.0 - 包含NPC裝備)
  * @access  Private
  */
 router.get('/start-trade/:npcName', async (req, res) => {
@@ -42,22 +42,38 @@ router.get('/start-trade/:npcName', async (req, res) => {
         const playerMoneyItem = playerInventory.find(item => item.templateId === '銀兩');
         const playerMoney = playerMoneyItem ? playerMoneyItem.quantity : 0;
         
-        const npcInventory = npcProfile.inventory || {};
-        const npcMoney = npcInventory['銀兩'] || 0;
+        const npcInventoryMap = npcProfile.inventory || {};
+        const npcMoney = npcInventoryMap['銀兩'] || 0;
+        
+        const allNpcItems = [];
 
-        const npcItemPromises = Object.entries(npcInventory)
+        // 1. 處理 inventory (可堆疊物品)
+        const npcStackableItemPromises = Object.entries(npcInventoryMap)
             .filter(([itemName, quantity]) => itemName !== '銀兩' && quantity > 0)
             .map(async ([itemName, quantity]) => {
                 const itemTemplateResult = await getOrGenerateItemTemplate(itemName);
                 if (!itemTemplateResult || !itemTemplateResult.template) return null;
+                // 對於可堆疊物品，我們使用 templateId 作為唯一標識
                 return { ...itemTemplateResult.template, quantity, instanceId: itemName, templateId: itemName, itemName };
             });
 
-        const npcItems = (await Promise.all(npcItemPromises)).filter(Boolean);
+        // 2. 處理 equipment (不可堆疊的實例化物品)
+        const npcEquipment = npcProfile.equipment || [];
+        const npcEquipmentPromises = npcEquipment.map(async (equip) => {
+             const itemTemplateResult = await getOrGenerateItemTemplate(equip.templateId);
+             if (!itemTemplateResult || !itemTemplateResult.template) return null;
+             // 對於裝備，我們使用 instanceId 作為唯一標識
+             return { ...itemTemplateResult.template, quantity: 1, instanceId: equip.instanceId, templateId: equip.templateId, itemName: equip.templateId };
+        });
+
+        // 合併所有物品
+        const npcItemsFromInventory = (await Promise.all(npcStackableItemPromises)).filter(Boolean);
+        const npcItemsFromEquipment = (await Promise.all(npcEquipmentPromises)).filter(Boolean);
+        allNpcItems.push(...npcItemsFromInventory, ...npcItemsFromEquipment);
 
         const tradeData = {
             player: { items: playerInventory, money: playerMoney },
-            npc: { name: npcProfile.name, items: npcItems, money: npcMoney, personality: npcProfile.personality }
+            npc: { name: npcProfile.name, items: allNpcItems, money: npcMoney, personality: npcProfile.personality }
         };
 
         res.json(tradeData);
@@ -71,7 +87,7 @@ router.get('/start-trade/:npcName', async (req, res) => {
 
 /**
  * @route   POST /api/game/npc/confirm-trade
- * @desc    確認並執行交易，並推進遊戲回合 (重構版)
+ * @desc    確認並執行交易 (v2.0 - 包含NPC裝備處理)
  * @access  Private
  */
 router.post('/confirm-trade', async (req, res) => {
@@ -84,83 +100,81 @@ router.post('/confirm-trade', async (req, res) => {
     }
 
     try {
-        // Step 1: 預先獲取所有需要的模板信息
-        const itemsToReceive = tradeState.npc.offer.items;
-        const receivedItemTemplates = new Map();
-        for (const item of itemsToReceive) {
-            const templateResult = await getOrGenerateItemTemplate(item.name);
-            if (!templateResult || !templateResult.template) {
-                throw new Error(`無法為收到的物品「${item.name}」找到或生成設計圖。`);
-            }
-            receivedItemTemplates.set(item.name, templateResult.template);
-        }
-
-        // Step 2: 在一個事務中安全地更新所有庫存和金錢
         await db.runTransaction(async (transaction) => {
             const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
-            
+            const npcStateDoc = await transaction.get(npcStateRef);
+            if (!npcStateDoc.exists) throw new Error("找不到NPC的狀態檔案。");
+            const npcStateData = npcStateDoc.data();
+
+            // --- 驗證與扣除玩家資源 ---
             const playerMoneyOffer = tradeState.player.offer.money || 0;
-            const npcMoneyOffer = tradeState.npc.offer.money || 0;
-            
-            // --- 驗證玩家是否有足夠的資源 ---
             const playerMoneyRef = playerInventoryRef.doc('銀兩');
             const playerMoneyDoc = await transaction.get(playerMoneyRef);
             if ((playerMoneyDoc.data()?.quantity || 0) < playerMoneyOffer) {
                 throw new Error('你的錢不夠！');
             }
+            if (playerMoneyOffer > 0) {
+                 transaction.set(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(-playerMoneyOffer) }, { merge: true });
+            }
             for (const item of tradeState.player.offer.items) {
                 const itemDoc = await transaction.get(playerInventoryRef.doc(item.id));
-                if (!itemDoc.exists) {
-                    throw new Error(`你背包裡沒有「${item.name}」這件物品。`);
-                }
+                if (!itemDoc.exists) throw new Error(`你背包裡沒有「${item.name}」這件物品。`);
+                transaction.delete(playerInventoryRef.doc(item.id));
             }
 
-            // --- 執行資源轉移 ---
-            const npcInventoryUpdate = {};
+            // --- 處理NPC資源轉移 ---
+            const npcMoneyOffer = tradeState.npc.offer.money || 0;
+            const npcCurrentMoney = npcStateData.inventory?.['銀兩'] || 0;
+            if (npcCurrentMoney < npcMoneyOffer) throw new Error(`${npcName}的錢不夠！`);
 
-            // A. 處理金錢
-            if (playerMoneyOffer > 0) {
-                transaction.set(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(-playerMoneyOffer) }, { merge: true });
-                npcInventoryUpdate['inventory.銀兩'] = admin.firestore.FieldValue.increment(playerMoneyOffer);
-            }
+            let npcInventoryUpdate = {};
+            // 金錢轉移
+            if (playerMoneyOffer > 0) npcInventoryUpdate['inventory.銀兩'] = admin.firestore.FieldValue.increment(playerMoneyOffer);
             if (npcMoneyOffer > 0) {
                 transaction.set(playerMoneyRef, { quantity: admin.firestore.FieldValue.increment(npcMoneyOffer), templateId: '銀兩', itemType: '財寶' }, { merge: true });
                 npcInventoryUpdate['inventory.銀兩'] = admin.firestore.FieldValue.increment(-npcMoneyOffer);
             }
 
-            // B. 處理玩家給出的物品
+            // 玩家給出的物品，加入NPC庫存
             for (const item of tradeState.player.offer.items) {
-                transaction.delete(playerInventoryRef.doc(item.id));
                 npcInventoryUpdate[`inventory.${item.name}`] = admin.firestore.FieldValue.increment(1);
             }
 
-            // C. 處理玩家收到的物品 (核心修復點)
-            for (const item of itemsToReceive) {
-                const template = receivedItemTemplates.get(item.name);
-                const isStackable = ['材料', '財寶', '道具', '其他', '秘笈', '書籍'].includes(template.itemType);
+            // --- 玩家收到的物品 (核心修改處) ---
+            let npcEquipmentUpdate = npcStateData.equipment || [];
+            for (const item of tradeState.npc.offer.items) {
+                // 判斷物品是來自裝備(有UUID)還是庫存(無UUID)
+                const isFromEquipment = item.id !== item.name;
+
+                if (isFromEquipment) {
+                    npcEquipmentUpdate = npcEquipmentUpdate.filter(equip => equip.instanceId !== item.id);
+                } else {
+                    const currentQuantity = npcStateData.inventory?.[item.name] || 0;
+                    if (currentQuantity < item.quantity) throw new Error(`${npcName}的「${item.name}」數量不足！`);
+                    npcInventoryUpdate[`inventory.${item.name}`] = admin.firestore.FieldValue.increment(-item.quantity);
+                }
                 
+                // 將物品加入玩家背包
+                const templateResult = await getOrGenerateItemTemplate(item.name);
+                if (!templateResult || !templateResult.template) continue;
+                const template = templateResult.template;
+                const isStackable = ['材料', '財寶', '道具', '其他', '秘笈', '書籍'].includes(template.itemType);
+
                 if (isStackable) {
-                    const stackableItemRef = playerInventoryRef.doc(item.name);
-                    transaction.set(stackableItemRef, { 
-                        templateId: item.name, 
-                        quantity: admin.firestore.FieldValue.increment(item.quantity)
-                    }, { merge: true });
+                    transaction.set(playerInventoryRef.doc(item.name), { templateId: item.name, quantity: admin.firestore.FieldValue.increment(item.quantity) }, { merge: true });
                 } else {
                     for (let i = 0; i < item.quantity; i++) {
                         const newItemRef = playerInventoryRef.doc(uuidv4());
                         transaction.set(newItemRef, { templateId: item.name, quantity: 1, isEquipped: false, equipSlot: null });
                     }
                 }
-                npcInventoryUpdate[`inventory.${item.name}`] = admin.firestore.FieldValue.increment(-item.quantity);
             }
-            
-            if (Object.keys(npcInventoryUpdate).length > 0) {
-                 transaction.set(npcStateRef, npcInventoryUpdate, { merge: true });
-            }
+            // 一次性更新NPC的庫存和裝備
+            transaction.set(npcStateRef, { ...npcInventoryUpdate, equipment: npcEquipmentUpdate }, { merge: true });
         });
 
-        // Step 3: 交易數據庫操作成功，開始生成劇情並推進回合
+        // ... 後續的劇情生成和回合推進邏輯（與您現有程式碼相同） ...
         const [lastSaveSnapshot, summaryDoc] = await Promise.all([
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             db.collection('users').doc(userId).collection('game_state').doc('summary').get()
@@ -186,7 +200,7 @@ router.post('/confirm-trade', async (req, res) => {
             EVT: tradeNarrativeResult.evt,
             ITM: inventoryState.itemsString,
             money: inventoryState.money,
-            itemChanges: [], // 交易後，單回合的itemChanges應為空
+            itemChanges: [],
         };
         
         const newSummary = await getAISummary(longTermSummary, newRoundData);
