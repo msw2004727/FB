@@ -113,15 +113,23 @@ async function endCombat(combatResult) {
 }
 
 async function handleTradeButtonClick(event) {
+    // ================== 偵錯點 1：流程起點 ==================
+    console.log("【偵錯點 1】: 交易按鈕點擊成功！(位於 interactionHandlers.js)");
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
+    console.log("【偵錯點 1.1】: 準備與 NPC [" + npcName + "] 進行交易。");
+    
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
     gameLoop.setLoading(true, `正在與 ${npcName} 準備交易...`);
     try {
         const tradeData = await api.startTrade(npcName);
+        
+        // ================== 偵錯點 1.2：檢查從後端拿到的資料 ==================
+        console.log("【偵錯點 1.2】: 已從後端獲取交易資料:", tradeData);
+
         const onTradeComplete = (newRound) => {
-            modal.closeTradeModal(); // 【修正】確保交易完成後有關閉視窗的明確回呼
+            modal.closeTradeModal(); 
             if (newRound && newRound.roundData) {
                 addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
                 updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
@@ -129,9 +137,12 @@ async function handleTradeButtonClick(event) {
                 gameState.roundData = newRound.roundData;
             }
         };
-        // 【修正】將關閉函式一併傳入，以便在初始化時綁定關閉按鈕
+
+        // 【關鍵】呼叫 modalManager 來打開交易視窗
         modal.openTradeModal(tradeData, npcName, onTradeComplete, modal.closeTradeModal);
+
     } catch (error) {
+        console.error("【錯誤】在 handleTradeButtonClick 中發生錯誤:", error);
         handleApiError(error);
     } finally {
         gameLoop.setLoading(false);
