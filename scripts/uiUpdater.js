@@ -245,7 +245,7 @@ function createItemEntry(item) {
             <div class="item-controls">
                 <i class="equipped-slot-icon fa-solid ${slotIcon} ${item.isEquipped ? 'visible' : ''}"></i>
                 <label class="switch">
-                    <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${item.instanceId}" data-slot="${item.equipSlot}">
+                    <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${item.instanceId}">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -267,21 +267,22 @@ function createItemEntry(item) {
     if (checkbox) {
         checkbox.addEventListener('change', (e) => {
             const itemId = e.target.dataset.itemId;
-            const slot = e.target.dataset.slot;
-            handleEquipToggle(itemId, e.target.checked, slot);
+            // 【核心修改】不再需要 slot，因為卸下也只基於itemId
+            handleEquipToggle(itemId, e.target.checked);
         });
     }
     return entry;
 }
 
-async function handleEquipToggle(itemId, shouldEquip, slot) {
+// 【核心修改】簡化裝備/卸下邏輯
+async function handleEquipToggle(itemId, shouldEquip) {
     if (gameState.isRequesting) return;
     gameState.isRequesting = true;
     try {
         const payload = {
             itemId: itemId,
             equip: shouldEquip,
-            slot: shouldEquip ? null : slot 
+            // 【核心修改】不再需要slot，後端會自動處理
         };
         const result = await api.equipItem(payload); 
 
@@ -303,6 +304,7 @@ async function handleEquipToggle(itemId, shouldEquip, slot) {
         gameState.isRequesting = false;
     }
 }
+
 
 export function handleApiError(error) {
     console.error('API 錯誤:', error);
