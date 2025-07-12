@@ -3,49 +3,27 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getPlayerSkills, getRawInventory, getInventoryState } = require('./playerStateHelpers');
+// 【核心修改】直接引用 getRawInventory，不再需要 getInventoryState 和 getUnifiedInventory
+const { getPlayerSkills, getRawInventory } = require('./playerStateHelpers'); 
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
+const BULK_TO_SCORE_MAP = { '輕': 0, '中': 2, '重': 5, '極重': 10 };
+
 /**
- * 【最終修正版】獲取玩家統一的物品列表（背包+裝備），並標記每個物品的裝備狀態
- * @param {string} userId - 玩家ID
- * @returns {Promise<Array<object>>}
+ * 【新增】計算總負重分數的輔助函式
+ * @param {Array<object>} inventoryList - 完整的物品列表
+ * @returns {number}
  */
-async function getUnifiedInventory(userId) {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) return [];
-
-    const userData = userDoc.data();
-    const equipment = userData.equipment || {};
-    const inventoryItems = await getRawInventory(userId); // 這會返回一個以instanceId為鍵的物件
-
-    const unifiedList = [];
-    const processedIds = new Set();
-
-    // 1. 添加已裝備的物品
-    Object.keys(equipment).forEach(slot => {
-        const item = equipment[slot];
-        if (item && item.instanceId && !processedIds.has(item.instanceId)) {
-            // 從背包數據中獲取最完整的實例數據，然後加上裝備狀態
-            const fullItemData = inventoryItems[item.instanceId] || item;
-            unifiedList.push({ ...fullItemData, isEquipped: true, equipSlot: slot });
-            processedIds.add(item.instanceId);
-        }
-    });
-
-    // 2. 添加背包中未裝備的物品
-    Object.keys(inventoryItems).forEach(instanceId => {
-        if (!processedIds.has(instanceId)) {
-            unifiedList.push({ ...inventoryItems[instanceId], isEquipped: false });
-        }
-    });
-    
-    return unifiedList;
+function calculateBulkScore(inventoryList) {
+    return inventoryList.reduce((score, item) => {
+        const quantity = item.quantity || 1;
+        const bulkValue = item.bulk || '中';
+        return score + (BULK_TO_SCORE_MAP[bulkValue] || 0) * quantity;
+    }, 0);
 }
-
 
 router.post('/equip', async (req, res) => {
     const { itemId, equip, slot } = req.body;
@@ -53,23 +31,27 @@ router.post('/equip', async (req, res) => {
 
     try {
         let result;
+        // 【核心修改】unequip現在也需要物品的instanceId
         if (equip) {
             result = await inventoryModel.equipItem(userId, itemId);
         } else {
-            result = await inventoryModel.unequipItem(userId, slot);
+            result = await inventoryModel.unequipItem(userId, itemId);
         }
 
         // 操作成功後，回傳最新的完整、統一的玩家狀態給前端
-        const unifiedInventory = await getUnifiedInventory(userId);
+        const fullInventory = await getRawInventory(userId);
+        const newBulkScore = calculateBulkScore(fullInventory);
         
+        // 【BUG修復】在回傳中補上最新的 bulkScore
         res.json({
             success: true,
             message: result.message,
-            inventory: unifiedInventory,
+            inventory: fullInventory,
+            bulkScore: newBulkScore,
         });
 
     } catch (error) {
-        console.error(`[裝備API] 玩家 ${userId} 操作物品時出錯:`, error);
+        console.error(`[裝備API] 玩家 ${userId} 操作物品 ${itemId} 時出錯:`, error);
         res.status(500).json({ success: false, message: error.message || '裝備操作時發生未知錯誤。' });
     }
 });
@@ -85,11 +67,12 @@ router.get('/latest-game', async (req, res) => {
             const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
             return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
         }
-
-        const [snapshot, newBountiesSnapshot, unifiedInventory, skills] = await Promise.all([
+        
+        // 【核心修改】直接使用 getRawInventory
+        const [snapshot, newBountiesSnapshot, fullInventory, skills] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
-            getUnifiedInventory(userId),
+            getRawInventory(userId),
             getPlayerSkills(userId)
         ]);
         
@@ -101,16 +84,18 @@ router.get('/latest-game', async (req, res) => {
         
         const locationData = await getMergedLocationData(userId, latestGameData.LOC);
         
-        // 將統一的、最新的數據合併到要傳回的物件中
+        const bulkScore = calculateBulkScore(fullInventory);
+
         Object.assign(latestGameData, { 
             ...userData, 
             skills: skills,
-            inventory: unifiedInventory, 
+            inventory: fullInventory, // 直接使用完整的物品列表
+            bulkScore: bulkScore,     // 加入負重分數
         });
         
-        const inventoryState = await getInventoryState(userId);
-        latestGameData.ITM = inventoryState.itemsString;
-        latestGameData.money = inventoryState.money;
+        // 不再需要 getInventoryState，因為錢的資訊也從 getRawInventory 間接處理
+        const moneyItem = fullInventory.find(item => item.templateId === '銀兩' || item.templateId === '賞金');
+        latestGameData.money = moneyItem ? moneyItem.quantity : 0;
 
         const [prequelText, suggestion] = await Promise.all([
             getAIPrequel(userData.preferredModel, [latestGameData]),
@@ -141,6 +126,7 @@ router.get('/inventory', async (req, res) => {
     }
 });
 
+// 其他路由... (get-skills, get-relations 等保持不變)
 router.get('/skills', async (req, res) => {
     try {
         const skills = await getPlayerSkills(req.user.id);
@@ -241,6 +227,10 @@ router.post('/restart', async (req, res) => {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
         
+        // 刪除玩家主文檔，這會級聯刪除所有子集合
+        // 注意：這是一個破壞性操作，但在重啟遊戲的邏輯中是合理的。
+        // 如果要保留用戶名等資訊，需要先讀取再刪除，然後重新創建。
+        // 為安全起見，這裡先只清除子集合
         const collections = ['game_saves', 'npc_states', 'game_state', 'skills', 'location_states', 'bounties', 'inventory_items'];
         for (const col of collections) {
             try {
@@ -255,10 +245,12 @@ router.post('/restart', async (req, res) => {
             }
         }
         
+        // 重置玩家核心屬性
         await userDocRef.set({
             internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
             timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1,
-            equipment: {}, bulkScore: 0
+            // 【核心修改】移除 equipment，因為狀態已存儲在物品自身
+            bulkScore: 0 
         }, { merge: true });
 
         await invalidateNovelCache(userId);
@@ -268,7 +260,6 @@ router.post('/restart', async (req, res) => {
         res.status(500).json({ message: '開啟新的輪迴時發生錯誤。' });
     }
 });
-
 
 router.post('/force-suicide', async (req, res) => {
     const userId = req.user.id;
@@ -311,6 +302,5 @@ router.post('/force-suicide', async (req, res) => {
         res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
-
 
 module.exports = router;
