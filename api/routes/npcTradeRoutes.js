@@ -34,26 +34,27 @@ router.get('/start-trade/:npcName', async (req, res) => {
         if (latestSaveSnapshot.empty) {
             return res.status(404).json({ message: '找不到玩家位置資訊，無法開啟交易。' });
         }
-        
-        // 【核心修改】採用更靈活的地點判定邏輯
-        const playerLocationHierarchy = latestSaveSnapshot.docs[0].data().LOC; // 这是一个陣列
-        const npcLocation = npcProfile.currentLocation; // 这是一个字串
+        const playerLocationHierarchy = latestSaveSnapshot.docs[0].data().LOC;
+        const npcLocation = npcProfile.currentLocation;
 
         if (!Array.isArray(playerLocationHierarchy) || !playerLocationHierarchy.includes(npcLocation)) {
             return res.status(403).json({ message: `你必須和 ${npcName} 在同一個地方才能與其交易。` });
         }
-        // --- 修改結束 ---
 
         const playerMoneyItem = playerInventory.find(item => item.templateId === '銀兩');
         const playerMoney = playerMoneyItem ? playerMoneyItem.quantity : 0;
         
+        // --- 核心修正：合併NPC的所有家當 ---
         const npcInventoryMap = npcProfile.inventory || {};
         const npcEquipmentArray = npcProfile.equipment || [];
 
+        // 1. 獲取NPC的金錢
         const npcMoney = npcInventoryMap['銀兩'] || 0;
         
+        // 2. 準備一個統一的物品列表
         const allNpcItems = [];
 
+        // 3. 處理 inventory (可堆疊物品)
         const npcStackableItemPromises = Object.entries(npcInventoryMap)
             .filter(([itemName, quantity]) => itemName !== '銀兩' && quantity > 0)
             .map(async ([itemName, quantity]) => {
@@ -62,15 +63,18 @@ router.get('/start-trade/:npcName', async (req, res) => {
                 return { ...itemTemplateResult.template, quantity, instanceId: itemName, templateId: itemName, itemName };
             });
 
+        // 4. 處理 equipment (不可堆疊的實例化物品)
         const npcEquipmentPromises = npcEquipmentArray.map(async (equip) => {
              const itemTemplateResult = await getOrGenerateItemTemplate(equip.templateId);
              if (!itemTemplateResult || !itemTemplateResult.template) return null;
              return { ...itemTemplateResult.template, quantity: 1, instanceId: equip.instanceId, templateId: equip.templateId, itemName: equip.templateId };
         });
 
+        // 5. 合併並等待所有物品資料都獲取完畢
         const npcItemsFromInventory = (await Promise.all(npcStackableItemPromises)).filter(Boolean);
         const npcItemsFromEquipment = (await Promise.all(npcEquipmentPromises)).filter(Boolean);
         allNpcItems.push(...npcItemsFromInventory, ...npcItemsFromEquipment);
+        // --- 合併結束 ---
 
         const tradeData = {
             player: { items: playerInventory, money: playerMoney },
@@ -108,6 +112,7 @@ router.post('/confirm-trade', async (req, res) => {
             if (!npcStateDoc.exists) throw new Error("找不到NPC的狀態檔案。");
             const npcStateData = npcStateDoc.data();
 
+            // 驗證與扣除玩家資源
             const playerMoneyOffer = tradeState.player.offer.money || 0;
             const playerMoneyRef = playerInventoryRef.doc('銀兩');
             const playerMoneyDoc = await transaction.get(playerMoneyRef);
@@ -123,6 +128,7 @@ router.post('/confirm-trade', async (req, res) => {
                 transaction.delete(playerInventoryRef.doc(item.id));
             }
 
+            // 處理NPC資源轉移
             const npcMoneyOffer = tradeState.npc.offer.money || 0;
             const npcCurrentMoney = npcStateData.inventory?.['銀兩'] || 0;
             if (npcCurrentMoney < npcMoneyOffer) throw new Error(`${npcName}的錢不夠！`);
