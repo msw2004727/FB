@@ -31,9 +31,9 @@ const getRandomEventPrompt = (eventType, playerProfile) => {
 - **你可能的回應 (JSON):**
   \`\`\`json
   {
-    "description": "你在路邊的草叢中，似乎看到有東西在閃閃發光，撥開一看，竟是一小袋銅錢。",
+    "description": "你在路邊的草叢中，似乎看到有東西在閃閃發光，撥開一看，竟是一小袋碎銀。",
     "effects": {
-      "ITM": "+10 文銅錢"
+      "ITM": "+10 碎銀"
     }
   }
   \`\`\`
