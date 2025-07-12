@@ -237,13 +237,17 @@ function createItemEntry(item) {
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
+    // 【核心修改】圖示渲染邏輯
+    let iconClass = item.icon || 'fa-box'; // 預設圖示
+    if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
+        iconClass = slotConfig[item.equipSlot].icon; // 若已裝備，使用對應的裝備槽圖示
+    }
+
     let equipControls = '';
     if (item.equipSlot) {
-        const slotIcon = item.isEquipped ? (slotConfig[item.equipSlot]?.icon || 'fa-question-circle') : '';
-        
+        // 【核心修改】從此處移除右側圖示
         equipControls = `
             <div class="item-controls">
-                <i class="equipped-slot-icon fa-solid ${slotIcon} ${item.isEquipped ? 'visible' : ''}"></i>
                 <label class="switch">
                     <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${item.instanceId}">
                     <span class="slider"></span>
@@ -252,9 +256,10 @@ function createItemEntry(item) {
         `;
     }
 
+    // 【核心修改】使用新的 iconClass 渲染左側圖示
     entry.innerHTML = `
         <div class="item-info">
-             <i class="item-icon fa-solid ${item.icon || 'fa-box'}"></i>
+             <i class="item-icon fa-solid ${iconClass}"></i>
             <div>
                  <span class="item-name">${item.itemName}</span>
                  ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
@@ -267,14 +272,12 @@ function createItemEntry(item) {
     if (checkbox) {
         checkbox.addEventListener('change', (e) => {
             const itemId = e.target.dataset.itemId;
-            // 【核心修改】不再需要 slot，因為卸下也只基於itemId
             handleEquipToggle(itemId, e.target.checked);
         });
     }
     return entry;
 }
 
-// 【核心修改】簡化裝備/卸下邏輯
 async function handleEquipToggle(itemId, shouldEquip) {
     if (gameState.isRequesting) return;
     gameState.isRequesting = true;
@@ -282,7 +285,6 @@ async function handleEquipToggle(itemId, shouldEquip) {
         const payload = {
             itemId: itemId,
             equip: shouldEquip,
-            // 【核心修改】不再需要slot，後端會自動處理
         };
         const result = await api.equipItem(payload); 
 
