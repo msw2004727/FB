@@ -113,7 +113,6 @@ async function endCombat(combatResult) {
 }
 
 async function handleTradeButtonClick(event) {
-    console.log("交易按鈕點擊成功！");
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     
@@ -154,7 +153,8 @@ async function handleChatButtonClick(event) {
         gameState.isInChat = true;
         gameState.currentChatNpc = profile.name;
         gameState.chatHistory = [];
-        modal.openChatModalUI(profile);
+        // 【核心修改】呼叫通用聊天窗口，模式為 'chat'
+        modal.openChatModalUI(profile, 'chat'); 
         dom.chatInput.focus();
     } catch (error) {
         if (error.message && error.message.includes('並未見到')) {
@@ -313,56 +313,19 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-async function handleBeggarInquiry(npcName) {
+// --- 【核心修改】處理丐幫情報探詢的流程 ---
+async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
+    if (gameState.isRequesting) return;
     
-    const onConfirm = async () => {
-        const userQuery = prompt(`你想向「${npcName}」打聽什麼消息？`);
-        if (!userQuery) return;
-
-        gameLoop.setLoading(true, `正在向 ${npcName} 打聽消息...`);
-        try {
-            const result = await api.inquireBeggar({
-                beggarName: npcName,
-                userQuery: userQuery,
-                model: dom.aiModelSelector.value
-            });
-            
-            if (result.success === false) {
-                 appendMessageToStory(`${npcName}對你說：「${result.response}」`, 'system-message');
-            } else {
-                const inquiryResultText = `你向${npcName}打聽消息，他收下你的錢後，賊眉鼠眼地湊到你耳邊說道：「${result.response}」`;
-                const lastRoundData = gameState.roundData;
-                const newRoundNumber = lastRoundData.R + 1;
-                const newRoundData = {
-                    ...lastRoundData,
-                    R: newRoundNumber,
-                    money: (lastRoundData.money || 0) - 100,
-                    story: inquiryResultText,
-                    PC: `你花費了100文錢，從丐幫弟子口中得到一條情報。`,
-                    EVT: `探聽江湖秘聞`,
-                    suggestion: `這條消息是真是假？得靠你自己判斷了。`,
-                    NPC: lastRoundData.NPC.filter(npc => npc.name !== npcName) // 臨時NPC消失
-                };
-                
-                if (result.isTrue) {
-                    newRoundData.CLS = result.response;
-                }
-
-                addRoundTitleToStory(newRoundData.EVT);
-                updateUI(newRoundData.story, newRoundData, null, null);
-                gameState.currentRound = newRoundNumber;
-                gameState.roundData = newRoundData;
-            }
-
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            gameLoop.setLoading(false);
-        }
-    };
+    gameState.isInChat = true;
+    gameState.currentChatNpc = npcName;
+    gameState.chatHistory = [];
     
-    modal.openBeggarInquiryModal(onConfirm);
+    // 直接開啟特殊模式的聊天彈窗
+    modal.openChatModalUI(npcProfile, 'inquiry'); 
+    modal.appendChatMessage('npc', "客官想打聽點什麼？小的知無不言，言無不盡...只要價錢合適。");
+    dom.chatInput.focus();
 }
 
 
@@ -384,7 +347,7 @@ export async function handleNpcClick(event) {
     const targetIsMenu = event.target.closest('.npc-interaction-menu');
 
     if (targetIsNpc) {
-        event.stopPropagation(); // 阻止事件冒泡，避免觸發全局點擊事件
+        event.stopPropagation();
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
         const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
 
@@ -393,7 +356,7 @@ export async function handleNpcClick(event) {
 
         if (localNpcData && (localNpcData.status_title === '丐幫弟子' || localNpcData.isTemp)) {
             // 如果是本地的臨時丐幫弟子，直接觸發探詢流程
-            await handleBeggarInquiry(npcName);
+            await handleBeggarInquiry(npcName, localNpcData);
         } else {
             // 否則，向後端請求資料來判斷
             try {
@@ -403,7 +366,7 @@ export async function handleNpcClick(event) {
                 targetIsNpc.style.cursor = 'pointer';
 
                 if (profile.status_title === '丐幫弟子') {
-                    await handleBeggarInquiry(npcName);
+                    await handleBeggarInquiry(npcName, profile);
                 } else {
                     showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
                 }
@@ -417,7 +380,6 @@ export async function handleNpcClick(event) {
     }
 }
 
-// ... (其他函式保持不變) ...
 export async function sendChatMessage() {
     const message = dom.chatInput.value.trim();
     if (!message || gameState.isRequesting) return;
@@ -427,14 +389,36 @@ export async function sendChatMessage() {
     gameLoop.setLoading(true);
 
     try {
-        const data = await api.npcChat({
-            npcName: gameState.currentChatNpc,
-            chatHistory: gameState.chatHistory,
-            playerMessage: message,
-            model: dom.aiModelSelector.value
-        });
-        modal.appendChatMessage('npc', data.npcMessage);
-        gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
+        const chatMode = dom.chatModal.dataset.mode || 'chat';
+        let data;
+
+        // 【核心修改】根據聊天模式，呼叫不同的API
+        if (chatMode === 'inquiry') {
+            data = await api.inquireBeggar({
+                beggarName: gameState.currentChatNpc,
+                userQuery: message,
+                model: dom.aiModelSelector.value
+            });
+            // 丐幫的回覆直接顯示，不需要再推入 history，因為它是一次性的
+             if (data.success === false) {
+                 modal.appendChatMessage('npc', data.response);
+                 // 錢不夠，直接關閉視窗
+                 setTimeout(() => modal.closeChatModal(), 2000);
+             } else {
+                 modal.appendChatMessage('npc', data.response);
+             }
+
+        } else {
+             data = await api.npcChat({
+                npcName: gameState.currentChatNpc,
+                chatHistory: gameState.chatHistory,
+                playerMessage: message,
+                model: dom.aiModelSelector.value
+            });
+            modal.appendChatMessage('npc', data.npcMessage);
+            gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
+        }
+
     } catch (error) {
         modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
     } finally {
