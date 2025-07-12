@@ -4,17 +4,20 @@ import { api } from './api.js';
 // 全域變數，用於儲存當前交易的狀態
 let state = {};
 let onTradeCompleteCallback = null;
-let closeTradeModalCallback = null; // 【新增】儲存關閉視窗的回呼函式
+let closeTradeModalCallback = null; // 【修正】儲存關閉視窗的回呼函式
 let currentNpcName = '';
 
 // DOM 元素快取
 const DOMElements = {};
 let areDOMsCached = false;
 
+/**
+ * 【核心修正】首次獲取或更新DOM元素引用
+ */
 function cacheDOMElements() {
     if (areDOMsCached) return;
-    DOMElements.tradeModal = document.getElementById('trade-modal'); // 【新增】獲取最外層容器
-    DOMElements.closeBtn = document.getElementById('close-trade-btn'); // 【新增】獲取關閉按鈕
+    DOMElements.tradeModal = document.getElementById('trade-modal');
+    DOMElements.closeBtn = document.getElementById('close-trade-btn');
     DOMElements.playerInventory = document.querySelector('#trade-player-inventory');
     DOMElements.playerOffer = document.querySelector('#trade-player-offer');
     DOMElements.npcInventory = document.querySelector('#trade-npc-inventory');
@@ -32,6 +35,9 @@ function cacheDOMElements() {
     areDOMsCached = true;
 }
 
+/**
+ * 渲染整個交易介面
+ */
 function render() {
     if (!DOMElements.playerInventory) return; 
 
@@ -52,6 +58,13 @@ function render() {
     calculateSummary();
 }
 
+/**
+ * 創建單個物品的HTML元素
+ * @param {object} item - 物品資料
+ * @param {string} owner - 擁有者 ('player' or 'npc')
+ * @param {string} area - 當前區域 ('inventory' or 'offer')
+ * @returns {HTMLLIElement}
+ */
 function createItemElement(item, owner, area) {
     const li = document.createElement('li');
     li.className = 'bg-amber-50/50 border border-amber-200 p-1.5 rounded-md cursor-pointer flex justify-between items-center text-sm hover:border-amber-400 hover:bg-amber-50 transform hover:-translate-y-px transition-all';
@@ -61,6 +74,12 @@ function createItemElement(item, owner, area) {
     return li;
 }
 
+/**
+ * 移動物品的邏輯
+ * @param {string} itemId - 物品的唯一ID
+ * @param {string} owner - 擁有者
+ * @param {string} currentArea - 當前區域
+ */
 function moveItem(itemId, owner, currentArea) {
     const sourceList = currentArea === 'inventory' ? state[owner].inventory : state[owner].offer.items;
     const targetList = currentArea === 'inventory' ? state[owner].offer.items : state[owner].inventory;
@@ -74,6 +93,9 @@ function moveItem(itemId, owner, currentArea) {
     }
 }
 
+/**
+ * 計算價值差並更新UI
+ */
 function calculateSummary() {
     if (!DOMElements.valueDiff) return;
 
@@ -103,6 +125,9 @@ function calculateSummary() {
     DOMElements.confirmBtn.disabled = !isTradeable;
 }
 
+/**
+ * 處理最終交易確認
+ */
 async function handleConfirmTrade() {
     DOMElements.confirmBtn.disabled = true;
     DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
@@ -140,6 +165,7 @@ async function handleConfirmTrade() {
     }
 }
 
+
 /**
  * 【核心修正】交易系統的總入口和初始化函式
  * @param {object} tradeData - 從API獲取的初始交易數據
@@ -152,7 +178,7 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
     
     currentNpcName = npcName;
     onTradeCompleteCallback = onTradeComplete;
-    closeTradeModalCallback = closeCallback; // 【新增】儲存關閉回呼
+    closeTradeModalCallback = closeCallback;
 
     state = {
         player: {
@@ -167,7 +193,7 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
         }
     };
     
-    // 【新增】為關閉按鈕和背景點擊添加事件監聽
+    // 【修正】確保為關閉按鈕和背景點擊綁定正確的回呼函式
     if (DOMElements.closeBtn) {
         DOMElements.closeBtn.onclick = closeTradeModalCallback;
     }
@@ -186,6 +212,9 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
     render();
 }
 
+/**
+ * 在關閉彈窗時，清理事件監聽器，避免記憶體洩漏
+ */
 export function closeTradeUI() {
     if (DOMElements.confirmBtn) DOMElements.confirmBtn.onclick = null;
     if (DOMElements.closeBtn) DOMElements.closeBtn.onclick = null;
