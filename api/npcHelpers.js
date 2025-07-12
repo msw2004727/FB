@@ -1,9 +1,8 @@
 // api/npcHelpers.js
 const admin = require('firebase-admin');
-const { getAIPerNpcSummary } = require('../services/aiService'); 
-const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
-// 【核心修改】引入新的創建服務，並移除舊的、內部的創建函式
-const { createNewNpc } = require('./services/npcCreationService'); 
+const { getAIPerNpcSummary, getRomanceEventPrompt } = require('../services/aiService');
+const { createNewNpc } = require('../services/npcCreationService');
+const { getIdentityForNewNpc } = require('./identityManager'); // 引入新的身份管理器
 
 const db = admin.firestore();
 
@@ -29,6 +28,7 @@ async function updateNpcMemoryAfterInteraction(userId, npcName, interactionData)
 
         const oldSummary = doc.data().interactionSummary || `你與${npcName}的交往尚淺。`;
         
+        // 注意：此處的'default'可以替換為玩家選擇的模型
         const newSummary = await getAIPerNpcSummary('default', npcName, oldSummary, interactionData);
 
         await npcStateRef.update({ interactionSummary: newSummary });
@@ -50,34 +50,80 @@ function getFriendlinessLevel(value) {
     return 'neutral';
 }
 
+/**
+ * 獲取合併後的NPC資料 (基礎資料 + 玩家特定狀態)
+ * v2.0: 新增邏輯 - 如果NPC基礎檔案不存在，則即時創建一個。
+ * @param {string} userId - 玩家ID
+ * @param {string} npcName - NPC姓名
+ * @returns {Promise<Object|null>} - 合併後的NPC資料物件，或在找不到時返回null
+ */
 async function getMergedNpcProfile(userId, npcName) {
-    if (!userId || !npcName) return null;
+    if (!userId || !npcName) {
+        console.error('[NPC助手] getMergedNpcProfile缺少userId或npcName參數');
+        return null;
+    }
+
     try {
-        const npcTemplateRef = db.collection('npcs').doc(npcName);
-        const playerNpcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+        const npcRef = db.collection('npcs').doc(npcName);
+        let npcDoc = await npcRef.get();
+        let baseProfile;
 
-        const [templateDoc, stateDoc] = await Promise.all([
-            npcTemplateRef.get(),
-            playerNpcStateRef.get()
-        ]);
+        // 【核心修改】如果NPC的基礎檔案不存在，則觸發創建流程
+        if (!npcDoc.exists) {
+            console.log(`[NPC助手] 基礎檔案 for "${npcName}" 不存在，開始即時創建...`);
+            
+            // 1. 呼叫身份管理器來決定NPC的身份和初始位置
+            const { identity, location } = await getIdentityForNewNpc(npcName);
 
-        if (!templateDoc.exists && !stateDoc.exists) {
-            console.warn(`[NPC系統] 找不到名為「${npcName}」的通用模板和玩家狀態。`);
-            return null;
+            // 2. 建立一個新的基礎檔案物件
+            const newProfile = {
+                name: npcName,
+                status_title: identity, // 使用動態獲取的身份作為其頭銜
+                friendlinessValue: 50, // 預設好感度
+                romanceValue: 0,
+                isDeceased: false,
+                status: '安好',
+                currentLocation: location || '未知',
+                inventory: {},
+                equipment: [],
+                skills: [],
+                personality: ["性格生成中..."],
+                appearance: "外貌生成中...",
+                age: "年齡不詳",
+                background: `關於${npcName}的過去，江湖上流傳著許多版本，但無人知曉真相。` // 預設背景
+            };
+
+            // 3. 將新檔案寫入 'npcs' 集合
+            await npcRef.set(newProfile);
+            console.log(`[NPC助手] 已為 "${npcName}" 成功創建基礎檔案，身份為: ${identity}`);
+
+            // 4. 重新獲取一次文檔，以確保後續流程拿到的是剛創建的資料
+            npcDoc = await npcRef.get();
+            baseProfile = npcDoc.data();
+
+        } else {
+            baseProfile = npcDoc.data();
         }
 
-        const templateData = templateDoc.exists ? templateDoc.data() : {};
-        const stateData = stateDoc.exists ? stateDoc.data() : {};
-        
-        const mergedProfile = { ...templateData, ...stateData, name: templateData.name || npcName };
-        if (!mergedProfile.name) mergedProfile.name = npcName;
+        // 接下來的邏輯：獲取玩家特定的NPC狀態並合併
+        const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+        const npcStateDoc = await npcStateRef.get();
 
-        return mergedProfile;
+        if (npcStateDoc.exists) {
+            const userSpecificState = npcStateDoc.data();
+            // 合併：玩家特定狀態會覆蓋基礎檔案的同名欄位
+            return { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
+        } else {
+            // 如果玩家從未與此NPC互動過，則直接返回基礎檔案
+            return { ...baseProfile, name: baseProfile.name || npcName };
+        }
+
     } catch (error) {
-        console.error(`[NPC系統] 合併NPC「${npcName}」的資料時出錯:`, error);
+        console.error(`[NPC助手] 在獲取 "${npcName}" 的資料時發生錯誤:`, error);
         return null;
     }
 }
+
 
 /**
  * 【核心重構】統一處理所有NPC友好度更新和檔案創建的函式
@@ -93,7 +139,7 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const batch = db.batch();
     
-    const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
+    const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[roundData.LOC.length - 1] : '未知之地';
 
     const existingNpcSnapshot = await playerNpcStatesRef.get();
     const existingNpcIds = new Set(existingNpcSnapshot.docs.map(doc => doc.id));
@@ -105,7 +151,6 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
         const isTrulyNew = !existingNpcIds.has(change.name);
 
         if (isTrulyNew) {
-            // 【核心修改】將創建邏輯完全委託給新的服務
             await createNewNpc(userId, username, change, roundData, playerProfile, batch);
         } else {
             // 對於舊識，只更新友好度和位置
@@ -159,6 +204,7 @@ async function checkAndTriggerRomanceEvent(userId, playerProfile) {
         for (const trigger of eventTriggers) {
             if (romanceValue >= trigger.threshold && !triggeredRomanceEvents.includes(trigger.level)) {
                 console.log(`[戀愛系統] 偵測到與 ${npcName} 的 ${trigger.level} 事件觸發條件！`);
+                // 此處需要一個AI調用來生成事件內容
                 const romanceEventResultText = await getRomanceEventPrompt(playerProfile, npcProfile, trigger.level);
                 try {
                     const romanceEventResult = JSON.parse(romanceEventResultText);
@@ -193,7 +239,7 @@ async function processNpcUpdates(userId, updates) {
             updatePayload[fieldToUpdate] = newValue;
         }
         batch.set(npcStateDocRef, updatePayload, { merge: true });
-        // 【核心新增】增加死亡日誌記錄
+        
         if (fieldToUpdate === 'isDeceased' && newValue === true) {
             console.log(`[生死簿系統] 偵測到NPC「${npcName}」的死亡指令，已加入批次處理佇列。`);
         } else {
