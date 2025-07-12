@@ -9,6 +9,7 @@ let currentNpcName = '';
 const DOMElements = {};
 let areDOMsCached = false;
 
+// 【核心修正】移除所有不存在的 "silver" 相關元素ID
 function cacheDOMElements() {
     if (areDOMsCached) return;
     DOMElements.tradeModal = document.getElementById('trade-modal');
@@ -18,17 +19,13 @@ function cacheDOMElements() {
     DOMElements.playerInventory = document.querySelector('#trade-player-inventory');
     DOMElements.playerOffer = document.querySelector('#trade-player-offer');
     DOMElements.playerMoneyDisplay = document.getElementById('trade-player-money');
-    DOMElements.playerSilverDisplay = document.getElementById('trade-player-silver');
     DOMElements.playerMoneyInput = document.getElementById('trade-player-money-input');
-    DOMElements.playerSilverInput = document.getElementById('trade-player-silver-input');
     
     // NPC elements
     DOMElements.npcInventory = document.querySelector('#trade-npc-inventory');
     DOMElements.npcOffer = document.querySelector('#trade-npc-offer');
     DOMElements.npcMoneyDisplay = document.getElementById('trade-npc-money');
-    DOMElements.npcSilverDisplay = document.getElementById('trade-npc-silver');
     DOMElements.npcMoneyInput = document.getElementById('trade-npc-money-input');
-    DOMElements.npcSilverInput = document.getElementById('trade-npc-silver-input');
 
     DOMElements.npcHeaderName = document.getElementById('trade-npc-header-name');
     DOMElements.npcNameDisplay = document.getElementById('trade-npc-name');
@@ -53,18 +50,15 @@ function render() {
         state[owner].offer.items.forEach(item => offerEl.appendChild(createItemElement(item, owner, 'offer')));
     });
 
-    // Render currency displays
+    // 【核心修正】移除對 "silver" 元素的渲染
     DOMElements.playerMoneyDisplay.textContent = state.player.money;
-    DOMElements.playerSilverDisplay.textContent = state.player.silver;
     DOMElements.npcMoneyDisplay.textContent = state.npc.money;
-    DOMElements.npcSilverDisplay.textContent = state.npc.silver;
     
     DOMElements.npcHeaderName.textContent = currentNpcName;
     DOMElements.npcNameDisplay.textContent = `${currentNpcName} 的出價`;
     
     // Add input listeners
     DOMElements.playerMoneyInput.oninput = () => calculateSummary();
-    DOMElements.playerSilverInput.oninput = () => calculateSummary();
     
     calculateSummary();
 }
@@ -93,19 +87,15 @@ function moveItem(itemId, owner, currentArea) {
 function calculateSummary() {
     if (!DOMElements.valueDiff) return;
     
-    const SILVER_TO_MONEY_RATE = 1000; // 1兩銀子 = 1000文錢
-
     const playerItemValue = state.player.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
     const npcItemValue = state.npc.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
     
     const playerMoneyValue = Number(DOMElements.playerMoneyInput.value) || 0;
-    const playerSilverValue = (Number(DOMElements.playerSilverInput.value) || 0) * SILVER_TO_MONEY_RATE;
-    
     const npcMoneyValue = Number(DOMElements.npcMoneyInput.value) || 0;
-    const npcSilverValue = (Number(DOMElements.npcSilverInput.value) || 0) * SILVER_TO_MONEY_RATE;
 
-    const playerOfferValue = playerItemValue + playerMoneyValue + playerSilverValue;
-    const npcOfferValue = npcItemValue + npcMoneyValue + npcSilverValue;
+    // 【核心修正】移除所有 "silver" 相關的計算
+    const playerOfferValue = playerItemValue + playerMoneyValue;
+    const npcOfferValue = npcItemValue + npcMoneyValue;
 
     const diff = playerOfferValue - npcOfferValue;
     DOMElements.valueDiff.textContent = diff;
@@ -119,7 +109,6 @@ async function handleConfirmTrade() {
     DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
 
     const playerMoneyOffer = Number(DOMElements.playerMoneyInput.value) || 0;
-    const playerSilverOffer = Number(DOMElements.playerSilverInput.value) || 0;
 
     if (playerMoneyOffer > state.player.money) {
         alert('你的文錢不夠！');
@@ -127,27 +116,22 @@ async function handleConfirmTrade() {
         DOMElements.confirmBtn.innerHTML = `成交`;
         return;
     }
-    if (playerSilverOffer > state.player.silver) {
-        alert('你的銀兩不夠！');
-        DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `成交`;
-        return;
-    }
 
     try {
+        // 【核心修正】提交給後端的數據中，不再包含 silver
         const finalTradeState = {
             player: {
                 offer: {
                     items: state.player.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
                     money: playerMoneyOffer,
-                    silver: playerSilverOffer
+                    silver: 0 // 保留欄位但值為0，以符合後端期望
                 }
             },
             npc: {
                 offer: {
                     items: state.npc.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
                     money: Number(DOMElements.npcMoneyInput.value) || 0,
-                    silver: Number(DOMElements.npcSilverInput.value) || 0
+                    silver: 0 // 保留欄位但值為0
                 }
             }
         };
@@ -178,24 +162,22 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
 
     state = {
         player: {
-            inventory: Object.values(tradeData.player.items).filter(item => item.itemName !== '文錢' && item.itemName !== '銀兩'),
+            inventory: Object.values(tradeData.player.items).filter(item => item.itemType !== '財寶'), // 過濾掉錢
             offer: { items: [], money: 0, silver: 0 },
             money: tradeData.player.money,
-            silver: tradeData.player.silver
+            silver: 0 // 預設為0
         },
         npc: {
-            inventory: Object.values(tradeData.npc.items).filter(item => item.itemName !== '文錢' && item.itemName !== '銀兩'),
+            inventory: Object.values(tradeData.npc.items).filter(item => item.itemType !== '財寶'), // 過濾掉錢
             offer: { items: [], money: 0, silver: 0 },
             money: tradeData.npc.money,
-            silver: tradeData.npc.silver
+            silver: 0 // 預設為0
         }
     };
     
-    // Reset input fields
+    // 【核心修正】移除對 "silver" 元素的重置
     DOMElements.playerMoneyInput.value = '0';
-    DOMElements.playerSilverInput.value = '0';
     DOMElements.npcMoneyInput.value = '0';
-    DOMElements.npcSilverInput.value = '0';
 
     if (DOMElements.closeBtn) {
         DOMElements.closeBtn.onclick = closeTradeModalCallback;
@@ -220,5 +202,4 @@ export function closeTradeUI() {
     if (DOMElements.closeBtn) DOMElements.closeBtn.onclick = null;
     if (DOMElements.tradeModal) DOMElements.tradeModal.onclick = null;
     DOMElements.playerMoneyInput.oninput = null;
-    DOMElements.playerSilverInput.oninput = null;
 }
