@@ -38,6 +38,11 @@ const closeSkillsBtn = document.getElementById('close-skills-btn');
 const skillsTabsContainer = document.getElementById('skills-tabs-container');
 const skillsBodyContainer = document.getElementById('skills-body-container');
 
+// --- 【核心新增】丐幫探訪彈窗相關元素 ---
+const beggarInquiryModal = document.getElementById('beggar-inquiry-modal');
+const beggarInquiryConfirmBtn = document.getElementById('beggar-inquiry-confirm');
+const beggarInquiryCancelBtn = document.getElementById('beggar-inquiry-cancel');
+
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
@@ -69,6 +74,42 @@ export function closeTradeModal() {
         console.log("【偵錯】: 交易視窗已關閉 (已移除 .visible class)。");
     }
 }
+
+// --- 【核心新增】丐幫探訪彈窗函式 ---
+/**
+ * 開啟丐幫情報探詢確認彈窗
+ * @param {function} onConfirm - 當玩家點擊確認後要執行的回呼函式
+ */
+export function openBeggarInquiryModal(onConfirm) {
+    if (!beggarInquiryModal) return;
+    
+    beggarInquiryModal.classList.add('visible');
+
+    const confirmHandler = () => {
+        if (typeof onConfirm === 'function') {
+            onConfirm();
+        }
+        closeBeggarInquiryModal();
+    };
+
+    beggarInquiryConfirmBtn.onclick = confirmHandler;
+    beggarInquiryCancelBtn.onclick = closeBeggarInquiryModal;
+}
+
+
+/**
+ * 關閉丐幫情報探詢確認彈窗
+ */
+export function closeBeggarInquiryModal() {
+    if (beggarInquiryModal) {
+        beggarInquiryModal.classList.remove('visible');
+        // 清理事件監聽器，避免記憶體洩漏
+        beggarInquiryConfirmBtn.onclick = null;
+        beggarInquiryCancelBtn.onclick = null;
+    }
+}
+// --- 新增結束 ---
+
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
