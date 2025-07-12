@@ -290,3 +290,13 @@ body.dark-theme .dashboard-header .header-buttons .theme-switcher:hover {
         z-index: 1002;
     }
 }
+/* --- 【核心新增】丐幫弟子專屬顏色 --- */
+.npc-name-beggar {
+    color: #8B4513; /* 深咖啡色 (SaddleBrown) */
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+body.dark-theme .npc-name-beggar {
+    color: #D2B48C; /* 淺咖啡色 (Tan) */
+}
