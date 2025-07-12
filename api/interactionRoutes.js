@@ -15,7 +15,7 @@ const {
     updateSkills,
     getRawInventory,
     calculateBulkScore,
-    getPlayerSkills, // 【核心修正】將被遺忘的 getPlayerSkills 函式加回引入列表
+    getPlayerSkills,
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -64,22 +64,10 @@ const interactRouteHandler = async (req, res) => {
         const romanceEventData = await checkAndTriggerRomanceEvent(userId, player);
 
         const aiResponse = await getAIStory(
-            playerModelChoice,
-            longTermSummary,
-            JSON.stringify(recentHistory),
-            playerAction,
-            player,
-            username,
-            player.currentTimeOfDay,
-            player.power,
-            player.morality,
-            [],
+            playerModelChoice, longTermSummary, JSON.stringify(recentHistory), playerAction, player,
+            username, player.currentTimeOfDay, player.power, player.morality, [],
             romanceEventData ? romanceEventData.eventStory : null,
-            null,
-            locationContext,
-            npcContext,
-            bulkScore,
-            []
+            null, locationContext, npcContext, bulkScore, []
         );
 
         if (!aiResponse || !aiResponse.roundData) {
@@ -93,7 +81,6 @@ const interactRouteHandler = async (req, res) => {
         
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
         const userDocRef = db.collection('users').doc(userId);
-
         const newRoundNumber = (player.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
@@ -133,11 +120,11 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
-        let newStamina = (player.stamina || 100) + staminaChange;
+        
         const isResting = ['睡覺', '休息', '歇息'].some(kw => playerAction.includes(kw));
         const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
+        let newStamina = (player.stamina || 100) + staminaChange;
         if (isResting && timeDidAdvance) newStamina = 100;
-        newStamina = Math.max(0, newStamina);
         
         let shortActionCounter = player.shortActionCounter || 0;
         if (!timeDidAdvance && !isResting) shortActionCounter++; else shortActionCounter = 0;
@@ -153,19 +140,38 @@ const interactRouteHandler = async (req, res) => {
         }
         for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
-        const playerUpdatesForDb = {
-            timeOfDay: finalTimeOfDay,
-            stamina: newStamina,
-            shortActionCounter,
-            ...finalDate,
-            currentLocation: aiResponse.roundData.LOC || player.currentLocation,
-            internalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.internal || 0),
-            externalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.external || 0),
-            lightness: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.lightness || 0),
-            morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0),
-            money: admin.firestore.FieldValue.increment(aiResponse.roundData.moneyChange || 0)
-        };
-        batch.update(userDocRef, playerUpdatesForDb);
+        // 【核心修改】將簡單的 batch.update 改為 runTransaction 來確保數值不為負
+        await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists) {
+                throw "Document does not exist!";
+            }
+            const currentData = userDoc.data();
+            
+            const powerChange = aiResponse.roundData.powerChange || {};
+            const newInternal = Math.max(0, (currentData.internalPower || 0) + (powerChange.internal || 0));
+            const newExternal = Math.max(0, (currentData.externalPower || 0) + (powerChange.external || 0));
+            const newLightness = Math.max(0, (currentData.lightness || 0) + (powerChange.lightness || 0));
+            
+            const finalStamina = Math.max(0, newStamina);
+            const finalMorality = (currentData.morality || 0) + (aiResponse.roundData.moralityChange || 0);
+            const finalMoney = (currentData.money || 0) + (aiResponse.roundData.moneyChange || 0);
+
+            const playerUpdatesForDb = {
+                timeOfDay: finalTimeOfDay,
+                stamina: finalStamina,
+                shortActionCounter,
+                ...finalDate,
+                currentLocation: aiResponse.roundData.LOC || player.currentLocation,
+                internalPower: newInternal,
+                externalPower: newExternal,
+                lightness: newLightness,
+                morality: finalMorality,
+                money: Math.max(0, finalMoney),
+            };
+            transaction.update(userDocRef, playerUpdatesForDb);
+        });
+        // --- 修改結束 ---
         
         const finalSaveData = { ...aiResponse.roundData, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
         const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
