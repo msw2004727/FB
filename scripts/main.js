@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 第一步：初始化所有DOM元素
     initializeDOM();
 
+    // 【核心修改】讀取玩家姓名並更新輸入框提示文字
+    const username = localStorage.getItem('username');
+    if (dom.playerInput && username) {
+        dom.playerInput.placeholder = `${username}接下來...`;
+    } else if (dom.playerInput) {
+        dom.playerInput.placeholder = '接下來...'; // 若找不到姓名則使用預設值
+    }
+    // 【修改結束】
+
     function setGameContainerHeight() {
         if (dom.gameContainer) {
             dom.gameContainer.style.height = `${window.innerHeight}px`;
