@@ -3,23 +3,15 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getPlayerSkills, getRawInventory } = require('./playerStateHelpers'); 
+// 【核心修改】引入 calculateBulkScore
+const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); 
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
-const BULK_TO_SCORE_MAP = { '輕': 0, '中': 2, '重': 5, '極重': 10 };
+// 【核心修改】移除本地的 calculateBulkScore 和 BULK_TO_SCORE_MAP
 
-function calculateBulkScore(inventoryList) {
-    return inventoryList.reduce((score, item) => {
-        const quantity = item.quantity || 1;
-        const bulkValue = item.bulk || '中';
-        return score + (BULK_TO_SCORE_MAP[bulkValue] || 0) * quantity;
-    }, 0);
-}
-
-// 【核心修改】裝備/卸下邏輯現在更簡潔，只傳送物品ID和操作意圖
 router.post('/equip', async (req, res) => {
     const { itemId, equip } = req.body;
     const userId = req.user.id;
@@ -37,6 +29,7 @@ router.post('/equip', async (req, res) => {
         }
 
         const fullInventory = await getRawInventory(userId);
+        // 【核心修改】使用引入的函式
         const newBulkScore = calculateBulkScore(fullInventory);
         
         res.json({
@@ -79,6 +72,7 @@ router.get('/latest-game', async (req, res) => {
         
         const locationData = await getMergedLocationData(userId, latestGameData.LOC);
         
+        // 【核心修改】使用引入的函式
         const bulkScore = calculateBulkScore(fullInventory);
 
         Object.assign(latestGameData, { 
