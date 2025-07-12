@@ -76,7 +76,6 @@ function render() {
 
 function createItemElement(item, owner, area) {
     const li = document.createElement('li');
-    // 【核心修正】統一使用 instanceId 作為點擊事件的依據
     const uniqueId = item.instanceId || item.templateId;
     const quantityText = item.quantity > 1 ? ` (x${item.quantity})` : '';
 
@@ -121,6 +120,7 @@ function calculateSummary() {
 
 async function handleConfirmTrade() {
     DOMElements.confirmBtn.disabled = true;
+    // 【核心修正】使用 Font Awesome 的旋轉圖示作為加載動畫
     DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
 
     const playerMoneyOffer = Number(DOMElements.playerMoneyInput.value) || 0;
@@ -167,8 +167,9 @@ async function handleConfirmTrade() {
 
     } catch (error) {
         alert(`交易失敗: ${error.message}`);
-        DOMElements.confirmBtn.disabled = false;
     } finally {
+        // 【核心修正】無論成功或失敗，最後都將按鈕恢復原狀
+        DOMElements.confirmBtn.disabled = false;
         DOMElements.confirmBtn.innerHTML = `成交`;
     }
 }
@@ -180,15 +181,14 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
     onTradeCompleteCallback = onTradeComplete;
     closeTradeModalCallback = closeCallback; 
 
-    // 【核心修正】直接使用後端傳來的完整資料
     state = {
         player: {
-            inventory: tradeData.player.items.filter(item => item.itemType !== '財寶'), // 過濾掉錢
+            inventory: tradeData.player.items.filter(item => item.itemType !== '財寶'),
             offer: { items: [], money: 0 },
             money: tradeData.player.money,
         },
         npc: {
-            inventory: tradeData.npc.items, // 直接使用合併後的列表
+            inventory: tradeData.npc.items,
             offer: { items: [], money: 0 },
             money: tradeData.npc.money,
         }
@@ -196,8 +196,8 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
     
     DOMElements.playerMoneyInput.value = '0';
     DOMElements.npcMoneyInput.value = '0';
-    DOMElements.npcMoneyInput.setAttribute('max', state.npc.money); // 設定NPC最大出價金額
-    DOMElements.playerMoneyInput.setAttribute('max', state.player.money); // 設定玩家最大出價金額
+    DOMElements.npcMoneyInput.setAttribute('max', state.npc.money); 
+    DOMElements.playerMoneyInput.setAttribute('max', state.player.money);
 
     if (DOMElements.closeBtn) {
         DOMElements.closeBtn.onclick = closeTradeModalCallback;
