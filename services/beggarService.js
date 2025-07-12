@@ -53,20 +53,11 @@ const APPEARANCE_STORIES = [
     "你剛走進客棧，店小二就熱情地迎上來，但你從他那過於熱情的眼神和不合身的衣服上看出了端倪。果然，他將你引到僻靜處後，抱拳道：『舵主座下弟子{beggarName}，見過大人！』"
 ];
 
-
-/**
- * 處理玩家呼叫丐幫的請求 (即時處理版)
- * @param {string} userId - 玩家ID
- * @returns {Promise<object>} - 返回包含丐幫弟子姓名和登場故事的物件
- */
 async function handleBeggarSummon(userId) {
     const beggarName = generateBeggarName();
-    
     const randomStoryTemplate = APPEARANCE_STORIES[Math.floor(Math.random() * APPEARANCE_STORIES.length)];
     const appearanceStory = randomStoryTemplate.replace('{beggarName}', beggarName);
-
     console.log(`[丐幫服務-即時] 為玩家 ${userId} 生成了臨時丐幫弟子「${beggarName}」。`);
-    
     return { 
         success: true, 
         beggarName: beggarName,
@@ -74,17 +65,13 @@ async function handleBeggarSummon(userId) {
     };
 }
 
-
 /**
- * 處理玩家向丐幫弟子打聽情报的请求 (v2.1 - 修正金錢處理邏輯)
+ * 開始情報探詢，處理一次性付費
  * @param {string} userId - 玩家ID
- * @param {object} playerProfile - 玩家的完整檔案 (包含準確的銀兩money)
- * @param {string} beggarName - 丐幫弟子的名字
- * @param {string} userQuery - 玩家的提問
- * @param {string} model - 玩家選擇的AI模型
- * @returns {Promise<object>} - 返回包含AI回覆的物件
+ * @param {object} playerProfile - 包含準確銀兩數量的玩家檔案
+ * @returns {Promise<object>} - 返回操作結果和最新餘額
  */
-async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery, model) {
+async function startInquirySession(userId, playerProfile) {
     const silverRef = db.collection('users').doc(userId).collection('inventory_items').doc('銀兩');
     
     try {
@@ -93,9 +80,8 @@ async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery,
             const currentSilver = silverDoc.exists ? silverDoc.data().quantity : 0;
 
             if (currentSilver < 100) {
-                // 如果錢不夠，直接拋出一個帶有特定訊息的錯誤
                 const error = new Error("銀兩不足");
-                error.code = 'INSUFFICIENT_FUNDS'; // 自定義錯誤碼
+                error.code = 'INSUFFICIENT_FUNDS';
                 throw error;
             }
             
@@ -103,50 +89,60 @@ async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery,
             return currentSilver - 100;
         });
 
-        console.log(`[丐幫服務] 已從玩家 ${userId} 的背包中扣除100銀兩。新餘額: ${newSilverAmount}`);
-
-        const allNpcNames = getKnownNpcNames();
-        const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name) && name !== beggarName);
-        
-        let targetNpcProfile = null;
-        if (targetNpcName) {
-            targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
-        }
-        
-        const prompt = getBeggarInquiryPrompt(playerProfile, targetNpcProfile, userQuery);
-        const aiResponseString = await callAI(model || aiConfig.npcChat, prompt, true);
-        const inquiryResult = JSON.parse(aiResponseString);
-
-        if (inquiryResult.isTrue && targetNpcName) {
-            const userSaveRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R','desc').limit(1);
-            const lastSave = (await userSaveRef.get()).docs[0];
-            if(lastSave.exists) {
-                const newClue = `從丐幫弟子處聽聞：${inquiryResult.response}`;
-                await lastSave.ref.update({ CLS: newClue });
-            }
-        }
-        
-        return {
-            success: true,
-            newBalance: newSilverAmount,
-            ...inquiryResult
-        };
+        console.log(`[丐幫服務] 玩家 ${userId} 支付100銀兩開啟情報會話。新餘額: ${newSilverAmount}`);
+        return { success: true, newBalance: newSilverAmount };
 
     } catch (error) {
-        // 捕獲交易中拋出的「銀兩不足」錯誤
         if (error.code === 'INSUFFICIENT_FUNDS') {
             console.log(`[丐幫服務] 玩家 ${userId} 銀兩不足，拒絕提供情報。`);
+            // 這段是關鍵，確保錢不夠時回傳特定的拒絕訊息
             return {
                 success: false,
                 response: "嘿嘿，客官，看您的樣子...這囊中似乎有些羞澀啊。沒錢？沒錢小的可不敢亂說話，會被舵主打斷腿的！"
             };
         }
         // 對於其他未知錯誤，則向上拋出
+        console.error(`[丐幫服務] 處理交易時發生未知錯誤 for ${userId}:`, error);
         throw error;
     }
 }
 
+/**
+ * 獲取情報回覆 (不再處理付費)
+ * @param {string} userId - 玩家ID
+ * @param {object} playerProfile - 玩家的完整檔案
+ * @param {string} beggarName - 丐幫弟子的名字
+ * @param {string} userQuery - 玩家的提問
+ * @param {string} model - 玩家選擇的AI模型
+ * @returns {Promise<object>} - 返回包含AI回覆的物件
+ */
+async function getInquiryResponse(userId, playerProfile, beggarName, userQuery, model) {
+    const allNpcNames = getKnownNpcNames();
+    const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name) && name !== beggarName);
+    
+    let targetNpcProfile = null;
+    if (targetNpcName) {
+        targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
+    }
+    
+    const prompt = getBeggarInquiryPrompt(playerProfile, targetNpcProfile, userQuery);
+    const aiResponseString = await callAI(model || aiConfig.npcChat, prompt, true);
+    const inquiryResult = JSON.parse(aiResponseString);
+
+    if (inquiryResult.isTrue && targetNpcName) {
+        const userSaveRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R','desc').limit(1);
+        const lastSave = (await userSaveRef.get()).docs[0];
+        if(lastSave.exists) {
+            const newClue = `從丐幫弟子處聽聞：${inquiryResult.response}`;
+            await lastSave.ref.update({ CLS: newClue });
+        }
+    }
+    
+    return { success: true, ...inquiryResult };
+}
+
 module.exports = { 
     handleBeggarSummon,
-    handleBeggarInquiry
+    startInquirySession,
+    getInquiryResponse
 };
