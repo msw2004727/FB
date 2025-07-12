@@ -7,7 +7,6 @@ const { getMergedNpcProfile, getFriendlinessLevel, updateNpcMemoryAfterInteracti
 const { getRawInventory, getInventoryState, getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const { getKnownNpcNames } = require('./cacheManager');
-// 【核心新增】引入全新的物品管理器
 const { processItemChanges } = require('./itemManager');
 
 const db = admin.firestore();
@@ -142,7 +141,7 @@ router.post('/npc-chat', async (req, res) => {
         ]);
         
         const playerProfile = playerProfileDoc.data();
-        const longTermSummary = summaryDoc.exists ? summaryDoc.data().summary : '無';
+        const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '無'; //修正：summary在text欄位
         const lastRoundData = lastSaveDoc.empty ? {} : lastSaveDoc.docs[0].data();
         const localLocationContext = lastRoundData.LOC ? { locationName: lastRoundData.LOC[0], description: lastRoundData.LOR } : null;
 
@@ -150,9 +149,19 @@ router.post('/npc-chat', async (req, res) => {
         const mentionedNpcNames = Array.from(knownNpcs).filter(name => playerMessage.includes(name) && name !== npcName);
         const mentionedNpcContext = mentionedNpcNames.length > 0 ? await getMergedNpcProfile(userId, mentionedNpcNames[0]) : null;
         
-        const aiResponseJson = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
-        const aiResponse = JSON.parse(aiResponseJson);
-
+        const aiResponseString = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
+        
+        // 【核心修正】在這裡加入清理和解析的容錯邏輯
+        let aiResponse;
+        try {
+            const cleanedJsonString = aiResponseString.replace(/^```json\s*|```\s*$/g, '');
+            aiResponse = JSON.parse(cleanedJsonString);
+        } catch(e) {
+            console.error("解析密談AI回傳的JSON時失敗，將嘗試直接使用文字。", e);
+            // 如果解析失敗，則創建一個預設的物件結構，將AI的回應作為對話內容
+            aiResponse = { response: aiResponseString, friendlinessChange: 0, romanceChange: 0, itemChanges: [] };
+        }
+        
         const batch = db.batch();
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
@@ -167,7 +176,6 @@ router.post('/npc-chat', async (req, res) => {
             }, { merge: true });
         }
 
-        // 【核心修改】檢查並處理來自密談AI的物品給予指令
         if (aiResponse.itemChanges && aiResponse.itemChanges.length > 0) {
             console.log(`[密談系統] 偵測到 NPC「${npcName}」想要給予物品，啟動物品管理器...`);
             await processItemChanges(userId, aiResponse.itemChanges, batch, lastRoundData, npcName);
@@ -179,7 +187,7 @@ router.post('/npc-chat', async (req, res) => {
             npcMessage: aiResponse.response,
             friendlinessChange: aiResponse.friendlinessChange || 0,
             romanceChange: aiResponse.romanceChange || 0,
-            itemChanges: aiResponse.itemChanges || [] // 將物品變化也回傳給前端，以便顯示提示
+            itemChanges: aiResponse.itemChanges || []
         };
 
         res.json(finalResponse);
