@@ -56,7 +56,6 @@ export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallbac
 
     initializeTrade(tradeData, npcName, onTradeComplete, closeCallback);
     
-    // 【核心修正】從操作 tailwind class 改為操作我們自定義的 .visible class
     tradeModalEl.classList.add('visible'); 
     
     console.log("【偵錯點 2.2】: 已將交易視窗設為可見 (已添加 .visible class)。");
@@ -65,7 +64,6 @@ export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallbac
 export function closeTradeModal() {
     const tradeModalEl = document.getElementById('trade-modal');
     if (tradeModalEl) {
-        // 【核心修正】從操作 tailwind class 改為操作我們自定義的 .visible class
         tradeModalEl.classList.remove('visible');
         closeTradeUI();
         console.log("【偵錯】: 交易視窗已關閉 (已移除 .visible class)。");
@@ -305,31 +303,38 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
     try {
-        const inventory = await api.getInventory();
+        const inventory = await api.getInventory(); // 獲取物品陣列
         giveInventoryList.innerHTML = '';
-        let hasItems = false;
-        for (const [itemName, itemData] of Object.entries(inventory)) {
-            if (itemData.quantity > 0) {
-                hasItems = true;
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'give-item';
-                itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
-                itemDiv.addEventListener('click', () => {
-                    if (itemName === '銀兩') {
-                        const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
-                        if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
-                            giveItemCallback({ type: 'money', amount: parseInt(amount), itemName: '銀兩' });
-                        } else if (amount !== null) {
-                            alert('請輸入有效的數量。');
+        
+        // 【核心修改】直接遍歷陣列
+        if (inventory && inventory.length > 0) {
+            inventory.forEach(itemData => {
+                if (itemData.quantity > 0) {
+                    const itemName = itemData.itemName || itemData.templateId; // 確保有名字
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'give-item';
+                    itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
+                    
+                    itemDiv.addEventListener('click', () => {
+                        if (itemName === '銀兩') {
+                            const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
+                            if (amount && !isNaN(amount) && amount > 0 && parseInt(amount) <= itemData.quantity) {
+                                giveItemCallback({ type: 'money', amount: parseInt(amount), itemName: '銀兩' });
+                            } else if (amount !== null) {
+                                alert('請輸入有效的數量。');
+                            }
+                        } else {
+                            // 對於普通物品，我們傳遞它的唯一實例ID
+                            giveItemCallback({ type: 'item', itemId: itemData.instanceId, itemName: itemName });
                         }
-                    } else {
-                        giveItemCallback({ type: 'item', itemId: itemName, itemName: itemName });
-                    }
-                });
-                giveInventoryList.appendChild(itemDiv);
-            }
+                    });
+                    giveInventoryList.appendChild(itemDiv);
+                }
+            });
+        } else {
+             giveInventoryList.innerHTML = '<p class="system-message">你身無長物，行囊空空。</p>';
         }
-        if (!hasItems) giveInventoryList.innerHTML = '<p class="system-message">你身無長物，行囊空空。</p>';
+
     } catch (error) {
         console.error("獲取背包資料失敗:", error);
         giveInventoryList.innerHTML = `<p class="system-message">翻檢行囊時出錯: ${error.message}</p>`;
