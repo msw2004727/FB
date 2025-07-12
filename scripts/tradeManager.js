@@ -8,11 +8,14 @@ let currentNpcName = '';
 
 // DOM 元素快取
 const DOMElements = {};
+let areDOMsCached = false; // 添加一個標誌來判斷是否已快取
 
 /**
- * 首次獲取或更新DOM元素引用
+ * 【核心修正】首次獲取或更新DOM元素引用
+ * 只在第一次初始化時執行
  */
 function cacheDOMElements() {
+    if (areDOMsCached) return;
     DOMElements.playerInventory = document.querySelector('#trade-player-inventory');
     DOMElements.playerOffer = document.querySelector('#trade-player-offer');
     DOMElements.npcInventory = document.querySelector('#trade-npc-inventory');
@@ -27,6 +30,7 @@ function cacheDOMElements() {
     DOMElements.npcPanel = document.getElementById('trade-npc-panel');
     DOMElements.playerOfferPanel = document.getElementById('trade-player-offer-panel');
     DOMElements.npcOfferPanel = document.getElementById('trade-npc-offer-panel');
+    areDOMsCached = true;
 }
 
 /**
@@ -93,6 +97,8 @@ function moveItem(itemId, owner, currentArea) {
  * 計算價值差並更新UI
  */
 function calculateSummary() {
+    if (!DOMElements.valueDiff) return;
+
     const playerOfferValue = state.player.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
     const npcOfferValue = state.npc.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
     const diff = playerOfferValue - npcOfferValue;
@@ -160,6 +166,7 @@ async function handleConfirmTrade() {
     }
 }
 
+
 /**
  * 交易系統的總入口和初始化函式
  * @param {object} tradeData - 從API獲取的初始交易數據
@@ -167,7 +174,6 @@ async function handleConfirmTrade() {
  * @param {function} onTradeComplete - 交易成功後的回調
  */
 export function initializeTrade(tradeData, npcName, onTradeComplete) {
-    // 首次初始化時快取所有DOM元素
     cacheDOMElements();
     
     currentNpcName = npcName;
@@ -188,8 +194,19 @@ export function initializeTrade(tradeData, npcName, onTradeComplete) {
     };
     
     // 綁定事件監聽器
-    DOMElements.confirmBtn.onclick = handleConfirmTrade;
+    if (DOMElements.confirmBtn) {
+        DOMElements.confirmBtn.onclick = handleConfirmTrade;
+    }
     
     // 初始渲染
     render();
+}
+
+/**
+ * 【新增】在關閉彈窗時，清理事件監聽器
+ */
+export function closeTradeUI() {
+    if (DOMElements.confirmBtn) {
+        DOMElements.confirmBtn.onclick = null;
+    }
 }
