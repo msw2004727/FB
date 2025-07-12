@@ -123,6 +123,7 @@ router.post('/confirm-trade', async (req, res) => {
                 throw new Error(`${npcName}的銀兩不夠！`);
             }
 
+            // --- 處理玩家給出的資源 ---
             if (playerMoneyOffer > 0) {
                 transaction.set(playerInventoryRef.doc('銀兩'), { quantity: admin.firestore.FieldValue.increment(-playerMoneyOffer) }, { merge: true });
             }
@@ -130,6 +131,7 @@ router.post('/confirm-trade', async (req, res) => {
                 transaction.delete(playerInventoryRef.doc(item.id));
             }
 
+            // --- 處理NPC給出的資源 ---
             if (npcMoneyOffer > 0) {
                  transaction.set(playerInventoryRef.doc('銀兩'), { templateId: '銀兩', itemType: '財寶', quantity: admin.firestore.FieldValue.increment(npcMoneyOffer) }, { merge: true });
             }
@@ -162,6 +164,7 @@ router.post('/confirm-trade', async (req, res) => {
                 }
             }
             
+            // --- 整合NPC的更新 ---
             if (playerMoneyOffer > 0) {
                 npcInventoryUpdate['inventory.銀兩'] = admin.firestore.FieldValue.increment(playerMoneyOffer);
             }
@@ -175,6 +178,7 @@ router.post('/confirm-trade', async (req, res) => {
             transaction.set(npcStateRef, { ...npcInventoryUpdate, equipment: npcEquipmentUpdate }, { merge: true });
         });
         
+        // --- 交易成功，生成後續劇情 ---
         const [lastSaveSnapshot, summaryDoc] = await Promise.all([
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             db.collection('users').doc(userId).collection('game_state').doc('summary').get()
@@ -186,8 +190,7 @@ router.post('/confirm-trade', async (req, res) => {
         const tradeDetailsForAI = { ...tradeState, location: lastRoundData.LOC[0] || '未知之地' };
         const tradeNarrativeResult = await getAITradeSummary(playerModelChoice, username, npcName, tradeDetailsForAI, longTermSummary);
 
-        // 【核心修正】將記憶文本中的 "文錢" 改為 "銀兩"
-        const memoryText = `我和 ${username} 完成了一筆交易。我用「${tradeState.npc.offer.items.map(i=>i.name).join('、') || '無'}」和${tradeState.npc.offer.money}兩銀子，換來了「${tradeState.player.offer.items.map(i=>i.name).join('、') || '無'}」和${tradeState.player.offer.money}兩銀子。`;
+        const memoryText = `我和 ${username} 完成了一筆交易。我用「${tradeState.npc.offer.items.map(i=>i.name).join('、') || '無'}」和${tradeState.npc.offer.money}文錢，換來了「${tradeState.player.offer.items.map(i=>i.name).join('、') || '無'}」和${tradeState.player.offer.money}文錢。`;
         await updateNpcMemoryAfterInteraction(userId, npcName, memoryText);
 
         const newRoundNumber = lastRoundData.R + 1;

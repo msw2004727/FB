@@ -2,33 +2,30 @@
 import { MAX_POWER } from './config.js';
 import { api } from './api.js';
 import { gameState } from './gameState.js';
-import { dom } from './dom.js'; 
 
 // --- DOM元素獲取 ---
-const {
-    storyPanelWrapper,
-    storyTextContainer,
-    statusBarEl,
-    pcContent,
-    internalPowerBar,
-    internalPowerValue,
-    externalPowerBar,
-    externalPowerValue,
-    lightnessPowerBar,
-    lightnessPowerValue,
-    staminaBar,
-    staminaValue,
-    moralityBarIndicator,
-    locationInfo,
-    npcContent,
-    itmContent,
-    bulkStatus,
-    qstContent,
-    psyContent,
-    clsContent,
-    actionSuggestion,
-    moneyContent
-} = dom;
+const storyPanelWrapper = document.querySelector('.story-panel');
+const storyTextContainer = document.getElementById('story-text-wrapper');
+const statusBarEl = document.getElementById('status-bar');
+const pcContent = document.getElementById('pc-content');
+const internalPowerBar = document.getElementById('internal-power-bar');
+const internalPowerValue = document.getElementById('internal-power-value');
+const externalPowerBar = document.getElementById('external-power-bar');
+const externalPowerValue = document.getElementById('external-power-value');
+const lightnessPowerBar = document.getElementById('lightness-power-bar');
+const lightnessPowerValue = document.getElementById('lightness-power-value');
+const staminaBar = document.getElementById('stamina-bar');
+const staminaValue = document.getElementById('stamina-value');
+const moralityBarIndicator = document.getElementById('morality-bar-indicator');
+const locationInfo = document.getElementById('location-info'); 
+const npcContent = document.getElementById('npc-content');
+const itmContent = document.getElementById('itm-content');
+const bulkStatus = document.getElementById('bulk-status');
+const qstContent = document.getElementById('qst-content');
+const psyContent = document.getElementById('psy-content');
+const clsContent = document.getElementById('cls-content');
+const actionSuggestion = document.getElementById('action-suggestion');
+const moneyContent = document.getElementById('money-content');
 
 // --- 圖示對照表 ---
 const slotConfig = {
@@ -72,20 +69,11 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateNpcList(roundData.NPC);
     renderInventory(roundData.inventory); 
     
-    moneyContent.textContent = `${roundData.money || 0} 銀兩`;
+    moneyContent.textContent = `${roundData.money || 0} 文錢`;
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
-    
-    const isTempEvent = roundData.NPC && roundData.NPC.some(npc => npc.isTemp);
-    if (isTempEvent) {
-        dom.playerInput.disabled = true;
-        dom.submitButton.textContent = '離開';
-    } else {
-        dom.playerInput.disabled = gameState.isRequesting;
-        dom.submitButton.textContent = '動作';
-    }
 }
 
 export function appendMessageToStory(htmlContent, className) {
@@ -117,15 +105,18 @@ function updateStatusBar(roundData) {
     `;
 }
 
+// 【核心修改】將精力條的危險狀態判斷邏輯加入此函數
 function updatePowerBars(roundData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
 
+    // --- 特別處理精力條 ---
     if (staminaBar && staminaValue) {
         const currentStamina = roundData.stamina || 0;
         updatePowerBar(staminaBar, staminaValue, currentStamina, 100);
         
+        // 判斷是否低於30，並加上或移除CSS class
         if (currentStamina < 30) {
             staminaBar.classList.add('pulsing-danger');
         } else {
@@ -200,8 +191,7 @@ function updateNpcList(npcs) {
     if (aliveNpcs.length > 0) {
         aliveNpcs.forEach(npc => {
             const npcLine = document.createElement('div');
-            const npcClass = npc.status_title === '丐幫弟子' ? 'npc-name-beggar' : `npc-${npc.friendliness}`;
-            npcLine.innerHTML = `<span class="npc-name ${npcClass}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
+            npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
             npcContent.appendChild(npcLine);
         });
     } else {
@@ -218,8 +208,7 @@ function highlightNpcNames(text, npcs) {
             const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(npcNameEscaped, 'g');
             const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
-            const npcClass = npc.status_title === '丐幫弟子' ? 'npc-name-beggar' : `npc-${npc.friendliness || 'neutral'}`;
-            const replacement = `<span class="npc-name ${npcClass}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
+            const replacement = `<span class="npc-name npc-${npc.friendliness || 'neutral'}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
         });
     }
@@ -250,8 +239,6 @@ function renderInventory(inventory) {
     }
 
     allItems.forEach(item => {
-        // 【核心修正】增加一個保護判斷，如果 item 為空則跳過
-        if (!item) return;
         const itemEl = createItemEntry(item);
         itmContent.appendChild(itemEl);
     });
@@ -260,12 +247,6 @@ function renderInventory(inventory) {
 
 function createItemEntry(item) {
     const entry = document.createElement('div');
-    // 【核心修正】增加一個保護判斷，如果 item 為空或缺少必要屬性，則返回一個空元素
-    if (!item || item.isEquipped === undefined) {
-        console.warn("嘗試渲染一個不完整的物品:", item);
-        return entry;
-    }
-
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
@@ -317,23 +298,19 @@ async function handleEquipToggle(itemId, shouldEquip) {
         };
         const result = await api.equipItem(payload); 
 
-        // 【核心修正】使用完整的後端數據更新整個 gameState，而不只是其中一部分
-        if (result.success && result.inventory && result.bulkScore !== undefined) {
-             gameState.roundData = { 
-                ...gameState.roundData, 
-                inventory: result.inventory, 
-                bulkScore: result.bulkScore 
-            };
-            // 只重繪需要更新的部分
-            renderInventory(gameState.roundData.inventory); 
-            updateBulkStatus(gameState.roundData.bulkScore);
+        if (result.success && result.inventory) {
+             gameState.roundData.inventory = result.inventory;
+             if (result.bulkScore !== undefined) {
+                 gameState.roundData.bulkScore = result.bulkScore;
+                 updateBulkStatus(gameState.roundData.bulkScore);
+             }
+             renderInventory(gameState.roundData.inventory); 
         } else {
             throw new Error(result.message || '操作失敗');
         }
     } catch (error) {
         console.error('裝備操作失敗:', error);
         handleApiError(error);
-        // 出錯時也用現有數據重繪，避免UI停在舊狀態
         renderInventory(gameState.roundData.inventory); 
     } finally {
         gameState.isRequesting = false;
@@ -343,16 +320,8 @@ async function handleEquipToggle(itemId, shouldEquip) {
 
 export function handleApiError(error) {
     console.error('API 錯誤:', error);
-
-    const inGameErrorKeywords = ['並未見到', '銀兩不足', '無法', '不是可裝備', '沒有', '未指定'];
-
-    if (error && error.message && inGameErrorKeywords.some(keyword => error.message.includes(keyword))) {
-        appendMessageToStory(error.message, 'system-message');
-    } else {
-        appendMessageToStory(`[系統] 連接失敗... (${error.message || '未知錯誤'})`, 'system-message');
-    }
-
-    if (error && error.message && (error.message.includes('未經授權') || error.message.includes('無效的身份令牌'))) {
+    appendMessageToStory(`[系統] 連接失敗... (${error.message})`, 'system-message');
+    if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
         setTimeout(() => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
