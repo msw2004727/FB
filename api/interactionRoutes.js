@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIStory, getAISummary, getAISuggestion } = require('../services/aiService');
+const beggarService = require('../services/beggarService'); // 【核心新增】引入丐幫服務
 
 const {
     updateFriendlinessValues,
@@ -38,6 +39,43 @@ const interactRouteHandler = async (req, res) => {
     try {
         const { action: playerAction, model: playerModelChoice } = req.body;
 
+        // --- 【核心修改】丐幫關鍵字檢測 ---
+        const beggarKeywords = ['丐幫', '乞丐', '打聽', '消息', '情報'];
+        const isSummoningBeggar = beggarKeywords.some(keyword => playerAction.includes(keyword));
+
+        if (isSummoningBeggar) {
+            console.log(`[互動路由] 偵測到玩家的丐幫呼叫意圖: "${playerAction}"`);
+            const summonResult = await beggarService.handleBeggarSummon(userId);
+            
+            // 直接返回一個簡單的回應，告知玩家已發出信號
+            // 主故事AI將在下一回合根據這個信號，安排NPC登場
+            const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+            if (lastSaveSnapshot.empty) {
+                return res.status(404).json({ message: '找不到存檔紀錄，無法呼叫丐幫。' });
+            }
+            const lastRoundData = lastSaveSnapshot.docs[0].data();
+            const newRoundData = {
+                ...lastRoundData,
+                R: lastRoundData.R + 1,
+                story: summonResult.message,
+                PC: '你發出了江湖暗號，靜待回音。',
+                EVT: '尋訪丐幫弟子',
+                suggestion: `接下來就在原地等等，或四處逛逛？`,
+            };
+            
+            await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundData.R}`).set(newRoundData);
+
+            return res.json({
+                story: newRoundData.story,
+                roundData: newRoundData,
+                suggestion: newRoundData.suggestion,
+                locationData: await getMergedLocationData(userId, newRoundData.LOC)
+            });
+        }
+        // --- 丐幫關鍵字檢測結束 ---
+
+
+        // 如果不是呼叫丐幫，則執行原有的主線劇情邏輯
         const context = await buildContext(userId, username);
         if (!context) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
@@ -62,16 +100,42 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const romanceEventData = await checkAndTriggerRomanceEvent(userId, player);
+        
+        // 【核心修改】獲取玩家的臨時狀態，看是否有丐幫弟子要登場
+        const playerTempFlagsDoc = await db.collection('users').doc(userId).collection('game_state').doc('player_temp_flags').get();
+        const beggarSummonFlag = playerTempFlagsDoc.exists ? playerTempFlagsDoc.data().beggarSummon : null;
+
 
         const aiResponse = await getAIStory(
-            playerModelChoice, longTermSummary, JSON.stringify(recentHistory), playerAction, player,
-            username, player.currentTimeOfDay, player.power, player.morality, [],
+            playerModelChoice,
+            longTermSummary,
+            JSON.stringify(recentHistory),
+            playerAction,
+            player,
+            username,
+            player.currentTimeOfDay,
+            player.power,
+            player.morality,
+            [],
             romanceEventData ? romanceEventData.eventStory : null,
-            null, locationContext, npcContext, bulkScore, []
+            beggarSummonFlag, // <-- 將丐幫事件標記傳給AI
+            locationContext,
+            npcContext,
+            bulkScore,
+            []
         );
 
         if (!aiResponse || !aiResponse.roundData) {
             throw new Error("主AI未能生成有效回應。");
+        }
+        
+        // 如果丐幫弟子已經成功登場，則清除標記
+        const arrivedNpcNames = aiResponse.roundData.NPC.map(npc => npc.name);
+        if (beggarSummonFlag && arrivedNpcNames.includes(beggarSummonFlag.beggarName)) {
+            await playerTempFlagsDoc.ref.update({
+                beggarSummon: admin.firestore.FieldValue.delete()
+            });
+            console.log(`[互動路由] 丐幫弟子 ${beggarSummonFlag.beggarName} 已成功登場，清除召喚標記。`);
         }
         
         if (!aiResponse.roundData.EVT || aiResponse.roundData.EVT.trim() === '') {
@@ -81,6 +145,7 @@ const interactRouteHandler = async (req, res) => {
         
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
         const userDocRef = db.collection('users').doc(userId);
+
         const newRoundNumber = (player.R || 0) + 1;
         aiResponse.roundData.R = newRoundNumber;
         
@@ -120,11 +185,11 @@ const interactRouteHandler = async (req, res) => {
         }
 
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
-        
+        let newStamina = (player.stamina || 100) + staminaChange;
         const isResting = ['睡覺', '休息', '歇息'].some(kw => playerAction.includes(kw));
         const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
-        let newStamina = (player.stamina || 100) + staminaChange;
         if (isResting && timeDidAdvance) newStamina = 100;
+        newStamina = Math.max(0, newStamina);
         
         let shortActionCounter = player.shortActionCounter || 0;
         if (!timeDidAdvance && !isResting) shortActionCounter++; else shortActionCounter = 0;
@@ -140,7 +205,6 @@ const interactRouteHandler = async (req, res) => {
         }
         for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
-        // 【核心修改】將簡單的 batch.update 改為 runTransaction 來確保數值不為負
         await db.runTransaction(async (transaction) => {
             const userDoc = await transaction.get(userDocRef);
             if (!userDoc.exists) {
@@ -171,7 +235,6 @@ const interactRouteHandler = async (req, res) => {
             };
             transaction.update(userDocRef, playerUpdatesForDb);
         });
-        // --- 修改結束 ---
         
         const finalSaveData = { ...aiResponse.roundData, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
         const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
