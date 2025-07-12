@@ -67,22 +67,16 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         : '';
 
     const npcLocationSyncRule = `
-## 【NPC 位置同步鐵律 (極高優先級)】
-為了確保遊戲邏輯的正確性，你必須嚴格遵守此規則。
+## 【NPC同步定位鐵律 (極高優先級)】
+為了確保遊戲世界的連貫性，你必須嚴格遵守此規則。
 
-1.  **偵測位置變化**: 在你撰寫的 \`story\` 中，如果任何一位**已知的NPC**（即在【長期故事摘要】或【重要NPC情境參考】中出現過的人物）的位置發生了變化，或者玩家移動到了某位NPC所在的位置，你**必須**觸發此規則。
-2.  **生成位置更新指令**: 你**必須**在回傳的 \`roundData.npcUpdates\` 陣列中，為每一位位置發生變化的NPC，都加入一個更新其位置的物件。
-    - **結構**: \`{ "npcName": "NPC姓名", "fieldToUpdate": "currentLocation", "newValue": "NPC的最新位置", "updateType": "set" }\`
-    - **\`newValue\` 的值**: 這個值**必須**與你在 \`story\` 中描述的、以及玩家當前的位置（\`roundData.LOC[0]\`）保持絕對一致。
+1.  **情境判斷**: 在你撰寫完 \`story\` 文字後，你必須判斷這段故事是否發生在「當下現實」。如果故事內容明確是關於「回憶」、「幻想」、「夢境」、「追憶」或角色的「內心思考」，則**跳過**此規則。
+2.  **掃描在場NPC**: 如果故事發生在「當下現實」，你必須掃描你寫的 \`story\` 文字，找出所有被提及的、且存在於【重要NPC情境參考】中的NPC姓名。
+3.  **自動更新位置**: 對於每一位在「當下現實」故事中被提及的NPC，你都**必須**在回傳的 \`roundData.npcUpdates\` 陣列中，為其加入一個更新位置的指令，將其位置同步到玩家的當前位置 (即 \`roundData.LOC[0]\`)。
+    * **結構**: \`{ "npcName": "被提及的NPC姓名", "fieldToUpdate": "currentLocation", "newValue": roundData.LOC[0], "updateType": "set" }\`
+    * **範例**: 玩家在「開封府」的街道上，故事提到「你遠遠看到林捕頭正與人爭論」。你必須在 \`npcUpdates\` 中加入 \`{"npcName": "林捕頭", "fieldToUpdate": "currentLocation", "newValue": "街道", "updateType": "set"}\`。
 
-### **場景範例**
-* **玩家指令**: "我前往王大夫的藥鋪"
-* **你的故事**: "你推開藥鋪的門，看見王大夫正在櫃檯後搗藥..."
-* **你必須做的事**:
-    1.  在 \`roundData\` 中，將玩家的位置更新為：\`"LOC": ["無名村", "藥鋪"]\`。
-    2.  在 \`roundData\` 中，**必須**加入位置同步指令：\`"npcUpdates": [{"npcName": "王大夫", "fieldToUpdate": "currentLocation", "newValue": "藥鋪", "updateType": "set"}]\`
-
-**此規則是為了確保玩家的資料庫 (\`game_saves\`) 和 NPC 的資料庫 (\`npc_states\`) 中的位置資訊永遠保持同步，是解決互動邏輯錯誤的關鍵。**`;
+此規則是為了解決玩家與NPC因劇情推進而身處同一場景、但數據庫位置卻未同步的問題，是保障後續互動（如交談、戰鬥）能夠順利進行的關鍵。`;
 
 
     const npcContextInstruction = Object.keys(npcContext).length > 0
