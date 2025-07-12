@@ -196,7 +196,7 @@ function startCombat(initialState) {
     gameState.combat.state = initialState;
     
     const cancelCombat = () => {
-        gameState.isInCombat = false;
+        gameState.isInChat = false;
         gameLoop.setLoading(false); 
     };
     
@@ -312,44 +312,18 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-// 【核心修改】處理丐幫情報探詢的完整流程
+// 【核心修正】重構丐幫互動流程
 async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
     
-    const onConfirm = async () => {
-        gameLoop.setLoading(true, "正在支付情報費用...");
-        try {
-            const result = await api.startBeggarInquiry();
-            // 付款成功，更新本地的錢錢顯示
-            if (gameState.roundData) {
-                gameState.roundData.money = result.newBalance;
-                // 直接調用 updateUI 來刷新儀表板，而不是整個重繪
-                updateUI(null, gameState.roundData, null, null); 
-            }
-            
-            // 開啟聊天視窗
-            gameState.isInChat = true;
-            gameState.currentChatNpc = npcName;
-            gameState.chatHistory = [];
-            modal.openChatModalUI(npcProfile, 'inquiry');
-            modal.appendChatMessage('npc', "錢已收到。客官想打聽點什麼？小的知無不言...");
-            dom.chatInput.focus();
-
-        } catch (error) {
-            // 處理錢不夠的狀況
-            if(error.message.includes('銀兩不足')) {
-                alert('你的銀兩不足以支付100文的情報費用！');
-            } else {
-                handleApiError(error);
-            }
-        } finally {
-            gameLoop.setLoading(false);
-        }
-    };
+    gameState.isInChat = true;
+    gameState.currentChatNpc = npcName;
+    gameState.chatHistory = [];
     
-    // 開啟付費確認彈窗
-    modal.openBeggarInquiryModal(onConfirm);
+    modal.openChatModalUI(npcProfile, 'inquiry'); 
+    modal.appendChatMessage('npc', "客官想打聽點什麼？（每次提問將花費100銀兩）");
+    dom.chatInput.focus();
 }
 
 
@@ -416,7 +390,26 @@ export async function sendChatMessage() {
         let data;
 
         if (chatMode === 'inquiry') {
-            // 【核心修改】呼叫新的、只負責提問的API
+            // 在提問前，先進行一次性的付費操作
+            try {
+                const paymentResult = await api.startBeggarInquiry();
+                // 付款成功，更新本地的錢錢顯示
+                if (gameState.roundData) {
+                    gameState.roundData.money = paymentResult.newBalance;
+                    updateUI(null, gameState.roundData, null, null); 
+                }
+            } catch (error) {
+                // 處理錢不夠的狀況
+                if(error.message.includes('銀兩不足')) {
+                    modal.appendChatMessage('npc', '嘿嘿，客官，您的銀兩似乎不太夠啊...');
+                    dom.chatActionBtn.disabled = true;
+                    return; // 中斷後續操作
+                } else {
+                    throw error; // 拋出其他網路或伺服器錯誤
+                }
+            }
+            
+            // 付費成功後，再進行提問
             data = await api.askBeggarQuestion({
                 beggarName: gameState.currentChatNpc,
                 userQuery: message,
@@ -445,7 +438,6 @@ export async function sendChatMessage() {
 export async function endChatSession() {
     if (gameState.isRequesting || !gameState.currentChatNpc) return;
     
-    // 【核心修正】如果是在情報模式下，關閉彈窗不觸發存檔
     const chatMode = dom.chatModal.dataset.mode || 'chat';
     if (chatMode === 'inquiry') {
         modal.closeChatModal();
