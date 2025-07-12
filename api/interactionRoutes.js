@@ -5,7 +5,6 @@ const admin = require('firebase-admin');
 const { getAIStory, getAISummary, getAISuggestion } = require('../services/aiService');
 
 const {
-    createNpcProfileInBackground,
     updateFriendlinessValues,
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
@@ -184,22 +183,17 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
+        // 【核心修正】修正了對 updateFriendlinessValues 的呼叫，補上所有必要參數
         await Promise.all([
             updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
             updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
-            updateFriendlinessValues(userId, aiResponse.roundData.NPC, aiResponse.roundData),
+            updateFriendlinessValues(userId, username, aiResponse.roundData.NPC, aiResponse.roundData, player),
             processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []),
             processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
         ]);
         
-        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            const newNpcs = aiResponse.roundData.NPC.filter(npc => npc.isNew);
-            if (newNpcs.length > 0) {
-                console.log(`[非同步優化] 偵測到 ${newNpcs.length} 位新NPC，已將通用模板建檔任務推入背景執行。`);
-                newNpcs.forEach(npc => createNpcProfileInBackground(userId, username, npc, aiResponse.roundData, player)
-                    .catch(err => console.error(`[背景建檔錯誤] NPC: ${npc.name}, UserID: ${userId}, 錯誤:`, err)));
-            }
-        }
+        // 【核心修正】移除了重複且邏輯衝突的舊版 NPC 創建邏輯
+        // 這段邏輯現在已經被整合進 updateFriendlinessValues 中，因此必須移除
 
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(longTermSummary, aiResponse.roundData),
@@ -228,7 +222,7 @@ const interactRouteHandler = async (req, res) => {
             lightness: newLightness,
             bulkScore: bulkScore,
             morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0),
-            money: admin.firestore.FieldValue.increment(aiResponse.roundData.moneyChange || 0) // 【核心修改】
+            money: admin.firestore.FieldValue.increment(aiResponse.roundData.moneyChange || 0)
         };
         
         const finalSaveData = { ...aiResponse.roundData, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
@@ -254,7 +248,7 @@ const interactRouteHandler = async (req, res) => {
             bulkScore: bulkScore,
             ITM: inventoryState.itemsString,
             money: inventoryState.money,
-            silver: inventoryState.silver, // 【核心新增】
+            silver: inventoryState.silver,
             skills: await getPlayerSkills(userId),
             suggestion: suggestion
         };
