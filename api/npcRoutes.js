@@ -289,7 +289,7 @@ router.post('/give-item', async (req, res) => {
     }
 });
 
-// 確認並執行交易的路由
+// 【核心修正】確認並執行交易的路由 (重構版)
 router.post('/confirm-trade', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -305,62 +305,65 @@ router.post('/confirm-trade', async (req, res) => {
             const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
             const playerMoneyRef = playerInventoryRef.doc('銀兩');
 
-            // --- 【核心修正】開始：處理金錢交換 ---
-            const playerMoneyChange = (tradeState.npc.offer.money || 0) - (tradeState.player.offer.money || 0);
+            // --- 處理金錢交換 ---
+            const playerMoneyOffer = tradeState.player.offer.money || 0;
+            const npcMoneyOffer = tradeState.npc.offer.money || 0;
             
-            if (playerMoneyChange !== 0) {
+            // 驗證玩家是否有足夠的錢
+            if (playerMoneyOffer > 0) {
+                 const playerMoneyDoc = await transaction.get(playerMoneyRef);
+                 if (!playerMoneyDoc.exists || (playerMoneyDoc.data().quantity || 0) < playerMoneyOffer) {
+                     throw new Error('你的錢不夠！');
+                 }
+            }
+
+            // 更新玩家金錢
+            if (playerMoneyOffer > 0 || npcMoneyOffer > 0) {
+                const totalMoneyChange = npcMoneyOffer - playerMoneyOffer;
                 transaction.set(playerMoneyRef, { 
-                    quantity: admin.firestore.FieldValue.increment(playerMoneyChange) 
-                }, { merge: true });
-                
-                // NPC 的金錢是存在 npc_states 文件中的 inventory 物件裡
-                const npcMoneyField = `inventory.銀兩`;
-                transaction.set(npcStateRef, {
-                    inventory: {
-                        '銀兩': admin.firestore.FieldValue.increment(-playerMoneyChange)
-                    }
+                    quantity: admin.firestore.FieldValue.increment(totalMoneyChange),
+                    templateId: '銀兩', itemType: '財寶' 
                 }, { merge: true });
             }
-            // --- 【核心修正】結束：處理金錢交換 ---
 
-            // 處理物品交換的內部函式
-            const handleItems = async (items, owner) => {
-                for (const item of items) {
-                    if (owner === 'player') { // 從玩家移動到NPC
-                        const docRef = playerInventoryRef.doc(item.id);
-                        const doc = await transaction.get(docRef);
-                        if (doc.exists) {
-                            const currentQty = doc.data().quantity || 1;
-                            if (currentQty > item.quantity) {
-                                transaction.update(docRef, { quantity: admin.firestore.FieldValue.increment(-item.quantity) });
-                            } else {
-                                transaction.delete(docRef);
-                            }
-                        }
-                        const npcFieldPath = `inventory.${item.name}`;
-                        transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(item.quantity) } }, { merge: true });
-                    } else { // 從NPC移動到玩家
-                        const npcFieldPath = `inventory.${item.name}`;
-                        transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(-item.quantity) } }, { merge: true });
-                        // 這裡不能直接在事務中呼叫 updateInventory，我們在外面處理
-                    }
+            // 更新 NPC 金錢
+            const npcMoneyField = `inventory.銀兩`;
+            transaction.set(npcStateRef, {
+                inventory: { '銀兩': admin.firestore.FieldValue.increment(playerMoneyOffer - npcMoneyOffer) }
+            }, { merge: true });
+
+
+            // --- 處理玩家給予NPC的物品 ---
+            for (const item of tradeState.player.offer.items) {
+                const docRef = playerInventoryRef.doc(item.id);
+                const doc = await transaction.get(docRef);
+                if (!doc.exists) throw new Error(`找不到你背包中的物品「${item.name}」`);
+                
+                const currentQty = doc.data().quantity || 1;
+                if (currentQty > item.quantity) {
+                    transaction.update(docRef, { quantity: admin.firestore.FieldValue.increment(-item.quantity) });
+                } else {
+                    transaction.delete(docRef);
                 }
-            };
+
+                const npcItemField = `inventory.${item.name}`;
+                transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(item.quantity) } }, { merge: true });
+            }
             
-            await handleItems(tradeState.player.offer.items, 'player');
-            await handleItems(tradeState.npc.offer.items, 'npc');
+            // --- 處理NPC給予玩家的物品 ---
+            for (const item of tradeState.npc.offer.items) {
+                 const npcItemField = `inventory.${item.name}`;
+                 transaction.set(npcStateRef, { inventory: { [item.name]: admin.firestore.FieldValue.increment(-item.quantity) } }, { merge: true });
+                 
+                 // 因為 templateId 和 itemName 相同，可以直接用
+                 const playerItemRef = playerInventoryRef.doc(item.name);
+                 transaction.set(playerItemRef, { 
+                     quantity: admin.firestore.FieldValue.increment(item.quantity),
+                     templateId: item.name,
+                     // 這裡可以從物品模板中獲取更多資訊，但為簡化，先這樣處理
+                 }, { merge: true });
+            }
         });
-
-        // 在事務之外處理玩家獲得NPC物品的邏輯
-        if (tradeState.npc.offer.items.length > 0) {
-            const itemsToAdd = tradeState.npc.offer.items.map(item => ({
-                action: 'add',
-                itemName: item.name,
-                quantity: item.quantity
-            }));
-            await updateInventory(userId, itemsToAdd, {});
-        }
-
 
         console.log(`[交易系統] 玩家 ${username} 與 ${npcName} 的交易成功完成。`);
 
@@ -403,7 +406,7 @@ router.post('/confirm-trade', async (req, res) => {
 
     } catch (error) {
         console.error(`[交易系統] /confirm-trade 錯誤:`, error);
-        res.status(500).json({ message: '交易過程中發生意外，交換失敗。' });
+        res.status(500).json({ message: error.message || '交易過程中發生意外，交換失敗。' });
     }
 });
 
