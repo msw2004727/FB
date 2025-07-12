@@ -309,12 +309,16 @@ async function processNpcUpdates(userId, updates) {
     }
 }
 
-// 導出 createNpcProfileInBackground 以便 GM 工具可以繼續使用
+// 【修正】將 createNpcProfileInBackground 重新命名並導出，以便 GM 工具可以繼續使用
+async function gmCreateNpcTemplate(username, npcData, roundData, playerProfile) {
+    return await generateNpcTemplateData(username, npcData, roundData, playerProfile);
+}
+
 module.exports = {
     getMoneyForNpc,
     getFriendlinessLevel,
     getMergedNpcProfile,
-    createNpcProfileInBackground: generateNpcTemplateData, // 讓舊的GM工具呼叫指向新的生成函式
+    gmCreateNpcTemplate, // 導出給GM工具使用
     updateFriendlinessValues,
     updateRomanceValues,
     checkAndTriggerRomanceEvent,
