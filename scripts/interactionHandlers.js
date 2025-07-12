@@ -317,13 +317,35 @@ async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
     
-    gameState.isInChat = true;
-    gameState.currentChatNpc = npcName;
-    gameState.chatHistory = [];
-    
-    modal.openChatModalUI(npcProfile, 'inquiry'); 
-    modal.appendChatMessage('npc', "客官想打聽點什麼？（每次提問將花費100銀兩）");
-    dom.chatInput.focus();
+    gameLoop.setLoading(true, `正在與 ${npcName} 交談...`);
+
+    try {
+        const paymentResult = await api.startBeggarInquiry();
+        
+        // 付款成功，更新本地的錢錢顯示
+        if (gameState.roundData) {
+            gameState.roundData.money = paymentResult.newBalance;
+            updateUI(null, gameState.roundData, null, null); 
+        }
+        
+        // 開啟聊天視窗
+        gameState.isInChat = true;
+        gameState.currentChatNpc = npcName;
+        gameState.chatHistory = [];
+        modal.openChatModalUI(npcProfile, 'inquiry');
+        modal.appendChatMessage('npc', "錢已收到。客官想打聽點什麼？小的知無不言...");
+        dom.chatInput.focus();
+
+    } catch (error) {
+        // 處理錢不夠的狀況
+        if(error.message.includes('銀兩不足')) {
+            appendMessageToStory("你摸了摸錢袋，發現銀兩不足以支付情報費用。", 'system-message');
+        } else {
+            handleApiError(error);
+        }
+    } finally {
+        gameLoop.setLoading(false);
+    }
 }
 
 
@@ -390,26 +412,6 @@ export async function sendChatMessage() {
         let data;
 
         if (chatMode === 'inquiry') {
-            // 在提問前，先進行一次性的付費操作
-            try {
-                const paymentResult = await api.startBeggarInquiry();
-                // 付款成功，更新本地的錢錢顯示
-                if (gameState.roundData) {
-                    gameState.roundData.money = paymentResult.newBalance;
-                    updateUI(null, gameState.roundData, null, null); 
-                }
-            } catch (error) {
-                // 處理錢不夠的狀況
-                if(error.message.includes('銀兩不足')) {
-                    modal.appendChatMessage('npc', '嘿嘿，客官，您的銀兩似乎不太夠啊...');
-                    dom.chatActionBtn.disabled = true;
-                    return; // 中斷後續操作
-                } else {
-                    throw error; // 拋出其他網路或伺服器錯誤
-                }
-            }
-            
-            // 付費成功後，再進行提問
             data = await api.askBeggarQuestion({
                 beggarName: gameState.currentChatNpc,
                 userQuery: message,
@@ -439,38 +441,33 @@ export async function endChatSession() {
     if (gameState.isRequesting || !gameState.currentChatNpc) return;
     
     const chatMode = dom.chatModal.dataset.mode || 'chat';
-    if (chatMode === 'inquiry') {
-        modal.closeChatModal();
-        gameState.isInChat = false; 
-        gameState.currentChatNpc = null;
-        gameState.chatHistory = [];
-        return;
-    }
-
-    const npcNameToSummarize = gameState.currentChatNpc;
-    
+    // 在任何模式下，點擊結束都應該關閉視窗並重設狀態
     modal.closeChatModal();
     gameState.isInChat = false; 
-    gameLoop.setLoading(true, '正在總結對話，更新江湖事態...');
-
-    try {
-        const data = await api.endChat({
-            npcName: npcNameToSummarize,
-            fullChatHistory: gameState.chatHistory,
-            model: dom.aiModelSelector.value
-        });
-        if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
-            appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
-            gameLoop.processNewRoundData(data);
-        } else {
-            throw new Error('從伺服器收到的回應格式不正確。');
+    gameState.currentChatNpc = null;
+    gameState.chatHistory = [];
+    
+    // 只有在普通聊天模式下，才需要存檔
+    if (chatMode === 'chat') {
+        const npcNameToSummarize = gameState.currentChatNpc;
+        gameLoop.setLoading(true, '正在總結對話，更新江湖事態...');
+        try {
+            const data = await api.endChat({
+                npcName: npcNameToSummarize,
+                fullChatHistory: gameState.chatHistory,
+                model: dom.aiModelSelector.value
+            });
+            if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
+                appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
+                gameLoop.processNewRoundData(data);
+            } else {
+                throw new Error('從伺服器收到的回應格式不正確。');
+            }
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            gameLoop.setLoading(false);
         }
-    } catch (error) {
-        handleApiError(error);
-    } finally {
-        gameState.currentChatNpc = null;
-        gameState.chatHistory = [];
-        gameLoop.setLoading(false);
     }
 }
 
