@@ -3,16 +3,13 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const beggarService = require('../services/beggarService');
-const { getInventoryState } = require('./playerStateHelpers'); // 【核心修正】引入標準的玩家狀態獲取函式
+const { getInventoryState } = require('./playerStateHelpers'); 
+const admin = require('firebase-admin');
 
-// 所有丐幫路由都需要身份驗證
+const db = admin.firestore(); 
+
 router.use(authMiddleware);
 
-/**
- * @route   POST /api/beggar/summon
- * @desc    玩家呼叫丐幫，請求一名弟子前來
- * @access  Private
- */
 router.post('/summon', async (req, res) => {
     try {
         const userId = req.user.id;
@@ -24,13 +21,37 @@ router.post('/summon', async (req, res) => {
     }
 });
 
+/**
+ * 【核心新增】開始情報探詢的API，處理一次性付費
+ * @route POST /api/beggar/start-inquiry
+ */
+router.post('/start-inquiry', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const playerProfile = await getInventoryState(userId);
+        if (!playerProfile) {
+            return res.status(404).json({ message: '找不到玩家檔案。' });
+        }
+
+        const result = await beggarService.startInquirySession(userId, playerProfile);
+        res.json(result);
+
+    } catch (error) {
+        // 特別處理銀兩不足的錯誤
+        if (error.message === '銀兩不足') {
+            return res.status(402).json({ success: false, message: '您的銀兩不足以支付情報費用。' });
+        }
+        console.error('[丐幫路由] /start-inquiry 錯誤:', error);
+        res.status(500).json({ message: '開啟情報對話時發生未知錯誤。' });
+    }
+});
+
 
 /**
- * @route   POST /api/beggar/inquire
- * @desc    玩家向丐幫弟子付費打聽情報
- * @access  Private
+ * 【核心修改】處理玩家的單次提問 (不再收費)
+ * @route POST /api/beggar/ask
  */
-router.post('/inquire', async (req, res) => {
+router.post('/ask', async (req, res) => {
     try {
         const userId = req.user.id;
         const { beggarName, userQuery, model } = req.body;
@@ -39,18 +60,16 @@ router.post('/inquire', async (req, res) => {
             return res.status(400).json({ message: '缺少必要的探訪資訊。' });
         }
 
-        // 【核心修正】使用 getInventoryState 來獲取包含準確銀兩數量的玩家資料
         const playerProfile = await getInventoryState(userId);
         if (!playerProfile) {
             return res.status(404).json({ message: '找不到玩家檔案。' });
         }
         
-        // 將最準確的玩家資料傳遞給服務層
-        const result = await beggarService.handleBeggarInquiry(userId, playerProfile, beggarName, userQuery, model);
+        const result = await beggarService.getInquiryResponse(userId, playerProfile, beggarName, userQuery, model);
         res.json(result);
 
     } catch (error) {
-        console.error('[丐幫路由] /inquire 錯誤:', error);
+        console.error('[丐幫路由] /ask 錯誤:', error);
         res.status(500).json({ message: error.message || '打聽情報時發生未知錯誤。' });
     }
 });
