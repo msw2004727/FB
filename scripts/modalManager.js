@@ -41,8 +41,21 @@ const skillsBodyContainer = document.getElementById('skills-body-container');
 
 // --- 【核心修正】交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
+    // ================== 偵錯點 2：檢查是否進入 modalManager ==================
+    console.log("【偵錯點 2】: 收到打開交易視窗的指令！(位於 modalManager.js)");
+
     const tradeModalEl = document.getElementById('trade-modal');
-    if (!tradeModalEl || !tradeData) return;
+    
+    // ================== 偵錯點 2.1：檢查是否成功抓取到 HTML 元素 ==================
+    console.log("【偵錯點 2.1】: 抓取到的 #trade-modal 元素是:", tradeModalEl);
+    if (!tradeModalEl) {
+        console.error("【嚴重錯誤】: 找不到 ID 為 'trade-modal' 的 HTML 元素！請檢查 index.html。");
+        return;
+    }
+    if (!tradeData) {
+        console.error("【嚴重錯誤】: 傳入的 tradeData 為空！");
+        return;
+    }
 
     // 將所有交易相關的初始化和事件綁定都交給 tradeManager 處理
     initializeTrade(tradeData, npcName, onTradeComplete, closeCallback);
@@ -50,6 +63,7 @@ export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallbac
     // modalManager 只負責單純的顯示
     tradeModalEl.classList.remove('hidden');
     tradeModalEl.classList.add('flex');
+    console.log("【偵錯點 2.2】: 已將交易視窗設為可見。");
 }
 
 export function closeTradeModal() {
@@ -59,6 +73,7 @@ export function closeTradeModal() {
         tradeModalEl.classList.remove('flex');
         // 在隱藏後，呼叫 tradeManager 的清理函式，解除事件綁定
         closeTradeUI();
+        console.log("【偵錯】: 交易視窗已關閉。");
     }
 }
 
