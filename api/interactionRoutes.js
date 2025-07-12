@@ -186,6 +186,14 @@ const interactRouteHandler = async (req, res) => {
 
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
         let newStamina = (player.stamina || 100) + staminaChange;
+
+        // ================= 【核心修改】 =================
+        // 在AI判定的基礎上，再隨機扣除1-5點精力
+        const randomStaminaDeduction = Math.floor(Math.random() * 5) + 1;
+        newStamina -= randomStaminaDeduction;
+        console.log(`[精力系統] 行動消耗: ${staminaChange}, 每回合基礎消耗: -${randomStaminaDeduction}`);
+        // ===============================================
+
         const isResting = ['睡覺', '休息', '歇息'].some(kw => playerAction.includes(kw));
         const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
         if (isResting && timeDidAdvance) newStamina = 100;
