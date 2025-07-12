@@ -1,6 +1,6 @@
 // scripts/modalManager.js
 import { api } from './api.js';
-import { initializeTrade } from './tradeManager.js'; 
+import { initializeTrade, closeTradeUI } from './tradeManager.js'; // 【修正】引入 closeTradeUI
 
 // --- 獲取所有彈窗相關的 DOM 元素 ---
 const deceasedOverlay = document.getElementById('deceased-overlay');
@@ -39,13 +39,12 @@ const skillsTabsContainer = document.getElementById('skills-tabs-container');
 const skillsBodyContainer = document.getElementById('skills-body-container');
 
 
-// --- 交易系統函式 ---
-
-export function openTradeModal(tradeData, npcName, onTradeComplete) {
+// --- 【核心修正】交易系統函式 ---
+export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
     const tradeModalEl = document.getElementById('trade-modal');
     if (!tradeModalEl || !tradeData) return;
 
-    initializeTrade(tradeData, npcName, onTradeComplete);
+    initializeTrade(tradeData, npcName, onTradeComplete, closeCallback);
     
     tradeModalEl.classList.remove('hidden');
     tradeModalEl.classList.add('flex');
@@ -56,6 +55,7 @@ export function closeTradeModal() {
     if (tradeModalEl) {
         tradeModalEl.classList.add('hidden');
         tradeModalEl.classList.remove('flex');
+        closeTradeUI(); // 【新增】清理 tradeManager 中的事件監聽
     }
 }
 
