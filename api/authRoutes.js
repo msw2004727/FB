@@ -10,6 +10,7 @@ const db = admin.firestore();
 
 // 預設的玩家欄位，包含新的 equipment 和 bulkScore
 const DEFAULT_USER_FIELDS = {
+    money: 50, // 【核心修改】初始貨幣
     internalPower: 5,
     externalPower: 5,
     lightness: 5,
@@ -91,6 +92,7 @@ router.post('/register', async (req, res) => {
             timeOfDay: '上午',
             powerChange: { internal: 0, external: 0, lightness: 0 },
             moralityChange: 0,
+            moneyChange: 50, // 【核心修改】
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
             EVT: '從天旋地轉中醒來，靈魂墜入陌生的時代',
             LOC: ['無名村'],
@@ -115,6 +117,8 @@ router.post('/register', async (req, res) => {
             lightness: 5,
             stamina: 100, 
             morality: 0,
+            money: 50, // 【核心修改】
+            silver: 0, // 【核心新增】
             yearName: '元祐',
             year: 1,
             month: 1,
@@ -165,6 +169,10 @@ router.post('/login', async (req, res) => {
         const batch = db.batch();
         
         // 【核心修改】為老玩家自動修補資料庫結構
+        // 檢查 money 欄位是否存在，如果不存在則給予預設值
+        if (userData.money === undefined) {
+             batch.update(userDoc.ref, { money: 50 });
+        }
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
                 const updatePayload = {};
