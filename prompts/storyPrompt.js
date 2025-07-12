@@ -19,19 +19,15 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心修改】根據傳入的事件標記，動態生成指令
+    // 【核心修改】簡化特殊事件指令，只要求AI寫故事，不要求其創建JSON數據
     let specialEventInstruction = '';
     if (worldEventToWeave && worldEventToWeave.eventName === 'BEGGAR_SUMMONED') {
         specialEventInstruction = `
 ## 【最高優先級特殊劇情指令：丐幫弟子登場】
 你已接收到召喚信號！本回合你必須完成以下核心任務：
-1.  **安排登場**: 在你的故事中，必須合乎邏輯地安排一位丐幫弟子NPC出現在玩家面前。
+1.  **安排登場**: 在你的 \`story\` 文字中，必須合乎邏輯地安排一位丐幫弟子NPC出現在玩家面前。這位NPC的名字是「${worldEventToWeave.beggarName}」。
 2.  **描寫細節**: 根據玩家要求，這位弟子的登場方式必須是「低調」的，例如從暗巷角落、人群中不起眼的地方湊過來。同時，你必須在描述中加入他「渾身臭味」的細節，以增強真實感。
-3.  **NPC設定**: 你必須在回傳的 \`roundData.NPC\` 陣列中，創建這位新的丐幫弟子。
-    * 他的 \`name\` 必須是: "${worldEventToWeave.beggarName}"。
-    * 他的 \`status_title\` (身份) 必須是: "丐幫弟子"。
-    * 他的 \`status\` (狀態) 必須符合你對他登場的描寫，例如：「一個衣衫襤褸、渾身散發酸臭味的乞丐悄悄湊到你身邊」。
-    * 將他的 \`isNew\` 設為 \`true\`。
+3.  **引導互動**: 你的故事結尾應該自然地引導玩家與這位新出現的丐幫弟子互動。
 `;
     } else if (worldEventToWeave) { // 其他世界事件
         specialEventInstruction = `
@@ -126,31 +122,44 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **大量消耗 (負值)**：施展威力強大的武學、全力奔跑以逃離危險、進行高強度的體力勞動、身受重傷。
 4.  **敘述整合**: 你需要在你的 \`story\` 敘述中，巧妙地反映出體力的變化。`;
 
+    // 引入其他規則模塊...
     const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality, playerPower });
     const romanceRules = getRomanceRule({ playerGender });
     const worldviewAndProgressionRules = getWorldviewAndProgressionRule({ protagonistDescription, playerPower });
     const systemInteractionRules = getSystemInteractionRule({ locationName: locationContext?.locationName });
     const outputStructureRules = getOutputStructureRule({ username, timeSequence });
     const martialArtsRules = getMartialArtsRule();
-    const anachronismRule = `...`; // 省略，保持不變
-    const languageProvocationRule = `...`; // 省略，保持不變
-    const itemExistenceRule = `...`; // 省略，保持不變
-    const npcUpdatesRule = `...`; // 省略，保持不變
-    
+    const itemLedgerRule = getItemLedgerRule();
+    const interactionRule = getInteractionRule();
+    const npcRule = getNpcRule();
+
+    // 整合所有規則...
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
 
 ${specialEventInstruction}
 ${romanceInstruction}
 ${dyingInstruction}
-
-// ... 此處插入所有其他規則 ...
+${worldviewAndProgressionRules}
+${encumbranceInstruction}
+${staminaSystemRule}
+${playerAttributeRules}
+${itemLedgerRule}
+${martialArtsRules}
+${npcRule}
+${interactionRule}
+${romanceRules}
+${npcLocationSyncRule}
+${actorCandidatesInstruction}
+${systemInteractionRules}
+${locationContextInstruction}
+${npcContextInstruction}
+${outputStructureRules}
+${currencyRule}
 
 ## 長期故事摘要 (世界核心記憶):
 ${longTermSummary}
 ${levelUpText}
-
-// ... 此處插入所有其他規則 ...
 
 ## 最近發生的事件 (短期記憶):
 ${recentHistory}
