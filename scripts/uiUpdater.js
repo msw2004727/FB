@@ -2,30 +2,33 @@
 import { MAX_POWER } from './config.js';
 import { api } from './api.js';
 import { gameState } from './gameState.js';
+import { dom } from './dom.js'; 
 
 // --- DOM元素獲取 ---
-const storyPanelWrapper = document.querySelector('.story-panel');
-const storyTextContainer = document.getElementById('story-text-wrapper');
-const statusBarEl = document.getElementById('status-bar');
-const pcContent = document.getElementById('pc-content');
-const internalPowerBar = document.getElementById('internal-power-bar');
-const internalPowerValue = document.getElementById('internal-power-value');
-const externalPowerBar = document.getElementById('external-power-bar');
-const externalPowerValue = document.getElementById('external-power-value');
-const lightnessPowerBar = document.getElementById('lightness-power-bar');
-const lightnessPowerValue = document.getElementById('lightness-power-value');
-const staminaBar = document.getElementById('stamina-bar');
-const staminaValue = document.getElementById('stamina-value');
-const moralityBarIndicator = document.getElementById('morality-bar-indicator');
-const locationInfo = document.getElementById('location-info'); 
-const npcContent = document.getElementById('npc-content');
-const itmContent = document.getElementById('itm-content');
-const bulkStatus = document.getElementById('bulk-status');
-const qstContent = document.getElementById('qst-content');
-const psyContent = document.getElementById('psy-content');
-const clsContent = document.getElementById('cls-content');
-const actionSuggestion = document.getElementById('action-suggestion');
-const moneyContent = document.getElementById('money-content');
+const {
+    storyPanelWrapper,
+    storyTextContainer,
+    statusBarEl,
+    pcContent,
+    internalPowerBar,
+    internalPowerValue,
+    externalPowerBar,
+    externalPowerValue,
+    lightnessPowerBar,
+    lightnessPowerValue,
+    staminaBar,
+    staminaValue,
+    moralityBarIndicator,
+    locationInfo,
+    npcContent,
+    itmContent,
+    bulkStatus,
+    qstContent,
+    psyContent,
+    clsContent,
+    actionSuggestion,
+    moneyContent
+} = dom;
 
 // --- 圖示對照表 ---
 const slotConfig = {
@@ -69,15 +72,12 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateNpcList(roundData.NPC);
     renderInventory(roundData.inventory); 
     
-    // 【核心修正】將顯示單位從 "文錢" 改為 "銀兩"
     moneyContent.textContent = `${roundData.money || 0} 銀兩`;
-    
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
-    	
-    // 【核心新增】根據是否為臨時事件，更新輸入框和按鈕狀態
+    
     const isTempEvent = roundData.NPC && roundData.NPC.some(npc => npc.isTemp);
     if (isTempEvent) {
         dom.playerInput.disabled = true;
@@ -250,6 +250,8 @@ function renderInventory(inventory) {
     }
 
     allItems.forEach(item => {
+        // 【核心修正】增加一個保護判斷，如果 item 為空則跳過
+        if (!item) return;
         const itemEl = createItemEntry(item);
         itmContent.appendChild(itemEl);
     });
@@ -258,6 +260,12 @@ function renderInventory(inventory) {
 
 function createItemEntry(item) {
     const entry = document.createElement('div');
+    // 【核心修正】增加一個保護判斷，如果 item 為空或缺少必要屬性，則返回一個空元素
+    if (!item || item.isEquipped === undefined) {
+        console.warn("嘗試渲染一個不完整的物品:", item);
+        return entry;
+    }
+
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
@@ -309,19 +317,23 @@ async function handleEquipToggle(itemId, shouldEquip) {
         };
         const result = await api.equipItem(payload); 
 
-        if (result.success && result.inventory) {
-             gameState.roundData.inventory = result.inventory;
-             if (result.bulkScore !== undefined) {
-                 gameState.roundData.bulkScore = result.bulkScore;
-                 updateBulkStatus(gameState.roundData.bulkScore);
-             }
-             renderInventory(gameState.roundData.inventory); 
+        // 【核心修正】使用完整的後端數據更新整個 gameState，而不只是其中一部分
+        if (result.success && result.inventory && result.bulkScore !== undefined) {
+             gameState.roundData = { 
+                ...gameState.roundData, 
+                inventory: result.inventory, 
+                bulkScore: result.bulkScore 
+            };
+            // 只重繪需要更新的部分
+            renderInventory(gameState.roundData.inventory); 
+            updateBulkStatus(gameState.roundData.bulkScore);
         } else {
             throw new Error(result.message || '操作失敗');
         }
     } catch (error) {
         console.error('裝備操作失敗:', error);
         handleApiError(error);
+        // 出錯時也用現有數據重繪，避免UI停在舊狀態
         renderInventory(gameState.roundData.inventory); 
     } finally {
         gameState.isRequesting = false;
