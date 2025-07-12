@@ -35,6 +35,31 @@ body.dark-theme .prequel-summary h3 {
     font-family: var(--font-sans);
     font-size: 0.9rem;
 }
+
+/* 【核心修改】讓錢袋內的貨幣並排顯示 */
+.info-card .money-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem; /* 貨幣間的間距 */
+}
+.money-display {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    flex-grow: 1;
+    text-align: center;
+}
+.silver-display {
+    background-color: #e9ecef;
+    color: #495057;
+    font-weight: bold;
+}
+body.dark-theme .silver-display {
+    background-color: #495057;
+    color: #ced4da;
+}
+/* 結束修改 */
+
 .welcome-card {
     text-align: center;
     color: var(--light-text-secondary);
@@ -50,7 +75,7 @@ body.dark-theme .welcome-card {
     color: var(--light-accent);
     border-bottom: 1px solid var(--light-border);
     padding-bottom: 0.5rem;
-    font-weight: bold; /* 【核心修正】重新將粗體樣式加回來 */
+    font-weight: bold;
 }
 body.dark-theme .info-card h4 {
     color: var(--dark-accent);
