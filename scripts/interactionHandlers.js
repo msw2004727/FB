@@ -387,13 +387,11 @@ export async function handleNpcClick(event) {
 
 export async function sendChatMessage() {
     const message = dom.chatInput.value.trim();
-    if (!message || gameState.isRequesting) return;
+    if (!message || gameState.isRequesting || dom.chatActionBtn.disabled) return;
     dom.chatInput.value = '';
     modal.appendChatMessage('player', message);
     gameState.chatHistory.push({ speaker: 'player', message: message });
     gameLoop.setLoading(true);
-
-    let inquiryFailed = false; // 添加一個標記
 
     try {
         const chatMode = dom.chatModal.dataset.mode || 'chat';
@@ -405,13 +403,8 @@ export async function sendChatMessage() {
                 model: dom.aiModelSelector.value
             });
              if (data.success === false) {
-                 inquiryFailed = true; // 標記為失敗
                  modal.appendChatMessage('npc', data.response);
-                 setTimeout(() => {
-                    modal.closeChatModal();
-                    gameState.isInChat = false; 
-                    gameLoop.setLoading(false); 
-                 }, 2000);
+                 dom.chatActionBtn.disabled = true; // 【核心修正】禁用按鈕
              } else {
                  modal.appendChatMessage('npc', data.response);
              }
@@ -428,10 +421,7 @@ export async function sendChatMessage() {
     } catch (error) {
         modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
     } finally {
-        // 【核心修正】只有在探詢不是因為錢不夠而失敗時，才由 finally 來解鎖UI
-        if (!inquiryFailed) {
-            gameLoop.setLoading(false);
-        }
+        gameLoop.setLoading(false);
     }
 }
 
