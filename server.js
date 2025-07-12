@@ -57,7 +57,7 @@ const epilogueRoutes = require('./api/epilogue.js');
 const bountyRoutes = require('./api/bountyRoutes');
 const gmRoutes = require('./api/gmRoutes');
 const mapRoutes = require('./api/mapRoutes');
-const adminRoutes = require('./api/admin/adminRoutes'); // 【***修正***】 已修正後台路由的路徑
+const adminRoutes = require('./api/admin/adminRoutes');
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -67,7 +67,7 @@ app.use('/api/epilogue', authMiddleware, epilogueRoutes);
 app.use('/api/bounties', bountyRoutes);
 app.use('/api/gm', gmRoutes);
 app.use('/api/map', authMiddleware, mapRoutes);
-app.use('/api/admin', adminRoutes); // 【***新***】 使用後台路由
+app.use('/api/admin', adminRoutes);
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
