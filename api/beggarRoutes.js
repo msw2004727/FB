@@ -3,9 +3,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const beggarService = require('../services/beggarService');
-const admin = require('firebase-admin'); // 【核心新增】引入admin
-
-const db = admin.firestore(); // 【核心新增】初始化db
+const { getInventoryState } = require('./playerStateHelpers'); // 【核心修正】引入標準的玩家狀態獲取函式
 
 // 所有丐幫路由都需要身份驗證
 router.use(authMiddleware);
@@ -41,14 +39,13 @@ router.post('/inquire', async (req, res) => {
             return res.status(400).json({ message: '缺少必要的探訪資訊。' });
         }
 
-        // 【核心修改】在呼叫服務前，先獲取玩家的完整檔案
-        const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) {
+        // 【核心修正】使用 getInventoryState 來獲取包含準確銀兩數量的玩家資料
+        const playerProfile = await getInventoryState(userId);
+        if (!playerProfile) {
             return res.status(404).json({ message: '找不到玩家檔案。' });
         }
-        const playerProfile = userDoc.data();
         
-        // 【核心修改】將玩家檔案傳遞給服務層
+        // 將最準確的玩家資料傳遞給服務層
         const result = await beggarService.handleBeggarInquiry(userId, playerProfile, beggarName, userQuery, model);
         res.json(result);
 
