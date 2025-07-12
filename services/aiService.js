@@ -51,7 +51,6 @@ const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
-// 【核心新增】引入新的交易摘要Prompt
 const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
 
 
@@ -242,13 +241,10 @@ async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, pla
     const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChat;
-        // 【第一處核心修改】明確要求AI回傳JSON格式
         const reply = await callAI(modelToUse, prompt, true);
-        // 【第二處核心修改】直接回傳AI給的JSON字串，不再進行任何破壞性修改
         return reply;
     } catch (error) {
         console.error("[AI 任務失敗] 聊天大師任務:", error);
-        // 【第三處核心修改】如果呼叫失敗，也回傳一個符合結構的JSON字串，而不是純文字
         return JSON.stringify({
             response: "（他似乎心事重重，沒有回答你。）",
             friendlinessChange: 0,
@@ -262,8 +258,8 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
     const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory, longTermSummary);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChatSummary;
-        const text = await callAI(modelToUse, prompt, true); // 要求回傳JSON
-        return parseJsonResponse(text); // 解析JSON
+        const text = await callAI(modelToUse, prompt, true); 
+        return parseJsonResponse(text); 
     } catch (error) {
         console.error("[AI 任務失敗] 摘要師任務:", error);
         return {
@@ -273,8 +269,15 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
     }
 }
 
-// 【核心新增】為交易事件生成摘要
 async function getAITradeSummary(playerModelChoice, username, npcName, tradeDetails, longTermSummary) {
+    // 【核心修復】增加一個防呆判斷，確保 tradeDetails 存在
+    if (!tradeDetails) {
+        console.error("[AI 任務失敗] 呼叫交易摘要師時缺少 tradeDetails。");
+        return {
+            story: `你與${npcName}完成了一筆交易，雙方各取所需，皆大歡喜。`,
+            evt: `與${npcName}的交易`
+        };
+    }
     const prompt = getTradeSummaryPrompt(username, npcName, tradeDetails, longTermSummary);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChatSummary || 'openai';
@@ -476,7 +479,7 @@ module.exports = {
     getAICombatSetup,
     getAIChatResponse,
     getAIChatSummary,
-    getAITradeSummary, // 【核心新增】導出新的函式
+    getAITradeSummary,
     getAIGiveItemResponse,
     getAINarrativeForGive,
     getRelationGraph,
