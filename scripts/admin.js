@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logsLoadingText = document.getElementById('logs-loading-text');
 
     // --- 全局變數 ---
-    const API_BASE_URL = 'https://ai-novel-final.onrender.com/api/gm'; // 【修正】後台API應使用 /api/gm
+    const backendBaseUrl = 'https://ai-novel-final.onrender.com';
     let adminToken = sessionStorage.getItem('admin_token');
 
     // --- 初始化檢查 ---
@@ -64,8 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 函式定義 ---
 
-    // 【核心修正】將 fetchApi 移至此處，並修正後台驗證方式
-    async function fetchApi(endpoint, options = {}) {
+    // 【核心修正】後台專用的API請求函式
+    async function fetchAdminApi(endpoint, options = {}) {
         const password = sessionStorage.getItem('admin_token');
         if (!password) throw new Error('未登入或授權已過期。');
 
@@ -75,8 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ...options.headers,
         };
         
-        // 修正：/api/admin 是給監控用的，GM工具應使用 /api/gm
-        const response = await fetch(`${backendBaseUrl}${endpoint}`, {
+        const response = await fetch(`${backendBaseUrl}/api/admin${endpoint}`, { // 直接指向 /api/admin
             ...options,
             headers,
         });
@@ -95,12 +94,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 模擬登入：直接將密碼存入 sessionStorage 並嘗試呼叫一個需要驗證的API
+        loginError.textContent = '驗證中...';
         sessionStorage.setItem('admin_token', password);
         
         try {
-            // 嘗試呼叫一個需要驗證的 API 來確認密碼是否正確
-            await fetchApi('/player-state'); 
+            // 【核心修正】將驗證請求指向一個確實存在的後台API端點，例如 /balances
+            await fetchAdminApi('/balances'); 
             showDashboard();
             loginError.textContent = '';
         } catch (error) {
@@ -114,14 +113,12 @@ document.addEventListener('DOMContentLoaded', () => {
         adminDashboard.classList.remove('hidden');
         switchPage('dashboard', 'API儀表板'); // 預設顯示儀表板
     }
-
-    // 【核心修正】修改 switchPage 函式以正確載入所有頁面內容
+    
     function switchPage(pageId, pageTitle) {
         mainHeaderTitle.textContent = pageTitle;
         pages.forEach(page => page.classList.toggle('active', page.id === `page-${pageId}`));
         menuLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${pageId}`));
 
-        // 呼叫對應的內容載入函式
         const loader = pageLoaders[pageId];
         const targetPage = document.getElementById(`page-${pageId}`);
         if (loader && targetPage) {
@@ -131,9 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 【整合】將 gmManager.js 的功能整合進來
-
-    // --- 頁面載入函式集合 ---
     const pageLoaders = {
         'dashboard': loadBalances,
         'logs': loadLogs,
@@ -144,15 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'npc-creator': loadNpcCreatorData
     };
     
-    // API儀表板
     async function loadBalances(page) {
         if (!balanceContainer) return;
         try {
             balanceContainer.innerHTML = '<p class="loading-text">正在獲取API餘額資訊...</p>';
-            const adminApi = (endpoint) => fetch(`${backendBaseUrl.replace('/gm', '/admin')}${endpoint}`, { headers: { 'Authorization': `Bearer ${sessionStorage.getItem('admin_token')}` } });
-            const response = await adminApi('/balances');
-            if(!response.ok) throw new Error((await response.json()).message);
-            const balances = await response.json();
+            const balances = await fetchAdminApi('/balances');
 
             balanceContainer.innerHTML = '';
             for (const key in balances) {
@@ -173,19 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 系統日誌
     async function loadLogs(page) {
         if (!logTableBody) return;
         logTableBody.innerHTML = '';
         logsLoadingText.textContent = '正在載入日誌...';
         logsLoadingText.classList.remove('hidden');
         try {
-            const adminApi = (endpoint) => fetch(`${backendBaseUrl.replace('/gm', '/admin')}${endpoint}`, { headers: { 'Authorization': `Bearer ${sessionStorage.getItem('admin_token')}` } });
-            // 先載入玩家列表
-            const playersResponse = await adminApi('/players');
-            if(!playersResponse.ok) throw new Error((await playersResponse.json()).message);
-            const players = await playersResponse.json();
-
+            const players = await fetchAdminApi('/players');
             const existingPlayers = new Set(Array.from(playerFilter.options).map(opt => opt.value));
             players.forEach(playerId => {
                 if (!existingPlayers.has(playerId)) {
@@ -196,11 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // 再根據篩選載入日誌
             const playerId = playerFilter.value;
-            const logsResponse = await adminApi(`/logs?playerId=${playerId}`);
-            if(!logsResponse.ok) throw new Error((await logsResponse.json()).message);
-            const logs = await logsResponse.json();
+            const logs = await fetchAdminApi(`/logs?playerId=${playerId}`);
             
             if (logs.length === 0) {
                  logsLoadingText.textContent = '找不到符合條件的日誌。';
@@ -225,13 +206,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 玩家屬性
+    // gmManager.js 的功能已整合在此處
     async function loadPlayerStatsData(page) {
         page.innerHTML = '<h3><i class="fa-solid fa-user-pen"></i> 玩家屬性編輯</h3><p class="loading-text">正在載入數據...</p>';
         try {
             const [playerState, itemTemplates] = await Promise.all([
-                fetchApi('/player-state'),
-                fetchApi('/item-templates')
+                api.getPlayerStateForGM(),
+                api.getItemTemplatesForGM()
             ]);
             
             let optionsHtml = '<option value="">-- 請選擇物品 --</option>';
@@ -282,12 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
              page.innerHTML = `<h3>玩家屬性編輯</h3><p class="error-message">載入數據失敗: ${error.message}</p>`;
         }
     }
-
-    // 地區編輯
+    
     async function loadLocationManagementData(page) {
         page.innerHTML = '<h3><i class="fa-solid fa-map-location-dot"></i> 地區編輯與瞬移</h3><p class="loading-text">正在從後端獲取地區列表...</p>';
         try {
-            const locList = await fetchApi('/locations');
+            const locList = await api.getLocationsForGM();
             let optionsHtml = '<option value="">-- 請選擇目標地點 --</option>';
             locList.forEach(loc => {
                 optionsHtml += `<option value="${loc.name}">${loc.name}</option>`;
@@ -327,13 +307,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // NPC管理
     async function loadNpcManagementData(page) {
         page.innerHTML = '<h3><i class="fa-solid fa-users-gear"></i> NPC關係管理</h3><p class="loading-text">正在獲取人物數據...</p>';
         try {
             const [npcList, characterList] = await Promise.all([
-                fetchApi('/npcs'),
-                fetchApi('/characters')
+                api.getNpcsForGM(),
+                api.getCharactersForGM()
             ]);
     
             const container = document.createElement('div');
@@ -376,8 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
             page.innerHTML = `<h3>NPC關係管理</h3><p class="error-message">獲取資料失敗: ${error.message}</p>`;
         }
     }
-    
-    // 物品生成
+
     function loadItemSpawnerData(page) {
         page.innerHTML = `
             <h3><i class="fa-solid fa-box-archive"></i> 物品模板生成</h3>
@@ -393,8 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.getElementById('gm-create-item-btn').addEventListener('click', gmHandleCreateItem);
     }
-
-    // NPC生成
+    
     function loadNpcCreatorData(page) {
         page.innerHTML = `
             <h3><i class="fa-solid fa-user-plus"></i> 創建新人物</h3>
@@ -411,7 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('gm-create-npc-btn').addEventListener('click', gmHandleCreateNpc);
     }
     
-    // --- 事件處理函式 ---
     async function gmSavePlayerStats(e) {
         const button = e.target.closest('button');
         button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 儲存中...`;
@@ -423,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lightness: document.getElementById('gm-lightness').value,
                 morality: document.getElementById('gm-morality').value
             };
-            const result = await fetchApi('/player-state', { method: 'POST', body: JSON.stringify(payload) });
+            const result = await api.updatePlayerStateForGM(payload);
             alert(result.message);
             button.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功!`;
         } catch (error) {
@@ -445,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.textContent = '設定中...';
         button.disabled = true;
         try {
-            const result = await fetchApi('/update-player-resources', { method: 'POST', body: JSON.stringify({ money: Number(money) }) });
+            const result = await api.updatePlayerResourcesForGM({ money: Number(money) });
             alert(result.message);
             button.textContent = '設定成功!';
         } catch (error) {
@@ -468,9 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
         button.disabled = true;
 
         try {
-            const result = await fetchApi('/update-player-resources', {
-                method: 'POST',
-                body: JSON.stringify({ itemChange: { action, itemName, quantity: Number(quantity) } })
+            const result = await api.updatePlayerResourcesForGM({
+                itemChange: { action, itemName, quantity: Number(quantity) }
             });
             alert(result.message);
             button.innerHTML = `<i class="fa-solid fa-check"></i> 操作成功!`;
@@ -496,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 正在傳送...`;
         button.disabled = true;
         try {
-            const result = await fetchApi('/teleport', { method: 'POST', body: JSON.stringify({ locationName }) });
+            const result = await api.teleportPlayer({ locationName });
             button.innerHTML = `<i class="fa-solid fa-check"></i> ${result.message}`;
              setTimeout(() => {
                 alert('瞬移成功！建議您重新載入遊戲以確保所有狀態同步。');
@@ -525,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const friendliness = document.getElementById(`friend-slider-${npcId}`).value;
                     const romance = document.getElementById(`romance-slider-${npcId}`).value;
-                    const result = await fetchApi('/update-npc', { method: 'POST', body: JSON.stringify({ npcId, friendlinessValue: friendliness, romanceValue: romance }) });
+                    const result = await api.updateNpcForGM({ npcId, friendlinessValue: friendliness, romanceValue: romance });
                     alert(result.message);
                     cardButton.innerHTML = `<i class="fa-solid fa-check"></i> 儲存成功`;
                 } catch (error) {
@@ -548,9 +523,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     let result;
                     if (cardButton.dataset.npcName) {
-                        result = await fetchApi('/rebuild-npc', { method: 'POST', body: JSON.stringify({ npcName: cardButton.dataset.npcName }) });
+                        result = await api.rebuildNpcForGM({ npcName: cardButton.dataset.npcName });
                     } else if (cardButton.dataset.locationName) {
-                        result = await fetchApi('/rebuild-location', { method: 'POST', body: JSON.stringify({ locationName: cardButton.dataset.locationName }) });
+                        result = await api.rebuildLocationForGM({ locationName: cardButton.dataset.locationName });
                     }
                     alert(result.message);
                     cardButton.innerHTML = `<i class="fa-solid fa-check"></i> ${result.message}`;
@@ -562,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const activeMenu = document.querySelector('#sidebar .menu-link.active');
                         if(activeMenu) {
                            const pageId = activeMenu.getAttribute('href').substring(1);
-                           loadPageContent(pageId);
+                           switchPage(pageId, activeMenu.innerText);
                         }
                      }, 2000);
                 }
@@ -587,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 生成中...`;
         button.disabled = true;
         try {
-            const result = await fetchApi('/create-item-template', { method: 'POST', body: JSON.stringify({ itemName }) });
+            const result = await api.gmCreateItemTemplate({ itemName });
             alert(result.message);
             document.getElementById('gm-new-item-name').value = '';
         } catch (error) {
@@ -608,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 生成中...`;
         button.disabled = true;
         try {
-            const result = await fetchApi('/create-npc-template', { method: 'POST', body: JSON.stringify({ npcName }) });
+            const result = await api.gmCreateNpcTemplate({ npcName });
             alert(result.message);
             document.getElementById('gm-new-npc-name').value = '';
         } catch (error) {
