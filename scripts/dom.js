@@ -22,6 +22,10 @@ export function initializeDOM() {
     dom.bountiesBtn = document.getElementById('bounties-btn');
     dom.aiModelSelector = document.getElementById('ai-model-selector');
     dom.npcInteractionMenu = document.getElementById('npc-interaction-menu');
+
+    // 【核心修正】補上對主要聊天視窗的引用
+    dom.chatModal = document.getElementById('chat-modal'); 
+    
     dom.chatInput = document.getElementById('chat-input');
     dom.chatActionBtn = document.getElementById('chat-action-btn');
     dom.closeChatBtn = document.getElementById('close-chat-btn');
@@ -46,7 +50,7 @@ export function initializeDOM() {
         `;
         dom.mainContent.appendChild(aiThinkingLoader);
         dom.aiThinkingLoader = aiThinkingLoader; 
-    } else {
+    } else if (dom.mainContent) {
         dom.aiThinkingLoader = dom.mainContent.querySelector('.ai-thinking-loader');
     }
 }
