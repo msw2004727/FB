@@ -1,6 +1,6 @@
 // scripts/modalManager.js
 import { api } from './api.js';
-import { initializeTrade, closeTradeUI } from './tradeManager.js'; // 【修正】引入 closeTradeUI
+import { initializeTrade, closeTradeUI } from './tradeManager.js'; 
 
 // --- 獲取所有彈窗相關的 DOM 元素 ---
 const deceasedOverlay = document.getElementById('deceased-overlay');
@@ -44,8 +44,10 @@ export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallbac
     const tradeModalEl = document.getElementById('trade-modal');
     if (!tradeModalEl || !tradeData) return;
 
+    // 將所有交易相關的初始化和事件綁定都交給 tradeManager 處理
     initializeTrade(tradeData, npcName, onTradeComplete, closeCallback);
     
+    // modalManager 只負責單純的顯示
     tradeModalEl.classList.remove('hidden');
     tradeModalEl.classList.add('flex');
 }
@@ -55,7 +57,8 @@ export function closeTradeModal() {
     if (tradeModalEl) {
         tradeModalEl.classList.add('hidden');
         tradeModalEl.classList.remove('flex');
-        closeTradeUI(); // 【新增】清理 tradeManager 中的事件監聽
+        // 在隱藏後，呼叫 tradeManager 的清理函式，解除事件綁定
+        closeTradeUI();
     }
 }
 
@@ -194,7 +197,6 @@ export function openCombatModal(initialState, onCombatCancel) {
     }
     setTurnCounter(initialState.turn || 1);
     
-    // 【核心修正】在這裡動態生成所有五個策略按鈕
     strategyButtonsContainer.innerHTML = `
         <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
         <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
