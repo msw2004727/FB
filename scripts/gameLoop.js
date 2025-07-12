@@ -18,7 +18,7 @@ const loadingDisclaimers = [
 ];
 
 let tipInterval = null;
-let disclaimerInterval = null; // 【核心新增】為載入提醒創建獨立的計時器
+let disclaimerInterval = null;
 
 function updateBountyButton(hasNew) {
     if (dom.bountiesBtn) {
@@ -30,7 +30,10 @@ export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
     dom.playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
     dom.submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    dom.submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+    
+    // 【核心修正】按鈕文字的處理移到 updateUI 中，此處只管禁用
+    // dom.submitButton.textContent = isLoading ? '撰寫中...' : '動作';
+
     dom.chatInput.disabled = isLoading;
     dom.chatActionBtn.disabled = isLoading;
     dom.endChatBtn.disabled = isLoading;
@@ -50,9 +53,6 @@ export function setLoading(isLoading, text = '') {
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
-            // --- 【核心修改】同時啟動兩個獨立的輪播 ---
-            
-            // 1. 遊戲技巧輪播
             const rotateTip = () => {
                 if (gameTips.length > 0) {
                     const randomIndex = Math.floor(Math.random() * gameTips.length);
@@ -62,9 +62,8 @@ export function setLoading(isLoading, text = '') {
                 }
             };
             rotateTip();
-            tipInterval = setInterval(rotateTip, 10000); // 技巧提示10秒換一次
+            tipInterval = setInterval(rotateTip, 10000);
 
-            // 2. 載入提醒輪播
             const rotateDisclaimer = () => {
                 if (loadingDisclaimers.length > 0) {
                     const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
@@ -74,10 +73,9 @@ export function setLoading(isLoading, text = '') {
                 }
             };
             rotateDisclaimer();
-            disclaimerInterval = setInterval(rotateDisclaimer, 10000); // 載入提醒10秒換一次
+            disclaimerInterval = setInterval(rotateDisclaimer, 10000);
 
         } else {
-            // --- 【核心修改】同時停止兩個輪播 ---
             clearInterval(tipInterval);
             clearInterval(disclaimerInterval);
         }
@@ -146,7 +144,6 @@ export function processNewRoundData(data) {
     data.roundData.suggestion = data.suggestion;
     addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
     
-    // 更新死亡名單
     if (data.roundData.NPC && Array.isArray(data.roundData.NPC)) {
         data.roundData.NPC.forEach(npc => {
             if (npc.isDeceased && !gameState.deceasedNpcs.includes(npc.name)) {
@@ -176,6 +173,13 @@ export function processNewRoundData(data) {
 
 export async function handlePlayerAction() {
     interaction.hideNpcInteractionMenu();
+    
+    // 【核心新增】處理「離開」臨時事件的邏輯
+    if (dom.submitButton.textContent === '離開') {
+        loadInitialGame();
+        return; // 中斷後續的正常動作流程
+    }
+
     const actionText = dom.playerInput.value.trim();
     if (!actionText || gameState.isRequesting) return;
 
