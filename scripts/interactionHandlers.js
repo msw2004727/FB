@@ -315,12 +315,10 @@ function handleSkillSelection(skillName) {
 async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-
-    // 【核心修正】將 setLoading(true) 移至實際異步操作之前
+    
     gameLoop.setLoading(true, `正在與 ${npcName} 交談...`);
 
     try {
-        // 先打開聊天視窗，提供即時反饋
         gameState.isInChat = true;
         gameState.currentChatNpc = npcName;
         gameState.chatHistory = [];
@@ -331,7 +329,6 @@ async function handleBeggarInquiry(npcName, npcProfile) {
     } catch (error) {
         handleApiError(error);
     } finally {
-        // 無論如何，確保在打開視窗後解除鎖定
         gameLoop.setLoading(false);
     }
 }
@@ -408,11 +405,13 @@ export async function sendChatMessage() {
             });
              if (data.success === false) {
                  modal.appendChatMessage('npc', data.response);
-                 // 【核心修正】錢不夠時，2秒後自動關閉彈窗
+                 // 【核心修正】錢不夠時，2秒後自動關閉彈窗並解鎖UI
                  setTimeout(() => {
                     modal.closeChatModal();
-                    gameState.isInChat = false; // 重設狀態
+                    gameState.isInChat = false; 
+                    gameLoop.setLoading(false); // 在這裡確保UI解鎖
                  }, 2000);
+                 return; // 提前返回，不再執行 finally 中的 setLoading
              } else {
                  modal.appendChatMessage('npc', data.response);
              }
@@ -431,7 +430,10 @@ export async function sendChatMessage() {
     } catch (error) {
         modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
     } finally {
-        gameLoop.setLoading(false);
+        // 【核心修正】只有在非「錢不夠」的情況下，才由 finally 來解鎖
+        if (!(dom.chatModal.dataset.mode === 'inquiry' && data && data.success === false)) {
+            gameLoop.setLoading(false);
+        }
     }
 }
 
