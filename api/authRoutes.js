@@ -6,6 +6,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { generateNpcTemplateData } = require('../services/npcCreationService');
+// 【核心新增】引入物品模板生成器和UUID
+const { getOrGenerateItemTemplate } = require('./playerStateHelpers');
+const { v4: uuidv4 } = require('uuid');
+
 
 const db = admin.firestore();
 
@@ -211,6 +215,25 @@ router.post('/login', async (req, res) => {
                         stateUpdatePayload[field] = defaultValue;
                     }
                 }
+
+                // 【核心修改】檢查並遷移舊的NPC裝備數據結構
+                if (Array.isArray(npcStateData.equipment) && npcStateData.equipment.length > 0 && typeof npcStateData.equipment[0] === 'string') {
+                    console.log(`[資料庫維護] 偵測到NPC「${npcName}」的裝備為舊格式，開始遷移...`);
+                    const newEquipment = [];
+                    for (const itemName of npcStateData.equipment) {
+                        newEquipment.push({
+                            instanceId: uuidv4(),
+                            templateId: itemName
+                        });
+                        // 在背景確保物品模板存在，不阻塞登入流程
+                        getOrGenerateItemTemplate(itemName).catch(e => console.error(`[背景任務] 為 ${itemName} 生成模板時出錯: ${e.message}`));
+                    }
+                    stateUpdatePayload.equipment = newEquipment;
+                    needsNpcStateUpdate = true;
+                } else if (npcStateData.equipment === undefined) {
+                    stateUpdatePayload.equipment = [];
+                    needsNpcStateUpdate = true;
+                }
                 
                 const npcTemplateRef = db.collection('npcs').doc(npcName);
                 const npcTemplateDoc = await npcTemplateRef.get();
@@ -226,9 +249,15 @@ router.post('/login', async (req, res) => {
                             const newTemplateData = { ...generationResult.templateData, name: generationResult.canonicalName, createdAt: admin.firestore.FieldValue.serverTimestamp() };
                             const finalTemplateRef = db.collection('npcs').doc(generationResult.canonicalName);
                             batch.set(finalTemplateRef, newTemplateData);
-                            // 【核心新增】為新生成的模板，將初始裝備賦予給玩家狀態
-                            stateUpdatePayload.equipment = newTemplateData.initialEquipment || [];
-                            needsNpcStateUpdate = true;
+                            
+                            // 如果新模板有初始裝備，賦予給NPC狀態
+                            if(newTemplateData.initialEquipment) {
+                                stateUpdatePayload.equipment = newTemplateData.initialEquipment.map(itemName => ({
+                                    instanceId: uuidv4(),
+                                    templateId: itemName
+                                }));
+                                needsNpcStateUpdate = true;
+                            }
                             console.log(`[資料庫維護] 已為「${generationResult.canonicalName}」生成並批次寫入新的通用模板。`);
                         }
                     }
@@ -236,15 +265,15 @@ router.post('/login', async (req, res) => {
                     const templateData = npcTemplateDoc.data();
                     const templateUpdatePayload = {};
                     let needsTemplateUpdate = false;
-
-                    // 【核心新增】遷移舊的 equipment 欄位
+                    
                     if (templateData.equipment) {
-                        // 1. 如果玩家狀態中沒有equipment，就從模板遷移過去
-                        if (npcStateData.equipment === undefined) {
-                            stateUpdatePayload.equipment = templateData.equipment;
+                        if (npcStateData.equipment === undefined || (Array.isArray(npcStateData.equipment) && npcStateData.equipment.length === 0)) {
+                             stateUpdatePayload.equipment = templateData.equipment.map(itemName => ({
+                                instanceId: uuidv4(),
+                                templateId: itemName
+                            }));
                             needsNpcStateUpdate = true;
                         }
-                        // 2. 將舊欄位從模板中移除，並存為新欄位
                         templateUpdatePayload.initialEquipment = templateData.equipment;
                         templateUpdatePayload.equipment = admin.firestore.FieldValue.delete();
                         needsTemplateUpdate = true;
@@ -264,7 +293,7 @@ router.post('/login', async (req, res) => {
                 }
 
                 if (needsNpcStateUpdate) {
-                    console.log(`[資料庫維護] 玩家的NPC狀態檔「${npcName}」不完整，加入批次修補。`);
+                    console.log(`[資料庫維護] 玩家的NPC狀態檔「${npcName}」不完整或格式陳舊，加入批次修補。`);
                     batch.set(npcStateDoc.ref, stateUpdatePayload, { merge: true });
                 }
             }
