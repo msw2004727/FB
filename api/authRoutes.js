@@ -5,12 +5,14 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
+// 【核心新增】引入NPC生成器，以便修補完全缺失的模板
+const { generateNpcTemplateData } = require('./npcHelpers');
 
 const db = admin.firestore();
 
 // 預設的玩家欄位，包含新的 equipment 和 bulkScore
 const DEFAULT_USER_FIELDS = {
-    money: 50, // 【核心修改】初始貨幣
+    money: 50,
     internalPower: 5,
     externalPower: 5,
     lightness: 5,
@@ -92,7 +94,7 @@ router.post('/register', async (req, res) => {
             timeOfDay: '上午',
             powerChange: { internal: 0, external: 0, lightness: 0 },
             moralityChange: 0,
-            moneyChange: 50, // 【核心修改】
+            moneyChange: 50,
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
             EVT: '從天旋地轉中醒來，靈魂墜入陌生的時代',
             LOC: ['無名村'],
@@ -117,8 +119,8 @@ router.post('/register', async (req, res) => {
             lightness: 5,
             stamina: 100, 
             morality: 0,
-            money: 50, // 【核心修改】
-            silver: 0, // 【核心新增】
+            money: 50,
+            silver: 0,
             yearName: '元祐',
             year: 1,
             month: 1,
@@ -168,15 +170,10 @@ router.post('/login', async (req, res) => {
 
         const batch = db.batch();
         
-        // 【核心修改】為老玩家自動修補資料庫結構
-        // 檢查 money 欄位是否存在，如果不存在則給予預設值
-        if (userData.money === undefined) {
-             batch.update(userDoc.ref, { money: 50 });
-        }
+        // --- 玩家主文件健康檢查 ---
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
                 const updatePayload = {};
-                // 特殊處理，確保最大值成就不會被重置
                 if (field === 'maxInternalPowerAchieved') {
                     updatePayload[field] = userData.internalPower || defaultValue;
                 } else if (field === 'maxExternalPowerAchieved') {
@@ -187,51 +184,78 @@ router.post('/login', async (req, res) => {
                     updatePayload[field] = defaultValue;
                 }
                 batch.update(userDoc.ref, updatePayload);
-                console.log(`[資料庫維護] 玩家 ${username} 缺少欄位 [${field}]，已加入批次更新。`);
             }
         }
         
+        // --- NPC 檔案健康檢查與修補 ---
         const npcStatesSnapshot = await userDoc.ref.collection('npc_states').get();
         if (!npcStatesSnapshot.empty) {
             console.log(`[資料庫維護] 開始為 ${username} 檢查 ${npcStatesSnapshot.size} 位NPC的舊資料...`);
-            for (const npcDoc of npcStatesSnapshot.docs) {
-                const npcData = npcDoc.data();
-                const npcName = npcDoc.id;
-                const updatePayload = {};
-                let needsNpcUpdate = false;
-                
-                if (npcData.interactionSummary === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.interactionSummary = `你與${npcName}的交往尚淺。`;
-                }
-                if (npcData.currentLocation === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.currentLocation = '未知之地';
-                }
-                 if (npcData.firstMet === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.firstMet = { round: 0, time: '未知時間', location: '未知地點', event: '初次相遇' };
-                }
-                if (npcData.isDeceased === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.isDeceased = false;
-                }
-                 if (npcData.inventory === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.inventory = {};
-                }
-                if (npcData.romanceValue === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.romanceValue = 0;
-                }
-                if (npcData.triggeredRomanceEvents === undefined) {
-                    needsNpcUpdate = true;
-                    updatePayload.triggeredRomanceEvents = [];
+
+            // 獲取玩家資料，以備生成新模板時作為上下文
+            const playerProfileForContext = userDoc.data();
+
+            for (const npcStateDoc of npcStatesSnapshot.docs) {
+                const npcStateData = npcStateDoc.data();
+                const npcName = npcStateDoc.id;
+
+                // 1. 修補玩家的NPC狀態檔 (`npc_states`)
+                const stateUpdatePayload = {};
+                let needsNpcStateUpdate = false;
+                const defaultStateFields = {
+                    interactionSummary: `你與${npcName}的交往尚淺。`,
+                    currentLocation: '未知之地',
+                    firstMet: { round: 0, time: '未知時間', location: '未知地點', event: '初次相遇' },
+                    isDeceased: false,
+                    inventory: {},
+                    romanceValue: 0,
+                    friendlinessValue: 0,
+                    triggeredRomanceEvents: []
+                };
+
+                for (const [field, defaultValue] of Object.entries(defaultStateFields)) {
+                    if (npcStateData[field] === undefined) {
+                        needsNpcStateUpdate = true;
+                        stateUpdatePayload[field] = defaultValue;
+                    }
                 }
 
-                if (needsNpcUpdate) {
-                    console.log(`[資料庫維護] NPC「${npcName}」的檔案不完整，已加入批次修補。`);
-                    batch.set(npcDoc.ref, updatePayload, { merge: true });
+                if (needsNpcStateUpdate) {
+                    console.log(`[資料庫維護] 玩家的NPC狀態檔「${npcName}」不完整，加入批次修補。`);
+                    batch.set(npcStateDoc.ref, stateUpdatePayload, { merge: true });
+                }
+
+                // 2. 檢查並修補公共模板 (`npcs`)
+                const npcTemplateRef = db.collection('npcs').doc(npcName);
+                const npcTemplateDoc = await npcTemplateRef.get();
+
+                if (!npcTemplateDoc.exists) {
+                    console.log(`[資料庫維護] 偵測到NPC「${npcName}」缺少通用模板，將為其生成...`);
+                    const lastSaveSnapshot = await userDoc.ref.collection('game_saves').orderBy('R', 'desc').limit(1).get();
+                    if (!lastSaveSnapshot.empty) {
+                        const lastRoundData = lastSaveSnapshot.docs[0].data();
+                        const generationResult = await generateNpcTemplateData(username, { name: npcName }, lastRoundData, playerProfileForContext);
+                        if (generationResult && generationResult.templateData) {
+                            const newTemplateData = { ...generationResult.templateData, name: npcName, createdAt: admin.firestore.FieldValue.serverTimestamp() };
+                            batch.set(npcTemplateRef, newTemplateData);
+                            console.log(`[資料庫維護] 已為「${npcName}」生成並批次寫入新的通用模板。`);
+                        }
+                    }
+                } else {
+                    const templateData = npcTemplateDoc.data();
+                    const templateUpdatePayload = {};
+                    let needsTemplateUpdate = false;
+
+                    if (templateData.romanceOrientation === undefined) { needsTemplateUpdate = true; templateUpdatePayload.romanceOrientation = "異性戀"; }
+                    if (templateData.currentLocation === undefined) { needsTemplateUpdate = true; templateUpdatePayload.currentLocation = npcStateData.currentLocation || "未知之地"; }
+                    if (templateData.skills === undefined) { needsTemplateUpdate = true; templateUpdatePayload.skills = []; }
+                    if (templateData.equipment === undefined) { needsTemplateUpdate = true; templateUpdatePayload.equipment = []; }
+                    if (templateData.inventory === undefined) { needsTemplateUpdate = true; templateUpdatePayload.inventory = {}; }
+
+                    if (needsTemplateUpdate) {
+                        console.log(`[資料庫維護] NPC通用模板「${npcName}」不完整，加入批次修補。`);
+                        batch.set(npcTemplateRef, templateUpdatePayload, { merge: true });
+                    }
                 }
             }
         }
