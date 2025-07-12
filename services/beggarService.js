@@ -16,7 +16,7 @@ function generateBeggarName() {
     return `${surname}${givenName}`;
 }
 
-// 【核心修改】擴充丐幫弟子隨機登場的劇情描述至30個
+// 擴充後的丐幫弟子隨機登場劇情描述
 const APPEARANCE_STORIES = [
     // --- 經典隱蔽型 ---
     "話音剛落，一個身影如同鬼魅般從你身後的暗巷中閃出，那人衣衫襤褸，一股酸臭味撲面而來，正是丐幫弟子——{beggarName}。",
@@ -29,19 +29,17 @@ const APPEARANCE_STORIES = [
     "你靠在牆邊假寐，一個聲音在你耳邊響起：『天王蓋地虎？』你睜開眼，看到一張滿是污垢的笑臉，是丐幫的{beggarName}。",
     "一個追逐打鬧的孩童撞了你一下，塞給你一張紙條，隨後跑開。你展開紙條，上面寫著：『抬頭看三樓酒肆窗邊』。你抬頭，看到{beggarName}正朝你點頭。",
     "你面前的地上突然多了一個破碗，碗裡有幾個銅板。一個聲音從地底下傳來似的：『賞點吧，爺，有事好商量。』你低頭，看到了蹲在地上的{beggarName}。",
-
     // --- 環境互動型 ---
     "你路過一片竹林，竹葉沙沙作響，一個掛在樹上睡覺的乞丐突然倒掛下來，嚇了你一跳。他嘿嘿一笑：『客官，找我？』，此人正是{beggarName}。",
     "河邊的渡船上，一個釣魚的蓑衣客對你喊道：『魚兒上鉤了！』，隨後向你走來，掀開斗笠，露出了{beggarName}的臉。",
     "一輛運貨的馬車經過，車夫對你使了個眼色。馬車駛過後，一個乞丐從車後面的草堆裡滾了出來，拍拍身上的土，向你走來，他就是{beggarName}。",
-    "寺廟的鐘聲響起，一個正在掃地的雜役僧人停下動作，走到你身邊，低聲道：『施主，塵緣未了，何不隨我來？』他身上的破爛僧衣下，是丐幫弟子{begg_arName}的身份。",
+    "寺廟的鐘聲響起，一個正在掃地的雜役僧人停下動作，走到你身邊，低聲道：『施主，塵緣未了，何不隨我來？』他身上的破爛僧衣下，是丐幫弟子{beggarName}的身份。",
     "一陣馬蹄聲由遠及近，一個信使模樣的人在你身邊勒馬，遞給你一封信，信上卻是空白。信使笑道：『信不重要，人到了就行。』他撕下偽裝，原來是{beggarName}。",
     "你走進一間破廟，正想歇腳，神像後面傳來聲音：『來者何人，報上名來！』一個乞丐從神像後跳了出來，正是{beggarName}。",
     "一陣鷹唳劃破長空，一隻信鴿落在了你的肩上，腳上綁著的不是信，而是一塊小小的令牌。隨後，{beggarName}從不遠處的屋頂上跳了下來。",
     "你正在查看懸賞告示，旁邊一個假裝不識字的乞丐湊過來問：『官爺，這上面寫的啥？』他湊近時，在你耳邊低語了接頭暗號，是{beggarName}。",
     "大雨傾盆，你跑進一個屋簷下躲雨，發現已經有個乞丐在那裡了。他遞給你一個冷掉的饅頭，說：『先墊墊肚子，有話慢慢說。』他就是{beggarName}。",
     "你感覺有人跟蹤，閃身躲進一條小巷，卻發現裡面是個死胡同。你轉過身，看到{beggarName}堵在巷口，笑道：『客官，你的身手不錯嘛。』",
-
     // --- 直接登場型 ---
     "你累得在路邊的石頭上坐下，一個乞丐也跟著一屁股坐到你旁邊，自來熟地說：『兄弟，跑累了吧？喝口水？』說著遞過來一個髒兮兮的葫蘆，他是{beggarName}。",
     "『讓一讓，讓一讓！』一群乞丐吵吵嚷嚷地經過，其中一個故意撞了你一下，在你耳邊飛快地說：『老大等你好久了。』領頭的正是{beggarName}。",
@@ -64,13 +62,11 @@ const APPEARANCE_STORIES = [
 async function handleBeggarSummon(userId) {
     const beggarName = generateBeggarName();
     
-    // 從預設的登場故事中隨機選擇一個
     const randomStoryTemplate = APPEARANCE_STORIES[Math.floor(Math.random() * APPEARANCE_STORIES.length)];
     const appearanceStory = randomStoryTemplate.replace('{beggarName}', beggarName);
 
     console.log(`[丐幫服務-即時] 為玩家 ${userId} 生成了臨時丐幫弟子「${beggarName}」。`);
     
-    // 不再操作資料庫，只回傳生成的資訊
     return { 
         success: true, 
         beggarName: beggarName,
@@ -80,52 +76,74 @@ async function handleBeggarSummon(userId) {
 
 
 /**
- * 處理玩家向丐幫弟子打聽情報的請求
+ * 處理玩家向丐幫弟子打聽情报的请求 (v2.1 - 修正金錢處理邏輯)
  * @param {string} userId - 玩家ID
- * @param {object} playerProfile - 玩家的完整檔案
+ * @param {object} playerProfile - 玩家的完整檔案 (包含準確的銀兩money)
  * @param {string} beggarName - 丐幫弟子的名字
  * @param {string} userQuery - 玩家的提問
  * @param {string} model - 玩家選擇的AI模型
  * @returns {Promise<object>} - 返回包含AI回覆的物件
  */
 async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery, model) {
-    const userDocRef = db.collection('users').doc(userId);
-
-    const currentMoney = playerProfile.money || 0;
-    if (currentMoney < 100) {
-        return {
-            success: false,
-            response: "嘿嘿，客官，看您的樣子...這囊中似乎有些羞澀啊。沒錢？沒錢小的可不敢亂說話，會被舵主打斷腿的！"
-        };
-    }
-    await userDocRef.update({ money: admin.firestore.FieldValue.increment(-100) });
-    console.log(`[丐幫服務] 已從玩家 ${userId} 帳戶扣除100文錢情報費。`);
-
-    const allNpcNames = getKnownNpcNames();
-    const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name) && name !== beggarName);
+    const silverRef = db.collection('users').doc(userId).collection('inventory_items').doc('銀兩');
     
-    let targetNpcProfile = null;
-    if (targetNpcName) {
-        targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
-    }
-    
-    const prompt = getBeggarInquiryPrompt(playerProfile, targetNpcProfile, userQuery);
-    const aiResponseString = await callAI(model || aiConfig.npcChat, prompt, true);
-    const inquiryResult = JSON.parse(aiResponseString);
+    try {
+        const newSilverAmount = await db.runTransaction(async (transaction) => {
+            const silverDoc = await transaction.get(silverRef);
+            const currentSilver = silverDoc.exists ? silverDoc.data().quantity : 0;
 
-    if (inquiryResult.isTrue && targetNpcName) {
-        const userSaveRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R','desc').limit(1);
-        const lastSave = (await userSaveRef.get()).docs[0];
-        if(lastSave.exists) {
-            const newClue = `從丐幫弟子處聽聞：${inquiryResult.response}`;
-            await lastSave.ref.update({ CLS: newClue });
+            if (currentSilver < 100) {
+                // 如果錢不夠，直接拋出一個帶有特定訊息的錯誤
+                const error = new Error("銀兩不足");
+                error.code = 'INSUFFICIENT_FUNDS'; // 自定義錯誤碼
+                throw error;
+            }
+            
+            transaction.update(silverRef, { quantity: admin.firestore.FieldValue.increment(-100) });
+            return currentSilver - 100;
+        });
+
+        console.log(`[丐幫服務] 已從玩家 ${userId} 的背包中扣除100銀兩。新餘額: ${newSilverAmount}`);
+
+        const allNpcNames = getKnownNpcNames();
+        const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name) && name !== beggarName);
+        
+        let targetNpcProfile = null;
+        if (targetNpcName) {
+            targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
         }
+        
+        const prompt = getBeggarInquiryPrompt(playerProfile, targetNpcProfile, userQuery);
+        const aiResponseString = await callAI(model || aiConfig.npcChat, prompt, true);
+        const inquiryResult = JSON.parse(aiResponseString);
+
+        if (inquiryResult.isTrue && targetNpcName) {
+            const userSaveRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R','desc').limit(1);
+            const lastSave = (await userSaveRef.get()).docs[0];
+            if(lastSave.exists) {
+                const newClue = `從丐幫弟子處聽聞：${inquiryResult.response}`;
+                await lastSave.ref.update({ CLS: newClue });
+            }
+        }
+        
+        return {
+            success: true,
+            newBalance: newSilverAmount,
+            ...inquiryResult
+        };
+
+    } catch (error) {
+        // 捕獲交易中拋出的「銀兩不足」錯誤
+        if (error.code === 'INSUFFICIENT_FUNDS') {
+            console.log(`[丐幫服務] 玩家 ${userId} 銀兩不足，拒絕提供情報。`);
+            return {
+                success: false,
+                response: "嘿嘿，客官，看您的樣子...這囊中似乎有些羞澀啊。沒錢？沒錢小的可不敢亂說話，會被舵主打斷腿的！"
+            };
+        }
+        // 對於其他未知錯誤，則向上拋出
+        throw error;
     }
-    
-    return {
-        success: true,
-        ...inquiryResult
-    };
 }
 
 module.exports = { 
