@@ -4,7 +4,7 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const authMiddleware = require('../middleware/auth');
 const { getFriendlinessLevel, createNpcProfileInBackground } = require('./npcHelpers');
-const { updateInventory, getInventoryState } = require('./playerStateHelpers');
+const { updateInventory, getInventoryState, getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { v4: uuidv4 } = require('uuid');
 
@@ -13,17 +13,78 @@ const db = admin.firestore();
 // 所有GM路由都需要經過身份驗證
 router.use(authMiddleware);
 
-// --- 【核心新增】獲取所有可設定關係的角色列表 (玩家+所有NPC) ---
+// --- 【核心新增】創建物品模板的API ---
+router.post('/create-item-template', async (req, res) => {
+    const { itemName } = req.body;
+    if (!itemName) {
+        return res.status(400).json({ message: '未提供物品名稱。' });
+    }
+    try {
+        const result = await getOrGenerateItemTemplate(itemName);
+        if (result.isNew) {
+            res.json({ message: `物品「${itemName}」的模板已由AI成功創建！` });
+        } else {
+            res.json({ message: `物品「${itemName}」的模板已存在，無需重複創建。` });
+        }
+    } catch (error) {
+        console.error(`[GM工具] 創建物品「${itemName}」時出錯:`, error);
+        res.status(500).json({ message: '創建物品模板時發生內部錯誤。' });
+    }
+});
+
+// --- 【核心新增】創建NPC模板的API ---
+router.post('/create-npc-template', async (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { npcName } = req.body;
+    if (!npcName) {
+        return res.status(400).json({ message: '未提供NPC姓名。' });
+    }
+    try {
+        const npcTemplateRef = db.collection('npcs').doc(npcName);
+        const doc = await npcTemplateRef.get();
+        if (doc.exists) {
+            return res.status(409).json({ message: `NPC「${npcName}」的檔案已存在，無法重複創建。` });
+        }
+
+        // 為GM創建一個通用的上下文
+        const gmRoundData = {
+            LOC: ['京城'],
+            WRD: '晴朗',
+            ATM: ['繁華'],
+            EVT: '創世神欽點',
+            NPC: [],
+            IMP: `由創世神${username}欽點，${npcName}就此誕生於江湖。`
+        };
+        const gmPlayerProfile = { gender: 'male' };
+
+        // 使用 createNpcProfileInBackground (它現在只生成數據，不寫入)
+        const newTemplateData = await createNpcProfileInBackground(username, { name: npcName }, gmRoundData, gmPlayerProfile);
+        
+        if (newTemplateData) {
+            newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+            await npcTemplateRef.set(newTemplateData);
+            res.json({ message: `NPC「${npcName}」的角色檔案已由AI成功創建！` });
+        } else {
+            throw new Error('AI未能生成有效的NPC數據。');
+        }
+
+    } catch (error) {
+        console.error(`[GM工具] 創建NPC「${npcName}」時出錯:`, error);
+        res.status(500).json({ message: '創建NPC檔案時發生內部錯誤。' });
+    }
+});
+
+
+// --- 獲取所有可設定關係的角色列表 (玩家+所有NPC) ---
 router.get('/characters', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     try {
-        // 【核心修正】從正確的 'npc_states' 集合中讀取
         const npcsSnapshot = await db.collection('users').doc(userId).collection('npc_states').get();
-        const characterList = [{ id: userId, name: username, isPlayer: true }]; // 將玩家自己加入列表
+        const characterList = [{ id: userId, name: username, isPlayer: true }]; 
 
         for (const doc of npcsSnapshot.docs) {
-            // 為了獲取NPC的真實姓名，我們需要反向查詢一下通用模板
             const npcTemplateDoc = await db.collection('npcs').doc(doc.id).get();
             if (npcTemplateDoc.exists) {
                 characterList.push({
@@ -41,31 +102,27 @@ router.get('/characters', async (req, res) => {
 
 
 // --- NPC管理相關API ---
-
 router.get('/npcs', async (req, res) => {
     const userId = req.user.id;
     try {
-        // 【核心修正】從 'npcs' 改為從 'npc_states' 讀取玩家的NPC關係檔案
         const userNpcsRef = db.collection('users').doc(userId).collection('npc_states');
         const userSavesRef = db.collection('users').doc(userId).collection('game_saves');
 
         const npcsSnapshot = await userNpcsRef.get();
         const existingNpcs = new Map();
-
-        // 為了獲取NPC的真實姓名，我們需要異步處理
+        
         const promises = npcsSnapshot.docs.map(async (doc) => {
             const data = doc.data();
             const npcName = doc.id;
             let displayName = npcName;
 
-            // 從通用模板獲取更準確的資訊
             const npcTemplateDoc = await db.collection('npcs').doc(npcName).get();
             if (npcTemplateDoc.exists) {
                 displayName = npcTemplateDoc.data().name || npcName;
             }
             
             existingNpcs.set(npcName, {
-                id: npcName, // ID 就是NPC的名字
+                id: npcName,
                 name: displayName,
                 friendlinessValue: data.friendlinessValue || 0,
                 romanceValue: data.romanceValue || 0,
@@ -107,7 +164,6 @@ router.post('/update-npc', async (req, res) => {
         return res.status(400).json({ message: '未提供NPC ID。' });
     }
     try {
-        // 【核心修正】更新 'npc_states' 集合中的文件
         const npcRef = db.collection('users').doc(userId).collection('npc_states').doc(npcId);
         const updates = {};
         if (friendlinessValue !== undefined) {
@@ -126,7 +182,6 @@ router.post('/update-npc', async (req, res) => {
     }
 });
 
-// --- 更新NPC關係的API ---
 router.post('/update-npc-relationship', async (req, res) => {
     const userId = req.user.id;
     const { npcId, relationshipType, targetName } = req.body;
@@ -136,10 +191,8 @@ router.post('/update-npc-relationship', async (req, res) => {
     }
 
     try {
-        // 【核心修正】更新 'npc_states' 集合中的文件
         const npcRef = db.collection('users').doc(userId).collection('npc_states').doc(npcId);
         
-        // 如果 targetName 是空的，代表要刪除這個關係
         const updatePayload = {
             relationships: {
                 [relationshipType]: targetName || admin.firestore.FieldValue.delete()
@@ -176,18 +229,26 @@ router.post('/rebuild-npc', async (req, res) => {
         if (!firstMentionRound) {
             return res.status(404).json({ message: `在存檔中找不到NPC「${npcName}」的初見情境。` });
         }
-
-        // createNpcProfileInBackground 已經是寫入到正確的 'npc_states'，所以無需修改
-        await createNpcProfileInBackground(userId, username, { name: npcName, isNew: true }, firstMentionRound);
         
-        res.json({ message: `已成功為「${npcName}」重建檔案。` });
+        const playerProfile = (await db.collection('users').doc(userId).get()).data();
+        const newTemplateData = await createNpcProfileInBackground(username, { name: npcName, isNew: true }, firstMentionRound, playerProfile);
+        
+        if (newTemplateData) {
+             const npcTemplateRef = db.collection('npcs').doc(npcName);
+             await npcTemplateRef.set(newTemplateData, { merge: true }); // 使用 merge 避免覆蓋現有關係
+             res.json({ message: `已成功為「${npcName}」重建檔案。` });
+        } else {
+             throw new Error('AI未能生成有效的NPC數據來重建檔案。');
+        }
+        
     } catch (error) {
         console.error(`[GM工具] 重建NPC「${npcName}」時出錯:`, error);
         res.status(500).json({ message: '重建NPC檔案時發生內部錯誤。' });
     }
 });
 
-// --- 地區管理相關API (此部分邏輯正確，無需修改) ---
+
+// --- 地區管理相關API ---
 router.get('/locations', async (req, res) => {
     const userId = req.user.id;
     try {
@@ -244,7 +305,7 @@ router.post('/rebuild-location', async (req, res) => {
     }
 });
 
-// --- 玩家屬性管理API (此部分邏輯正確，無需修改) ---
+// --- 玩家屬性管理API ---
 router.get('/player-state', async (req, res) => {
     const userId = req.user.id;
     try {
