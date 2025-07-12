@@ -23,6 +23,7 @@ const chatNpcName = document.getElementById('chat-npc-name');
 const chatNpcInfo = document.getElementById('chat-npc-info');
 const chatLog = document.getElementById('chat-log');
 const chatLoader = document.getElementById('chat-loader');
+const chatActionBtn = document.getElementById('chat-action-btn'); // 獲取發話按鈕
 
 const giveItemBtn = document.getElementById('give-item-btn');
 const giveItemModal = document.getElementById('give-item-modal');
@@ -273,15 +274,10 @@ export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.cla
 
 // --- 對話彈窗 ---
 
-/**
- * 【核心修改】通用聊天彈窗開啟函式
- * @param {object} profile - NPC的公開資料
- * @param {string} mode - 'chat' (預設) 或 'inquiry' (情報模式)
- */
 export function openChatModalUI(profile, mode = 'chat') {
     if (mode === 'inquiry') {
         chatNpcName.textContent = `向 ${profile.name} 探聽秘聞`;
-        chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 花費100文錢</span>`;
+        chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 花費100銀兩</span>`;
     } else {
         chatNpcName.textContent = `與 ${profile.name} 交談`;
         chatNpcInfo.innerHTML = profile.appearance || '';
@@ -289,13 +285,18 @@ export function openChatModalUI(profile, mode = 'chat') {
         displayFriendlinessBar(profile.friendlinessValue);
     }
     
-    // 根據模式顯示/隱藏贈禮按鈕和結束交談按鈕
     giveItemBtn.style.display = mode === 'inquiry' ? 'none' : 'inline-flex';
     document.querySelector('.chat-footer').style.display = mode === 'inquiry' ? 'none' : 'block';
 
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
+    
+    // 【核心修正】確保每次打開彈窗時，發話按鈕都是可用的
+    if (chatActionBtn) {
+        chatActionBtn.disabled = false;
+    }
+
     chatModal.classList.add('visible');
-    chatModal.dataset.mode = mode; // 將模式儲存在DOM上
+    chatModal.dataset.mode = mode;
 }
 
 export function closeChatModal() { 
