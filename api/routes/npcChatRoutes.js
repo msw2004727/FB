@@ -37,26 +37,26 @@ router.post('/chat', async (req, res) => {
         const mentionedNpcNames = Array.from(knownNpcs).filter(name => playerMessage.includes(name) && name !== npcName);
         const mentionedNpcContext = mentionedNpcNames.length > 0 ? await getMergedNpcProfile(userId, mentionedNpcNames[0]) : null;
         
-        // 1. 從AI獲取回應字串
+        // 1. 從AI獲取回應字串 (現在應該總是一個JSON字串)
         const aiResponseString = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
         
         // 2. 【核心加固】使用一個安全的解析函式來處理不穩定的AI回應
         let aiResponse;
         try {
-            //  步驟A：先移除頭尾可能存在的Markdown標記
+            //  步驟A：先移除頭尾可能存在的Markdown標記 (以防萬一)
             const cleanedJsonString = aiResponseString.trim().replace(/^```json\s*|```\s*$/g, '');
             
             //  步驟B：嘗試解析JSON
             aiResponse = JSON.parse(cleanedJsonString);
 
-            //  步驟C：驗證解析後的物件是否包含必要的鍵，以防AI回傳合法的但無效的JSON (例如 "{}")
+            //  步驟C：驗證解析後的物件是否包含必要的鍵
             if (typeof aiResponse.response !== 'string') {
                 throw new Error("AI回傳的JSON中缺少 'response' 欄位。");
             }
-
         } catch (e) {
-            //  步驟D：如果以上任何一步失敗，將整個AI的回應視為純文字對話，並建立一個預設的物件結構
-            console.error("解析密談AI回傳的JSON時失敗，將嘗試直接使用文字。", e.message);
+            //  【核心修改】如果解析失敗，代表AI沒有回傳預期的JSON。
+            //  我們不再打印錯誤日誌，而是靜默地將整個原始字串視為NPC的回應。
+            console.warn(`[NPC 聊天系統] AI未能回傳有效的JSON，已將其作為純文字處理。原始回傳: "${aiResponseString}"`);
             aiResponse = { 
                 response: aiResponseString, // 將原始回傳作為對話內容
                 friendlinessChange: 0, 
