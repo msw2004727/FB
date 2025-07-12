@@ -8,6 +8,19 @@ const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js'
 const db = admin.firestore();
 const skillTemplateCache = new Map();
 
+// 【核心新增】將計算負重分數的函式移至此處並導出
+const BULK_TO_SCORE_MAP = { '輕': 0, '中': 2, '重': 5, '極重': 10 };
+
+function calculateBulkScore(inventoryList) {
+    if (!Array.isArray(inventoryList)) return 0;
+    return inventoryList.reduce((score, item) => {
+        const quantity = item.quantity || 1;
+        const bulkValue = item.bulk || '中';
+        return score + (BULK_TO_SCORE_MAP[bulkValue] || 0) * quantity;
+    }, 0);
+}
+
+
 async function getOrGenerateItemTemplate(itemName, roundData = {}) {
     if (!itemName) return null;
     const templateRef = db.collection('items').doc(itemName);
@@ -17,14 +30,12 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
             let templateData = doc.data();
             let needsUpdate = false;
             
-            // 【核心修改】自動修補舊物品資料
             if (templateData.bulk === undefined) {
                 templateData.bulk = '中'; 
                 needsUpdate = true;
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 bulk 欄位，自動修補為 "中"。`);
             }
             if (templateData.equipSlot === undefined) {
-                // 根據物品類型，給予一個合理的預設裝備位置
                 switch (templateData.itemType) {
                     case '武器':
                         templateData.equipSlot = 'weapon_right';
@@ -42,14 +53,12 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 equipSlot 欄位，自動修補為 "${templateData.equipSlot}"。`);
             }
             if (templateData.hands === undefined) {
-                // 如果是武器，預設為單手，否則為null
                 templateData.hands = templateData.itemType === '武器' ? 1 : null;
                 needsUpdate = true;
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 hands 欄位，自動修補為 "${templateData.hands}"。`);
             }
 
             if(needsUpdate) {
-                // 將修補後的資料寫回資料庫
                 await templateRef.set(templateData, { merge: true });
                 console.log(`[資料庫維護] 已成功將物品「${itemName}」的模板更新至最新結構。`);
             }
@@ -71,7 +80,6 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
 
         if (!newTemplateData.itemName) throw new Error('AI生成的物品模板缺少itemName。');
         
-        // 為AI生成的新物品提供保障，確保新欄位存在
         if (newTemplateData.bulk === undefined) newTemplateData.bulk = '中';
         if (newTemplateData.equipSlot === undefined) newTemplateData.equipSlot = null;
         if (newTemplateData.hands === undefined) newTemplateData.hands = null;
@@ -342,5 +350,6 @@ module.exports = {
     getInventoryState,
     getRawInventory,
     updateSkills,
-    getPlayerSkills
+    getPlayerSkills,
+    calculateBulkScore // 【核心新增】導出此函式
 };
