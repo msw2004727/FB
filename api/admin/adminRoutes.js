@@ -1,9 +1,9 @@
 // api/adminRoutes.js
 const express = require('express');
 const router = express.Router();
-const adminAuth = require('./admin/adminAuth');
-const { getLogs, getPlayersWithLogs } = require('./admin/logService');
-const { getApiBalances } = require('./admin/balanceService');
+const adminAuth = require('./adminAuth');
+const { getLogs, getPlayersWithLogs } = require('./logService');
+const { getApiBalances } = require('./balanceService');
 
 // 所有後台 API 都需要通過 adminAuth 中間件的驗證
 router.use(adminAuth);
