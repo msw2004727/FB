@@ -69,7 +69,9 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateNpcList(roundData.NPC);
     renderInventory(roundData.inventory); 
     
-    moneyContent.textContent = `${roundData.money || 0} 文錢`;
+    // 【核心修正】將顯示單位從 "文錢" 改為 "銀兩"
+    moneyContent.textContent = `${roundData.money || 0} 銀兩`;
+    
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
@@ -105,18 +107,15 @@ function updateStatusBar(roundData) {
     `;
 }
 
-// 【核心修改】將精力條的危險狀態判斷邏輯加入此函數
 function updatePowerBars(roundData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
 
-    // --- 特別處理精力條 ---
     if (staminaBar && staminaValue) {
         const currentStamina = roundData.stamina || 0;
         updatePowerBar(staminaBar, staminaValue, currentStamina, 100);
         
-        // 判斷是否低於30，並加上或移除CSS class
         if (currentStamina < 30) {
             staminaBar.classList.add('pulsing-danger');
         } else {
@@ -191,7 +190,8 @@ function updateNpcList(npcs) {
     if (aliveNpcs.length > 0) {
         aliveNpcs.forEach(npc => {
             const npcLine = document.createElement('div');
-            npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
+            const npcClass = npc.status_title === '丐幫弟子' ? 'npc-name-beggar' : `npc-${npc.friendliness}`;
+            npcLine.innerHTML = `<span class="npc-name ${npcClass}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
             npcContent.appendChild(npcLine);
         });
     } else {
@@ -208,7 +208,8 @@ function highlightNpcNames(text, npcs) {
             const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(npcNameEscaped, 'g');
             const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
-            const replacement = `<span class="npc-name npc-${npc.friendliness || 'neutral'}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
+            const npcClass = npc.status_title === '丐幫弟子' ? 'npc-name-beggar' : `npc-${npc.friendliness || 'neutral'}`;
+            const replacement = `<span class="npc-name ${npcClass}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
         });
     }
@@ -320,8 +321,16 @@ async function handleEquipToggle(itemId, shouldEquip) {
 
 export function handleApiError(error) {
     console.error('API 錯誤:', error);
-    appendMessageToStory(`[系統] 連接失敗... (${error.message})`, 'system-message');
-    if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
+
+    const inGameErrorKeywords = ['並未見到', '銀兩不足', '無法', '不是可裝備', '沒有', '未指定'];
+
+    if (error && error.message && inGameErrorKeywords.some(keyword => error.message.includes(keyword))) {
+        appendMessageToStory(error.message, 'system-message');
+    } else {
+        appendMessageToStory(`[系統] 連接失敗... (${error.message || '未知錯誤'})`, 'system-message');
+    }
+
+    if (error && error.message && (error.message.includes('未經授權') || error.message.includes('無效的身份令牌'))) {
         setTimeout(() => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
