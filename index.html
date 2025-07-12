@@ -352,10 +352,11 @@
         
         <div id="trade-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex-col items-center justify-center p-2 hidden">
             <div class="bg-transparent w-full max-w-6xl h-[95vh] max-h-[800px] flex flex-col">
-                <header class="p-2 flex-shrink-0">
+                <header class="p-2 flex-shrink-0 relative">
                     <h2 class="text-2xl md:text-3xl font-serif text-center text-amber-100/90 [text-shadow:_0_2px_2px_rgb(0_0_0_/_50%)]">
                         <i class="fas fa-balance-scale-right mr-2"></i>貨物交割
                     </h2>
+                     <button id="close-trade-btn" class="absolute top-2 right-2 text-amber-100/70 hover:text-white text-3xl">&times;</button>
                 </header>
                 <main class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden p-2">
                     <div id="trade-player-panel" class="w-full md:w-1/3 flex flex-col gap-3 p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
@@ -363,10 +364,10 @@
                             <h3 class="font-serif text-xl text-black">你</h3>
                             <div class="text-sm text-gray-600 flex items-center justify-center gap-1">
                                 <i class="fas fa-coins text-yellow-600"></i>
-                                <span id="trade-player-money">1500</span>
+                                <span id="trade-player-money">0</span>
                             </div>
                         </div>
-                        <div class="flex-grow border-2 border-dashed border-[#d4cba7] rounded p-2 overflow-y-auto">
+                        <div class="flex-grow border-2 border-dashed border-[#d4cba7] rounded p-2 overflow-y-auto custom-scrollbar">
                             <p class="text-xs text-center text-gray-500 mb-2">你的行囊</p>
                             <ul id="trade-player-inventory" class="space-y-2"></ul>
                         </div>
@@ -374,7 +375,7 @@
                     <div class="w-full md:w-1/3 flex flex-col gap-3 order-first md:order-none">
                         <div id="trade-npc-offer-panel" class="h-1/2 flex flex-col p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
                             <h4 id="trade-npc-name" class="font-serif text-center text-lg text-black border-b-2 border-dashed border-[#d4cba7] pb-2 mb-2"></h4>
-                            <ul id="trade-npc-offer" class="flex-grow space-y-2 overflow-y-auto pr-1"></ul>
+                            <ul id="trade-npc-offer" class="flex-grow space-y-2 overflow-y-auto pr-1 custom-scrollbar"></ul>
                         </div>
                         <div class="flex-shrink-0 bg-black/30 p-3 rounded-lg flex flex-col items-center justify-center gap-2 text-center">
                             <div class="font-serif text-amber-100 text-lg">價值差</div>
@@ -383,7 +384,7 @@
                         </div>
                         <div id="trade-player-offer-panel" class="h-1/2 flex flex-col p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
                             <h4 class="font-serif text-center text-lg text-black border-b-2 border-dashed border-[#d4cba7] pb-2 mb-2">你的出價</h4>
-                            <ul id="trade-player-offer" class="flex-grow space-y-2 overflow-y-auto pr-1"></ul>
+                            <ul id="trade-player-offer" class="flex-grow space-y-2 overflow-y-auto pr-1 custom-scrollbar"></ul>
                         </div>
                     </div>
                     <div id="trade-npc-panel" class="w-full md:w-1/3 flex flex-col gap-3 p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
@@ -391,10 +392,10 @@
                             <h3 id="trade-npc-header-name" class="font-serif text-xl text-black"></h3>
                             <div class="text-sm text-gray-600 flex items-center justify-center gap-1">
                                 <i class="fas fa-coins text-yellow-600"></i>
-                                <span id="trade-npc-money">800</span>
+                                <span id="trade-npc-money">0</span>
                             </div>
                         </div>
-                        <div class="flex-grow border-2 border-dashed border-[#d4cba7] rounded p-2 overflow-y-auto">
+                        <div class="flex-grow border-2 border-dashed border-[#d4cba7] rounded p-2 overflow-y-auto custom-scrollbar">
                             <p class="text-xs text-center text-gray-500 mb-2">對方的貨物</p>
                             <ul id="trade-npc-inventory" class="space-y-2"></ul>
                         </div>
@@ -402,7 +403,6 @@
                 </main>
             </div>
         </div>
-
 
     </div>
 
