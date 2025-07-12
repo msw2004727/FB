@@ -2,7 +2,7 @@
 const admin = require('firebase-admin');
 const { getAIPerNpcSummary, getRomanceEventPrompt } = require('../services/aiService');
 const { createNewNpc } = require('../services/npcCreationService');
-const { getIdentityForNewNpc } = require('./identityManager'); // 引入新的身份管理器
+const { getIdentityForNewNpc } = require('./identityManager');
 
 const db = admin.firestore();
 
@@ -68,18 +68,15 @@ async function getMergedNpcProfile(userId, npcName) {
         let npcDoc = await npcRef.get();
         let baseProfile;
 
-        // 【核心修改】如果NPC的基礎檔案不存在，則觸發創建流程
         if (!npcDoc.exists) {
             console.log(`[NPC助手] 基礎檔案 for "${npcName}" 不存在，開始即時創建...`);
             
-            // 1. 呼叫身份管理器來決定NPC的身份和初始位置
             const { identity, location } = await getIdentityForNewNpc(npcName);
 
-            // 2. 建立一個新的基礎檔案物件
             const newProfile = {
                 name: npcName,
-                status_title: identity, // 使用動態獲取的身份作為其頭銜
-                friendlinessValue: 50, // 預設好感度
+                status_title: identity,
+                friendlinessValue: 50,
                 romanceValue: 0,
                 isDeceased: false,
                 status: '安好',
@@ -90,14 +87,12 @@ async function getMergedNpcProfile(userId, npcName) {
                 personality: ["性格生成中..."],
                 appearance: "外貌生成中...",
                 age: "年齡不詳",
-                background: `關於${npcName}的過去，江湖上流傳著許多版本，但無人知曉真相。` // 預設背景
+                background: `關於${npcName}的過去，江湖上流傳著許多版本，但無人知曉真相。`
             };
 
-            // 3. 將新檔案寫入 'npcs' 集合
             await npcRef.set(newProfile);
             console.log(`[NPC助手] 已為 "${npcName}" 成功創建基礎檔案，身份為: ${identity}`);
-
-            // 4. 重新獲取一次文檔，以確保後續流程拿到的是剛創建的資料
+            
             npcDoc = await npcRef.get();
             baseProfile = npcDoc.data();
 
@@ -105,16 +100,13 @@ async function getMergedNpcProfile(userId, npcName) {
             baseProfile = npcDoc.data();
         }
 
-        // 接下來的邏輯：獲取玩家特定的NPC狀態並合併
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
         const npcStateDoc = await npcStateRef.get();
 
         if (npcStateDoc.exists) {
             const userSpecificState = npcStateDoc.data();
-            // 合併：玩家特定狀態會覆蓋基礎檔案的同名欄位
             return { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
         } else {
-            // 如果玩家從未與此NPC互動過，則直接返回基礎檔案
             return { ...baseProfile, name: baseProfile.name || npcName };
         }
 
@@ -137,35 +129,45 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
     if (!npcChanges || npcChanges.length === 0) return;
 
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
-    const batch = db.batch();
-    
     const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[roundData.LOC.length - 1] : '未知之地';
+    const existingNpcIds = new Set((await playerNpcStatesRef.get()).docs.map(doc => doc.id));
 
-    const existingNpcSnapshot = await playerNpcStatesRef.get();
-    const existingNpcIds = new Set(existingNpcSnapshot.docs.map(doc => doc.id));
-    console.log('[友好度系統] 已建立玩家的現存NPC名單:', Array.from(existingNpcIds));
+    const batch = db.batch();
 
     for (const change of npcChanges) {
         if (!change.name) continue;
-        
-        const isTrulyNew = !existingNpcIds.has(change.name);
 
+        const isTrulyNew = !existingNpcIds.has(change.name);
         if (isTrulyNew) {
-            await createNewNpc(userId, username, change, roundData, playerProfile, batch);
+            await createNewNpc(userId, username, change, roundData, playerProfile, batch, Array.from(existingNpcIds));
         } else {
-            // 對於舊識，只更新友好度和位置
             const npcStateDocRef = playerNpcStatesRef.doc(change.name);
             const updatePayload = { currentLocation: playerLocation };
+
             if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
-                console.log(`[友好度系統] 更新舊識「${change.name}」的友好度: ${change.friendlinessChange > 0 ? '+' : ''}${change.friendlinessChange}`);
-                updatePayload.friendlinessValue = admin.firestore.FieldValue.increment(change.friendlinessChange);
+                try {
+                    await db.runTransaction(async (transaction) => {
+                        const npcStateDoc = await transaction.get(npcStateDocRef);
+                        const currentFriendliness = npcStateDoc.data()?.friendlinessValue || 0;
+                        const newFriendliness = currentFriendliness + change.friendlinessChange;
+                        
+                        // 確保友好度最高為100
+                        updatePayload.friendlinessValue = Math.min(100, newFriendliness);
+                        
+                        transaction.set(npcStateDocRef, updatePayload, { merge: true });
+                    });
+                     console.log(`[友好度系統] 更新舊識「${change.name}」的友好度，新數值為: ${updatePayload.friendlinessValue}`);
+                } catch (e) {
+                     console.error(`[友好度系統] Transaction for ${change.name} failed: `, e);
+                }
+            } else {
+                 batch.set(npcStateDocRef, updatePayload, { merge: true });
             }
-            batch.set(npcStateDocRef, updatePayload, { merge: true });
         }
     }
-    
+
     try {
-        await batch.commit();
+        await batch.commit(); // 注意：Transaction外的操作仍需commit
         console.log(`[友好度系統] 批次更新NPC關係與位置完畢。`);
     } catch (error) {
         console.error(`[友好度系統] 批次更新NPC關係時出錯:`, error);
@@ -175,16 +177,27 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
 async function updateRomanceValues(userId, romanceChanges) {
     if (!romanceChanges || romanceChanges.length === 0) return;
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
-    const promises = romanceChanges.map(async ({ npcName, valueChange }) => {
-        if (!npcName || typeof valueChange !== 'number' || valueChange === 0) return;
+    
+    for (const { npcName, valueChange } of romanceChanges) {
+        if (!npcName || typeof valueChange !== 'number' || valueChange === 0) continue;
+        
         const npcStateDocRef = playerNpcStatesRef.doc(npcName);
         try {
-            await npcStateDocRef.set({ romanceValue: admin.firestore.FieldValue.increment(valueChange) }, { merge: true });
+            await db.runTransaction(async (transaction) => {
+                const npcStateDoc = await transaction.get(npcStateDocRef);
+                const currentRomance = npcStateDoc.data()?.romanceValue || 0;
+                const newRomance = currentRomance + valueChange;
+
+                // 確保心動值最高為100
+                const finalRomance = Math.min(100, newRomance);
+
+                transaction.set(npcStateDocRef, { romanceValue: finalRomance }, { merge: true });
+                console.log(`[戀愛系統] 更新「${npcName}」心動值，新數值為: ${finalRomance}`);
+            });
         } catch (error) {
             console.error(`[戀愛系統] 更新與NPC "${npcName}" 的心動值時出錯:`, error);
         }
-    });
-    await Promise.all(promises);
+    }
 }
 
 async function checkAndTriggerRomanceEvent(userId, playerProfile) {
@@ -204,7 +217,6 @@ async function checkAndTriggerRomanceEvent(userId, playerProfile) {
         for (const trigger of eventTriggers) {
             if (romanceValue >= trigger.threshold && !triggeredRomanceEvents.includes(trigger.level)) {
                 console.log(`[戀愛系統] 偵測到與 ${npcName} 的 ${trigger.level} 事件觸發條件！`);
-                // 此處需要一個AI調用來生成事件內容
                 const romanceEventResultText = await getRomanceEventPrompt(playerProfile, npcProfile, trigger.level);
                 try {
                     const romanceEventResult = JSON.parse(romanceEventResultText);
