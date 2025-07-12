@@ -86,6 +86,126 @@ function showFinalConfirmation(event) {
 }
 
 
+async function endCombat(combatResult) {
+    gameState.isInCombat = false;
+    modal.closeCombatModal();
+
+    if (!combatResult) {
+        gameLoop.setLoading(false);
+        return;
+    }
+
+    gameLoop.setLoading(true, "正在結算戰鬥結果...");
+
+    try {
+        const data = await api.finalizeCombat({
+            combatResult: combatResult,
+            model: dom.aiModelSelector.value
+        });
+        gameLoop.processNewRoundData(data);
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
+            gameLoop.setLoading(false);
+        }
+    }
+}
+
+async function handleTradeButtonClick(event) {
+    event.stopPropagation();
+    const npcName = event.currentTarget.dataset.npcName;
+    hideNpcInteractionMenu();
+    if (gameState.isRequesting) return;
+    gameLoop.setLoading(true, `正在與 ${npcName} 準備交易...`);
+    try {
+        const tradeData = await api.startTrade(npcName);
+        const onTradeComplete = (newRound) => {
+            modal.closeTradeModal(); // 【修正】確保交易完成後有關閉視窗的明確回呼
+            if (newRound && newRound.roundData) {
+                addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
+                updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
+                gameState.currentRound = newRound.roundData.R;
+                gameState.roundData = newRound.roundData;
+            }
+        };
+        // 【修正】將關閉函式一併傳入，以便在初始化時綁定關閉按鈕
+        modal.openTradeModal(tradeData, npcName, onTradeComplete, modal.closeTradeModal);
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        gameLoop.setLoading(false);
+    }
+}
+
+async function handleChatButtonClick(event) {
+    event.stopPropagation();
+    const npcName = event.currentTarget.dataset.npcName;
+    hideNpcInteractionMenu();
+    if (gameState.isRequesting) return;
+    gameLoop.setLoading(true, '正在查找此人檔案...');
+    try {
+        const profile = await api.getNpcProfile(npcName);
+        gameState.isInChat = true;
+        gameState.currentChatNpc = profile.name;
+        gameState.chatHistory = [];
+        modal.openChatModalUI(profile);
+        dom.chatInput.focus();
+    } catch (error) {
+        if (error.message && error.message.includes('並未見到')) {
+            appendMessageToStory(error.message, 'system-message');
+        } else {
+            handleApiError(error);
+        }
+    } finally {
+        gameLoop.setLoading(false);
+    }
+}
+
+async function confirmAndInitiateAttack(event) {
+    event.stopPropagation();
+    const npcName = event.currentTarget.dataset.npcName;
+    const intention = event.currentTarget.dataset.intention;
+    hideNpcInteractionMenu();
+    if (gameState.isRequesting) return;
+    
+    gameLoop.setLoading(true, `準備與 ${npcName} 對決...`);
+    try {
+        const data = await api.initiateCombat({ 
+            targetNpcName: npcName, 
+            intention: intention
+        });
+        if (data.status === 'COMBAT_START') {
+            startCombat(data.initialState);
+        }
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        if (!gameState.isInCombat) {
+             gameLoop.setLoading(false);
+        }
+    }
+}
+
+function startCombat(initialState) {
+    gameState.isInCombat = true;
+    gameState.combat.state = initialState;
+    
+    const cancelCombat = () => {
+        gameState.isInCombat = false;
+        gameLoop.setLoading(false); 
+    };
+    
+    modal.openCombatModal(initialState, cancelCombat);
+    
+    document.querySelectorAll('.strategy-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
+    });
+
+    const surrenderBtn = document.getElementById('combat-surrender-btn');
+    if(surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
+}
+
 function handleStrategySelection(strategy) {
     gameState.combat.selectedStrategy = strategy;
     gameState.combat.selectedSkill = null; 
@@ -186,125 +306,6 @@ function handleSkillSelection(skillName) {
     
     const confirmBtn = document.getElementById('combat-confirm-btn');
     if (confirmBtn) confirmBtn.disabled = false;
-}
-
-async function endCombat(combatResult) {
-    gameState.isInCombat = false;
-    modal.closeCombatModal();
-
-    if (!combatResult) {
-        gameLoop.setLoading(false);
-        return;
-    }
-
-    gameLoop.setLoading(true, "正在結算戰鬥結果...");
-
-    try {
-        const data = await api.finalizeCombat({
-            combatResult: combatResult,
-            model: dom.aiModelSelector.value
-        });
-        gameLoop.processNewRoundData(data);
-    } catch (error) {
-        handleApiError(error);
-    } finally {
-        if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
-            gameLoop.setLoading(false);
-        }
-    }
-}
-
-async function handleTradeButtonClick(event) {
-    event.stopPropagation();
-    const npcName = event.currentTarget.dataset.npcName;
-    hideNpcInteractionMenu();
-    if (gameState.isRequesting) return;
-    gameLoop.setLoading(true, `正在與 ${npcName} 準備交易...`);
-    try {
-        const tradeData = await api.startTrade(npcName);
-        const onTradeComplete = (newRound) => {
-            modal.closeTradeModal();
-            if (newRound && newRound.roundData) {
-                addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
-                updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
-                gameState.currentRound = newRound.roundData.R;
-                gameState.roundData = newRound.roundData;
-            }
-        };
-        modal.openTradeModal(tradeData, npcName, onTradeComplete);
-    } catch (error) {
-        handleApiError(error);
-    } finally {
-        gameLoop.setLoading(false);
-    }
-}
-
-async function handleChatButtonClick(event) {
-    event.stopPropagation();
-    const npcName = event.currentTarget.dataset.npcName;
-    hideNpcInteractionMenu();
-    if (gameState.isRequesting) return;
-    gameLoop.setLoading(true, '正在查找此人檔案...');
-    try {
-        const profile = await api.getNpcProfile(npcName);
-        gameState.isInChat = true;
-        gameState.currentChatNpc = profile.name;
-        gameState.chatHistory = [];
-        modal.openChatModalUI(profile);
-        dom.chatInput.focus();
-    } catch (error) {
-        if (error.message && error.message.includes('並未見到')) {
-            appendMessageToStory(error.message, 'system-message');
-        } else {
-            handleApiError(error);
-        }
-    } finally {
-        gameLoop.setLoading(false);
-    }
-}
-
-async function confirmAndInitiateAttack(event) {
-    event.stopPropagation();
-    const npcName = event.currentTarget.dataset.npcName;
-    const intention = event.currentTarget.dataset.intention;
-    hideNpcInteractionMenu();
-    if (gameState.isRequesting) return;
-    
-    gameLoop.setLoading(true, `準備與 ${npcName} 對決...`);
-    try {
-        const data = await api.initiateCombat({ 
-            targetNpcName: npcName, 
-            intention: intention
-        });
-        if (data.status === 'COMBAT_START') {
-            startCombat(data.initialState);
-        }
-    } catch (error) {
-        handleApiError(error);
-    } finally {
-        if (!gameState.isInCombat) {
-             gameLoop.setLoading(false);
-        }
-    }
-}
-
-function startCombat(initialState) {
-    gameState.isInCombat = true;
-    gameState.combat.state = initialState;
-    
-    const cancelCombat = () => {
-        gameState.isInCombat = false;
-        gameLoop.setLoading(false); 
-    };
-    
-    modal.openCombatModal(initialState, cancelCombat);
-    
-    document.querySelectorAll('.strategy-btn').forEach(btn => {
-        btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
-    });
-
-    const surrenderBtn = document.getElementById('combat-surrender-btn');
-    if(surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
 }
 
 // --- Exported Functions ---
