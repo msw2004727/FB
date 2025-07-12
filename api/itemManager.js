@@ -1,0 +1,111 @@
+// api/itemManager.js
+const admin = require('firebase-admin');
+const { getOrGenerateItemTemplate } = require('./playerStateHelpers');
+const { v4: uuidv4 } = require('uuid');
+
+const db = admin.firestore();
+
+/**
+ * 將物品從NPC的庫存中移除
+ * @param {string} userId - 玩家ID
+ * @param {string} npcName - NPC的名稱
+ * @param {string} itemName - 要移除的物品名稱
+ * @param {number} quantity - 要移除的數量
+ * @param {admin.firestore.WriteBatch} batch - Firestore的批次寫入對象
+ */
+async function removeItemFromNpc(userId, npcName, itemName, quantity, batch) {
+    if (!npcName || !itemName || !quantity) return;
+    
+    console.log(`[物品管理器] 準備從NPC「${npcName}」的庫存中移除 ${quantity} 個「${itemName}」...`);
+    const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+    
+    // 使用 FieldValue.increment 來安全地減少數量
+    const inventoryUpdate = {
+        [`inventory.${itemName}`]: admin.firestore.FieldValue.increment(-quantity)
+    };
+    
+    batch.set(npcStateRef, inventoryUpdate, { merge: true });
+}
+
+/**
+ * 將物品添加到玩家的庫存中
+ * @param {string} userId - 玩家ID
+ * @param {string} itemName - 要添加的物品名稱
+ * @param {number} quantity - 要添加的數量
+ * @param {admin.firestore.WriteBatch} batch - Firestore的批次寫入對象
+ * @param {object} roundData - 當前回合數據，用於生成新物品模板
+ */
+async function addItemToPlayer(userId, itemName, quantity, batch, roundData = {}) {
+    if (!itemName || !quantity) return;
+    
+    console.log(`[物品管理器] 準備為玩家 ${userId} 添加 ${quantity} 個「${itemName}」...`);
+    const itemTemplateResult = await getOrGenerateItemTemplate(itemName, roundData);
+    if (!itemTemplateResult || !itemTemplateResult.template) {
+        console.error(`[物品管理器] 無法獲取或生成「${itemName}」的模板，操作中止。`);
+        return;
+    }
+    
+    const itemTemplate = itemTemplateResult.template;
+    const userInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
+    
+    // 判斷物品是否可堆疊
+    const isStackable = itemTemplate.itemType === '材料' || itemTemplate.itemType === '道具' || itemTemplate.itemType === '丹藥' || itemTemplate.itemName === '銀兩';
+
+    if (isStackable) {
+        const itemRef = userInventoryRef.doc(itemName);
+        batch.set(itemRef, {
+            templateId: itemName,
+            quantity: admin.firestore.FieldValue.increment(quantity),
+            itemType: itemTemplate.itemType,
+        }, { merge: true });
+    } else {
+        // 對於不可堆疊物品，創建多個獨立的實例
+        for (let i = 0; i < quantity; i++) {
+            const instanceId = uuidv4();
+            const itemRef = userInventoryRef.doc(instanceId);
+            batch.set(itemRef, {
+                templateId: itemName,
+                quantity: 1,
+                itemType: itemTemplate.itemType,
+                instanceId: instanceId,
+                equipped: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    }
+}
+
+/**
+ * 處理來自AI的 itemChanges 陣列 (給予玩家物品)
+ * @param {string} userId - 玩家ID
+ * @param {Array<object>} itemChanges - AI返回的物品變化陣列
+ * @param {admin.firestore.WriteBatch} batch - Firestore的批次寫入對象
+ * @param {object} roundData - 當前回合數據
+ * @param {string|null} sourceNpcName - 物品的來源NPC (可選)
+ */
+async function processItemChanges(userId, itemChanges, batch, roundData, sourceNpcName = null) {
+    if (!itemChanges || !Array.isArray(itemChanges) || itemChanges.length === 0) {
+        return;
+    }
+
+    console.log(`[物品管理器] 開始處理來自 ${sourceNpcName ? `NPC「${sourceNpcName}」` : '系統'} 的 ${itemChanges.length} 項物品變更...`);
+
+    for (const change of itemChanges) {
+        const { action, itemName, quantity = 1 } = change;
+        
+        if (action === 'add') {
+            await addItemToPlayer(userId, itemName, quantity, batch, roundData);
+            if (sourceNpcName) {
+                // 如果是NPC給予的，要從NPC庫存中扣除
+                await removeItemFromNpc(userId, sourceNpcName, itemName, quantity, batch);
+            }
+        }
+        // 未來可以擴展 'remove' 等其他操作
+    }
+}
+
+module.exports = {
+    processItemChanges,
+    addItemToPlayer,
+    removeItemFromNpc
+};
