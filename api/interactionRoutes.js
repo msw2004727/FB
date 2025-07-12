@@ -12,7 +12,6 @@ const {
     updateNpcMemoryAfterInteraction
 } = require('./npcHelpers');
 const {
-    updateInventory,
     updateSkills,
     getInventoryState,
     getPlayerSkills,
@@ -27,6 +26,8 @@ const {
 const { triggerBountyGeneration } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 const { buildContext } = require('./contextBuilder');
+// 【核心新增】引入全新的物品管理器
+const { processItemChanges } = require('./itemManager');
 
 const db = admin.firestore();
 
@@ -86,10 +87,8 @@ const interactRouteHandler = async (req, res) => {
         }
         
         if (!aiResponse.roundData.EVT || aiResponse.roundData.EVT.trim() === '') {
-            console.warn(`[後端修正] AI未能生成有效的章回標題(EVT)。正在從玩家行動「${playerAction}」中自動提取...`);
             const fallbackEVT = playerAction.length > 8 ? playerAction.substring(0, 8) + '…' : playerAction;
             aiResponse.roundData.EVT = fallbackEVT;
-            console.log(`[後端修正] 已自動生成後備標題: "${fallbackEVT}"`);
         }
         
         const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
@@ -101,77 +100,18 @@ const interactRouteHandler = async (req, res) => {
         if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
             const npcsToUpdate = aiResponse.roundData.NPC.filter(npc => npc.status);
             if (npcsToUpdate.length > 0) {
-                console.log(`[背景任務] 正在為 ${npcsToUpdate.length} 位在場NPC啟動非同步記憶更新...`);
                 npcsToUpdate.forEach(npc => {
                     const interactionContext = `事件：「${aiResponse.roundData.EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
-                    updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext)
-                        .catch(err => console.error(`[背景記憶更新錯誤] NPC: ${npc.name}, UserID: ${userId}, 錯誤:`, err));
+                    updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext).catch(err => console.error(`[背景任務] 更新NPC ${npc.name} 記憶時出錯:`, err));
                 });
             }
         }
         
-        const { timeOfDay: aiNextTimeOfDay, daysToAdvance: aiDaysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
+        const batch = db.batch();
+
+        // 【核心修改】統一使用物品管理器處理物品變更
+        await processItemChanges(userId, aiResponse.roundData.itemChanges, batch, aiResponse.roundData);
         
-        let newStamina = (player.stamina || 100) + staminaChange;
-        
-        const basalMetabolismCost = Math.floor(Math.random() * 5) + 1;
-        newStamina -= basalMetabolismCost;
-        
-        const restKeywords = ['睡覺', '休息', '歇息', '歇會', '小憩', '安歇', '打坐'];
-        const isResting = restKeywords.some(kw => playerAction.includes(kw));
-        const timeDidAdvance = (aiDaysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
-        
-        let staminaLog = `[精力系統] 行動消耗: ${staminaChange}, 基礎代謝消耗: -${basalMetabolismCost}`;
-
-        if (isResting && timeDidAdvance) {
-            const oldTimeIndex = TIME_SEQUENCE.indexOf(player.currentTimeOfDay);
-            const newTimeIndex = TIME_SEQUENCE.indexOf(aiNextTimeOfDay);
-            let slotsPassed = (aiDaysToAdvance * TIME_SEQUENCE.length) + (newTimeIndex - oldTimeIndex + TIME_SEQUENCE.length) % TIME_SEQUENCE.length;
-            
-            const originalStamina = player.stamina || 100;
-            let recoveredStamina;
-
-            if (slotsPassed >= 4) {
-                newStamina = 100;
-            } else {
-                newStamina = Math.min(100, originalStamina + (25 * slotsPassed));
-            }
-            recoveredStamina = newStamina - originalStamina;
-            staminaLog += `, 休息恢復: +${recoveredStamina > 0 ? recoveredStamina : 0}`;
-        }
-        
-        console.log(staminaLog);
-
-        if (newStamina <= 0) {
-            const passOutEvent = { story: "你感到一陣天旋地轉，眼前一黑，便失去了所有知覺...再次醒來時，只覺得頭痛欲裂，不知已過去了多久。", PC: "你因體力不支而昏倒在地。", EVT: "力竭昏迷" };
-            aiResponse.story = passOutEvent.story;
-            aiResponse.roundData.PC = passOutEvent.PC;
-            aiResponse.roundData.EVT = passOutEvent.EVT;
-            newStamina = 50; 
-        } else {
-            newStamina = Math.min(100, newStamina);
-        }
-        
-        let shortActionCounter = player.shortActionCounter || 0;
-        if (!timeDidAdvance && !isResting) shortActionCounter++;
-        else shortActionCounter = 0;
-
-        let finalTimeOfDay = aiNextTimeOfDay || player.currentTimeOfDay;
-        let finalDate = { year: player.year, month: player.month, day: player.day, yearName: player.yearName };
-        let daysToAdd = aiDaysToAdvance;
-
-        if (shortActionCounter >= 3) {
-            const currentTimeIndex = TIME_SEQUENCE.indexOf(finalTimeOfDay);
-            const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
-            finalTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
-            if (nextTimeIndex === 0) daysToAdd++;
-            shortActionCounter = 0;
-        }
-
-        for (let i = 0; i < daysToAdd; i++) {
-            finalDate = advanceDate(finalDate);
-        }
-
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, player);
         
         if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -183,81 +123,77 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
-        // 【核心修正】修正了對 updateFriendlinessValues 的呼叫，補上所有必要參數
-        await Promise.all([
-            updateInventory(userId, aiResponse.roundData.itemChanges, aiResponse.roundData),
-            updateRomanceValues(userId, aiResponse.roundData.romanceChanges),
-            updateFriendlinessValues(userId, username, aiResponse.roundData.NPC, aiResponse.roundData, player),
-            processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []),
-            processLocationUpdates(userId, player.currentLocation?.[0], aiResponse.roundData.locationUpdates)
-        ]);
-        
-        // 【核心修正】移除了重複且邏輯衝突的舊版 NPC 創建邏輯
-        // 這段邏輯現在已經被整合進 updateFriendlinessValues 中，因此必須移除
+        await updateFriendlinessValues(userId, username, aiResponse.roundData.NPC, aiResponse.roundData, player);
+        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
+        await processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []);
+        if (aiResponse.roundData.locationUpdates) {
+            await processLocationUpdates(userId, locationContext.locationName, aiResponse.roundData.locationUpdates);
+        }
+        if (romanceEventData && romanceEventData.npcUpdates) {
+            await processNpcUpdates(userId, romanceEventData.npcUpdates);
+        }
 
-        const [newSummary, suggestion] = await Promise.all([
-            getAISummary(longTermSummary, aiResponse.roundData),
-            getAISuggestion(aiResponse.roundData)
-        ]);
+        const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
+        let newStamina = (player.stamina || 100) + staminaChange;
+        const isResting = ['睡覺', '休息', '歇息'].some(kw => playerAction.includes(kw));
+        const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
+        if (isResting && timeDidAdvance) newStamina = 100;
+        newStamina = Math.max(0, newStamina);
         
-        const currentInternalPower = player.internalPower || 0;
-        const currentExternalPower = player.externalPower || 0;
-        const currentLightness = player.lightness || 0;
+        let shortActionCounter = player.shortActionCounter || 0;
+        if (!timeDidAdvance && !isResting) shortActionCounter++; else shortActionCounter = 0;
+        let finalTimeOfDay = aiNextTimeOfDay || player.currentTimeOfDay;
+        let finalDate = { year: player.year, month: player.month, day: player.day, yearName: player.yearName };
+        let daysToAdd = daysToAdvance;
+        if (shortActionCounter >= 3) {
+            const currentTimeIndex = TIME_SEQUENCE.indexOf(finalTimeOfDay);
+            const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
+            finalTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
+            if (nextTimeIndex === 0) daysToAdd++;
+            shortActionCounter = 0;
+        }
+        for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
-        const internalPowerChange = aiResponse.roundData.powerChange?.internal || 0;
-        const externalPowerChange = aiResponse.roundData.powerChange?.external || 0;
-        const lightnessPowerChange = aiResponse.roundData.powerChange?.lightness || 0;
-
-        const newInternalPower = Math.max(0, currentInternalPower + internalPowerChange);
-        const newExternalPower = Math.max(0, currentExternalPower + externalPowerChange);
-        const newLightness = Math.max(0, currentLightness + lightnessPowerChange);
-        
         const playerUpdatesForDb = {
             timeOfDay: finalTimeOfDay,
             stamina: newStamina,
             shortActionCounter,
             ...finalDate,
-            internalPower: newInternalPower,
-            externalPower: newExternalPower,
-            lightness: newLightness,
-            bulkScore: bulkScore,
+            internalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.internal || 0),
+            externalPower: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.external || 0),
+            lightness: admin.firestore.FieldValue.increment(aiResponse.roundData.powerChange?.lightness || 0),
             morality: admin.firestore.FieldValue.increment(aiResponse.roundData.moralityChange || 0),
             money: admin.firestore.FieldValue.increment(aiResponse.roundData.moneyChange || 0)
         };
+        batch.update(userDocRef, playerUpdatesForDb);
         
         const finalSaveData = { ...aiResponse.roundData, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
-        delete finalSaveData.power;
+        const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
+        batch.set(newSaveRef, finalSaveData);
+
+        const newSummary = await getAISummary(longTermSummary, finalSaveData);
+        batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
+
+        await batch.commit();
+
+        invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username);
         
-        await Promise.all([
-            userDocRef.update(playerUpdatesForDb),
-            summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber }),
-            userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalSaveData)
+        const [inventoryState, updatedSkills, finalPlayerProfile] = await Promise.all([
+            getInventoryState(userId),
+            getPlayerSkills(userId),
+            userDocRef.get().then(doc => doc.data())
         ]);
         
-        await invalidateNovelCache(userId);
-        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
+        const suggestion = await getAISuggestion(finalSaveData);
         
-        const inventoryState = await getInventoryState(userId);
-        
-        const finalRoundDataForClient = { 
-            ...finalSaveData,
-            internalPower: newInternalPower,
-            externalPower: newExternalPower,
-            lightness: newLightness,
-            morality: (player.morality || 0) + (aiResponse.roundData.moralityChange || 0),
-            bulkScore: bulkScore,
-            ITM: inventoryState.itemsString,
-            money: inventoryState.money,
-            silver: inventoryState.silver,
-            skills: await getPlayerSkills(userId),
-            suggestion: suggestion
-        };
+        const finalRoundDataForClient = { ...finalSaveData, ...finalPlayerProfile, skills: updatedSkills, ...inventoryState, suggestion };
 
         res.json({
             story: finalSaveData.story,
             roundData: finalRoundDataForClient,
             suggestion: suggestion,
-            locationData: await getMergedLocationData(userId, finalRoundDataForClient.LOC)
+            locationData: await getMergedLocationData(userId, finalSaveData.LOC)
         });
 
     } catch (error) {
