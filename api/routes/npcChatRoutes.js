@@ -28,6 +28,7 @@ router.post('/chat', async (req, res) => {
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
         
+        const playerProfile = playerProfileDoc.data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '無';
         const lastRoundData = lastSaveDoc.empty ? {} : lastSaveDoc.docs[0].data();
         const localLocationContext = lastRoundData.LOC ? { locationName: lastRoundData.LOC[0], description: lastRoundData.LOR } : null;
@@ -36,17 +37,35 @@ router.post('/chat', async (req, res) => {
         const mentionedNpcNames = Array.from(knownNpcs).filter(name => playerMessage.includes(name) && name !== npcName);
         const mentionedNpcContext = mentionedNpcNames.length > 0 ? await getMergedNpcProfile(userId, mentionedNpcNames[0]) : null;
         
+        // 1. 從AI獲取回應字串
         const aiResponseString = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
         
+        // 2. 【核心加固】使用一個安全的解析函式來處理不穩定的AI回應
         let aiResponse;
         try {
-            const cleanedJsonString = aiResponseString.replace(/^```json\s*|```\s*$/g, '');
+            //  步驟A：先移除頭尾可能存在的Markdown標記
+            const cleanedJsonString = aiResponseString.trim().replace(/^```json\s*|```\s*$/g, '');
+            
+            //  步驟B：嘗試解析JSON
             aiResponse = JSON.parse(cleanedJsonString);
-        } catch(e) {
-            console.error("解析密談AI回傳的JSON時失敗，將嘗試直接使用文字。", e);
-            aiResponse = { response: aiResponseString, friendlinessChange: 0, romanceChange: 0, itemChanges: [] };
+
+            //  步驟C：驗證解析後的物件是否包含必要的鍵，以防AI回傳合法的但無效的JSON (例如 "{}")
+            if (typeof aiResponse.response !== 'string') {
+                throw new Error("AI回傳的JSON中缺少 'response' 欄位。");
+            }
+
+        } catch (e) {
+            //  步驟D：如果以上任何一步失敗，將整個AI的回應視為純文字對話，並建立一個預設的物件結構
+            console.error("解析密談AI回傳的JSON時失敗，將嘗試直接使用文字。", e.message);
+            aiResponse = { 
+                response: aiResponseString, // 將原始回傳作為對話內容
+                friendlinessChange: 0, 
+                romanceChange: 0, 
+                itemChanges: [] 
+            };
         }
         
+        // 3. 執行資料庫操作
         const batch = db.batch();
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
@@ -64,6 +83,7 @@ router.post('/chat', async (req, res) => {
 
         await batch.commit();
         
+        // 4. 準備回傳給前端的資料
         const finalResponse = {
             npcMessage: aiResponse.response,
             friendlinessChange: aiResponse.friendlinessChange || 0,
@@ -116,12 +136,17 @@ router.post('/give-item', async (req, res) => {
         // 玩家給予NPC物品
         const itemKey = type === 'money' ? '銀兩' : itemName;
         const itemToRemove = { action: 'remove', itemName: itemKey, quantity: type === 'money' ? amount : (amount || 1) };
-        await processItemChanges(userId, [itemToRemove], batch, lastRoundData, null); 
+        // 此處不應使用 processItemChanges，因為它是設計來從玩家身上移除物品
+        // 我們需要一個更底層的函式來處理，或直接在此處實現
+        const playerItemRef = db.collection('users').doc(userId).collection('inventory_items').doc(itemToRemove.itemName);
+        batch.update(playerItemRef, { quantity: admin.firestore.FieldValue.increment(-itemToRemove.quantity) });
         batch.set(npcStateRef, { [`inventory.${itemKey}`]: admin.firestore.FieldValue.increment(itemToRemove.quantity) }, { merge: true });
 
         // 更新友好度
         if(friendlinessChange) {
-             batch.set(npcStateRef, { friendlinessValue: admin.firestore.FieldValue.increment(friendlinessChange) }, { merge: true });
+             batch.set(npcStateRef, { 
+                friendlinessValue: admin.firestore.FieldValue.increment(friendlinessChange) 
+            }, { merge: true });
         }
         
         // NPC回禮
