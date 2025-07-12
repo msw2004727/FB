@@ -58,6 +58,7 @@ const bountyRoutes = require('./api/bountyRoutes');
 const gmRoutes = require('./api/gmRoutes');
 const mapRoutes = require('./api/mapRoutes');
 const adminRoutes = require('./api/admin/adminRoutes');
+const beggarRoutes = require('./api/beggarRoutes'); // 【核心修正】引入丐幫路由
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -68,6 +69,7 @@ app.use('/api/bounties', bountyRoutes);
 app.use('/api/gm', gmRoutes);
 app.use('/api/map', authMiddleware, mapRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/beggar', beggarRoutes); // 【核心修正】啟用丐幫路由
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
