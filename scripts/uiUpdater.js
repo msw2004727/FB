@@ -67,7 +67,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateBulkStatus(roundData.bulkScore || 0); 
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData.inventory); // 直接傳入統一的inventory列表
+    renderInventory(roundData.inventory); 
     
     moneyContent.textContent = `${roundData.money || 0} 文錢`;
     qstContent.textContent = roundData.QST || '暫無要事';
@@ -105,11 +105,24 @@ function updateStatusBar(roundData) {
     `;
 }
 
+// 【核心修改】將精力條的危險狀態判斷邏輯加入此函數
 function updatePowerBars(roundData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
-    updatePowerBar(staminaBar, staminaValue, roundData.stamina, 100);
+
+    // --- 特別處理精力條 ---
+    if (staminaBar && staminaValue) {
+        const currentStamina = roundData.stamina || 0;
+        updatePowerBar(staminaBar, staminaValue, currentStamina, 100);
+        
+        // 判斷是否低於30，並加上或移除CSS class
+        if (currentStamina < 30) {
+            staminaBar.classList.add('pulsing-danger');
+        } else {
+            staminaBar.classList.remove('pulsing-danger');
+        }
+    }
 }
 
 function updatePowerBar(barEl, valueEl, current, max) {
@@ -237,15 +250,13 @@ function createItemEntry(item) {
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
-    // 【核心修改】圖示渲染邏輯
-    let iconClass = item.icon || 'fa-box'; // 預設圖示
+    let iconClass = item.icon || 'fa-box';
     if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
-        iconClass = slotConfig[item.equipSlot].icon; // 若已裝備，使用對應的裝備槽圖示
+        iconClass = slotConfig[item.equipSlot].icon;
     }
 
     let equipControls = '';
     if (item.equipSlot) {
-        // 【核心修改】從此處移除右側圖示
         equipControls = `
             <div class="item-controls">
                 <label class="switch">
@@ -256,7 +267,6 @@ function createItemEntry(item) {
         `;
     }
 
-    // 【核心修改】使用新的 iconClass 渲染左側圖示
     entry.innerHTML = `
         <div class="item-info">
              <i class="item-icon fa-solid ${iconClass}"></i>
