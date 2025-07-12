@@ -19,6 +19,25 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
+    // 【核心修改】為貨幣系統新增規則
+    const currencyRule = `
+## 【核心經濟系統鐵律：雙貨幣系統】
+你現在必須嚴格區分兩種資產：「文錢」和「銀兩」。
+
+1.  **文錢 (Money/Copper Coins)**:
+    * 這是遊戲的**基礎抽象貨幣**，代表玩家的零錢，用於日常小額花費。
+    * 你**必須**使用新增的 **\`moneyChange\`** 欄位來處理「文錢」的變化。
+    * 此欄位是一個**數字**，正數代表增加，負數代表減少。
+    * **範例**：玩家完成任務獲得500文錢，你應回傳 \`"moneyChange": 500\`。玩家吃飯花了30文，應回傳 \`"moneyChange": -30\`。
+
+2.  **銀兩 (Silver)**:
+    * 這是一種**有價值的實體物品**，被歸類為「財寶」，用於大宗交易或儲存價值。
+    * 你**必須**使用 **\`itemChanges\`** 陣列來處理「銀兩」的增減，就像處理其他任何物品（如劍、丹藥）一樣。
+    * **範例**：玩家打劫富商獲得100兩銀子，你應回傳 \`"itemChanges": [{"action": "add", "itemName": "銀兩", "quantity": 100}]\`。
+
+**【絕對禁止】** 絕對禁止在 \`itemChanges\` 中處理「文錢」，也絕對禁止在 \`moneyChange\` 中處理「銀兩」。這兩套系統涇渭分明，不可混淆。
+`;
+
     const actorCandidatesInstruction = actorCandidates.length > 0
         ? `\n## 【演員候補名單】\n以下是幾位已在故事中被提及、但尚未正式登場的人物。當你需要一個新角色登場時，你必須優先從這份名單中選擇最符合當前劇情需求的一位，而不是創造一個全新的隨機角色。只有當名單上沒有合適人選時，你才能創造新角色。\n- ${actorCandidates.join('\n- ')}\n`
         : '';
@@ -145,7 +164,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
       - **【劣例】**：「${username}在瀑布下練習劍法」、「${username}走進了村莊」。`;
         
         // 使用正則表達式替換掉原有的 EVT 規則
-        return originalRule.replace(/- EVT: \(字串\) 事件摘要[^`]*\s*.*【佳例】\s*.*【劣例】[^`]*/, enhancedEvtRule);
+        // 同時在此處加入新的 moneyChange 欄位說明
+        return originalRule.replace(/- EVT: \(字串\) 事件摘要[^`]*\s*.*【佳例】\s*.*【劣例】[^`]*/, enhancedEvtRule)
+                         .replace("- itemChanges: (陣列) 根據最新的「物品帳本系統」規則生成。", "- moneyChange: (數字) 基礎貨幣「文錢」的變化。\n    - itemChanges: (陣列) 所有「實體物品」（包含銀兩）的變化。");
     };
 
     const outputStructureRules = getOutputStructureRuleWithEnforcedEVT({
@@ -216,6 +237,8 @@ ${actorCandidatesInstruction}
 
 ---
 
+${currencyRule}
+---
 ${staminaSystemRule}
 ${dyingInstruction}
 ${romanceInstruction}
