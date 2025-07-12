@@ -15,17 +15,20 @@ router.get('/profile/:npcName', async (req, res) => {
     const userId = req.user.id;
     const { npcName } = req.params;
     try {
-        const npcProfile = await getMergedNpcProfile(userId, npcName);
+        const [npcProfile, userDoc] = await Promise.all([
+            getMergedNpcProfile(userId, npcName),
+            db.collection('users').doc(userId).get() // 【核心修正】直接獲取玩家主文件
+        ]);
 
         if (!npcProfile) {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        const latestSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
-        if (latestSaveSnapshot.empty) {
+        // 【核心修正】從玩家主文件中讀取最即時的位置
+        if (!userDoc.exists || !userDoc.data().currentLocation) {
             return res.status(404).json({ message: '找不到玩家位置資訊。' });
         }
-        const playerLocation = latestSaveSnapshot.docs[0].data().LOC[0];
+        const playerLocation = userDoc.data().currentLocation[0]; // 取層級中的最深層地點
 
         if (playerLocation !== npcProfile.currentLocation) {
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
