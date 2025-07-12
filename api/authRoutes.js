@@ -19,7 +19,7 @@ const DEFAULT_USER_FIELDS = {
     externalPower: 5,
     lightness: 5,
     morality: 0,
-    stamina: 100,
+    stamina: 25, // <--- 【修改點】
     bulkScore: 0,
     isDeceased: false,
     equipment: {
@@ -118,7 +118,7 @@ router.post('/register', async (req, res) => {
             internalPower: 5,
             externalPower: 5,
             lightness: 5,
-            stamina: 100, 
+            stamina: 25, // <--- 【修改點】
             morality: 0,
             money: 50,
             silver: 0,
@@ -245,7 +245,7 @@ router.post('/login', async (req, res) => {
                         const lastRoundData = lastSaveSnapshot.docs[0].data();
                         const generationResult = await generateNpcTemplateData(username, { name: npcName }, lastRoundData, playerProfileForContext);
                         
-                        if (generationResult && generationResult.templateData && generationResult.canonicalName) {
+                        if (generationResult && generationResult.canonicalName && generationResult.templateData) {
                             const newTemplateData = { ...generationResult.templateData, name: generationResult.canonicalName, createdAt: admin.firestore.FieldValue.serverTimestamp() };
                             const finalTemplateRef = db.collection('npcs').doc(generationResult.canonicalName);
                             batch.set(finalTemplateRef, newTemplateData);
