@@ -6,12 +6,29 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { generateNpcTemplateData } = require('../services/npcCreationService');
-// 【核心新增】引入物品模板生成器和UUID
 const { getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { v4: uuidv4 } = require('uuid');
 
 
 const db = admin.firestore();
+
+// --- 統治者名稱生成器 (從populateRulers.js移植過來) ---
+const SURNAMES = [
+  '趙', '錢', '孫', '李', '周', '吳', '鄭', '王', '馮', '陳', '褚', '衛', '蔣', '沈', '韓', '楊', 
+  '朱', '秦', '尤', '許', '何', '呂', '施', '張', '孔', '曹', '嚴', '華', '金', '魏', '陶', '姜'
+];
+const GIVEN_NAMES = [
+  '霸', '天', '龍', '傲', '風', '雲', '海', '山', '河', '川', '林', '武', '文', '斌', '哲', '威', 
+  '雄', '傑', '豪', '英', '毅', '誠', '信', '義', '輝', '光', '明', '遠', '博', '軒', '宇', '峰'
+];
+function generateRulerName() {
+  const surname = SURNAMES[Math.floor(Math.random() * SURNAMES.length)];
+  const givenName1 = GIVEN_NAMES[Math.floor(Math.random() * GIVEN_NAMES.length)];
+  const givenName2 = GIVEN_NAMES[Math.floor(Math.random() * GIVEN_NAMES.length)];
+  return givenName1 === givenName2 ? `${surname}${givenName1}` : `${surname}${givenName1}${givenName2}`;
+}
+// --- 統治者名稱生成器結束 ---
+
 
 const DEFAULT_USER_FIELDS = {
     money: 50,
@@ -19,7 +36,7 @@ const DEFAULT_USER_FIELDS = {
     externalPower: 5,
     lightness: 5,
     morality: 0,
-    stamina: 25, // <--- 【修改點】
+    stamina: 25,
     bulkScore: 0,
     isDeceased: false,
     equipment: {
@@ -118,7 +135,7 @@ router.post('/register', async (req, res) => {
             internalPower: 5,
             externalPower: 5,
             lightness: 5,
-            stamina: 25, // <--- 【修改點】
+            stamina: 25,
             morality: 0,
             money: 50,
             silver: 0,
@@ -171,6 +188,39 @@ router.post('/login', async (req, res) => {
 
         const batch = db.batch();
         
+        // --- 【核心新增】登入時自動檢查並填充統治者 ---
+        console.log(`[登入流程] 開始為玩家 ${username} 檢查其已發現地點的統治者狀態...`);
+        const playerLocationsSnapshot = await userDoc.ref.collection('location_states').get();
+        if (!playerLocationsSnapshot.empty) {
+            const rulerUpdateBatch = db.batch();
+            let updatesCount = 0;
+            
+            for (const locStateDoc of playerLocationsSnapshot.docs) {
+                const locationId = locStateDoc.id;
+                const globalLocationRef = db.collection('locations').doc(locationId);
+                const globalLocationDoc = await globalLocationRef.get();
+
+                if (globalLocationDoc.exists) {
+                    const locationData = globalLocationDoc.data();
+                    const isGovernable = ['村莊', '城鎮', '城市', '都府', '山寨', '門派', '堡壘'].includes(locationData.locationType);
+                    const hasRuler = locationData.ruler && locationData.ruler.trim() !== '';
+
+                    if (isGovernable && !hasRuler) {
+                        const newRulerName = generateRulerName();
+                        rulerUpdateBatch.update(globalLocationRef, { ruler: newRulerName });
+                        updatesCount++;
+                        console.log(`[登入修補] 發現地點「${locationId}」無統治者，已自動指派：${newRulerName}`);
+                    }
+                }
+            }
+            if (updatesCount > 0) {
+                await rulerUpdateBatch.commit();
+                console.log(`[登入流程] 本次登入共為 ${updatesCount} 個地點補充了統治者。`);
+            }
+        }
+        // --- 統治者檢查結束 ---
+        
+        // 繼續執行原有的用戶和NPC資料健康檢查
         for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
             if (userData[field] === undefined) {
                 const updatePayload = {};
@@ -216,7 +266,6 @@ router.post('/login', async (req, res) => {
                     }
                 }
 
-                // 【核心修改】檢查並遷移舊的NPC裝備數據結構
                 if (Array.isArray(npcStateData.equipment) && npcStateData.equipment.length > 0 && typeof npcStateData.equipment[0] === 'string') {
                     console.log(`[資料庫維護] 偵測到NPC「${npcName}」的裝備為舊格式，開始遷移...`);
                     const newEquipment = [];
@@ -225,7 +274,6 @@ router.post('/login', async (req, res) => {
                             instanceId: uuidv4(),
                             templateId: itemName
                         });
-                        // 在背景確保物品模板存在，不阻塞登入流程
                         getOrGenerateItemTemplate(itemName).catch(e => console.error(`[背景任務] 為 ${itemName} 生成模板時出錯: ${e.message}`));
                     }
                     stateUpdatePayload.equipment = newEquipment;
@@ -250,7 +298,6 @@ router.post('/login', async (req, res) => {
                             const finalTemplateRef = db.collection('npcs').doc(generationResult.canonicalName);
                             batch.set(finalTemplateRef, newTemplateData);
                             
-                            // 如果新模板有初始裝備，賦予給NPC狀態
                             if(newTemplateData.initialEquipment) {
                                 stateUpdatePayload.equipment = newTemplateData.initialEquipment.map(itemName => ({
                                     instanceId: uuidv4(),
