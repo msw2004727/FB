@@ -57,7 +57,7 @@ const epilogueRoutes = require('./api/epilogue.js');
 const bountyRoutes = require('./api/bountyRoutes');
 const gmRoutes = require('./api/gmRoutes');
 const mapRoutes = require('./api/mapRoutes');
-const adminRoutes = require('./api/adminRoutes'); // 【***新***】 引入後台路由
+const adminRoutes = require('./api/admin/adminRoutes'); // 【***修正***】 已修正後台路由的路徑
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
