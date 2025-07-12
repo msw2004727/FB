@@ -16,21 +16,42 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
         if (doc.exists) {
             let templateData = doc.data();
             let needsUpdate = false;
+            
+            // 【核心修改】自動修補舊物品資料
             if (templateData.bulk === undefined) {
                 templateData.bulk = '中'; 
                 needsUpdate = true;
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 bulk 欄位，自動修補為 "中"。`);
             }
             if (templateData.equipSlot === undefined) {
-                if (templateData.itemType === '武器') templateData.equipSlot = 'weapon_right';
-                else if (templateData.itemType === '裝備') templateData.equipSlot = 'body';
-                else templateData.equipSlot = null;
+                // 根據物品類型，給予一個合理的預設裝備位置
+                switch (templateData.itemType) {
+                    case '武器':
+                        templateData.equipSlot = 'weapon_right';
+                        break;
+                    case '裝備':
+                        templateData.equipSlot = 'body';
+                        break;
+                    case '秘笈':
+                        templateData.equipSlot = 'manuscript';
+                        break;
+                    default:
+                        templateData.equipSlot = null;
+                }
                 needsUpdate = true;
                 console.log(`[資料庫維護] 物品「${itemName}」缺少 equipSlot 欄位，自動修補為 "${templateData.equipSlot}"。`);
             }
+            if (templateData.hands === undefined) {
+                // 如果是武器，預設為單手，否則為null
+                templateData.hands = templateData.itemType === '武器' ? 1 : null;
+                needsUpdate = true;
+                console.log(`[資料庫維護] 物品「${itemName}」缺少 hands 欄位，自動修補為 "${templateData.hands}"。`);
+            }
 
             if(needsUpdate) {
-                await templateRef.update({ bulk: templateData.bulk, equipSlot: templateData.equipSlot });
+                // 將修補後的資料寫回資料庫
+                await templateRef.set(templateData, { merge: true });
+                console.log(`[資料庫維護] 已成功將物品「${itemName}」的模板更新至最新結構。`);
             }
 
             return { template: templateData, isNew: false };
@@ -50,8 +71,10 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
 
         if (!newTemplateData.itemName) throw new Error('AI生成的物品模板缺少itemName。');
         
+        // 為AI生成的新物品提供保障，確保新欄位存在
         if (newTemplateData.bulk === undefined) newTemplateData.bulk = '中';
         if (newTemplateData.equipSlot === undefined) newTemplateData.equipSlot = null;
+        if (newTemplateData.hands === undefined) newTemplateData.hands = null;
 
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await templateRef.set(newTemplateData);
@@ -132,7 +155,7 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
             const newItemData = {
                 templateId: itemName,
                 isEquipped: false,
-                equipSlot: null, // 初始狀態下，equipSlot 為 null
+                equipSlot: null, 
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
             if (isStackable) {
@@ -178,11 +201,6 @@ async function getInventoryState(userId) {
     return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
 }
 
-/**
- * 【v3 修復版】修正數據合併邏輯，確保UI能正確判斷可裝備性
- * @param {string} userId - 玩家ID
- * @returns {Promise<Array<object>>}
- */
 async function getRawInventory(userId) {
     const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const snapshot = await playerInventoryRef.get();
@@ -196,16 +214,13 @@ async function getRawInventory(userId) {
         const templateDataResult = await getOrGenerateItemTemplate(templateId);
         if (templateDataResult?.template) {
             const templateData = templateDataResult.template;
-            // 【核心修正】在這裡解決數據覆蓋問題
             const finalItem = {
-                ...templateData, // 先鋪上模板的預設值 (包含潛在的equipSlot)
-                ...instanceData,  // 再用實例數據覆蓋 (包含isEquipped和當前的equipSlot)
+                ...templateData, 
+                ...instanceData,  
                 instanceId: doc.id,
-                itemName: templateData.itemName, // 確保名稱總是來自模板，避免出錯
+                itemName: templateData.itemName, 
             };
             
-            // 為了讓UI能正確顯示開關，如果物品本身可裝備，但當前未裝備(equipSlot為null)，
-            // 我們把模板的潛在槽位資訊補回去，這樣UI的 `if (item.equipSlot)` 判斷才能通過。
             if (templateData.equipSlot && !instanceData.equipSlot) {
                 finalItem.equipSlot = templateData.equipSlot;
             }
