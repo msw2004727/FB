@@ -61,9 +61,10 @@ export const api = {
     // Map Route
     getMap: () => fetchApi('/api/map/world-map'),
     
-    // 【核心新增】Beggar (丐幫) Routes
+    // 【核心修改】Beggar (丐幫) Routes
     summonBeggar: (body) => fetchApi('/api/beggar/summon', { method: 'POST', body: JSON.stringify(body) }),
-    inquireBeggar: (body) => fetchApi('/api/beggar/inquire', { method: 'POST', body: JSON.stringify(body) }),
+    startBeggarInquiry: (body) => fetchApi('/api/beggar/start-inquiry', { method: 'POST', body: JSON.stringify(body) }), // 新增：付費API
+    askBeggarQuestion: (body) => fetchApi('/api/beggar/ask', { method: 'POST', body: JSON.stringify(body) }), // 修改：提問API
 
     // GM Panel Routes
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
