@@ -113,11 +113,9 @@ async function endCombat(combatResult) {
 }
 
 async function handleTradeButtonClick(event) {
-    // ================== 偵錯點 1：流程起點 ==================
-    console.log("【偵錯點 1】: 交易按鈕點擊成功！(位於 interactionHandlers.js)");
+    console.log("交易按鈕點擊成功！");
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
-    console.log("【偵錯點 1.1】: 準備與 NPC [" + npcName + "] 進行交易。");
     
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
@@ -125,9 +123,6 @@ async function handleTradeButtonClick(event) {
     try {
         const tradeData = await api.startTrade(npcName);
         
-        // ================== 偵錯點 1.2：檢查從後端拿到的資料 ==================
-        console.log("【偵錯點 1.2】: 已從後端獲取交易資料:", tradeData);
-
         const onTradeComplete = (newRound) => {
             modal.closeTradeModal(); 
             if (newRound && newRound.roundData) {
@@ -138,11 +133,10 @@ async function handleTradeButtonClick(event) {
             }
         };
 
-        // 【關鍵】呼叫 modalManager 來打開交易視窗
         modal.openTradeModal(tradeData, npcName, onTradeComplete, modal.closeTradeModal);
 
     } catch (error) {
-        console.error("【錯誤】在 handleTradeButtonClick 中發生錯誤:", error);
+        console.error("處理交易點擊時出錯:", error);
         handleApiError(error);
     } finally {
         gameLoop.setLoading(false);
@@ -319,7 +313,6 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-// --- 【核心修改】處理丐幫情報探詢的邏輯 ---
 async function handleBeggarInquiry(npcName) {
     hideNpcInteractionMenu();
     
@@ -335,15 +328,10 @@ async function handleBeggarInquiry(npcName) {
                 model: dom.aiModelSelector.value
             });
             
-            // 根據後端回傳的 success 標記來決定下一步
             if (result.success === false) {
-                 // 如果失敗 (例如錢不夠)，只顯示NPC的拒絕訊息
                  appendMessageToStory(`${npcName}對你說：「${result.response}」`, 'system-message');
-
             } else {
-                // 如果成功，則構造一個完整的新回合
                 const inquiryResultText = `你向${npcName}打聽消息，他收下你的錢後，賊眉鼠眼地湊到你耳邊說道：「${result.response}」`;
-                
                 const lastRoundData = gameState.roundData;
                 const newRoundNumber = lastRoundData.R + 1;
                 const newRoundData = {
@@ -353,14 +341,14 @@ async function handleBeggarInquiry(npcName) {
                     story: inquiryResultText,
                     PC: `你花費了100文錢，從丐幫弟子口中得到一條情報。`,
                     EVT: `探聽江湖秘聞`,
-                    suggestion: `這條消息是真是假？得靠你自己判斷了。`
+                    suggestion: `這條消息是真是假？得靠你自己判斷了。`,
+                    NPC: lastRoundData.NPC.filter(npc => npc.name !== npcName) // 臨時NPC消失
                 };
                 
                 if (result.isTrue) {
                     newRoundData.CLS = result.response;
                 }
 
-                // 更新UI並結束loading
                 addRoundTitleToStory(newRoundData.EVT);
                 updateUI(newRoundData.story, newRoundData, null, null);
                 gameState.currentRound = newRoundNumber;
@@ -374,7 +362,6 @@ async function handleBeggarInquiry(npcName) {
         }
     };
     
-    // 開啟確認彈窗
     modal.openBeggarInquiryModal(onConfirm);
 }
 
@@ -397,37 +384,40 @@ export async function handleNpcClick(event) {
     const targetIsMenu = event.target.closest('.npc-interaction-menu');
 
     if (targetIsNpc) {
+        event.stopPropagation(); // 阻止事件冒泡，避免觸發全局點擊事件
         const npcName = targetIsNpc.dataset.npcName || targetIsNpc.textContent;
         const isDeceased = targetIsNpc.dataset.isDeceased === 'true';
 
-        // --- 【核心修改】先呼叫API獲取NPC檔案，再根據身份決定互動方式 ---
-        try {
-            // 顯示一個小的讀取提示
-            targetIsNpc.style.cursor = 'wait';
-            hideNpcInteractionMenu();
-            
-            const profile = await api.getNpcProfile(npcName);
-            
-            if (profile.status_title === '丐幫弟子') {
-                await handleBeggarInquiry(npcName);
-            } else {
-                showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
-            }
-        } catch (error) {
-            // 如果API出錯（例如NPC不在附近），則顯示錯誤訊息
-            appendMessageToStory(error.message, 'system-message');
-        } finally {
-            // 恢復滑鼠指標
-            targetIsNpc.style.cursor = 'pointer';
-        }
-        // --- 修改結束 ---
+        // --- 【核心修改】優先從本地 gameState 檢查 NPC 身份 ---
+        const localNpcData = gameState.roundData?.NPC?.find(npc => npc.name === npcName);
 
+        if (localNpcData && (localNpcData.status_title === '丐幫弟子' || localNpcData.isTemp)) {
+            // 如果是本地的臨時丐幫弟子，直接觸發探詢流程
+            await handleBeggarInquiry(npcName);
+        } else {
+            // 否則，向後端請求資料來判斷
+            try {
+                targetIsNpc.style.cursor = 'wait';
+                hideNpcInteractionMenu();
+                const profile = await api.getNpcProfile(npcName);
+                targetIsNpc.style.cursor = 'pointer';
+
+                if (profile.status_title === '丐幫弟子') {
+                    await handleBeggarInquiry(npcName);
+                } else {
+                    showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
+                }
+            } catch (error) {
+                targetIsNpc.style.cursor = 'pointer';
+                handleApiError(error);
+            }
+        }
     } else if (!targetIsMenu) {
         hideNpcInteractionMenu();
     }
 }
 
-
+// ... (其他函式保持不變) ...
 export async function sendChatMessage() {
     const message = dom.chatInput.value.trim();
     if (!message || gameState.isRequesting) return;
