@@ -13,9 +13,9 @@ const {
 } = require('./npcHelpers');
 const {
     updateSkills,
-    // 【核心修改】引入 getRawInventory 和 calculateBulkScore
     getRawInventory,
     calculateBulkScore,
+    getPlayerSkills, // 【核心修正】將被遺忘的 getPlayerSkills 函式加回引入列表
 } = require('./playerStateHelpers');
 const {
     TIME_SEQUENCE,
@@ -178,7 +178,6 @@ const interactRouteHandler = async (req, res) => {
         invalidateNovelCache(userId);
         updateLibraryNovel(userId, username);
         
-        // 【核心修改】重新從資料庫獲取最完整的最終狀態，以回傳給前端
         const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
             getRawInventory(userId),
             getPlayerSkills(userId),
@@ -188,14 +187,13 @@ const interactRouteHandler = async (req, res) => {
         const suggestion = await getAISuggestion(finalSaveData);
         const finalBulkScore = calculateBulkScore(fullInventory);
         
-        // 【核心修改】組合一個包含完整物品陣列的回應物件
         const finalRoundDataForClient = { 
             ...finalSaveData, 
             ...finalPlayerProfile, 
             skills: updatedSkills, 
-            inventory: fullInventory, // <-- 傳回完整的物品陣列
+            inventory: fullInventory,
             money: finalPlayerProfile.money || 0,
-            bulkScore: finalBulkScore, // <-- 傳回最新的負重分數
+            bulkScore: finalBulkScore, 
             suggestion: suggestion 
         };
 
