@@ -37,53 +37,55 @@ router.post('/chat', async (req, res) => {
         const mentionedNpcNames = Array.from(knownNpcs).filter(name => playerMessage.includes(name) && name !== npcName);
         const mentionedNpcContext = mentionedNpcNames.length > 0 ? await getMergedNpcProfile(userId, mentionedNpcNames[0]) : null;
         
-        // 1. 從AI獲取回應字串 (現在應該總是一個JSON字串)
         const aiResponseString = await getAIChatResponse(model, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
         
-        // 2. 【核心加固】使用一個安全的解析函式來處理不穩定的AI回應
         let aiResponse;
         try {
-            //  步驟A：先移除頭尾可能存在的Markdown標記 (以防萬一)
             const cleanedJsonString = aiResponseString.trim().replace(/^```json\s*|```\s*$/g, '');
-            
-            //  步驟B：嘗試解析JSON
             aiResponse = JSON.parse(cleanedJsonString);
-
-            //  步驟C：驗證解析後的物件是否包含必要的鍵
             if (typeof aiResponse.response !== 'string') {
                 throw new Error("AI回傳的JSON中缺少 'response' 欄位。");
             }
         } catch (e) {
-            //  【核心修改】如果解析失敗，代表AI沒有回傳預期的JSON。
-            //  我們不再打印錯誤日誌，而是靜默地將整個原始字串視為NPC的回應。
             console.warn(`[NPC 聊天系統] AI未能回傳有效的JSON，已將其作為純文字處理。原始回傳: "${aiResponseString}"`);
             aiResponse = { 
-                response: aiResponseString, // 將原始回傳作為對話內容
+                response: aiResponseString,
                 friendlinessChange: 0, 
                 romanceChange: 0, 
                 itemChanges: [] 
             };
         }
         
-        // 3. 執行資料庫操作
-        const batch = db.batch();
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
+        if (aiResponse.friendlinessChange || aiResponse.romanceChange) {
+             await db.runTransaction(async (transaction) => {
+                const npcStateDoc = await transaction.get(npcStateRef);
+                if (!npcStateDoc.exists) { return; }
+                const currentData = npcStateDoc.data();
+                
+                const updateData = {};
+                
+                if (aiResponse.friendlinessChange) {
+                    const newFriendliness = (currentData.friendlinessValue || 0) + aiResponse.friendlinessChange;
+                    updateData.friendlinessValue = Math.min(100, newFriendliness);
+                }
 
-        if (aiResponse.friendlinessChange) {
-            batch.set(npcStateRef, { friendlinessValue: admin.firestore.FieldValue.increment(aiResponse.friendlinessChange) }, { merge: true });
+                if (aiResponse.romanceChange) {
+                    const newRomance = (currentData.romanceValue || 0) + aiResponse.romanceChange;
+                    updateData.romanceValue = Math.min(100, newRomance);
+                }
+                
+                transaction.set(npcStateRef, updateData, { merge: true });
+            });
         }
-        if (aiResponse.romanceChange) {
-            batch.set(npcStateRef, { romanceValue: admin.firestore.FieldValue.increment(aiResponse.romanceChange) }, { merge: true });
-        }
-
+        
         if (aiResponse.itemChanges && aiResponse.itemChanges.length > 0) {
             console.log(`[密談系統] 偵測到 NPC「${npcName}」想要給予物品，啟動物品管理器...`);
+            const batch = db.batch();
             await processItemChanges(userId, aiResponse.itemChanges, batch, lastRoundData, npcName);
+            await batch.commit();
         }
-
-        await batch.commit();
         
-        // 4. 準備回傳給前端的資料
         const finalResponse = {
             npcMessage: aiResponse.response,
             friendlinessChange: aiResponse.friendlinessChange || 0,
@@ -92,6 +94,7 @@ router.post('/chat', async (req, res) => {
         };
 
         res.json(finalResponse);
+
     } catch (error) {
         console.error(`[NPC路由] /chat 錯誤:`, error);
         res.status(500).json({ message: '與對方交談時發生了意外。' });
@@ -133,23 +136,25 @@ router.post('/give-item', async (req, res) => {
         const batch = db.batch();
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
 
-        // 玩家給予NPC物品
         const itemKey = type === 'money' ? '銀兩' : itemName;
         const itemToRemove = { action: 'remove', itemName: itemKey, quantity: type === 'money' ? amount : (amount || 1) };
-        // 此處不應使用 processItemChanges，因為它是設計來從玩家身上移除物品
-        // 我們需要一個更底層的函式來處理，或直接在此處實現
+        
         const playerItemRef = db.collection('users').doc(userId).collection('inventory_items').doc(itemToRemove.itemName);
         batch.update(playerItemRef, { quantity: admin.firestore.FieldValue.increment(-itemToRemove.quantity) });
         batch.set(npcStateRef, { [`inventory.${itemKey}`]: admin.firestore.FieldValue.increment(itemToRemove.quantity) }, { merge: true });
 
-        // 更新友好度
         if(friendlinessChange) {
-             batch.set(npcStateRef, { 
-                friendlinessValue: admin.firestore.FieldValue.increment(friendlinessChange) 
-            }, { merge: true });
+            await db.runTransaction(async (transaction) => {
+                const npcStateDoc = await transaction.get(npcStateRef);
+                if (!npcStateDoc.exists) { return; }
+                const currentFriendliness = npcStateDoc.data()?.friendlinessValue || 0;
+                const newFriendliness = currentFriendliness + friendlinessChange;
+                transaction.set(npcStateRef, { 
+                    friendlinessValue: Math.min(100, newFriendliness)
+                }, { merge: true });
+            });
         }
         
-        // NPC回禮
         if (npcItemGifts && npcItemGifts.length > 0) {
             await processItemChanges(userId, npcItemGifts, batch, lastRoundData, npcName);
         }
