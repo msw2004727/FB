@@ -4,7 +4,7 @@ import { api } from './api.js';
 // 全域變數，用於儲存當前交易的狀態
 let state = {};
 let onTradeCompleteCallback = null;
-let closeTradeModalCallback = null; 
+let closeTradeModalCallback = null;
 let currentNpcName = '';
 
 // DOM 元素快取
@@ -21,6 +21,9 @@ function cacheDOMElements() {
     DOMElements.npcOffer = document.querySelector('#trade-npc-offer');
     DOMElements.playerMoney = document.getElementById('trade-player-money');
     DOMElements.npcMoney = document.getElementById('trade-npc-money');
+    // 【核心新增】獲取金錢輸入框
+    DOMElements.playerMoneyInput = document.getElementById('trade-player-money-input');
+    DOMElements.npcMoneyInput = document.getElementById('trade-npc-money-input');
     DOMElements.npcHeaderName = document.getElementById('trade-npc-header-name');
     DOMElements.npcNameDisplay = document.getElementById('trade-npc-name');
     DOMElements.valueDiff = document.getElementById('trade-value-diff');
@@ -48,6 +51,10 @@ function render() {
     DOMElements.npcMoney.textContent = state.npc.money;
     DOMElements.npcHeaderName.textContent = currentNpcName;
     DOMElements.npcNameDisplay.textContent = `${currentNpcName} 的出價`;
+    
+    // 【核心新增】監聽輸入框變化
+    DOMElements.playerMoneyInput.oninput = () => calculateSummary();
+    DOMElements.npcMoneyInput.oninput = () => calculateSummary();
     
     calculateSummary();
 }
@@ -77,8 +84,16 @@ function moveItem(itemId, owner, currentArea) {
 function calculateSummary() {
     if (!DOMElements.valueDiff) return;
 
-    const playerOfferValue = state.player.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
-    const npcOfferValue = state.npc.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
+    const playerItemValue = state.player.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
+    const npcItemValue = state.npc.offer.items.reduce((sum, item) => sum + (item.value || 0), 0);
+    
+    // 【核心修正】將金錢也計入價值計算
+    const playerMoneyValue = Number(DOMElements.playerMoneyInput.value) || 0;
+    const npcMoneyValue = Number(DOMElements.npcMoneyInput.value) || 0;
+    
+    const playerOfferValue = playerItemValue + playerMoneyValue;
+    const npcOfferValue = npcItemValue + npcMoneyValue;
+
     const diff = playerOfferValue - npcOfferValue;
 
     DOMElements.valueDiff.textContent = diff;
@@ -99,7 +114,7 @@ function calculateSummary() {
         DOMElements.npcOfferPanel.classList.add('glow-positive');
     }
     
-    const isTradeable = state.player.offer.items.length > 0 || state.npc.offer.items.length > 0;
+    const isTradeable = playerOfferValue > 0 || npcOfferValue > 0;
     DOMElements.confirmBtn.disabled = !isTradeable;
 }
 
@@ -107,18 +122,35 @@ async function handleConfirmTrade() {
     DOMElements.confirmBtn.disabled = true;
     DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
 
+    // 【核心修正】獲取並驗證玩家輸入的金錢
+    const playerMoneyOffer = Number(DOMElements.playerMoneyInput.value) || 0;
+    const npcMoneyOffer = Number(DOMElements.npcMoneyInput.value) || 0;
+
+    if (playerMoneyOffer > state.player.money) {
+        alert('你的錢不夠！');
+        DOMElements.confirmBtn.disabled = false;
+        DOMElements.confirmBtn.innerHTML = `成交`;
+        return;
+    }
+    if (npcMoneyOffer > state.npc.money) {
+        alert('對方的錢不夠！');
+        DOMElements.confirmBtn.disabled = false;
+        DOMElements.confirmBtn.innerHTML = `成交`;
+        return;
+    }
+
     try {
         const finalTradeState = {
             player: {
                 offer: {
                     items: state.player.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
-                    money: 0
+                    money: playerMoneyOffer
                 }
             },
             npc: {
                 offer: {
                     items: state.npc.offer.items.map(item => ({ id: item.instanceId || item.templateId, name: item.itemName, quantity: 1 })),
-                    money: 0
+                    money: npcMoneyOffer
                 }
             }
         };
@@ -141,8 +173,6 @@ async function handleConfirmTrade() {
 }
 
 export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallback) {
-    // ================== 偵錯點 3：流程終點 ==================
-    console.log("【偵錯點 3】: 交易管理器已成功初始化！(位於 tradeManager.js)");
     cacheDOMElements();
     
     currentNpcName = npcName;
@@ -162,6 +192,10 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
         }
     };
     
+    // 【核心新增】重置金錢輸入框
+    DOMElements.playerMoneyInput.value = '0';
+    DOMElements.npcMoneyInput.value = '0';
+
     if (DOMElements.closeBtn) {
         DOMElements.closeBtn.onclick = closeTradeModalCallback;
     }
@@ -184,4 +218,6 @@ export function closeTradeUI() {
     if (DOMElements.confirmBtn) DOMElements.confirmBtn.onclick = null;
     if (DOMElements.closeBtn) DOMElements.closeBtn.onclick = null;
     if (DOMElements.tradeModal) DOMElements.tradeModal.onclick = null;
+    if (DOMElements.playerMoneyInput) DOMElements.playerMoneyInput.oninput = null;
+    if (DOMElements.npcMoneyInput) DOMElements.npcMoneyInput.oninput = null;
 }
