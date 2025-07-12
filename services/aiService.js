@@ -50,8 +50,9 @@ const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
-// 【核心修改】引用新的通用NPC記憶Prompt
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
+// 【核心新增】引入新的交易摘要Prompt
+const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
 
 
 // 統一的AI調度中心
@@ -272,6 +273,22 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
     }
 }
 
+// 【核心新增】為交易事件生成摘要
+async function getAITradeSummary(playerModelChoice, username, npcName, tradeDetails, longTermSummary) {
+    const prompt = getTradeSummaryPrompt(username, npcName, tradeDetails, longTermSummary);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.npcChatSummary || 'openai';
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text);
+    } catch (error) {
+        console.error(`[AI 任務失敗] 交易摘要師任務 (for ${npcName}):`, error);
+        return {
+            story: `你與${npcName}完成了一筆交易，雙方各取所需，皆大歡喜。`,
+            evt: `與${npcName}的交易`
+        };
+    }
+}
+
 async function getAICombatAction(playerModelChoice, playerProfile, combatState, playerAction) {
     const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
     try {
@@ -459,6 +476,7 @@ module.exports = {
     getAICombatSetup,
     getAIChatResponse,
     getAIChatSummary,
+    getAITradeSummary, // 【核心新增】導出新的函式
     getAIGiveItemResponse,
     getAINarrativeForGive,
     getRelationGraph,
