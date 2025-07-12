@@ -360,8 +360,9 @@ export async function sendChatMessage() {
             playerMessage: message,
             model: dom.aiModelSelector.value
         });
-        modal.appendChatMessage('npc', data.reply);
-        gameState.chatHistory.push({ speaker: 'npc', message: data.reply });
+        // 【核心修正】將 data.reply 改為 data.npcMessage
+        modal.appendChatMessage('npc', data.npcMessage);
+        gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
     } catch (error) {
         modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
     } finally {
