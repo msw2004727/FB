@@ -45,43 +45,49 @@ async function handleBeggarSummon(userId) {
 
 
 /**
- * 處理玩家向丐幫弟子打聽情報的請求
+ * 【核心修改】處理玩家向丐幫弟子打聽情報的請求
  * @param {string} userId - 玩家ID
+ * @param {object} playerProfile - 玩家的完整檔案
  * @param {string} beggarName - 丐幫弟子的名字
  * @param {string} userQuery - 玩家的提問
  * @param {string} model - 玩家選擇的AI模型
  * @returns {Promise<object>} - 返回包含AI回覆的物件
  */
-async function handleBeggarInquiry(userId, beggarName, userQuery, model) {
-    const playerDoc = await db.collection('users').doc(userId).get();
-    const playerProfile = playerDoc.data();
+async function handleBeggarInquiry(userId, playerProfile, beggarName, userQuery, model) {
+    const userDocRef = db.collection('users').doc(userId);
 
-    // 從玩家的問題中，嘗試找出他想問的目標NPC是誰
+    // 1. 【核心修改】驗證並扣除費用
+    const currentMoney = playerProfile.money || 0;
+    if (currentMoney < 100) {
+        return {
+            success: false,
+            response: "嘿嘿，客官，看您的樣子...這囊中似乎有些羞澀啊。沒錢？沒錢小的可不敢亂說話，會被舵主打斷腿的！"
+        };
+    }
+    await userDocRef.update({ money: admin.firestore.FieldValue.increment(-100) });
+    console.log(`[丐幫服務] 已從玩家 ${userId} 帳戶扣除100文錢情報費。`);
+    // --- 扣款結束 ---
+
+    // 2. 從玩家的問題中，嘗試找出他想問的目標NPC是誰
     const allNpcNames = getKnownNpcNames();
-    const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name));
+    const targetNpcName = Array.from(allNpcNames).find(name => userQuery.includes(name) && name !== beggarName);
     
     let targetNpcProfile = null;
     if (targetNpcName) {
         targetNpcProfile = await getMergedNpcProfile(userId, targetNpcName);
     }
     
-    // 呼叫AI扮演丐幫弟子
+    // 3. 呼叫AI扮演丐幫弟子
     const prompt = getBeggarInquiryPrompt(playerProfile, targetNpcProfile, userQuery);
     const aiResponseString = await callAI(model || aiConfig.npcChat, prompt, true);
     const inquiryResult = JSON.parse(aiResponseString);
 
-    // 處理扣款 - 這裡先不實現，等到第三階段前端整合時再一起完成
-    // const playerMoneyRef = db.collection('users').doc(userId).collection('inventory_items').doc('銀兩');
-    // await playerMoneyRef.update({ quantity: admin.firestore.FieldValue.increment(-100) });
-
-    // 如果情報為真，且有具體目標，可以考慮更新玩家的線索(CLS)
+    // 4. 如果情報為真，且有具體目標，可以考慮更新玩家的線索(CLS)
     if (inquiryResult.isTrue && targetNpcName) {
         const userSaveRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R','desc').limit(1);
         const lastSave = (await userSaveRef.get()).docs[0];
         if(lastSave.exists) {
-            const currentClues = lastSave.data().CLS || '';
             const newClue = `從丐幫弟子處聽聞：${inquiryResult.response}`;
-            // 這裡可以選擇覆蓋或添加
             await lastSave.ref.update({ CLS: newClue });
         }
     }
