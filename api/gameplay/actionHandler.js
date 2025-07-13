@@ -62,7 +62,8 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("主AI未能生成有效回應。");
         }
 
-        const finalRoundData = await updateGameState(userId, username, player, aiResponse, newRoundNumber);
+        // 【核心修正】將 playerAction 傳遞給 updateGameState
+        const finalRoundData = await updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber);
         
         const suggestion = await getAISuggestion(finalRoundData);
         finalRoundData.suggestion = suggestion;
