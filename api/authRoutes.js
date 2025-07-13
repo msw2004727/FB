@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const bcrypt = 'bcryptjs';
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { generateNpcTemplateData } = require('../services/npcCreationService');
@@ -280,13 +280,17 @@ async function runDataHealthCheck(userId, username) {
     // 檢查NPC
     const npcStatesSnapshot = await userDocRef.collection('npc_states').get();
     for (const doc of npcStatesSnapshot.docs) {
-        const templateExists = (await db.collection('npcs').doc(doc.id).get()).exists;
-        if (!templateExists) {
+        const npcTemplateRef = db.collection('npcs').doc(doc.id);
+        const templateDoc = await npcTemplateRef.get();
+        if (!templateDoc.exists) {
             console.log(`[健康檢查 v2.0] NPC模板缺失: ${doc.id}，嘗試重建...`);
             const firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === doc.id));
             if(firstMentionRound) {
                 const genData = await generateNpcTemplateData(username, { name: doc.id }, firstMentionRound, playerProfileForContext);
-                if(genData) await db.collection('npcs').doc(genData.canonicalName).set(genData.templateData);
+                if(genData) {
+                    // 【***核心修正***】使用 set + merge: true 來安全地創建或更新模板
+                    await npcTemplateRef.set(genData.templateData, { merge: true });
+                }
             }
         }
     }
