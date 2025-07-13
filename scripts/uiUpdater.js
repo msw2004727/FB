@@ -105,18 +105,15 @@ function updateStatusBar(roundData) {
     `;
 }
 
-// 【核心修改】將精力條的危險狀態判斷邏輯加入此函數
 function updatePowerBars(roundData) {
     updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
     updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
     updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
 
-    // --- 特別處理精力條 ---
     if (staminaBar && staminaValue) {
         const currentStamina = roundData.stamina || 0;
         updatePowerBar(staminaBar, staminaValue, currentStamina, 100);
         
-        // 判斷是否低於30，並加上或移除CSS class
         if (currentStamina < 30) {
             staminaBar.classList.add('pulsing-danger');
         } else {
@@ -172,11 +169,17 @@ function updateBulkStatus(score) {
     bulkStatus.className = `bulk-status-display ${colorClass}`;
 }
 
+// 【核心修改】重寫此函式以動態生成統治者資訊和按鈕
 function updateLocationInfo(locationData) {
      if (locationInfo) {
         if (locationData) {
             locationInfo.innerHTML = `
-                <div>統治者：<span class="location-ruler">${locationData.governance?.ruler || '未知'}</span></div>
+                <div class="location-ruler-container">
+                    <span>統治者：<span class="location-ruler">${locationData.governance?.ruler || '未知'}</span></span>
+                    <button id="view-location-details-btn" class="header-icon-btn" title="查看地區詳情">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
                 <div class="location-desc">${locationData.description || '此地詳情尚在傳聞之中...'}</div>
             `;
         } else {
