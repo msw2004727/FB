@@ -33,23 +33,46 @@ const { processItemChanges } = require('./itemManager');
 
 const db = admin.firestore();
 
+// 【核心新增】指令預處理函式 (第二層保險)
+const preprocessPlayerAction = (playerAction, locationContext) => {
+    const facilityKeywords = {
+        '鐵匠鋪': '鐵匠鋪', '打鐵鋪': '鐵匠鋪',
+        '藥鋪': '藥鋪', '藥房': '藥鋪', '醫館': '藥鋪',
+        '客棧': '客棧', '酒館': '客棧', '酒樓': '客棧',
+        '雜貨鋪': '雜貨鋪',
+        '村長家': '村長家',
+    };
+
+    for (const [keyword, type] of Object.entries(facilityKeywords)) {
+        if (playerAction.includes(keyword)) {
+            const facilities = locationContext?.facilities || [];
+            const targetFacility = facilities.find(f => f.type === type);
+            if (targetFacility) {
+                const newAction = `前往${targetFacility.name}`;
+                console.log(`[指令預處理] 偵測到通用指令，已將 "${playerAction}" 修正為 "${newAction}"`);
+                return newAction; // 返回修正後的精確指令
+            }
+        }
+    }
+    return playerAction; // 如果沒有匹配，返回原始指令
+};
+
+
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const userDocRef = db.collection('users').doc(userId);
 
     try {
-        const { action: playerAction, model: playerModelChoice } = req.body;
+        let { action: playerAction, model: playerModelChoice } = req.body;
         
-        // 【第一道防線】在所有邏輯之前，先獲取最新的玩家狀態
         const playerStateSnapshot = await userDocRef.get();
         if (!playerStateSnapshot.exists) {
             return res.status(404).json({ message: '找不到玩家資料。' });
         }
         const player = playerStateSnapshot.data();
 
-        // ================= 【核心修正】精力為零時的強制昏迷事件 =================
-        // 定義哪些行為不算在「掙扎」，而是「合理的求生」
+        // ================= 【精力為零時的強制昏迷事件】 =================
         const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救'].some(kw => playerAction.includes(kw));
 
         if (player.stamina <= 0 && !isTryingToRestOrHeal) {
@@ -151,6 +174,9 @@ const interactRouteHandler = async (req, res) => {
         const context = await buildContext(userId, username);
         if (!context) throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         
+        // 【核心修改】在呼叫AI之前，執行指令預處理
+        playerAction = preprocessPlayerAction(playerAction, context.locationContext);
+        
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame } = context;
         if (isNewGame) return res.status(404).json({ message: '找不到存檔紀錄。' });
         if (player.isDeceased) return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
@@ -189,23 +215,17 @@ const interactRouteHandler = async (req, res) => {
 
         const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
         
-        // ================= 【核心修正】精力計算邏輯 =================
-        // 1. 使用 '??' 取代 '||'，避免 0 被當成 false
         let newStamina = (player.stamina ?? 100) + staminaChange;
-        // 2. 隨機扣減精力
         const randomStaminaDeduction = Math.floor(Math.random() * 5) + 1;
         newStamina -= randomStaminaDeduction;
         console.log(`[精力系統] AI判定消耗: ${staminaChange}, 每回合基礎消耗: -${randomStaminaDeduction}`);
-        // 3. 優化休息邏輯，只有「睡覺」才能補滿
         const isSleeping = ['睡覺'].some(kw => playerAction.includes(kw));
         const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
         if (isSleeping && timeDidAdvance) {
             newStamina = 100;
              console.log(`[精力系統] 玩家睡覺，精力完全恢復。`);
         }
-        // 4. 確保精力值有其上下限
         newStamina = Math.max(0, Math.min(100, newStamina));
-        // =========================================================
         
         let shortActionCounter = player.shortActionCounter || 0;
         if (!timeDidAdvance && !isSleeping) shortActionCounter++; else shortActionCounter = 0;
