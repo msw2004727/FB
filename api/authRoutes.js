@@ -6,8 +6,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { v4: uuidv4 } = require('uuid');
-const { runDataHealthCheck } = require('./dataIntegrityService');
-const { DEFAULT_USER_FIELDS } = require('./models/userModel'); // 【核心修改】從新的模型檔案讀取
+const { runDataHealthCheck } = require('./dataIntegrityService'); // 【核心新增】引入新的健康檢查服務
+const { DEFAULT_USER_FIELDS } = require('./models/userModel');
 
 const db = admin.firestore();
 
@@ -134,7 +134,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
         
-        // 【核心修改】登入時，在後台啟動「資料完整性檢查」服務
+        // 【核心修改】登入成功後，在背景非同步執行資料健康檢查，不影響登入速度
         runDataHealthCheck(userId, username).catch(err => {
             console.error(`[背景健康檢查] 為玩家 ${username} 執行時發生錯誤:`, err);
         });
@@ -152,5 +152,4 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// 【核心修改】移除對 DEFAULT_USER_FIELDS 的導出，現在由 userModel.js 負責
 module.exports = router;
