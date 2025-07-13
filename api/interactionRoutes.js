@@ -250,7 +250,8 @@ const interactRouteHandler = async (req, res) => {
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
         await processItemChanges(userId, itemChanges, batch, { R: newRoundNumber, ...finalDate, timeOfDay: finalTimeOfDay, LOC });
-        await updateFriendlinessValues(userId, username, NPC, { R: newRoundNumber, LOC }, player);
+        // 【***核心修正***】將 batch 參數傳遞給 updateFriendlinessValues
+        await updateFriendlinessValues(userId, username, NPC, { R: newRoundNumber, LOC }, player, batch);
         await updateRomanceValues(userId, romanceChanges);
         await processNpcUpdates(userId, npcUpdates);
         if (locationUpdates && locationContext) {
