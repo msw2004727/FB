@@ -8,7 +8,6 @@ import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js'; 
 import { api } from './api.js';
 
-// 將 gameLoop 中的函式傳遞給 interactionHandlers，建立連接
 interaction.setGameLoop(gameLoop);
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,17 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // 第一步：初始化所有DOM元素
     initializeDOM();
 
-    // 【核心修改】讀取玩家姓名並更新輸入框提示文字
     const username = localStorage.getItem('username');
     if (dom.playerInput && username) {
         dom.playerInput.placeholder = `${username}接下來...`;
     } else if (dom.playerInput) {
-        dom.playerInput.placeholder = '接下來...'; // 若找不到姓名則使用預設值
+        dom.playerInput.placeholder = '接下來...';
     }
-    // 【修改結束】
 
     function setGameContainerHeight() {
         if (dom.gameContainer) {
@@ -95,15 +91,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // --- 【核心修改】 ---
         if (dom.bountiesBtn) {
             dom.bountiesBtn.addEventListener('click', () => {
                 interaction.hideNpcInteractionMenu();
-                // 在點擊的瞬間，立刻移除高亮樣式，達到「已讀」的視覺效果
                 dom.bountiesBtn.classList.remove('has-new-bounty');
             });
         }
-        // --- 修改結束 ---
+        
+        // 【核心新增】為地區資訊卡片添加事件委託，以處理動態生成的按鈕
+        const locationInfoContainer = document.getElementById('location-info');
+        if (locationInfoContainer) {
+            locationInfoContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('#view-location-details-btn');
+                if (button) {
+                    if (gameState.currentLocationData) {
+                        modal.openLocationDetailsModal(gameState.currentLocationData);
+                    } else {
+                        alert("當前地區的詳細情報尚未載入。");
+                    }
+                }
+            });
+        }
         
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
