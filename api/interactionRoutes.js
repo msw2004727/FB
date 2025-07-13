@@ -65,6 +65,10 @@ const interactRouteHandler = async (req, res) => {
     try {
         let { action: playerAction, model: playerModelChoice } = req.body;
         
+        console.log(`\n--- [新回合開始] ---`);
+        console.log(`[玩家] ${username} (ID: ${userId})`);
+        console.log(`[行動] ${playerAction}`);
+        
         const [playerStateSnapshot, lastSaveSnapshot] = await Promise.all([
             userDocRef.get(),
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
@@ -78,12 +82,12 @@ const interactRouteHandler = async (req, res) => {
         const currentRoundNumber = lastSaveSnapshot.empty ? 0 : (lastSaveSnapshot.docs[0].data().R || 0);
         const newRoundNumber = currentRoundNumber + 1;
         
-        console.log(`[回合數檢查] 偵測到最新存檔回合為 R${currentRoundNumber}，本次將寫入 R${newRoundNumber}。`);
+        console.log(`[回合數] 最新存檔為 R${currentRoundNumber}，本次將寫入 R${newRoundNumber}。`);
         
         const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救'].some(kw => playerAction.includes(kw));
 
         if ((player.stamina || 0) <= 0 && !isTryingToRestOrHeal) {
-            console.log(`[精力系統] 玩家精力為零 (${player.stamina}) 且行動 (${playerAction}) 並非求生，強制觸發昏迷事件。`);
+            console.log(`[精力系統] 玩家精力為零 (${player.stamina})，強制觸發昏迷事件。`);
 
             const currentTimeIndex = TIME_SEQUENCE.indexOf(player.timeOfDay);
             const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
@@ -262,22 +266,15 @@ const interactRouteHandler = async (req, res) => {
             ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
         };
 
-        console.log('--- [存檔檢查點] ---');
-        console.log('準備寫入存檔的最終數據:', JSON.stringify(finalSaveData, null, 2));
-        
         const finalNewSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
         await finalNewSaveRef.set(finalSaveData);
-        console.log(`[強制寫入機制] R${newRoundNumber} 存檔成功！`);
+        console.log(`[存檔系統] 已成功寫入 R${newRoundNumber} 的存檔。`);
 
         const batch = db.batch();
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
         await processItemChanges(userId, itemChanges, batch, { R: newRoundNumber, ...finalDate, timeOfDay: finalTimeOfDay, LOC });
-        
-        // --- 核心修正：將完整的 finalSaveData 傳遞下去 ---
         await updateFriendlinessValues(userId, username, NPC, finalSaveData, player, batch);
-        // --- 核心修正結束 ---
-
         await updateRomanceValues(userId, romanceChanges);
         await processNpcUpdates(userId, npcUpdates);
         if (locationUpdates && locationContext) {
@@ -306,7 +303,7 @@ const interactRouteHandler = async (req, res) => {
         batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
         
         await batch.commit();
-        console.log(`[數據同步] R${newRoundNumber} 的其餘數據已成功同步至資料庫。`);
+        console.log(`[數據同步] 玩家主檔案與長期記憶已同步至 R${newRoundNumber}。`);
         
         const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
             getRawInventory(userId),
