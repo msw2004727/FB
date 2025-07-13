@@ -8,6 +8,42 @@
     <link rel="stylesheet" href="styles/admin.css">
     <style>
         /* 新增的專用樣式 */
+        .page-header {
+            margin-bottom: 2rem;
+        }
+        .page-header p {
+            color: var(--secondary-text);
+            font-size: 0.95rem;
+        }
+        .rebuild-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        .rebuild-section h4 {
+            margin-top: 0;
+            color: var(--accent-color);
+        }
+        .rebuild-section p {
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+        }
+        .btn-rebuild {
+             background-color: #e67e22;
+             color: white;
+             padding: 10px 15px;
+             border:none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-weight: bold;
+        }
+         .btn-rebuild:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+         }
+
         .template-card {
             background: var(--card-bg);
             padding: 20px;
@@ -23,6 +59,7 @@
             color: var(--accent-color);
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 10px;
+            word-break: break-all;
         }
         .template-card .details {
             font-size: 0.9rem;
@@ -52,7 +89,7 @@
         }
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 20px;
         }
         .modal-backdrop {
@@ -119,9 +156,10 @@
             <ul class="menu-list">
                 <li><a href="#dashboard" class="menu-link active"><i class="fas fa-chart-line"></i> API儀表板</a></li>
                 <li><a href="#logs" class="menu-link"><i class="fas fa-file-alt"></i> 系統日誌</a></li>
-                <li><a href="#npc-templates" class="menu-link"><i class="fas fa-users"></i> NPC模板管理</a></li>
-                <li><a href="#item-templates" class="menu-link"><i class="fas fa-archive"></i> 物品模板管理</a></li>
-                <li><a href="#location-templates" class="menu-link"><i class="fas fa-map-marked-alt"></i> 地點模板管理</a></li>
+                <li><a href="#npc-templates" class="menu-link"><i class="fas fa-users"></i> NPC模板</a></li>
+                <li><a href="#item-templates" class="menu-link"><i class="fas fa-archive"></i> 物品模板</a></li>
+                <li><a href="#location-templates" class="menu-link"><i class="fas fa-map-marked-alt"></i> 地點模板</a></li>
+                <li><a href="#skill-templates" class="menu-link"><i class="fas fa-khanda"></i> 技能模板</a></li>
             </ul>
         </nav>
 
@@ -132,45 +170,70 @@
             </header>
 
             <div id="page-dashboard" class="page-content active">
-                <div id="balance-cards-container" class="balance-cards-container">
-                    <p class="loading-text">正在獲取API餘額資訊...</p>
-                </div>
+                <div id="balance-cards-container" class="balance-cards-container"><p class="loading-text">正在獲取API餘額資訊...</p></div>
             </div>
 
             <div id="page-logs" class="page-content">
                 <div class="log-controls">
-                    <select id="player-filter">
-                        <option value="">所有玩家</option>
-                    </select>
+                    <select id="player-filter"><option value="">所有玩家</option></select>
                     <button id="refresh-logs-btn"><i class="fas fa-sync-alt"></i> 重新整理</button>
                 </div>
                 <div class="log-table-container">
-                    <table id="log-table">
-                        <thead>
-                            <tr><th>時間</th><th>等級</th><th>玩家ID</th><th>訊息</th></tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                    <table id="log-table"><thead><tr><th>時間</th><th>等級</th><th>玩家ID</th><th>訊息</th></tr></thead><tbody></tbody></table>
                     <p id="logs-loading-text" class="loading-text">正在載入日誌...</p>
                 </div>
             </div>
             
             <div id="page-npc-templates" class="page-content">
-                <h2>NPC 模板全局管理</h2>
-                <p>此處顯示的是 <code>/npcs</code> 集合中的所有通用角色模板。修改此處的資料將會影響到未來所有玩家新遇到的同名NPC。</p>
+                <div class="page-header">
+                    <h2>NPC 模板全局管理</h2>
+                    <p>此處顯示的是 <code>/npcs</code> 集合中的所有通用角色模板。修改此處的資料將會影響到未來所有玩家新遇到的同名NPC。</p>
+                </div>
+                <div class="rebuild-section" data-type="npc">
+                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
+                    <p>此功能會掃描所有玩家的<code>npc_states</code>子集合，找出那些只存在於玩家個人數據中、卻沒有對應根模板的「黑戶」NPC，並利用AI為其自動創建健全的根模板。此過程可能需要數分鐘。</p>
+                    <button class="btn-rebuild" data-type="npc"><i class="fas fa-cogs"></i> 一鍵回填NPC黑戶</button>
+                </div>
                 <div id="npc-templates-container" class="grid-container"><p class="loading-text">正在讀取NPC模板...</p></div>
             </div>
 
             <div id="page-item-templates" class="page-content">
-                 <h2>物品模板全局管理</h2>
-                <p>此處顯示的是 <code>/items</code> 集合中的所有通用物品模板。修改此處的資料將會影響到所有玩家獲得的同名物品。</p>
+                 <div class="page-header">
+                    <h2>物品模板全局管理</h2>
+                    <p>此處顯示的是 <code>/items</code> 集合中的所有通用物品模板。修改此處的資料將會影響到所有玩家獲得的同名物品。</p>
+                </div>
+                <div class="rebuild-section" data-type="item">
+                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
+                    <p>此功能會掃描所有玩家的<code>inventory_items</code>子集合，找出那些被玩家擁有、卻沒有對應根模板的「黑戶」物品，並利用AI為其自動創建健全的根模板。</p>
+                    <button class="btn-rebuild" data-type="item"><i class="fas fa-cogs"></i> 一鍵回填物品黑戶</button>
+                </div>
                 <div id="item-templates-container" class="grid-container"><p class="loading-text">正在讀取物品模板...</p></div>
             </div>
 
             <div id="page-location-templates" class="page-content">
-                <h2>地點模板全局管理</h2>
-                <p>此處顯示的是 <code>/locations</code> 集合中的所有通用地點模板。</p>
+                <div class="page-header">
+                    <h2>地點模板全局管理</h2>
+                    <p>此處顯示的是 <code>/locations</code> 集合中的所有通用地點模板。</p>
+                </div>
+                <div class="rebuild-section" data-type="location">
+                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
+                    <p>此功能會掃描所有玩家的<code>location_states</code>子集合，找出那些被玩家探索過、卻沒有對應根模板的「黑戶」地點，並利用AI為其自動創建健全的根模板。</p>
+                    <button class="btn-rebuild" data-type="location"><i class="fas fa-cogs"></i> 一鍵回填地點黑戶</button>
+                </div>
                 <div id="location-templates-container" class="grid-container"><p class="loading-text">正在讀取地點模板...</p></div>
+            </div>
+            
+            <div id="page-skill-templates" class="page-content">
+                <div class="page-header">
+                    <h2>技能模板全局管理</h2>
+                    <p>此處顯示的是 <code>/skills</code> 集合中的所有通用技能模板。</p>
+                </div>
+                 <div class="rebuild-section" data-type="skill">
+                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
+                    <p>此功能會掃描所有玩家的<code>skills</code>子集合，找出那些被玩家學會、卻沒有對應根模板的「黑戶」技能，並利用AI為其自動創建健全的根模板。</p>
+                    <button class="btn-rebuild" data-type="skill"><i class="fas fa-cogs"></i> 一鍵回填技能黑戶</button>
+                </div>
+                <div id="skill-templates-container" class="grid-container"><p class="loading-text">正在讀取技能模板...</p></div>
             </div>
         </main>
     </div>
