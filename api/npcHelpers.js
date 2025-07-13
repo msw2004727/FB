@@ -135,7 +135,12 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
     const batch = db.batch();
 
     for (const change of npcChanges) {
-        if (!change.name) continue;
+        // --- 【核心修正】 ---
+        // 增加一個守衛，如果AI回傳的NPC物件沒有名字，就直接跳過，避免後續流程崩潰
+        if (!change || !change.name) {
+            console.warn(`[NPC助手] 偵測到一個無效的NPC物件 (缺少名字)，已略過。`, change);
+            continue; 
+        }
 
         const isTrulyNew = !existingNpcIds.has(change.name);
         if (isTrulyNew) {
