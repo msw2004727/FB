@@ -19,7 +19,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心修改】簡化特殊事件指令，只要求AI寫故事，不要求其創建JSON數據
     let specialEventInstruction = '';
     if (worldEventToWeave && worldEventToWeave.eventName === 'BEGGAR_SUMMONED') {
         specialEventInstruction = `
@@ -29,7 +28,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 2.  **描寫細節**: 根據玩家要求，這位弟子的登場方式必須是「低調」的，例如從暗巷角落、人群中不起眼的地方湊過來。同時，你必須在描述中加入他「渾身臭味」的細節，以增強真實感。
 3.  **引導互動**: 你的故事結尾應該自然地引導玩家與這位新出現的丐幫弟子互動。
 `;
-    } else if (worldEventToWeave) { // 其他世界事件
+    } else if (worldEventToweaved) { 
         specialEventInstruction = `
 ## 【最高優先級特殊劇情指令：世界事件編織】
 江湖中一樁大事正在發酵，你本回合的故事必須圍繞此事展開。這不是一個可選項，而是必須完成的核心任務！
@@ -83,7 +82,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **結構**: \`{ "npcName": "被提及的NPC姓名", "fieldToUpdate": "currentLocation", "newValue": roundData.LOC[roundData.LOC.length - 1], "updateType": "set" }\`
 `;
 
-
     const npcContextInstruction = Object.keys(npcContext).length > 0
         ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的資訊，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！
         ### 【復仇行為鐵律】
@@ -109,7 +107,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 * **不堪重負 (>30分)**：當玩家負重極高時，你的描述必須**強烈地**表現出負面效果。
 `;
 
-    // ================= 【核心修改】 =================
+    // ================= 【核心修正】精力系統規則強化 =================
     const staminaSystemRule = `
 ## 【核心新增】體力系統 (Stamina System)
 你的首要新職責是根據玩家的行動，判斷其體力消耗。
@@ -121,10 +119,10 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **微量消耗 (-1 ~ -5)**：在城鎮或村莊內短距離行走、搜查一個房間、進行簡單的交易或手工。
     * **中等消耗 (-10 ~ -20)**：在野外進行長途跋涉、進行常規的武學修練、參與一場普通的戰鬥。
     * **大量消耗 (-25 ~ -40)**：施展威力強大的武學、全力奔跑以逃離危險、進行高強度的體力勞動、身受重傷。
-4.  **【數據一致性鐵律】**: 你在 \`story\` 中的文字描述，必須與你回傳的 \`staminaChange\` 數值**完全一致**。如果你在故事中寫到「感到疲憊」、「氣喘吁吁」、「體力消耗」，那麼你的 \`staminaChange\` **絕對不能** 為0或正數。反之，如果你在故事中描述玩家正在「休息」，那麼 \`staminaChange\` **必須**是正數。任何數據與描述的矛盾，都將被視為一次嚴重的判斷失誤。`;
-    // ===============================================
+4.  **【數據一致性鐵律】**: 你在 \`story\` 中的文字描述，必須與你回傳的 \`staminaChange\` 數值**完全一致**。如果你在故事中寫到「感到疲憊」、「氣喘吁吁」、「體力消耗」，那麼你的 \`staminaChange\` **絕對不能** 為0或正數。反之，如果你在故事中描述玩家正在「休息」，那麼 \`staminaChange\` **必須**是正數。任何數據與描述的矛盾，都將被視為一次嚴重的判斷失誤。
+5.  **【昏迷鐵律】**: 如果玩家的體力在行動前就已經是 0 或更低，你**必須**忽略玩家的任何行動指令（除非是求救或使用丹藥等合理求生行為），並直接觸發「昏迷事件」。你的故事描述必須是關於玩家體力不支、失去意識的過程。同時，你必須回傳一個較大的**正數** \`staminaChange\`（例如 +100）來代表昏迷後的體力恢復，並推進至少一個時間單位。`;
+    // =======================================================================
 
-    // 引入其他規則模塊...
     const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality, playerPower });
     const romanceRules = getRomanceRule({ playerGender });
     const worldviewAndProgressionRules = getWorldviewAndProgressionRule({ protagonistDescription, playerPower });
@@ -135,7 +133,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const interactionRule = getInteractionRule();
     const npcRule = getNpcRule();
 
-    // 整合所有規則...
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
 
