@@ -57,7 +57,6 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
     return playerAction;
 };
 
-
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -66,11 +65,24 @@ const interactRouteHandler = async (req, res) => {
     try {
         let { action: playerAction, model: playerModelChoice } = req.body;
         
-        const playerStateSnapshot = await userDocRef.get();
+        // --- 核心修正：同時獲取玩家狀態和真實的最後一筆存檔 ---
+        const [playerStateSnapshot, lastSaveSnapshot] = await Promise.all([
+            userDocRef.get(),
+            userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
+        ]);
+
         if (!playerStateSnapshot.exists) {
             return res.status(404).json({ message: '找不到玩家資料。' });
         }
         let player = playerStateSnapshot.data();
+
+        // 從 game_saves 中獲取最準確的當前回合數，而不是依賴 user document
+        const currentRoundNumber = lastSaveSnapshot.empty ? 0 : (lastSaveSnapshot.docs[0].data().R || 0);
+        const newRoundNumber = currentRoundNumber + 1;
+        
+        console.log(`[回合數檢查] 偵測到最新存檔回合為 R${currentRoundNumber}，本次將寫入 R${newRoundNumber}。`);
+        // --- 核心修正結束 ---
+
 
         // ================= 【精力為零時的強制昏迷事件】 =================
         const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救'].some(kw => playerAction.includes(kw));
@@ -87,14 +99,16 @@ const interactRouteHandler = async (req, res) => {
             }
 
             const comaStory = `你試圖繼續行動，但眼前猛地一黑，身體再也支撐不住，直挺挺地倒了下去，徹底失去了意識。不知過了多久，你才悠悠轉醒，發現時間已經悄然流逝。`;
-            const newRoundNumber = (player.R || 0) + 1;
+            
+            // 使用修正後的回合數
+            const comaRoundNumber = newRoundNumber;
 
             const finalSaveData = {
                 ...player,
                 story: comaStory,
                 PC: "你因體力不支而昏倒，醒來後體力已完全恢復。",
                 EVT: "體力耗盡而昏迷",
-                R: newRoundNumber,
+                R: comaRoundNumber,
                 timeOfDay: newTimeOfDay,
                 ...newDate,
                 stamina: 100,
@@ -109,14 +123,14 @@ const interactRouteHandler = async (req, res) => {
                 NPC: player.NPC || [],
             };
 
-            const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
+            const newSaveRef = userDocRef.collection('game_saves').doc(`R${comaRoundNumber}`);
             await newSaveRef.set(finalSaveData);
 
             await userDocRef.update({
                 stamina: 100,
                 timeOfDay: newTimeOfDay,
                 ...newDate,
-                R: newRoundNumber,
+                R: comaRoundNumber,
             });
 
             const suggestion = "你大病初癒，最好先查看一下自身狀態。";
@@ -149,13 +163,13 @@ const interactRouteHandler = async (req, res) => {
 
         if (isSummoningBeggar) {
             const summonResult = await beggarService.handleBeggarSummon(userId);
-            const [lastSaveSnapshot, inventoryState, fullInventory] = await Promise.all([
+            const [b_lastSaveSnapshot, inventoryState, fullInventory] = await Promise.all([
                 db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
                 getInventoryState(userId),
                 getRawInventory(userId)
             ]);
-            if (lastSaveSnapshot.empty) return res.status(404).json({ message: '找不到存檔紀錄，無法呼叫丐幫。' });
-            const lastRoundData = lastSaveSnapshot.docs[0].data();
+            if (b_lastSaveSnapshot.empty) return res.status(404).json({ message: '找不到存檔紀錄，無法呼叫丐幫。' });
+            const lastRoundData = b_lastSaveSnapshot.docs[0].data();
             const tempRoundData = {
                 ...lastRoundData,
                 money: inventoryState.money || 0,
@@ -185,7 +199,6 @@ const interactRouteHandler = async (req, res) => {
 
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
         
-        // --- 核心修改：建立「金鐘罩」，為所有從AI收到的資料提供預設值，杜絕 `undefined` ---
         const safeRoundData = aiResponse.roundData;
         const playerState = safeRoundData.playerState || 'alive';
         const powerChange = safeRoundData.powerChange || { internal: 0, external: 0, lightness: 0 };
@@ -210,9 +223,6 @@ const interactRouteHandler = async (req, res) => {
         const aiNextTimeOfDay = safeRoundData.timeOfDay;
         const daysToAdvance = safeRoundData.daysToAdvance || 0;
         const staminaChange = safeRoundData.staminaChange || 0;
-        // --- 修改結束 ---
-
-        const newRoundNumber = (player.R || 0) + 1;
 
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, skillChanges, player);
         if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -245,7 +255,6 @@ const interactRouteHandler = async (req, res) => {
         }
         for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
-        // --- 核心修改：將存檔操作提前 ---
         const finalSaveData = { 
             story: aiResponse.story || "江湖靜好，歲月無聲。", 
             R: Number(newRoundNumber), 
@@ -263,8 +272,8 @@ const interactRouteHandler = async (req, res) => {
         console.log('--- [存檔檢查點] ---');
         console.log('準備寫入存檔的最終數據:', JSON.stringify(finalSaveData, null, 2));
         
-        const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
-        await newSaveRef.set(finalSaveData);
+        const finalNewSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
+        await finalNewSaveRef.set(finalSaveData);
         console.log(`[強制寫入機制] R${newRoundNumber} 存檔成功！`);
 
         const batch = db.batch();
