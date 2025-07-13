@@ -3,14 +3,11 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-// 【核心修改】引入 calculateBulkScore
 const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); 
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
-
-// 【核心修改】移除本地的 calculateBulkScore 和 BULK_TO_SCORE_MAP
 
 router.post('/equip', async (req, res) => {
     const { itemId, equip } = req.body;
@@ -29,7 +26,6 @@ router.post('/equip', async (req, res) => {
         }
 
         const fullInventory = await getRawInventory(userId);
-        // 【核心修改】使用引入的函式
         const newBulkScore = calculateBulkScore(fullInventory);
         
         res.json({
@@ -71,19 +67,23 @@ router.get('/latest-game', async (req, res) => {
         let latestGameData = snapshot.docs[0].data();
         
         const locationData = await getMergedLocationData(userId, latestGameData.LOC);
-        
-        // 【核心修改】使用引入的函式
         const bulkScore = calculateBulkScore(fullInventory);
 
+        // ** 核心修正開始 **
+        // 確保回傳給前端的 `money` 是 user document 中的「文錢」
+        // `silver` 則是從物品庫中計算的「銀兩」
+        const silverItem = fullInventory.find(item => item.templateId === '銀兩');
+        const silverAmount = silverItem ? silverItem.quantity : 0;
+        
         Object.assign(latestGameData, { 
             ...userData, 
             skills: skills,
             inventory: fullInventory,
-            bulkScore: bulkScore,     
+            bulkScore: bulkScore,
+            money: userData.money || 0, // 確保 money 是 userDoc 中的文錢
+            silver: silverAmount         // 新增 silver 欄位代表銀兩
         });
-        
-        const moneyItem = fullInventory.find(item => item.templateId === '銀兩' || item.templateId === '賞金');
-        latestGameData.money = moneyItem ? moneyItem.quantity : 0;
+        // ** 核心修正結束 **
 
         const [prequelText, suggestion] = await Promise.all([
             getAIPrequel(userData.preferredModel, [latestGameData]),
