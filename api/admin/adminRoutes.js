@@ -3,13 +3,16 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const adminAuth = require('./adminAuth');
-const { getLogs, getPlayersWithLogs } = require('./logService'); // getPlayersWithLogs 仍用於日誌篩選
+const { getLogs, getPlayersWithLogs } = require('./logService');
 const { getApiBalances } = require('./balanceService');
+
+// --- 【核心修正】修正所有模組的相對路徑 ---
 const { generateNpcTemplateData } = require('../../services/npcCreationService');
-const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../../playerStateHelpers');
-const { generateAndCacheLocation } = require('../../worldEngine');
+const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../playerStateHelpers');
+const { generateAndCacheLocation } = require('../worldEngine');
 const { getRelationshipFixPrompt } = require('../../prompts/relationshipFixPrompt');
 const { callAI, aiConfig } = require('../../services/aiService');
+
 
 const db = admin.firestore();
 
@@ -25,26 +28,17 @@ router.get('/balances', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
-
 router.get('/logs', async (req, res) => {
     try {
         const { playerId, limit = 150 } = req.query;
-        // 為了日誌篩選，這裡仍然可以使用舊的函式
         const logs = await getLogs(playerId || null, parseInt(limit));
         res.json(logs);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
-
-/**
- * @route   GET /api/admin/players
- * @desc    獲取所有玩家列表
- * @access  Private (Admin)
- */
 router.get('/players', async (req, res) => {
     try {
-        // 【核心修正】直接從 /users 集合獲取所有玩家ID
         const usersSnapshot = await db.collection('users').get();
         if (usersSnapshot.empty) {
             return res.json([]);
