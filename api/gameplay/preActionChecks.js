@@ -1,6 +1,7 @@
 // /api/gameplay/preActionChecks.js
 const { TIME_SEQUENCE, advanceDate, invalidateNovelCache, updateLibraryNovel, getMergedLocationData } = require('../worldStateHelpers');
-const { getRawInventory, getPlayerSkills, calculateBulkScore } = require('../playerStateHelpers');
+// 【核心修正】從 playerStateHelpers 中，補上對 getInventoryState 的引用
+const { getRawInventory, getPlayerSkills, calculateBulkScore, getInventoryState } = require('../playerStateHelpers');
 const beggarService = require('../../services/beggarService');
 const admin = require('firebase-admin');
 const db = admin.firestore();
@@ -76,7 +77,7 @@ async function handleStaminaDepletion(req, res, player, newRoundNumber) {
  * @returns {Promise<boolean>} - 如果事件被觸發並處理，返回 true
  */
 async function handleBeggarSummon(req, res) {
-    const { id: userId } = req.user;
+    const { id: userId, username } = req.user;
     const { action: playerAction } = req.body;
     const beggarKeywords = ['丐幫', '乞丐', '打聽', '消息', '情報'];
     
