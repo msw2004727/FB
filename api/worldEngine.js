@@ -7,7 +7,7 @@ const { callAI, aiConfig } = require('../services/aiService');
 const db = admin.firestore();
 
 /**
- * 【核心重構 3.0】採用批次處理和層級感知的地點生成邏輯
+ * 【核心重構 4.0】採用「先檢查、後創建」的全局模板生成邏輯
  * @param {string} userId - 玩家的ID.
  * @param {string} locationName - 需要生成的最深層地點的名稱.
  * @param {string} locationType - 地點的類型.
@@ -16,26 +16,23 @@ const db = admin.firestore();
  */
 async function generateAndCacheLocation(userId, locationName, locationType = '未知', worldSummary = '江湖軼事無可考。', knownHierarchy = []) {
     if (!userId || !locationName) return;
-    console.log(`[世界引擎 3.0] 收到為玩家 ${userId} 初始化地點「${locationName}」的請求...`);
+    console.log(`[世界引擎 4.0] 收到為玩家 ${userId} 初始化地點「${locationName}」的請求...`);
 
     const staticLocationRef = db.collection('locations').doc(locationName);
     const dynamicLocationRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
 
     try {
-        const staticDoc = await staticLocationRef.get();
+        let staticDoc = await staticLocationRef.get();
 
-        // 如果最深層的地點已存在，則無需生成
-        if (staticDoc.exists) {
-            console.log(`[世界引擎 3.0] 地點「${locationName}」的共享模板已存在，跳過AI生成。`);
-        } else {
-            console.log(`[世界引擎 3.0] 為「${locationName}」啟動層級感知生成程序...`);
+        // 步驟一：檢查並創建最外層的【全局靜態模板】
+        if (!staticDoc.exists) {
+            console.log(`[世界引擎 4.0] 全局模板「${locationName}」不存在，啟動AI生成程序...`);
             
-            // 建立一個更豐富的上下文，告訴AI我們已經知道了哪些上級
             const generationContext = `需要為地點「${locationName}」建檔。目前已知的上級地點包含：${knownHierarchy.join('->') || '無'}。請基於此脈絡，生成包含「${locationName}」在內的完整、合理的行政層級。`;
             
             const prompt = getLocationGeneratorPrompt(locationName, locationType, generationContext);
             const locationJsonString = await callAI(aiConfig.location, prompt, true);
-            const locationDataArray = JSON.parse(locationJsonString).locationHierarchy; // 假設AI現在會回傳一個地點陣列
+            const locationDataArray = JSON.parse(locationJsonString).locationHierarchy;
 
             if (!locationDataArray || !Array.isArray(locationDataArray) || locationDataArray.length === 0) {
                  throw new Error("AI生成的地點資料結構不正確，應為一個包含地點物件的陣列。");
@@ -45,42 +42,49 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
 
             for (const loc of locationDataArray) {
                 const locRef = db.collection('locations').doc(loc.locationName);
-                const doc = await locRef.get();
-                // 只有當該層級的地點不存在時，才寫入
-                if (!doc.exists) {
+                const docToCheck = await locRef.get();
+                if (!docToCheck.exists) {
                     batch.set(locRef, loc.staticTemplate);
-                     console.log(`[世界引擎 3.0] 已將新地點「${loc.locationName}」加入批次創建佇列。`);
+                    console.log(`[世界引擎 4.0] 已將新地點「${loc.locationName}」的全局模板加入批次創建佇列。`);
                 }
-            }
-
-            // 為玩家初始化最深層地點的動態狀態
-            const deepestLocation = locationDataArray.find(loc => loc.locationName === locationName);
-            if (deepestLocation) {
-                batch.set(dynamicLocationRef, deepestLocation.initialDynamicState);
             }
             
             await batch.commit();
-            console.log(`[世界引擎 3.0] 成功批次創建地點層級及玩家初始狀態。`);
-            return;
+            console.log(`[世界引擎 4.0] 成功批次創建地點層級的全局模板。`);
+
+            // 重新獲取一次，確保後續邏輯能用到剛創建的資料
+            staticDoc = await staticLocationRef.get(); 
+        } else {
+             console.log(`[世界引擎 4.0] 地點「${locationName}」的全局模板已存在，跳過AI生成。`);
         }
 
-        // 如果模板存在，但玩家的動態狀態不存在，則為其建立
+        // 步驟二：為當前玩家創建【個人動態狀態】
         const dynamicDoc = await dynamicLocationRef.get();
         if (!dynamicDoc.exists) {
-            console.log(`[世界引擎 3.0] 模板已存在，但玩家 ${userId} 的動態狀態不存在，正在為其建立...`);
+            console.log(`[世界引擎 4.0] 玩家 ${userId} 的個人地點狀態「${locationName}」不存在，正在為其初始化...`);
+            
+            // 從剛獲取或已存在的靜態文檔中，提取對應的初始動態狀態
+            // 這裡假設 getLocationGeneratorPrompt 返回的結構中，staticTemplate 同層級有 initialDynamicState
+            // 我們需要找到對應 locationName 的 initialDynamicState
+            const staticData = staticDoc.data(); 
+
+            // 如果模板是AI生成的，我們可以從中獲取初始狀態，否則使用一個預設值
+            // 這個邏輯需要 getLocationGeneratorPrompt 配合返回 staticTemplate 和 initialDynamicState
+            // 由於我們無法直接從 staticDoc 獲取 initialDynamicState，這裡使用一個安全的預設值
             const initialDynamicData = {
-                governance: { ruler: '未知', allegiance: '獨立', security: '普通' },
+                governance: { ruler: staticData.governance?.ruler || '未知', allegiance: staticData.governance?.allegiance ||'獨立', security: '普通' },
                 economy: { currentProsperity: '普通' },
-                facilities: [],
-                buildings: [],
+                facilities: staticData.facilities || [],
+                buildings: staticData.buildings || [],
                 lore: { currentIssues: ['暫無江湖傳聞'] }
             };
+
             await dynamicLocationRef.set(initialDynamicData);
-            console.log(`[世界引擎 3.0] 成功為玩家 ${userId} 初始化了「${locationName}」的動態狀態。`);
+            console.log(`[世界引擎 4.0] 成功為玩家 ${userId} 初始化了「${locationName}」的個人地點狀態。`);
         }
 
     } catch (error) {
-        console.error(`[世界引擎 3.0] 在處理地點「${locationName}」時發生錯誤:`, error);
+        console.error(`[世界引擎 4.0] 在處理地點「${locationName}」時發生嚴重錯誤:`, error);
     }
 }
 
