@@ -1,6 +1,6 @@
 // api/dataIntegrityService.js
 const admin = require('firebase-admin');
-const { DEFAULT_USER_FIELDS } = require('./models/userModel'); // 【核心修改】從新的模型檔案讀取預設值
+const { DEFAULT_USER_FIELDS } = require('./models/userModel');
 const { generateNpcTemplateData } = require('../services/npcCreationService');
 const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
