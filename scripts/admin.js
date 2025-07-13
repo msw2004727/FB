@@ -27,6 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
     let currentEditData = null;
 
+    // --- 【***核心修正***】將頁面載入器(pageLoaders)的宣告提前 ---
+    const pageLoaders = {
+        'dashboard': loadBalances,
+        'logs': loadLogs,
+        'npc-templates': () => loadTemplates('npc'),
+        'item-templates': () => loadTemplates('item'),
+        'location-templates': () => loadTemplates('location'),
+    };
+    
     // --- 初始化檢查 ---
     if (sessionStorage.getItem('admin_token')) {
         showDashboard();
@@ -91,15 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 頁面內容載入器 ---
-    const pageLoaders = {
-        'dashboard': loadBalances,
-        'logs': loadLogs,
-        'npc-templates': () => loadTemplates('npc'),
-        'item-templates': () => loadTemplates('item'),
-        'location-templates': () => loadTemplates('location'),
-    };
-
+    // --- 頁面內容載入器函式 ---
     async function loadBalances() {
         const container = document.getElementById('balance-cards-container');
         if (!container) return;
