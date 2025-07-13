@@ -38,7 +38,6 @@ const DEFAULT_USER_FIELDS = {
     morality: 0,
     stamina: 25,
     bulkScore: 0,
-    isDeceased: false,
     equipment: {
         head: null,
         body: null,
@@ -102,6 +101,7 @@ router.post('/register', async (req, res) => {
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
+        // 【***核心修正***】在註冊時，強制檢查並生成初始地點「無名村」
         console.log(`[註冊流程] 正在為新玩家 ${username} 主動建立初始地點「無名村」...`);
         await generateAndCacheLocation(newUserRef.id, '無名村', '村莊', '玩家初入江湖，身在無名村。');
         console.log(`[註冊流程] 「無名村」建立完畢。`);
