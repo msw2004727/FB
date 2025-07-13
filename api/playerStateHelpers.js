@@ -256,6 +256,64 @@ async function getRawInventory(userId) {
     return results.filter(item => item !== null);
 }
 
+/**
+ * 【核心新增】獲取NPC的完整物品列表（背包+裝備）
+ * @param {object} npcProfile - 從 getMergedNpcProfile 獲取的NPC完整檔案
+ * @returns {Promise<Array<object>>}
+ */
+async function getRawNpcInventory(npcProfile) {
+    if (!npcProfile) return [];
+
+    const allItems = [];
+    const itemPromises = [];
+
+    // 1. 處理背包中的物品 (inventory)
+    if (npcProfile.inventory && typeof npcProfile.inventory === 'object') {
+        for (const [itemName, quantity] of Object.entries(npcProfile.inventory)) {
+            if (quantity > 0) {
+                 itemPromises.push(
+                    getOrGenerateItemTemplate(itemName).then(res => {
+                        if (res?.template) {
+                            allItems.push({
+                                ...res.template,
+                                itemName: res.template.itemName || itemName,
+                                quantity: quantity,
+                                instanceId: itemName, // 對於可堆疊物品，用模板ID作為唯一標識
+                                isEquipped: false
+                            });
+                        }
+                    })
+                );
+            }
+        }
+    }
+    
+    // 2. 處理裝備中的物品 (equipment)
+    if (npcProfile.equipment && Array.isArray(npcProfile.equipment)) {
+         for (const equip of npcProfile.equipment) {
+            if (equip.templateId) {
+                itemPromises.push(
+                    getOrGenerateItemTemplate(equip.templateId).then(res => {
+                        if (res?.template) {
+                            allItems.push({
+                                ...res.template,
+                                ...equip,
+                                itemName: res.template.itemName || equip.templateId,
+                                quantity: 1,
+                                isEquipped: true // 標記為已裝備
+                            });
+                        }
+                    })
+                );
+            }
+        }
+    }
+    
+    await Promise.all(itemPromises);
+    return allItems;
+}
+
+
 async function updateSkills(userId, skillChanges, playerProfile) {
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
     const playerSkillsRef = db.collection('users').doc(userId).collection('skills');
@@ -363,6 +421,7 @@ module.exports = {
     updateInventory,
     getInventoryState,
     getRawInventory,
+    getRawNpcInventory, // 導出新函式
     updateSkills,
     getPlayerSkills,
     calculateBulkScore
