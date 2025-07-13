@@ -49,10 +49,9 @@ function getFriendlinessLevel(value) {
 }
 
 /**
- * 【核心修正 v2.0】
- * 獲取NPC的合併檔案 (通用模板 + 玩家專屬狀態)
- * 當通用模板不存在時，此函式不再創建佔位符，而是直接返回 null，
- * 將創建的責任完全交給 createNewNpc。
+ * 【核心修正 v3.0 - 最終版】
+ * 獲取NPC的合併檔案。此函式現在嚴格遵守「只讀」原則。
+ * 當通用模板不存在時，直接返回 null，將創建的責任完全交給 createNewNpc。
  * @param {string} userId - 玩家ID
  * @param {string} npcName - NPC姓名
  * @returns {Promise<object|null>} - 返回合併後的NPC檔案，或在找不到模板時返回null
@@ -69,7 +68,7 @@ async function getMergedNpcProfile(userId, npcName) {
 
         // 如果通用模板不存在，直接返回 null，不執行任何寫入操作。
         if (!npcTemplateDoc.exists) {
-            console.log(`[NPC助手] 偵測到NPC「${npcName}」的通用模板不存在。`);
+            console.log(`[NPC助手] 偵測到NPC「${npcName}」的通用模板不存在，將等待主流程創建。`);
             return null;
         }
         
