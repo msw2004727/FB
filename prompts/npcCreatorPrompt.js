@@ -1,16 +1,17 @@
 // prompts/npcCreatorPrompt.js
 
 const getNpcCreatorPrompt = (username, npcName, roundData, playerProfile) => {
-    // 從回合資訊中提取情境，幫助AI更好地創作
+    // 【核心修正】為所有可能不存在的欄位提供預設值，確保程式碼的穩健性
+    const safeRoundData = roundData || {};
     const context = `
 - 玩家姓名: ${username}
-- 玩家性別: ${playerProfile.gender}
-- 首次相遇地點: ${roundData.LOC[0]}
-- 當時天氣: ${roundData.WRD}
-- 當時氛圍: ${roundData.ATM.join('、')}
-- 遭遇事件: ${roundData.EVT}
-- NPC當時的狀態: ${roundData.NPC.find(npc => npc.name === npcName)?.status || '狀態不明'}
-- 玩家當時的行動: ${roundData.IMP}
+- 玩家性別: ${playerProfile.gender || '未知'}
+- 首次相遇地點: ${(safeRoundData.LOC && safeRoundData.LOC[0]) || '未知地點'}
+- 當時天氣: ${safeRoundData.WRD || '天氣不明'}
+- 當時氛圍: ${(safeRoundData.ATM || []).join('、') || '氛圍不詳'}
+- 遭遇事件: ${safeRoundData.EVT || '一次平凡的相遇'}
+- NPC當時的狀態: ${(safeRoundData.NPC || []).find(npc => npc.name === npcName)?.status || '狀態不明'}
+- 玩家當時的行動: ${safeRoundData.IMP || '未知'}
     `;
 
     return `
