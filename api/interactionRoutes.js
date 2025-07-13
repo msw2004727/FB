@@ -65,7 +65,6 @@ const interactRouteHandler = async (req, res) => {
     try {
         let { action: playerAction, model: playerModelChoice } = req.body;
         
-        // --- 核心修正：同時獲取玩家狀態和真實的最後一筆存檔 ---
         const [playerStateSnapshot, lastSaveSnapshot] = await Promise.all([
             userDocRef.get(),
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get()
@@ -76,15 +75,11 @@ const interactRouteHandler = async (req, res) => {
         }
         let player = playerStateSnapshot.data();
 
-        // 從 game_saves 中獲取最準確的當前回合數，而不是依賴 user document
         const currentRoundNumber = lastSaveSnapshot.empty ? 0 : (lastSaveSnapshot.docs[0].data().R || 0);
         const newRoundNumber = currentRoundNumber + 1;
         
         console.log(`[回合數檢查] 偵測到最新存檔回合為 R${currentRoundNumber}，本次將寫入 R${newRoundNumber}。`);
-        // --- 核心修正結束 ---
-
-
-        // ================= 【精力為零時的強制昏迷事件】 =================
+        
         const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救'].some(kw => playerAction.includes(kw));
 
         if ((player.stamina || 0) <= 0 && !isTryingToRestOrHeal) {
@@ -100,7 +95,6 @@ const interactRouteHandler = async (req, res) => {
 
             const comaStory = `你試圖繼續行動，但眼前猛地一黑，身體再也支撐不住，直挺挺地倒了下去，徹底失去了意識。不知過了多久，你才悠悠轉醒，發現時間已經悄然流逝。`;
             
-            // 使用修正後的回合數
             const comaRoundNumber = newRoundNumber;
 
             const finalSaveData = {
@@ -156,8 +150,7 @@ const interactRouteHandler = async (req, res) => {
                 locationData: await getMergedLocationData(userId, player.currentLocation)
             });
         }
-        // =======================================================================
-
+        
         const beggarKeywords = ['丐幫', '乞丐', '打聽', '消息', '情報'];
         const isSummoningBeggar = beggarKeywords.some(keyword => playerAction.includes(keyword));
 
@@ -280,7 +273,11 @@ const interactRouteHandler = async (req, res) => {
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
         await processItemChanges(userId, itemChanges, batch, { R: newRoundNumber, ...finalDate, timeOfDay: finalTimeOfDay, LOC });
-        await updateFriendlinessValues(userId, username, NPC, { R: newRoundNumber, LOC }, player, batch);
+        
+        // --- 核心修正：將完整的 finalSaveData 傳遞下去 ---
+        await updateFriendlinessValues(userId, username, NPC, finalSaveData, player, batch);
+        // --- 核心修正結束 ---
+
         await updateRomanceValues(userId, romanceChanges);
         await processNpcUpdates(userId, npcUpdates);
         if (locationUpdates && locationContext) {
