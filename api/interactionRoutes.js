@@ -1,4 +1,4 @@
-// /api/interactionRoutes.js 小心修復這會造成存檔異常
+// /api/interactionRoutes.js
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
@@ -29,7 +29,6 @@ const {
 const { triggerBountyGeneration } = require('./worldEngine');
 const { processLocationUpdates } = require('./locationManager');
 const { buildContext } = require('./contextBuilder');
-// 【核心修正】修正了 'itemManager' 的引入路徑
 const { processItemChanges } = require('./itemManager');
 
 const db = admin.firestore();
@@ -183,7 +182,7 @@ const interactRouteHandler = async (req, res) => {
         if (player.isDeceased) return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
 
         const romanceEventData = await checkAndTriggerRomanceEvent(userId, player);
-        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistory), playerAction, player, username, player.currentTimeOfDay, player.power, player.morality, [], romanceEventData ? romanceEventData.eventStory : null, null, locationContext, npcContext, bulkScore, []);
+        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistory), playerAction, player, username, player.currentTimeOfDay, player.power, player.morality, [], romanceEventData ? romanceEventData.eventStory : null, null, locationContext, npcContext, playerBulkScore, []);
 
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
         
@@ -250,7 +249,6 @@ const interactRouteHandler = async (req, res) => {
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
         await processItemChanges(userId, itemChanges, batch, { R: newRoundNumber, ...finalDate, timeOfDay: finalTimeOfDay, LOC });
-        // 【***核心修正***】將 batch 參數傳遞給 updateFriendlinessValues
         await updateFriendlinessValues(userId, username, NPC, { R: newRoundNumber, LOC }, player, batch);
         await updateRomanceValues(userId, romanceChanges);
         await processNpcUpdates(userId, npcUpdates);
@@ -291,8 +289,16 @@ const interactRouteHandler = async (req, res) => {
 
         const newSummary = await getAISummary(longTermSummary, finalSaveData);
         batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
-
-        await batch.commit();
+        
+        // 【***核心修正***】為批次提交操作增加錯誤捕獲
+        try {
+            await batch.commit();
+        } catch (commitError) {
+            console.error(`[嚴重錯誤] 玩家 ${username} (ID: ${userId}) 的回合 ${newRoundNumber} 資料庫批次寫入失敗！`, commitError);
+            console.error('[錯誤詳情] 導致失敗的可能原因是玩家資料中的欄位類型與操作不符（例如對字串執行increment）。');
+            // 向前端回傳一個錯誤，告知操作失敗
+            return res.status(500).json({ message: '系統繁忙，暫存江湖記憶時發生錯誤，您的進度未能保存，請稍後再試。' });
+        }
 
         const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
             getRawInventory(userId),
