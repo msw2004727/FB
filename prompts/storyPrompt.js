@@ -19,25 +19,31 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心修改】簡化特殊事件指令，只要求AI寫故事，不要求其創建JSON數據
-    let specialEventInstruction = '';
-    if (worldEventToWeave && worldEventToWeave.eventName === 'BEGGAR_SUMMONED') {
-        specialEventInstruction = `
-## 【最高優先級特殊劇情指令：丐幫弟子登場】
-你已接收到召喚信號！本回合你必須完成以下核心任務：
-1.  **安排登場**: 在你的 \`story\` 文字中，必須合乎邏輯地安排一位丐幫弟子NPC出現在玩家面前。這位NPC的名字是「${worldEventToWeave.beggarName}」。
-2.  **描寫細節**: 根據玩家要求，這位弟子的登場方式必須是「低調」的，例如從暗巷角落、人群中不起眼的地方湊過來。同時，你必須在描述中加入他「渾身臭味」的細節，以增強真實感。
-3.  **引導互動**: 你的故事結尾應該自然地引導玩家與這位新出現的丐幫弟子互動。
+    // 【核心新增】空間情境與移動鐵律
+    const spatialContextRule = `
+## 【空間情境與移動鐵律 (極高優先級)】
+你必須嚴格區分「內部移動」和「外部移動」，以確保空間的邏輯性。
+
+1.  **內部移動 (優先判定)**:
+    * **定義**: 指在同一個上級地點內部的移動。例如，從「無名村」的廣場移動到「無名村」的「葉家鐵鋪」。
+    * **觸發條件**: 當玩家的指令是前往一個**通用設施**（如 "去鐵匠鋪", "進客棧", "找藥鋪"）時，你**必須**首先檢查【重要地點情境參考】中，當前地點 \`${locationContext?.locationName || '未知'}\` 是否已存在對應的設施 (\`facilities\`)。
+    * **執行鐵律**:
+        * 如果**存在**對應設施（例如，玩家要去鐵匠鋪，而地點內正好有「葉家鐵鋪」），你**必須**將劇情導向這個已存在的設施。你的 \`roundData.LOC\` 回傳值**必須**是原地點層級上追加子地點，例如：從 \`["無名村"]\` 變成 \`["無名村", "葉家鐵鋪"]\`。
+        * 在這種情況下，**絕對禁止**創造任何新的父級地點（如新的村莊或城鎮）。
+
+2.  **外部移動 (次級判定)**:
+    * **定義**: 指從一個上級地點前往另一個完全不同的上級地點。例如，從「無名村」前往「開封府」。
+    * **觸發條件**: 只有在玩家的指令中包含**明確的、不存在於當前地點層級中的地名**（如 "前往開封府"），或者當玩家的「內部移動」指令在當前地點找不到對應設施時，你才能將其視為一次外部移動。
+    * **執行鐵律**: 當你判定為外部移動時，你可以發揮想像力，創造前往新地點的過程，並在 \`roundData.LOC\` 中設定新的地點層級。
 `;
-    } else if (worldEventToWeave) { // <-- FIX IS HERE: Corrected variable name
-        specialEventInstruction = `
+
+    const specialEventInstruction = worldEventToWeave ? `
 ## 【最高優先級特殊劇情指令：世界事件編織】
 江湖中一樁大事正在發酵，你本回合的故事必須圍繞此事展開。這不是一個可選項，而是必須完成的核心任務！
 - **事件類型**: ${worldEventToWeave.eventType}
 - **事件核心**: ${worldEventToWeave.eventData.summary}
 - **當前階段**: ${worldEventToWeave.currentStage}
-- **你的任務**: 你必須將「${worldEventToWeave.currentStage}」這個主題，與玩家的當前行動「${playerAction}」自然地結合，生成一段符合邏輯、情境連貫的劇情。例如，如果事件是「NPC死亡後的社會反應」，而玩家行動是「去酒館喝酒」，你可以描寫酒館裡的人們正在議論此事。如果玩家的行動與事件無關，你可以描寫事件的餘波如何影響到玩家周遭的環境。`;
-    }
+- **你的任務**: 你必須將「${worldEventToWeave.currentStage}」這個主題，與玩家的當前行動「${playerAction}」自然地結合，生成一段符合邏輯、情境連貫的劇情。例如，如果事件是「NPC死亡後的社會反應」，而玩家行動是「去酒館喝酒」，你可以描寫酒館裡的人們正在議論此事。如果玩家的行動與事件無關，你可以描寫事件的餘波如何影響到玩家周遭的環境。` : '';
 
     const currencyRule = `
 ## 【核心經濟系統鐵律：雙貨幣系統】
@@ -141,6 +147,7 @@ ${specialEventInstruction}
 ${romanceInstruction}
 ${dyingInstruction}
 ${worldviewAndProgressionRules}
+${spatialContextRule}
 ${encumbranceInstruction}
 ${staminaSystemRule}
 ${playerAttributeRules}
