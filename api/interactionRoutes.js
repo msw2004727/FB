@@ -84,7 +84,7 @@ const interactRouteHandler = async (req, res) => {
         
         console.log(`[回合數] 最新存檔為 R${currentRoundNumber}，本次將寫入 R${newRoundNumber}。`);
         
-        const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救'].some(kw => playerAction.includes(kw));
+        const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救', '小歇', '歇會', '躺一下', '坐一下'].some(kw => playerAction.includes(kw));
 
         if ((player.stamina || 0) <= 0 && !isTryingToRestOrHeal) {
             console.log(`[精力系統] 玩家精力為零 (${player.stamina})，強制觸發昏迷事件。`);
@@ -232,14 +232,28 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
-        let newStamina = (player.stamina ?? 100) + (staminaChange || 0) - (Math.floor(Math.random() * 5) + 1);
-        const isSleeping = ['睡覺'].some(kw => playerAction.includes(kw));
-        const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
-        if (isSleeping && timeDidAdvance) newStamina = 100;
-        newStamina = Math.max(0, Math.min(100, newStamina));
+        // --- 核心修正：重構精力值計算邏輯 v2.0 ---
+        const longRestKeywords = ['睡覺', '歇息', '休息'];
+        const isLongRest = longRestKeywords.some(kw => playerAction.includes(kw)) && daysToAdvance > 0;
         
+        let newStamina = player.stamina ?? 100;
+
+        if (isLongRest) {
+            newStamina = 100; // 長時間休息直接回滿
+        } else {
+            // 應用 AI 返回的精力變化（正數為恢復，負數為消耗）
+            newStamina += staminaChange;
+            // 應用所有行動都具備的基礎消耗
+            newStamina -= (Math.floor(Math.random() * 5) + 1); // 基礎消耗1-5點
+        }
+
+        newStamina = Math.max(0, Math.min(100, newStamina)); // 確保精力在 0-100 之間
+        // --- 核心修正結束 ---
+        
+        const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
         let shortActionCounter = player.shortActionCounter || 0;
-        if (!timeDidAdvance && !isSleeping) shortActionCounter++; else shortActionCounter = 0;
+        if (!timeDidAdvance && !isTryingToRestOrHeal) shortActionCounter++; else shortActionCounter = 0;
+
         let finalTimeOfDay = aiNextTimeOfDay || player.currentTimeOfDay;
         let finalDate = { year: player.year, month: player.month, day: player.day, yearName: player.yearName };
         let daysToAdd = daysToAdvance;
@@ -265,7 +279,7 @@ const interactRouteHandler = async (req, res) => {
             itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
             ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
         };
-
+        
         const finalNewSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
         await finalNewSaveRef.set(finalSaveData);
         console.log(`[存檔系統] 已成功寫入 R${newRoundNumber} 的存檔。`);
