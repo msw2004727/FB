@@ -1,19 +1,29 @@
 // api/worldEngine.js
 const admin = require('firebase-admin');
-const { getBountyGeneratorPrompt } = require('../prompts/bountyGeneratorPrompt.js');
 const { getLocationGeneratorPrompt } = require('../prompts/locationGeneratorPrompt.js');
 const { callAI, aiConfig } = require('../services/aiService');
 
 const db = admin.firestore();
 
-/**
- * 【核心重構 4.0】採用「先檢查、後創建」的全局模板生成邏輯
- * @param {string} userId - 玩家的ID.
- * @param {string} locationName - 需要生成的最深層地點的名稱.
- * @param {string} locationType - 地點的類型.
- * @param {string} worldSummary - 當前世界的長期故事摘要.
- * @param {Array<string>} [knownHierarchy=[]] - 已知的上級地點層級.
- */
+// 【核心新增】數據淨化與預設值填充函式
+function sanitizeLocationData(template) {
+    if (!template) return null;
+
+    // 確保頂層屬性存在
+    template.geography = template.geography || {};
+    template.economy = template.economy || {};
+    template.lore = template.lore || {};
+    template.address = template.address || {};
+
+    // 為lore.history提供預設值，防止undefined
+    if (!template.lore.history) {
+        template.lore.history = "關於此地的由來，已淹沒在時間的長河中。";
+    }
+    
+    return template;
+}
+
+
 async function generateAndCacheLocation(userId, locationName, locationType = '未知', worldSummary = '江湖軼事無可考。', knownHierarchy = []) {
     if (!userId || !locationName) return;
     console.log(`[世界引擎 4.0] 收到為玩家 ${userId} 初始化地點「${locationName}」的請求...`);
@@ -24,7 +34,6 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
     try {
         let staticDoc = await staticLocationRef.get();
 
-        // 步驟一：檢查並創建最外層的【全局靜態模板】
         if (!staticDoc.exists) {
             console.log(`[世界引擎 4.0] 全局模板「${locationName}」不存在，啟動AI生成程序...`);
             
@@ -44,33 +53,29 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
                 const locRef = db.collection('locations').doc(loc.locationName);
                 const docToCheck = await locRef.get();
                 if (!docToCheck.exists) {
-                    batch.set(locRef, loc.staticTemplate);
-                    console.log(`[世界引擎 4.0] 已將新地點「${loc.locationName}」的全局模板加入批次創建佇列。`);
+                    // 【核心修正】在寫入前，對AI生成的數據進行淨化
+                    const sanitizedTemplate = sanitizeLocationData(loc.staticTemplate);
+                    if (sanitizedTemplate) {
+                        batch.set(locRef, sanitizedTemplate);
+                        console.log(`[世界引擎 4.0] 已將淨化後的新地點「${loc.locationName}」的全局模板加入批次創建佇列。`);
+                    }
                 }
             }
             
             await batch.commit();
             console.log(`[世界引擎 4.0] 成功批次創建地點層級的全局模板。`);
 
-            // 重新獲取一次，確保後續邏輯能用到剛創建的資料
             staticDoc = await staticLocationRef.get(); 
         } else {
              console.log(`[世界引擎 4.0] 地點「${locationName}」的全局模板已存在，跳過AI生成。`);
         }
 
-        // 步驟二：為當前玩家創建【個人動態狀態】
         const dynamicDoc = await dynamicLocationRef.get();
         if (!dynamicDoc.exists) {
             console.log(`[世界引擎 4.0] 玩家 ${userId} 的個人地點狀態「${locationName}」不存在，正在為其初始化...`);
             
-            // 從剛獲取或已存在的靜態文檔中，提取對應的初始動態狀態
-            // 這裡假設 getLocationGeneratorPrompt 返回的結構中，staticTemplate 同層級有 initialDynamicState
-            // 我們需要找到對應 locationName 的 initialDynamicState
             const staticData = staticDoc.data(); 
 
-            // 如果模板是AI生成的，我們可以從中獲取初始狀態，否則使用一個預設值
-            // 這個邏輯需要 getLocationGeneratorPrompt 配合返回 staticTemplate 和 initialDynamicState
-            // 由於我們無法直接從 staticDoc 獲取 initialDynamicState，這裡使用一個安全的預設值
             const initialDynamicData = {
                 governance: { ruler: staticData.governance?.ruler || '未知', allegiance: staticData.governance?.allegiance ||'獨立', security: '普通' },
                 economy: { currentProsperity: '普通' },
