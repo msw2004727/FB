@@ -3,18 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI文字江湖 - 後台管理</title>
+    <title>AI文字江湖 - 後台管理系統</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="styles/admin.css">
+    <style>
+        /* 新增的專用樣式 */
+        .template-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .template-card h4 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .template-card .details {
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+            line-height: 1.6;
+            flex-grow: 1;
+        }
+        .template-card .actions {
+            display: flex;
+            gap: 10px;
+        }
+        .template-card .actions .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .template-card .actions .btn-edit {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        .template-card .actions .btn-delete {
+            background-color: var(--error-color);
+            color: white;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: var(--header-bg);
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+        }
+        .modal-content textarea {
+            width: 100%;
+            min-height: 400px;
+            box-sizing: border-box;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .modal-actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
 </head>
 <body>
 
     <div id="login-container" class="login-container">
         <div class="login-box">
             <i class="fas fa-user-shield login-icon"></i>
-            <h2>後台登入</h2>
+            <h2>後台管理系統</h2>
             <p>請輸入管理密碼以繼續</p>
-            <input type="password" id="admin-password" placeholder="管理密碼...">
+            <input type="password" id="admin-password" placeholder="管理密碼..." value="1121">
             <button id="login-btn">登入</button>
             <p id="login-error" class="login-error-message"></p>
         </div>
@@ -23,17 +113,15 @@
     <div id="admin-dashboard" class="admin-dashboard hidden">
         <nav id="sidebar" class="sidebar">
             <div class="sidebar-header">
-                <h3><i class="fas fa-toolbox"></i> 管理面板</h3>
+                <h3><i class="fas fa-database"></i> 資料庫總覽</h3>
                 <button id="menu-toggle-close" class="menu-toggle-btn"><i class="fas fa-times"></i></button>
             </div>
             <ul class="menu-list">
                 <li><a href="#dashboard" class="menu-link active"><i class="fas fa-chart-line"></i> API儀表板</a></li>
                 <li><a href="#logs" class="menu-link"><i class="fas fa-file-alt"></i> 系統日誌</a></li>
-                <li><a href="#player-stats" class="menu-link"><i class="fa-solid fa-user-pen"></i> 玩家屬性</a></li>
-                <li><a href="#npc-management" class="menu-link"><i class="fa-solid fa-users-gear"></i> NPC 管理</a></li>
-                <li><a href="#location-editor" class="menu-link"><i class="fa-solid fa-map-location-dot"></i> 地區編輯</a></li>
-                <li><a href="#item-spawner" class="menu-link"><i class="fa-solid fa-box-archive"></i> 物品生成</a></li>
-                <li><a href="#npc-creator" class="menu-link"><i class="fa-solid fa-user-plus"></i> 創建新人物</a></li>
+                <li><a href="#npc-templates" class="menu-link"><i class="fas fa-users"></i> NPC模板管理</a></li>
+                <li><a href="#item-templates" class="menu-link"><i class="fas fa-archive"></i> 物品模板管理</a></li>
+                <li><a href="#location-templates" class="menu-link"><i class="fas fa-map-marked-alt"></i> 地點模板管理</a></li>
             </ul>
         </nav>
 
@@ -53,33 +141,49 @@
                 <div class="log-controls">
                     <select id="player-filter">
                         <option value="">所有玩家</option>
-                        </select>
+                    </select>
                     <button id="refresh-logs-btn"><i class="fas fa-sync-alt"></i> 重新整理</button>
                 </div>
                 <div class="log-table-container">
                     <table id="log-table">
                         <thead>
-                            <tr>
-                                <th>時間</th>
-                                <th>等級</th>
-                                <th>玩家ID</th>
-                                <th>訊息</th>
-                            </tr>
+                            <tr><th>時間</th><th>等級</th><th>玩家ID</th><th>訊息</th></tr>
                         </thead>
-                        <tbody>
-                            </tbody>
+                        <tbody></tbody>
                     </table>
-                     <p id="logs-loading-text" class="loading-text">正在載入日誌...</p>
+                    <p id="logs-loading-text" class="loading-text">正在載入日誌...</p>
                 </div>
             </div>
             
-            <div id="page-player-stats" class="page-content"></div>
-            <div id="page-npc-management" class="page-content"></div>
-            <div id="page-location-editor" class="page-content"></div>
-            <div id="page-item-spawner" class="page-content"></div>
-            <div id="page-npc-creator" class="page-content"></div>
+            <div id="page-npc-templates" class="page-content">
+                <h2>NPC 模板全局管理</h2>
+                <p>此處顯示的是 <code>/npcs</code> 集合中的所有通用角色模板。修改此處的資料將會影響到未來所有玩家新遇到的同名NPC。</p>
+                <div id="npc-templates-container" class="grid-container"><p class="loading-text">正在讀取NPC模板...</p></div>
+            </div>
 
+            <div id="page-item-templates" class="page-content">
+                 <h2>物品模板全局管理</h2>
+                <p>此處顯示的是 <code>/items</code> 集合中的所有通用物品模板。修改此處的資料將會影響到所有玩家獲得的同名物品。</p>
+                <div id="item-templates-container" class="grid-container"><p class="loading-text">正在讀取物品模板...</p></div>
+            </div>
+
+            <div id="page-location-templates" class="page-content">
+                <h2>地點模板全局管理</h2>
+                <p>此處顯示的是 <code>/locations</code> 集合中的所有通用地點模板。</p>
+                <div id="location-templates-container" class="grid-container"><p class="loading-text">正在讀取地點模板...</p></div>
+            </div>
         </main>
+    </div>
+
+    <div id="edit-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h3 id="modal-title">編輯模板</h3>
+            <textarea id="modal-textarea"></textarea>
+            <div class="modal-actions">
+                <button id="modal-cancel" class="btn btn-secondary">取消</button>
+                <button id="modal-save" class="btn btn-edit">儲存變更</button>
+            </div>
+        </div>
     </div>
 
     <script src="scripts/admin.js" type="module"></script>
