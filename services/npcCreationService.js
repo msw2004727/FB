@@ -1,9 +1,9 @@
-// api/services/npcCreationService.js
+// /services/npcCreationService.js
 const admin = require('firebase-admin');
-const { callAI, aiConfig } = require('../../services/aiService'); 
-const { getNpcCreatorPrompt } = require('../../prompts/npcCreatorPrompt.js');
-const { processNpcRelationships } = require('../relationshipManager');
-const { findReusableNpc } = require('../templateManager'); // 引入新的模板管理器
+const { callAI, aiConfig } = require('./aiService'); // 【修正】路徑從 '../../services/aiService' 改為 './aiService'
+const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
+const { processNpcRelationships } = require('../api/relationshipManager');
+const { findReusableNpc } = require('../api/templateManager'); 
 
 const db = admin.firestore();
 
