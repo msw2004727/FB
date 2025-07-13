@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const bcrypt = require('bcryptjs');
+const bcrypt = 'bcryptjs';
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { generateNpcTemplateData } = require('../services/npcCreationService');
@@ -38,6 +38,7 @@ const DEFAULT_USER_FIELDS = {
     morality: 0,
     stamina: 25,
     bulkScore: 0,
+    isDeceased: false,
     equipment: {
         head: null,
         body: null,
@@ -101,7 +102,6 @@ router.post('/register', async (req, res) => {
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // 【***核心修正***】在註冊時，強制檢查並生成初始地點「無名村」
         console.log(`[註冊流程] 正在為新玩家 ${username} 主動建立初始地點「無名村」...`);
         await generateAndCacheLocation(newUserRef.id, '無名村', '村莊', '玩家初入江湖，身在無名村。');
         console.log(`[註冊流程] 「無名村」建立完畢。`);
@@ -207,16 +207,16 @@ router.post('/login', async (req, res) => {
 
 
 /**
- * 獨立的資料健康檢查函式，用於登入後在背景執行
+ * 【***核心重構***】獨立的資料健康檢查與遷移函式
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  */
 async function runDataHealthCheck(userId, username) {
-    console.log(`[健康檢查] 開始為玩家 ${username} 執行登入後資料健康檢查...`);
+    console.log(`[健康檢查 v2.0] 開始為玩家 ${username} 執行登入後資料健康檢查...`);
     const userDocRef = db.collection('users').doc(userId);
     const playerProfileForContext = (await userDocRef.get()).data();
     
-    // --- 檢查點 1: 修補玩家核心欄位 ---
+    // --- 檢查點 1: 修補玩家核心欄位 (與之前相同) ---
     const userUpdateBatch = db.batch();
     let userNeedsUpdate = false;
     for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
@@ -232,93 +232,73 @@ async function runDataHealthCheck(userId, username) {
     }
     if (userNeedsUpdate) {
         await userUpdateBatch.commit();
-        console.log(`[健康檢查] 已為玩家 ${username} 補全了缺失的核心欄位。`);
+        console.log(`[健康檢查 v2.0] 已為玩家 ${username} 補全了缺失的核心欄位。`);
     }
 
-    // --- 檢查點 2: 修補地點的統治者 ---
-    const locationsSnapshot = await userDocRef.collection('location_states').get();
-    if (!locationsSnapshot.empty) {
-        const rulerUpdateBatch = db.batch();
-        let rulerUpdatesCount = 0;
-        for (const locStateDoc of locationsSnapshot.docs) {
-            const locationDoc = await db.collection('locations').doc(locStateDoc.id).get();
-            if (locationDoc.exists) {
-                const locData = locationDoc.data();
-                const isGovernable = ['村莊', '城鎮', '城市', '都府', '山寨', '門派', '堡壘'].includes(locData.locationType);
-                if (isGovernable && (!locData.ruler || locData.ruler.trim() === '')) {
-                    const newRuler = generateRulerName();
-                    rulerUpdateBatch.update(locationDoc.ref, { ruler: newRuler });
-                    rulerUpdatesCount++;
-                    console.log(`[健康檢查] 地點「${locData.locationName}」缺少統治者，自動指派：${newRuler}`);
-                }
+    // --- 【核心】檢查點 2: 處理舊版物品資料遷移 ---
+    // 檢查是否存在舊的 inventory (game_state/inventory)
+    const oldInventoryDocRef = db.collection('users').doc(userId).collection('game_state').doc('inventory');
+    const oldInventoryDoc = await oldInventoryDocRef.get();
+
+    if(oldInventoryDoc.exists) {
+        console.log(`[資料遷移] 偵測到玩家 ${username} 存在舊版 inventory 資料，開始遷移...`);
+        const oldInventoryData = oldInventoryDoc.data();
+        const newInventoryCollectionRef = db.collection('users').doc(userId).collection('inventory_items');
+        const migrationBatch = db.batch();
+        let migratedCount = 0;
+
+        for (const [itemName, itemData] of Object.entries(oldInventoryData)) {
+            // 為每個舊物品創建新格式的文檔
+            const template = await getOrGenerateItemTemplate(itemName);
+            if(template && template.template) {
+                 const isStackable = ['材料', '財寶', '道具', '其他', '秘笈', '書籍'].includes(template.template.itemType);
+                 if(isStackable || itemName === '銀兩') {
+                     migrationBatch.set(newInventoryCollectionRef.doc(itemName), {
+                         templateId: itemName,
+                         quantity: itemData.quantity || 1,
+                         itemType: template.template.itemType
+                     }, { merge: true });
+                 } else {
+                     for(let i=0; i < (itemData.quantity || 1); i++) {
+                         migrationBatch.set(newInventoryCollectionRef.doc(uuidv4()), { templateId: itemName, quantity: 1, itemType: template.template.itemType, isEquipped: false, equipSlot: null });
+                     }
+                 }
+                 migratedCount++;
             }
         }
-        if (rulerUpdatesCount > 0) {
-            await rulerUpdateBatch.commit();
-            console.log(`[健康檢查] 本次登入共為 ${rulerUpdatesCount} 個地點補充了統治者。`);
-        }
+        // 遷移成功後，刪除舊的 inventory 文檔
+        migrationBatch.delete(oldInventoryDocRef);
+        await migrationBatch.commit();
+        console.log(`[資料遷移] 成功為玩家 ${username} 遷移了 ${migratedCount} 種物品到新的 inventory_items 集合，並已刪除舊資料。`);
     }
 
-    // --- 檢查點 3: 修補NPC相關資料 ---
-    const npcStatesSnapshot = await userDocRef.collection('npc_states').get();
-    if (npcStatesSnapshot.empty) {
-        console.log(`[健康檢查] 玩家 ${username} 的資料健康檢查完畢 (無NPC需檢查)。`);
-        return;
-    }
 
+    // --- 檢查點 3: 確保所有接觸過的NPC、物品、技能、地點都有模板 (與之前類似，但更健壯) ---
+    console.log(`[健康檢查 v2.0] 開始檢查 ${username} 的模板完整性...`);
     const allSavesData = (await userDocRef.collection('game_saves').orderBy('R', 'asc').get()).docs.map(doc => doc.data());
     
-    for (const npcStateDoc of npcStatesSnapshot.docs) {
-        const npcName = npcStateDoc.id;
-        const npcTemplateRef = db.collection('npcs').doc(npcName);
-        const npcTemplateDoc = await npcTemplateRef.get();
-
-        if (!npcTemplateDoc.exists) {
-            console.log(`[健康檢查] 偵測到「${npcName}」缺少模板，開始自動修補...`);
-            const firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === npcName));
-            if (firstMentionRound) {
-                try {
-                    const generationResult = await generateNpcTemplateData(username, { name: npcName }, firstMentionRound, playerProfileForContext);
-                    if (generationResult && generationResult.templateData) {
-                        await npcTemplateRef.set(generationResult.templateData);
-                        console.log(`[健康檢查] 成功為「${npcName}」重建了通用模板。`);
-                    }
-                } catch (genError) {
-                    console.error(`[健康檢查] 為「${npcName}」生成模板時AI出錯:`, genError);
-                }
-            } else {
-                console.warn(`[健康檢查] 警告：在存檔中找不到NPC「${npcName}」的初見情境，無法為其生成模板。`);
-            }
-        } else {
-            // 如果模板存在，檢查格式是否需要更新 (例如舊的 equipment 格式)
-            const templateData = npcTemplateDoc.data();
-            const npcStateData = npcStateDoc.data();
-            const templateUpdatePayload = {};
-            let needsTemplateUpdate = false;
-            
-            if (templateData.equipment && Array.isArray(templateData.equipment)) {
-                templateUpdatePayload.initialEquipment = templateData.equipment;
-                templateUpdatePayload.equipment = admin.firestore.FieldValue.delete();
-                needsTemplateUpdate = true;
-            }
-
-            if (needsTemplateUpdate) {
-                console.log(`[健康檢查] 正在更新NPC「${npcName}」的舊模板結構...`);
-                await npcTemplateRef.update(templateUpdatePayload);
-            }
-            
-            if (npcStateData.equipment === undefined || (Array.isArray(npcStateData.equipment) && npcStateData.equipment.length > 0 && typeof npcStateData.equipment[0] === 'string')) {
-                console.log(`[健康檢查] 正在更新玩家與「${npcName}」的舊裝備狀態格式...`);
-                const initialEquipment = (await npcTemplateRef.get()).data().initialEquipment || [];
-                const newEquipment = initialEquipment.map(itemName => ({
-                    instanceId: uuidv4(),
-                    templateId: itemName
-                }));
-                 await npcStateDoc.ref.update({ equipment: newEquipment });
+    // 檢查NPC
+    const npcStatesSnapshot = await userDocRef.collection('npc_states').get();
+    for (const doc of npcStatesSnapshot.docs) {
+        const templateExists = (await db.collection('npcs').doc(doc.id).get()).exists;
+        if (!templateExists) {
+            console.log(`[健康檢查 v2.0] NPC模板缺失: ${doc.id}，嘗試重建...`);
+            const firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === doc.id));
+            if(firstMentionRound) {
+                const genData = await generateNpcTemplateData(username, { name: doc.id }, firstMentionRound, playerProfileForContext);
+                if(genData) await db.collection('npcs').doc(genData.canonicalName).set(genData.templateData);
             }
         }
     }
-    console.log(`[健康檢查] 玩家 ${username} 的資料健康檢查完畢。`);
+
+    // 檢查物品
+    const itemStatesSnapshot = await userDocRef.collection('inventory_items').get();
+     for (const doc of itemStatesSnapshot.docs) {
+        const itemData = doc.data();
+        if(itemData.templateId) await getOrGenerateItemTemplate(itemData.templateId);
+    }
+    
+    console.log(`[健康檢查 v2.0] 玩家 ${username} 的資料完整性檢查完畢。`);
 }
 
 
