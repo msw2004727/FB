@@ -118,6 +118,14 @@ async function getOrGenerateSkillTemplate(skillName) {
                 console.log(`[資料庫維護] 武學「${skillName}」缺少 combatCategory 欄位，自動修補為 ${templateData.combatCategory}。`);
             }
             
+            // --- 【核心修改】 ---
+            if (templateData.requiredWeaponType === undefined) {
+                // 如果舊模板沒有武器需求欄位，給一個預設值 "無"
+                templateData.requiredWeaponType = '無';
+                needsUpdate = true;
+                console.log(`[資料庫維護] 武學「${skillName}」缺少 requiredWeaponType 欄位，自動修補為 "無"。`);
+            }
+            
             if (needsUpdate) {
                 await skillTemplateRef.set(templateData, { merge: true });
                 console.log(`[資料庫維護] 已成功將武學「${skillName}」的模板更新至最新結構。`);
@@ -132,6 +140,12 @@ async function getOrGenerateSkillTemplate(skillName) {
         const skillJsonString = await callAI(aiConfig.skillTemplate || 'openai', prompt, true);
         const newTemplateData = JSON.parse(skillJsonString);
         if (!newTemplateData.skillName) throw new Error('AI生成的武學模板缺少skillName。');
+        
+        // --- 【核心修改】 ---
+        if (newTemplateData.requiredWeaponType === undefined) {
+             newTemplateData.requiredWeaponType = '無'; // 確保新生成的模板也有預設值
+        }
+
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await skillTemplateRef.set(newTemplateData);
         const finalTemplateData = (await skillTemplateRef.get()).data();
@@ -351,5 +365,5 @@ module.exports = {
     getRawInventory,
     updateSkills,
     getPlayerSkills,
-    calculateBulkScore // 【核心新增】導出此函式
+    calculateBulkScore
 };
