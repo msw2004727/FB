@@ -440,6 +440,13 @@ body.dark-theme #internal-power-bar {
 body.dark-theme #external-power-bar {
     background-color: var(--external-power-color-dark);
 }
+/* 【核心修正】新增輕功條樣式 */
+#lightness-power-bar {
+    background-color: var(--lightness-power-color-light);
+}
+body.dark-theme #lightness-power-bar {
+    background-color: var(--lightness-power-color-dark);
+}
 #stamina-bar {
     background-color: var(--stamina-color-light);
 }
