@@ -1,0 +1,85 @@
+/ (專案根目錄)
+├── 📄 admin.html                  # 【前端】後台管理系統介面，供您管理遊戲全局數據。
+├── 📄 bounties.html               # 【前端】懸賞任務告示板介面。
+├── 📄 encyclopedia.html           # 【前端】玩家個人江湖百科介面。
+├── 📄 index.html                   # 【前端】遊戲主介面，玩家主要互動的地方。
+├── 📄 library.html                # 【前端】江湖圖書館介面，瀏覽所有玩家的傳奇故事。
+├── 📄 login.html                  # 【前端】玩家登入頁面。
+├── 📄 map.html                    # 【前端】世界地圖（輿圖）介面。
+├── 📄 novel.html                  # 【前端】玩家個人完整故事（小說）閱讀介面。
+├── 📄 package.json                # 【後端】Node.js專案設定檔，定義專案依賴與腳本。
+├── 📄 package-lock.json           # 【後端】鎖定專案依賴的版本，確保部署一致性。
+├── 📄 register.html               # 【前端】新玩家註冊頁面。
+├── 📄 relations.html              # 【前端】玩家個人人物關係圖介面。
+├── 📄 server.js                   # 【後端】伺服器主入口檔案，啟動Express服務、初始化Firebase、設定CORS。
+├── 📄 viewport.html               # 【前端】玩家操作手冊，提供遊戲玩法說明。
+│
+├── 📁 api/                        # 【後端】所有伺服器API邏輯的核心資料夾。
+│   ├── 📁 admin/                   # 【後端】處理後台管理系統所有請求的API。
+│   │   ├── 📄 adminAuth.js         #   - 後台管理員身份驗證中間件。
+│   │   ├── 📄 adminRoutes.js        #   - 後台管理系統的核心路由，負責全局模板管理與修復。
+│   │   ├── 📄 balanceService.js     #   - 模擬獲取各大AI服務餘額的服務。
+│   │   └── 📄 logService.js         #   - 從Firebase讀取並提供系統日誌的服務。
+│   │
+│   ├── 📁 models/                  # 【後端】處理與資料庫特定集合互動的模組 (目前較少使用)。
+│   │   └── 📄 inventoryModel.js     #   - (舊版)處理裝備與卸下物品的邏輯。
+│   │
+│   ├── 📁 routes/                   # 【後端】將大型路由拆分為更小的子路由，保持結構清晰。
+│   │   ├── 📄 npcChatRoutes.js      #   - 專門處理NPC聊天、贈禮、結束對話的API。
+│   │   ├── 📄 npcProfileRoutes.js   #   - 專門處理獲取NPC公開資料的API。
+│   │   └── 📄 npcTradeRoutes.js     #   - 專門處理與NPC交易相關的API。
+│   │
+│   ├── 📄 aiConfig.js               # 【後端】AI模型中控設定檔，可為不同任務指派不同AI模型。
+│   ├── 📄 authRoutes.js             # 【後端】處理玩家註冊與登入的API。
+│   ├── 📄 beggarRoutes.js           # 【後端】處理「丐幫情報網」系統所有功能的API。
+│   ├── 📄 bountyRoutes.js           # 【後端】處理懸賞任務的獲取與領取的API。
+│   ├── 📄 cacheManager.js           # 【後端】伺服器啟動時，快取常用數據(如NPC名稱)以提升效能。
+│   ├── 📄 combatRoutes.js           # 【後端】處理戰鬥發起、戰鬥回合、認輸、結束等所有戰鬥相關API。
+│   ├── 📄 contextBuilder.js         # 【後端】AI的「眼睛」，在生成故事前，從各處彙整玩家、NPC、地點等完整情境。
+│   ├── 📄 dataIntegrityService.js   # 【後端】(舊版)資料健康檢查服務，部分功能已被adminRoutes取代。
+│   ├── 📄 epilogue.js               # 【後端】處理玩家死亡後，生成結局故事的API。
+│   ├── 📄 gameRoutes.js             # 【後端】遊戲核心API的總入口，將請求分發到具體的子路由。
+│   ├── 📄 gameplayRoutes.js         # 【後端】(舊版)遊戲互動的總路由，現已被拆分。
+│   ├── 📄 gmRoutes.js               # 【後端】處理針對單一玩家的GM指令(如修改屬性、傳送)的API。
+│   ├── 📄 identityManager.js        # 【後端】當新NPC出現時，為其決定身份(如寨主、浪人)的管理器。
+│   ├── 📄 interactionRoutes.js      # 【後端】處理玩家核心「動作」指令的API，是遊戲的主驅動之一。
+│   ├── 📄 itemManager.js            # 【後端】處理玩家與NPC之間物品轉移的核心邏輯。
+│   ├── 📄 libraryRoutes.js          # 【後端】提供「江湖圖書館」所需小說列表與內容的API。
+│   ├── 📄 locationManager.js        # 【後端】處理因玩家行為導致地點狀態發生永久改變的邏輯。
+│   ├── 📄 mapRoutes.js              # 【後端】生成玩家個人世界地圖(Mermaid語法)的API。
+│   ├── 📄 npcHelpers.js             # 【後端】提供NPC相關的輔助函式，如合併資料、計算友好度等級。
+│   ├── 📄 npcRoutes.js              # 【後端】NPC互動的總路由，將請求分發給聊天、交易等子路由。
+│   ├── 📄 playerStateHelpers.js     # 【後端】提供玩家狀態相關的輔助函式，如獲取背包、技能、計算負重。
+│   ├── 📄 relationshipManager.js    # 【後端】處理NPC之間雙向關係建立與擴散的核心邏輯。
+│   ├── 📄 reputationManager.js      # 【後端】處理NPC死亡後，其親友關係鏈的聲望連鎖變化。
+│   ├── 📄 stateRoutes.js            # 【後端】處理讀取/儲存玩家遊戲狀態、背包、技能等數據的API。
+│   ├── 📄 templateManager.js        # 【後端】當需要新NPC時，嘗試從模板池中尋找可復用模板的管理器。
+│   ├── 📄 worldEngine.js            # 【後端】遊戲世界生成引擎，負責動態生成新地點和懸賞任務。
+│   └── 📄 worldStateHelpers.js      # 【後端】提供世界狀態相關的輔助函式，如時間推進、小說快取管理。
+│
+├── 📁 middleware/                 # 【後端】Express中間件，在請求到達API前進行預處理。
+│   └── 📄 auth.js                   #   - 核心身份驗證中間件，保護需要登入才能訪問的API。
+│
+├── 📁 prompts/                    # 【後端】AI的「靈魂」，存放所有給AI的指令稿(Prompt)。
+│   ├── 📁 story_components/         #   - 構成主故事生成Prompt的各個規則模組。
+│   └── 📄 ... (40+ files)          #   - 針對不同任務(如寫故事、生成NPC、戰鬥裁決)的專屬指令稿。
+│
+├── 📁 public/                     # 【前端】存放靜態資源，目前較少使用。
+│   └── 📁 js/
+│       └── 📄 inventoryManager.js   #   - (舊版)前端管理物品欄的邏輯。
+│
+├── 📁 scripts/                    # 【前端】存放所有前端頁面的JavaScript邏輯。
+│   ├── 📄 admin.js                #   - 後台管理系統(`admin.html`)的核心驅動邏輯。
+│   ├── 📄 api.js                  #   - 前端API請求的統一封裝模組，所有與後端的通訊都經過此處。
+│   ├── 📄 config.js               #   - 前端設定檔，定義後端URL等常數。
+│   ├── 📄 gameLoop.js             #   - 遊戲主循環與核心邏輯，處理玩家動作、載入狀態等。
+│   ├── 📄 gmManager.js            #   - (舊版)GM面板邏輯，已被整合進`admin.js`。
+│   └── 📄 ... (20+ files)          #   - 其他各個頁面(`login.html`, `map.html`等)的專屬JS檔案。
+│
+├── 📁 services/                   # 【後端】提供專門服務的模組。
+│   ├── 📄 aiService.js            #   - AI服務的總調度中心，負責呼叫不同AI模型並回傳結果。
+│   ├── 📄 beggarService.js        #   - 實現「丐幫情報網」功能的具體服務邏輯。
+│   └── 📄 npcCreationService.js     #   - 專門負責從無到有創建一個完整NPC模板的核心服務。
+│
+└── 📁 styles/                     # 【前端】存放所有CSS樣式表。
+    └── 📄 ... (16+ files)          #   - 各個頁面和元件的專屬CSS檔案。
