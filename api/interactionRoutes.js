@@ -57,7 +57,7 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
     return playerAction;
 };
 
-// 【核心修復】建立一個獨立的資料健康檢查函式，用於錯誤處理
+// 【核心修正】建立一個獨立的資料健康檢查函式，用於錯誤處理
 const runEmergencyHealthCheck = async (userId) => {
     console.log(`[緊急修復機制] 啟動！為玩家 ${userId} 進行資料健康檢查...`);
     const userDocRef = db.collection('users').doc(userId);
@@ -286,64 +286,48 @@ const interactRouteHandler = async (req, res) => {
         }
         if (romanceEventData && romanceEventData.npcUpdates) await processNpcUpdates(userId, romanceEventData.npcUpdates);
         
+        // --- 核心修改：在寫入前，對所有數字欄位進行淨化，確保它們是數字 ---
         const playerUpdatesForDb = {
             timeOfDay: finalTimeOfDay,
-            stamina: newStamina,
-            shortActionCounter,
-            ...finalDate,
+            stamina: Number(newStamina),
+            shortActionCounter: Number(shortActionCounter),
+            year: Number(finalDate.year),
+            month: Number(finalDate.month),
+            day: Number(finalDate.day),
             currentLocation: LOC,
-            internalPower: admin.firestore.FieldValue.increment(powerChange?.internal || 0),
-            externalPower: admin.firestore.FieldValue.increment(powerChange?.external || 0),
-            lightness: admin.firestore.FieldValue.increment(powerChange?.lightness || 0),
-            morality: admin.firestore.FieldValue.increment(moralityChange || 0),
-            money: admin.firestore.FieldValue.increment(moneyChange || 0),
-            R: newRoundNumber
+            internalPower: admin.firestore.FieldValue.increment(Number(powerChange?.internal || 0)),
+            externalPower: admin.firestore.FieldValue.increment(Number(powerChange?.external || 0)),
+            lightness: admin.firestore.FieldValue.increment(Number(powerChange?.lightness || 0)),
+            morality: admin.firestore.FieldValue.increment(Number(moralityChange || 0)),
+            money: admin.firestore.FieldValue.increment(Number(moneyChange || 0)),
+            R: Number(newRoundNumber)
         };
         batch.update(userDocRef, playerUpdatesForDb);
 
         const finalSaveData = { 
             story: aiResponse.story || "江湖靜好，歲月無聲。", 
-            R: newRoundNumber, 
+            R: Number(newRoundNumber), 
             timeOfDay: finalTimeOfDay, 
-            ...finalDate, 
-            stamina: newStamina,
+            year: Number(finalDate.year),
+            month: Number(finalDate.month),
+            day: Number(finalDate.day),
+            yearName: finalDate.yearName,
+            stamina: Number(newStamina),
             playerState, powerChange, 
-            moralityChange: moralityChange, 
-            moneyChange: moneyChange,
+            moralityChange: Number(moralityChange), 
+            moneyChange: Number(moneyChange),
             itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
             ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
         };
         const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
         batch.set(newSaveRef, finalSaveData);
+        // --- 核心修改結束 ---
 
         const newSummary = await getAISummary(longTermSummary, finalSaveData);
         batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
         
-        // --- 【核心修改】實現「修復式重試」機制 ---
-        try {
-            await batch.commit();
-        } catch (commitError) {
-            // 只在特定的錯誤類型時才觸發修復，避免無限循環
-            if (commitError.message.includes('INVALID_ARGUMENT') || commitError.message.includes('is not a valid number')) {
-                console.warn(`[存檔失敗] 偵測到玩家 ${username} 的資料類型錯誤，將執行緊急修復並重試...`);
-                await runEmergencyHealthCheck(userId);
-                
-                // 【重要】建立一個新的batch物件並重新填充所有操作
-                const retryBatch = db.batch();
-                // 重新填充所有之前的操作... (這裡為了簡潔省略了重新填充的程式碼，實際應用中需要重新執行上面的所有batch.set/update操作)
-                // 為了本次修復，我們簡化為只重試最重要的玩家資料更新和存檔
-                retryBatch.update(userDocRef, playerUpdatesForDb);
-                retryBatch.set(newSaveRef, finalSaveData);
-                retryBatch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
-
-                await retryBatch.commit();
-                console.log(`[存檔重試] 成功！玩家 ${username} 的資料已修復並成功保存進度。`);
-            } else {
-                // 如果是其他類型的錯誤，則直接拋出
-                throw commitError;
-            }
-        }
-        // --- 修改結束 ---
+        // 【核心修正】移除舊的、有缺陷的重試機制，改為直接提交
+        await batch.commit();
         
         const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
             getRawInventory(userId),
