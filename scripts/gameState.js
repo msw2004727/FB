@@ -9,11 +9,12 @@ export const gameState = {
     currentChatNpc: null,
     chatHistory: [],
     roundData: null,
+    currentLocationData: null, // 【核心新增】儲存當前地區的詳細資料
     combat: {
         state: null,
         selectedStrategy: null,
         selectedSkill: null,
         selectedTarget: null,
     },
-    deceasedNpcs: [] // 新增：死亡NPC名單
+    deceasedNpcs: [] 
 };
