@@ -14,11 +14,12 @@ const db = admin.firestore();
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} player - 當前回合開始前的玩家數據
+ * @param {string} playerAction - 玩家的原始行動指令
  * @param {object} aiResponse - AI生成的回應
  * @param {number} newRoundNumber - 新的回合數
  * @returns {Promise<object>} - 返回處理後、準備發送給前端的完整回合數據
  */
-async function updateGameState(userId, username, player, aiResponse, newRoundNumber) {
+async function updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber) {
     const userDocRef = db.collection('users').doc(userId);
     const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
@@ -58,19 +59,29 @@ async function updateGameState(userId, username, player, aiResponse, newRoundNum
         aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
     }
 
+    // --- 【核心修正】重構精力值計算邏輯 v3.0 ---
+    const recoveryKeywords = ['睡覺', '休息', '歇息', '打坐', '進食', '喝水', '療傷', '丹藥', '求救', '小歇', '歇會', '躺一下', '坐一下'];
+    const isRecoveryAction = recoveryKeywords.some(kw => playerAction.includes(kw));
     const longRestKeywords = ['睡覺', '歇息', '休息'];
-    const isLongRest = longRestKeywords.some(kw => (aiResponse.roundData.EVT || '').includes(kw)) && daysToAdvance > 0;
-    
+    const isLongRest = longRestKeywords.some(kw => playerAction.includes(kw)) && daysToAdvance > 0;
+
     let newStamina = player.stamina ?? 100;
-    newStamina += (staminaChange || 0) - (Math.floor(Math.random() * 5) + 1);
 
     if (isLongRest) {
-        newStamina = 100;
+        newStamina = 100; // 長時間休息直接回滿
+    } else if (isRecoveryAction) {
+        // 短暫休息：只增加AI給的精力值，確保恢復。如果AI沒給，至少恢復10點。
+        newStamina += (staminaChange || 10);
+    } else {
+        // 消耗性活動：應用AI的精力變化（通常為負），並扣除基礎消耗
+        newStamina += (staminaChange || 0);
+        newStamina -= (Math.floor(Math.random() * 5) + 1); // 基礎消耗1-5點
     }
-    newStamina = Math.max(0, Math.min(100, newStamina));
+
+    newStamina = Math.max(0, Math.min(100, newStamina)); // 確保精力在 0-100 之間
+    // --- 核心修正結束 ---
 
     const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
-    const isRecoveryAction = ['睡覺', '休息', '歇息', '打坐', '進食', '喝水', '療傷', '小歇', '歇會', '躺一下', '坐一下'].some(kw => (aiResponse.roundData.EVT || '').includes(kw));
     let shortActionCounter = player.shortActionCounter || 0;
     if (!timeDidAdvance && !isRecoveryAction) shortActionCounter++; else shortActionCounter = 0;
     
