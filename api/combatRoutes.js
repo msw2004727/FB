@@ -5,7 +5,7 @@ const admin = require('firebase-admin');
 const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult, getAISummary, getAISuggestion } = require('../services/aiService');
 
 const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require('./npcHelpers');
-const { getPlayerSkills, updateInventory, getInventoryState } = require('./playerStateHelpers');
+const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState } = require('./playerStateHelpers'); // 引入 getRawInventory
 const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
 
@@ -70,7 +70,32 @@ const initiateCombatHandler = async (req, res) => {
         
         const combatSetupResult = await getAICombatSetup(simulatedPlayerAction, lastSave);
 
-        const playerSkills = await getPlayerSkills(userId);
+        // --- 【核心修改開始】 ---
+        
+        // 1. 同時獲取玩家所有技能和完整背包
+        const [allPlayerSkills, playerInventory] = await Promise.all([
+            getPlayerSkills(userId),
+            getRawInventory(userId) 
+        ]);
+
+        // 2. 判斷玩家當前裝備的武器類型
+        const equippedWeapon = playerInventory.find(item => item.isEquipped && item.equipSlot && item.equipSlot.startsWith('weapon'));
+        const currentWeaponType = equippedWeapon ? equippedWeapon.weaponType : null;
+
+        // 3. 篩選出可用的技能
+        const usableSkills = allPlayerSkills.filter(skill => {
+            const requiredType = skill.requiredWeaponType;
+            if (requiredType === '無' || !requiredType) {
+                return true; // 拳腳功夫或內功心法永遠可用
+            }
+            return requiredType === currentWeaponType; // 武器類型匹配
+        });
+        
+        console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。可用技能數量: ${usableSkills.length}/${allPlayerSkills.length}`);
+
+        // --- 【核心修改結束】 ---
+
+
         const userProfile = (await userDocRef.get()).data();
         const maxHp = (userProfile.externalPower || 5) * 10 + 50;
         const maxMp = (userProfile.internalPower || 5) * 5 + 20;
@@ -104,7 +129,7 @@ const initiateCombatHandler = async (req, res) => {
             turn: 1, 
             player: { 
                 username, 
-                skills: playerSkills, 
+                skills: usableSkills, // <-- 將篩選後的技能傳給前端
                 hp: maxHp, 
                 maxHp, 
                 mp: maxMp, 
@@ -129,6 +154,7 @@ const initiateCombatHandler = async (req, res) => {
         res.status(500).json({ message: error.message || "發起戰鬥時發生未知錯誤" });
     }
 };
+
 
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
@@ -264,7 +290,6 @@ const surrenderRouteHandler = async (req, res) => {
         const lastRoundData = lastSaveSnapshot.docs[0].data();
         const playerChanges = surrenderResult.outcome.playerChanges || {};
         
-        // 【核心修改】使用 Transaction 來更新玩家數值
         await db.runTransaction(async (transaction) => {
             const currentUserDoc = await transaction.get(userDocRef);
             if (!currentUserDoc.exists) throw "Document does not exist!";
@@ -363,7 +388,6 @@ const finalizeCombatHandler = async (req, res) => {
         
         await updateInventory(userId, itemChanges || [], preCombatRoundData);
         
-        // 【核心修改】使用 Transaction 來更新玩家數值
         if (playerChanges && (playerChanges.powerChange || playerChanges.moralityChange)) {
             await db.runTransaction(async (transaction) => {
                 const currentUserDoc = await transaction.get(userDocRef);
