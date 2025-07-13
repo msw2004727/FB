@@ -10,11 +10,15 @@ const db = admin.firestore();
  */
 async function getLogs(playerId = null, limit = 100) {
     try {
-        let query = db.collection('logs').orderBy('timestamp', 'desc').limit(limit);
+        let query = db.collection('logs');
 
+        // 【核心修正】將 'where' 篩選放在 'orderBy' 之前
         if (playerId) {
             query = query.where('userId', '==', playerId);
         }
+
+        // 統一將排序和數量限制放在最後
+        query = query.orderBy('timestamp', 'desc').limit(limit);
 
         const snapshot = await query.get();
         if (snapshot.empty) {
