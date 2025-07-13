@@ -46,7 +46,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const IMP = safeRoundData.IMP || '你的行動似乎沒有產生什麼特別的影響。';
     const aiNextTimeOfDay = safeRoundData.timeOfDay;
     const daysToAdvance = safeRoundData.daysToAdvance || 0;
-    const staminaChange = safeRoundData.staminaChange || 0;
+    const staminaChange = safeRoundData.staminaChange || 0; // AI給的精力變化，現在只在消耗時參考
 
     const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, skillChanges, player);
     if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -58,30 +58,38 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     if (levelUpEvents.length > 0) {
         aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
     }
+    
+    const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
 
-    // --- 【核心修正】重構精力值計算邏輯 v3.0 ---
+    // --- 【核心修正】三階調息心法 ---
     const recoveryKeywords = ['睡覺', '休息', '歇息', '打坐', '進食', '喝水', '療傷', '丹藥', '求救', '小歇', '歇會', '躺一下', '坐一下'];
     const isRecoveryAction = recoveryKeywords.some(kw => playerAction.includes(kw));
-    const longRestKeywords = ['睡覺', '歇息', '休息'];
-    const isLongRest = longRestKeywords.some(kw => playerAction.includes(kw)) && daysToAdvance > 0;
-
+    
     let newStamina = player.stamina ?? 100;
 
-    if (isLongRest) {
-        newStamina = 100; // 長時間休息直接回滿
-    } else if (isRecoveryAction) {
-        // 短暫休息：只增加AI給的精力值，確保恢復。如果AI沒給，至少恢復10點。
-        newStamina += (staminaChange || 10);
+    if (isRecoveryAction) {
+        if (daysToAdvance > 0) {
+            // 規則 3: 跨日大睡，恢復75%
+            newStamina += 75;
+            console.log('[精力系統] 進行了跨日大睡，恢復 75 點精力。');
+        } else if (timeDidAdvance) {
+            // 規則 1: 時辰小憩，恢復25%
+            newStamina += 25;
+            console.log('[精力系統] 進行了時辰小憩，恢復 25 點精力。');
+        } else {
+            // 規則 2: 回合調息，恢復10%
+            newStamina += 10;
+            console.log('[精力系統] 進行了回合調息，恢復 10 點精力。');
+        }
     } else {
-        // 消耗性活動：應用AI的精力變化（通常為負），並扣除基礎消耗
+        // 非恢復性活動：應用AI的精力變化，並扣除基礎消耗
         newStamina += (staminaChange || 0);
-        newStamina -= (Math.floor(Math.random() * 5) + 1); // 基礎消耗1-5點
+        newStamina -= (Math.floor(Math.random() * 5) + 1);
     }
 
     newStamina = Math.max(0, Math.min(100, newStamina)); // 確保精力在 0-100 之間
     // --- 核心修正結束 ---
 
-    const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
     let shortActionCounter = player.shortActionCounter || 0;
     if (!timeDidAdvance && !isRecoveryAction) shortActionCounter++; else shortActionCounter = 0;
     
