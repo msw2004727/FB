@@ -28,7 +28,6 @@ async function updateNpcMemoryAfterInteraction(userId, npcName, interactionData)
 
         const oldSummary = doc.data().interactionSummary || `你與${npcName}的交往尚淺。`;
         
-        // 注意：此處的'default'可以替換為玩家選擇的模型
         const newSummary = await getAIPerNpcSummary('default', npcName, oldSummary, interactionData);
 
         await npcStateRef.update({ interactionSummary: newSummary });
@@ -50,13 +49,6 @@ function getFriendlinessLevel(value) {
     return 'neutral';
 }
 
-/**
- * 獲取合併後的NPC資料 (基礎資料 + 玩家特定狀態)
- * v2.0: 新增邏輯 - 如果NPC基礎檔案不存在，則即時創建一個。
- * @param {string} userId - 玩家ID
- * @param {string} npcName - NPC姓名
- * @returns {Promise<Object|null>} - 合併後的NPC資料物件，或在找不到時返回null
- */
 async function getMergedNpcProfile(userId, npcName) {
     if (!userId || !npcName) {
         console.error('[NPC助手] getMergedNpcProfile缺少userId或npcName參數');
@@ -116,27 +108,25 @@ async function getMergedNpcProfile(userId, npcName) {
     }
 }
 
-
 /**
- * 【核心重構】統一處理所有NPC友好度更新和檔案創建的函式
+ * 【核心修正】統一處理所有NPC友好度更新和檔案創建的函式
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {Array<object>} npcChanges - 從AI主函式傳來的NPC變化陣列
  * @param {object} roundData - 當前回合數據
  * @param {object} playerProfile - 玩家的完整檔案
+ * @param {admin.firestore.WriteBatch} batch - 從主流程傳遞過來的 Firestore 批次寫入物件
  */
-async function updateFriendlinessValues(userId, username, npcChanges, roundData, playerProfile) {
+async function updateFriendlinessValues(userId, username, npcChanges, roundData, playerProfile, batch) {
     if (!npcChanges || npcChanges.length === 0) return;
 
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
     const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[roundData.LOC.length - 1] : '未知之地';
     const existingNpcIds = new Set((await playerNpcStatesRef.get()).docs.map(doc => doc.id));
 
-    const batch = db.batch();
+    // 【修正】不再在這裡創建新的 batch，而是使用傳入的 batch
 
     for (const change of npcChanges) {
-        // --- 【核心修正】 ---
-        // 增加一個守衛，如果AI回傳的NPC物件沒有名字，就直接跳過，避免後續流程崩潰
         if (!change || !change.name) {
             console.warn(`[NPC助手] 偵測到一個無效的NPC物件 (缺少名字)，已略過。`, change);
             continue; 
@@ -144,21 +134,21 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
 
         const isTrulyNew = !existingNpcIds.has(change.name);
         if (isTrulyNew) {
+            // 將主流程的 batch 傳遞下去
             await createNewNpc(userId, username, change, roundData, playerProfile, batch, Array.from(existingNpcIds));
         } else {
             const npcStateDocRef = playerNpcStatesRef.doc(change.name);
             const updatePayload = { currentLocation: playerLocation };
 
             if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
+                // 注意：由於友好度更新需要讀取舊值，它不能在一個純批次寫入中完成
+                // 因此這裡使用 Transaction，它獨立於外部的 batch
                 try {
                     await db.runTransaction(async (transaction) => {
                         const npcStateDoc = await transaction.get(npcStateDocRef);
                         const currentFriendliness = npcStateDoc.data()?.friendlinessValue || 0;
                         const newFriendliness = currentFriendliness + change.friendlinessChange;
-                        
-                        // 確保友好度最高為100
                         updatePayload.friendlinessValue = Math.min(100, newFriendliness);
-                        
                         transaction.set(npcStateDocRef, updatePayload, { merge: true });
                     });
                      console.log(`[友好度系統] 更新舊識「${change.name}」的友好度，新數值為: ${updatePayload.friendlinessValue}`);
@@ -166,17 +156,12 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
                      console.error(`[友好度系統] Transaction for ${change.name} failed: `, e);
                 }
             } else {
+                 // 如果只是更新位置，則加入到主 batch 中
                  batch.set(npcStateDocRef, updatePayload, { merge: true });
             }
         }
     }
-
-    try {
-        await batch.commit(); // 注意：Transaction外的操作仍需commit
-        console.log(`[友好度系統] 批次更新NPC關係與位置完畢。`);
-    } catch (error) {
-        console.error(`[友好度系統] 批次更新NPC關係時出錯:`, error);
-    }
+    // 【修正】移除此處的 commit，交給主流程統一提交
 }
 
 async function updateRomanceValues(userId, romanceChanges) {
@@ -192,10 +177,7 @@ async function updateRomanceValues(userId, romanceChanges) {
                 const npcStateDoc = await transaction.get(npcStateDocRef);
                 const currentRomance = npcStateDoc.data()?.romanceValue || 0;
                 const newRomance = currentRomance + valueChange;
-
-                // 確保心動值最高為100
                 const finalRomance = Math.min(100, newRomance);
-
                 transaction.set(npcStateDocRef, { romanceValue: finalRomance }, { merge: true });
                 console.log(`[戀愛系統] 更新「${npcName}」心動值，新數值為: ${finalRomance}`);
             });
