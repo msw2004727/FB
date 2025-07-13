@@ -123,13 +123,24 @@ body.dark-theme .death-countdown {
 
 /* 地點資訊欄的專屬樣式 */
 #location-info .location-ruler {
+    .location-ruler-info {
+    margin-bottom: 0.5rem; /* 與下方描述隔開 */
+}
+.location-ruler {
     font-weight: bold;
     color: var(--light-text-primary);
 }
-body.dark-theme #location-info .location-ruler {
+body.dark-theme .location-ruler {
     color: var(--dark-text-primary);
 }
 #location-info .location-desc {
+    .location-desc-container {
+    display: flex;
+    align-items: flex-start; /* 讓文字和按鈕頂部對齊 */
+    gap: 1rem; /* 文字和按鈕之間的間距 */
+}
+.location-desc {
+    flex-grow: 1; /* 讓描述文字佔據大部分空間 */
     font-size: 0.85rem;
     color: var(--light-text-secondary);
     font-style: italic;
@@ -139,8 +150,9 @@ body.dark-theme #location-info .location-ruler {
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin: 0;
 }
-body.dark-theme #location-info .location-desc {
+body.dark-theme .location-desc {
     color: var(--dark-text-secondary);
 }
 
