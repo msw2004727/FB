@@ -70,15 +70,15 @@ const interactRouteHandler = async (req, res) => {
         if (!playerStateSnapshot.exists) {
             return res.status(404).json({ message: '找不到玩家資料。' });
         }
-        const player = playerStateSnapshot.data();
+        let player = playerStateSnapshot.data();
 
         // ================= 【精力為零時的強制昏迷事件】 =================
         const isTryingToRestOrHeal = ['睡覺', '休息', '歇息', '進食', '喝水', '打坐', '療傷', '丹藥', '求救'].some(kw => playerAction.includes(kw));
 
-        if (player.stamina <= 0 && !isTryingToRestOrHeal) {
+        if ((player.stamina || 0) <= 0 && !isTryingToRestOrHeal) {
             console.log(`[精力系統] 玩家精力為零 (${player.stamina}) 且行動 (${playerAction}) 並非求生，強制觸發昏迷事件。`);
 
-            const currentTimeIndex = TIME_SEQUENCE.indexOf(player.currentTimeOfDay);
+            const currentTimeIndex = TIME_SEQUENCE.indexOf(player.timeOfDay);
             const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
             const newTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
             let newDate = { year: player.year, month: player.month, day: player.day, yearName: player.yearName };
@@ -121,8 +121,9 @@ const interactRouteHandler = async (req, res) => {
 
             const suggestion = "你大病初癒，最好先查看一下自身狀態。";
             
-            invalidateNovelCache(userId);
-            updateLibraryNovel(userId, username);
+            // 非同步執行背景更新，不阻塞主流程
+            invalidateNovelCache(userId).catch(e => console.error("背景任務失敗(昏迷): 無效化小說快取", e));
+            updateLibraryNovel(userId, username).catch(e => console.error("背景任務失敗(昏迷): 更新圖書館", e));
             
             const [fullInventory, updatedSkills] = await Promise.all([ getRawInventory(userId), getPlayerSkills(userId) ]);
             
@@ -174,7 +175,6 @@ const interactRouteHandler = async (req, res) => {
         const context = await buildContext(userId, username);
         if (!context) throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         
-        // 【核心修改】在呼叫AI之前，執行指令預處理
         playerAction = preprocessPlayerAction(playerAction, context.locationContext);
         
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame } = context;
@@ -185,46 +185,29 @@ const interactRouteHandler = async (req, res) => {
         const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistory), playerAction, player, username, player.currentTimeOfDay, player.power, player.morality, [], romanceEventData ? romanceEventData.eventStory : null, null, locationContext, npcContext, bulkScore, []);
 
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
-        if (!aiResponse.roundData.EVT || aiResponse.roundData.EVT.trim() === '') aiResponse.roundData.EVT = playerAction.length > 8 ? playerAction.substring(0, 8) + '…' : playerAction;
         
-        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
-        const newRoundNumber = (player.R || 0) + 1;
-        aiResponse.roundData.R = newRoundNumber;
-        
-        if (aiResponse.roundData.NPC && Array.isArray(aiResponse.roundData.NPC)) {
-            aiResponse.roundData.NPC.filter(npc => npc.status).forEach(npc => {
-                const interactionContext = `事件：「${aiResponse.roundData.EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
-                updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext).catch(err => console.error(`[背景任務] 更新NPC ${npc.name} 記憶時出錯:`, err));
-            });
+        const roundDataFromAI = aiResponse.roundData;
+        if (!roundDataFromAI.EVT || roundDataFromAI.EVT.trim() === '') {
+            roundDataFromAI.EVT = playerAction.length > 8 ? playerAction.substring(0, 8) + '…' : playerAction;
         }
         
-        const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, aiResponse.roundData.skillChanges, player);
+        const newRoundNumber = (player.R || 0) + 1;
+        roundDataFromAI.R = newRoundNumber;
+
+        const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, roundDataFromAI.skillChanges, player);
         if (customSkillCreationResult && !customSkillCreationResult.success) {
             aiResponse.story = customSkillCreationResult.reason;
-            aiResponse.roundData.skillChanges = [];
+            roundDataFromAI.skillChanges = [];
         }
-        if (levelUpEvents.length > 0) aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
+        if (levelUpEvents.length > 0) {
+            aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
+        }
 
-        const batch = db.batch();
-        await processItemChanges(userId, aiResponse.roundData.itemChanges, batch, aiResponse.roundData);
-        await updateFriendlinessValues(userId, username, aiResponse.roundData.NPC, aiResponse.roundData, player);
-        await updateRomanceValues(userId, aiResponse.roundData.romanceChanges);
-        await processNpcUpdates(userId, aiResponse.roundData.npcUpdates || []);
-        if (aiResponse.roundData.locationUpdates) await processLocationUpdates(userId, locationContext.locationName, aiResponse.roundData.locationUpdates);
-        if (romanceEventData && romanceEventData.npcUpdates) await processNpcUpdates(userId, romanceEventData.npcUpdates);
-
-        const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = aiResponse.roundData;
-        
-        let newStamina = (player.stamina ?? 100) + staminaChange;
-        const randomStaminaDeduction = Math.floor(Math.random() * 5) + 1;
-        newStamina -= randomStaminaDeduction;
-        console.log(`[精力系統] AI判定消耗: ${staminaChange}, 每回合基礎消耗: -${randomStaminaDeduction}`);
+        const { timeOfDay: aiNextTimeOfDay, daysToAdvance = 0, staminaChange = 0 } = roundDataFromAI;
+        let newStamina = (player.stamina ?? 100) + staminaChange - (Math.floor(Math.random() * 5) + 1);
         const isSleeping = ['睡覺'].some(kw => playerAction.includes(kw));
         const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
-        if (isSleeping && timeDidAdvance) {
-            newStamina = 100;
-             console.log(`[精力系統] 玩家睡覺，精力完全恢復。`);
-        }
+        if (isSleeping && timeDidAdvance) newStamina = 100;
         newStamina = Math.max(0, Math.min(100, newStamina));
         
         let shortActionCounter = player.shortActionCounter || 0;
@@ -241,43 +224,73 @@ const interactRouteHandler = async (req, res) => {
         }
         for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
-        await db.runTransaction(async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists) throw "Document does not exist!";
-            const currentData = userDoc.data();
-            const powerChange = aiResponse.roundData.powerChange || {};
-            const playerUpdatesForDb = {
-                timeOfDay: finalTimeOfDay,
-                stamina: newStamina,
-                shortActionCounter,
-                ...finalDate,
-                currentLocation: aiResponse.roundData.LOC || player.currentLocation,
-                internalPower: Math.max(0, (currentData.internalPower || 0) + (powerChange.internal || 0)),
-                externalPower: Math.max(0, (currentData.externalPower || 0) + (powerChange.external || 0)),
-                lightness: Math.max(0, (currentData.lightness || 0) + (powerChange.lightness || 0)),
-                morality: (currentData.morality || 0) + (aiResponse.roundData.moralityChange || 0),
-                money: Math.max(0, (currentData.money || 0) + (aiResponse.roundData.moneyChange || 0)),
-            };
-            transaction.update(userDocRef, playerUpdatesForDb);
-        });
+        const batch = db.batch();
+        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
+
+        await processItemChanges(userId, roundDataFromAI.itemChanges, batch, roundDataFromAI);
+        await updateFriendlinessValues(userId, username, roundDataFromAI.NPC, roundDataFromAI, player);
+        await updateRomanceValues(userId, roundDataFromAI.romanceChanges);
+        await processNpcUpdates(userId, roundDataFromAI.npcUpdates || []);
+        if (roundDataFromAI.locationUpdates) await processLocationUpdates(userId, locationContext.locationName, roundDataFromAI.locationUpdates);
+        if (romanceEventData && romanceEventData.npcUpdates) await processNpcUpdates(userId, romanceEventData.npcUpdates);
         
-        const finalSaveData = { ...aiResponse.roundData, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
+        const powerChange = roundDataFromAI.powerChange || {};
+        const playerUpdatesForDb = {
+            timeOfDay: finalTimeOfDay,
+            stamina: newStamina,
+            shortActionCounter,
+            ...finalDate,
+            currentLocation: roundDataFromAI.LOC || player.currentLocation,
+            internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
+            externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
+            lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
+            morality: admin.firestore.FieldValue.increment(roundDataFromAI.moralityChange || 0),
+            money: admin.firestore.FieldValue.increment(roundDataFromAI.moneyChange || 0),
+            R: newRoundNumber
+        };
+        batch.update(userDocRef, playerUpdatesForDb);
+
+        const finalSaveData = { ...roundDataFromAI, story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina };
         const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
         batch.set(newSaveRef, finalSaveData);
 
         const newSummary = await getAISummary(longTermSummary, finalSaveData);
         batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
+
         await batch.commit();
-
-        invalidateNovelCache(userId);
-        updateLibraryNovel(userId, username);
         
-        const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([ getRawInventory(userId), getPlayerSkills(userId), userDocRef.get().then(doc => doc.data()) ]);
-        const suggestion = await getAISuggestion(finalSaveData);
-        const finalBulkScore = calculateBulkScore(fullInventory);
-        const finalRoundDataForClient = { ...finalSaveData, ...finalPlayerProfile, skills: updatedSkills, inventory: fullInventory, money: finalPlayerProfile.money || 0, bulkScore: finalBulkScore, suggestion: suggestion };
+        const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
+            getRawInventory(userId),
+            getPlayerSkills(userId),
+            userDocRef.get().then(doc => doc.data()),
+            getAISuggestion(finalSaveData),
+            getMergedLocationData(userId, finalSaveData.LOC)
+        ]);
 
-        res.json({ story: finalSaveData.story, roundData: finalRoundDataForClient, suggestion: suggestion, locationData: await getMergedLocationData(userId, finalSaveData.LOC) });
+        const finalRoundDataForClient = {
+             ...finalSaveData, 
+             ...finalPlayerProfile, 
+             skills: updatedSkills, 
+             inventory: fullInventory, 
+             bulkScore: calculateBulkScore(fullInventory),
+             suggestion: suggestion 
+        };
+        
+        res.json({
+            story: finalSaveData.story,
+            roundData: finalRoundDataForClient,
+            suggestion: suggestion,
+            locationData: finalLocationData
+        });
+        
+        if (roundDataFromAI.NPC && Array.isArray(roundDataFromAI.NPC)) {
+            roundDataFromAI.NPC.filter(npc => npc.status).forEach(npc => {
+                const interactionContext = `事件：「${roundDataFromAI.EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
+                updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext).catch(err => console.error(`[背景任務] 更新NPC ${npc.name} 記憶時出錯:`, err));
+            });
+        }
+        invalidateNovelCache(userId).catch(e => console.error("背景任務失敗: 無效化小說快取", e));
+        updateLibraryNovel(userId, username).catch(e => console.error("背景任務失敗: 更新圖書館", e));
 
     } catch (error) {
         console.error(`[互動路由] /interact 錯誤:`, error);
