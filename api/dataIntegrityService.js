@@ -8,7 +8,7 @@ const { generateAndCacheLocation } = require('./worldEngine');
 const db = admin.firestore();
 
 /**
- * 檢查並修補玩家資料中的預設欄位
+ * 檢查並修補玩家資料中的預設欄位和資料類型
  * @param {string} userId - 玩家ID
  */
 async function checkUserFields(userId) {
@@ -17,9 +17,10 @@ async function checkUserFields(userId) {
     if (!userDoc.exists) return;
 
     const userData = userDoc.data();
-    const batch = db.batch();
+    const updates = {};
     let needsUpdate = false;
 
+    // 1. 補全缺失的欄位
     for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
         if (userData[field] === undefined) {
             needsUpdate = true;
@@ -27,13 +28,27 @@ async function checkUserFields(userId) {
             if (field === 'maxInternalPowerAchieved') value = userData.internalPower || defaultValue;
             else if (field === 'maxExternalPowerAchieved') value = userData.externalPower || defaultValue;
             else if (field === 'maxLightnessAchieved') value = userData.lightness || defaultValue;
-            batch.update(userDocRef, { [field]: value });
+            updates[field] = value;
+            console.log(`[健康檢查-玩家] 補齊缺失欄位: ${field} ->`, value);
+        }
+    }
+    
+    // 2. 修正錯誤的資料類型
+    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day'];
+    for (const field of fieldsToEnsureNumber) {
+        if (userData[field] !== undefined && typeof userData[field] !== 'number') {
+            const parsedValue = Number(userData[field]);
+            // 如果無法轉換為數字，則使用預設值；否則使用轉換後的值
+            updates[field] = isNaN(parsedValue) ? (DEFAULT_USER_FIELDS[field] || 0) : parsedValue;
+            needsUpdate = true;
+            console.log(`[健康檢查-玩家] 修正類型錯誤: ${field} 從 "${userData[field]}" (${typeof userData[field]}) 修復為 ${updates[field]} (number)。`);
         }
     }
 
+
     if (needsUpdate) {
-        await batch.commit();
-        console.log(`[健康檢查-玩家] 已為玩家 ${userId} 補全了缺失的核心欄位。`);
+        await userDocRef.update(updates);
+        console.log(`[健康檢查-玩家] 已為玩家 ${userId} 補全並修正了核心欄位。`);
     }
 }
 
