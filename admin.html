@@ -17,7 +17,7 @@
         }
         .rebuild-section {
             background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 2rem;
@@ -66,6 +66,11 @@
             color: var(--secondary-text);
             line-height: 1.6;
             flex-grow: 1;
+            overflow: auto;
+            max-height: 200px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
         }
         .template-card .actions {
             display: flex;
@@ -81,10 +86,6 @@
         }
         .template-card .actions .btn-edit {
             background-color: var(--accent-color);
-            color: white;
-        }
-        .template-card .actions .btn-delete {
-            background-color: var(--error-color);
             color: white;
         }
         .grid-container {
@@ -112,12 +113,15 @@
             max-width: 700px;
             max-height: 90vh;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
         .modal-content h3 {
             margin-top: 0;
         }
         .modal-content textarea {
             width: 100%;
+            flex-grow: 1;
             min-height: 400px;
             box-sizing: border-box;
             padding: 10px;
@@ -125,12 +129,24 @@
             border-radius: 4px;
             font-family: monospace;
             font-size: 0.9rem;
+            resize: vertical;
         }
         .modal-actions {
             margin-top: 20px;
             display: flex;
             justify-content: flex-end;
             gap: 10px;
+        }
+        .gm-select {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .gm-input-group {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
     </style>
 </head>
@@ -160,6 +176,7 @@
                 <li><a href="#item-templates" class="menu-link"><i class="fas fa-archive"></i> 物品模板</a></li>
                 <li><a href="#location-templates" class="menu-link"><i class="fas fa-map-marked-alt"></i> 地點模板</a></li>
                 <li><a href="#skill-templates" class="menu-link"><i class="fas fa-khanda"></i> 技能模板</a></li>
+                <li><a href="#relationship-auditor" class="menu-link"><i class="fas fa-project-diagram"></i> 關係鏈審核</a></li>
             </ul>
         </nav>
 
@@ -169,72 +186,28 @@
                 <h1 id="main-header-title">API儀表板</h1>
             </header>
 
-            <div id="page-dashboard" class="page-content active">
-                <div id="balance-cards-container" class="balance-cards-container"><p class="loading-text">正在獲取API餘額資訊...</p></div>
-            </div>
-
-            <div id="page-logs" class="page-content">
-                <div class="log-controls">
-                    <select id="player-filter"><option value="">所有玩家</option></select>
-                    <button id="refresh-logs-btn"><i class="fas fa-sync-alt"></i> 重新整理</button>
-                </div>
-                <div class="log-table-container">
-                    <table id="log-table"><thead><tr><th>時間</th><th>等級</th><th>玩家ID</th><th>訊息</th></tr></thead><tbody></tbody></table>
-                    <p id="logs-loading-text" class="loading-text">正在載入日誌...</p>
-                </div>
-            </div>
+            <div id="page-dashboard" class="page-content active"><div id="balance-cards-container" class="balance-cards-container"><p class="loading-text">正在獲取API餘額資訊...</p></div></div>
+            <div id="page-logs" class="page-content"><div class="log-controls"><select id="player-filter"><option value="">所有玩家</option></select><button id="refresh-logs-btn"><i class="fas fa-sync-alt"></i> 重新整理</button></div><div class="log-table-container"><table id="log-table"><thead><tr><th>時間</th><th>等級</th><th>玩家ID</th><th>訊息</th></tr></thead><tbody></tbody></table><p id="logs-loading-text" class="loading-text">正在載入日誌...</p></div></div>
+            <div id="page-npc-templates" class="page-content"><div class="page-header"><h2>NPC 模板全局管理</h2><p>此處顯示的是 <code>/npcs</code> 集合中的所有通用角色模板。</p></div><div class="rebuild-section" data-type="npc"><h4><i class="fas fa-hammer"></i> 模板健康檢查與修復</h4><p>此功能會掃描所有玩家數據，找出「黑戶」(不存在的模板)與「汙染模板」(內容不完整的模板)，並利用AI為其自動創建或覆蓋健全的根模板。</p><button class="btn-rebuild" data-type="npc"><i class="fas fa-cogs"></i> 一鍵修復NPC模板</button></div><div id="npc-templates-container" class="grid-container"><p class="loading-text">正在讀取NPC模板...</p></div></div>
+            <div id="page-item-templates" class="page-content"><div class="page-header"><h2>物品模板全局管理</h2><p>此處顯示的是 <code>/items</code> 集合中的所有通用物品模板。</p></div><div class="rebuild-section" data-type="item"><h4><i class="fas fa-hammer"></i> 模板健康檢查與修復</h4><p>此功能會掃描所有玩家的物品，找出「黑戶」物品並利用AI為其自動創建健全的根模板。</p><button class="btn-rebuild" data-type="item"><i class="fas fa-cogs"></i> 一鍵修復物品模板</button></div><div id="item-templates-container" class="grid-container"><p class="loading-text">正在讀取物品模板...</p></div></div>
+            <div id="page-location-templates" class="page-content"><div class="page-header"><h2>地點模板全局管理</h2><p>此處顯示的是 <code>/locations</code> 集合中的所有通用地點模板。</p></div><div class="rebuild-section" data-type="location"><h4><i class="fas fa-hammer"></i> 模板健康檢查與修復</h4><p>此功能會掃描所有玩家探索過的地點，找出「黑戶」地點並利用AI為其自動創建健全的根模板。</p><button class="btn-rebuild" data-type="location"><i class="fas fa-cogs"></i> 一鍵修復地點模板</button></div><div id="location-templates-container" class="grid-container"><p class="loading-text">正在讀取地點模板...</p></div></div>
+            <div id="page-skill-templates" class="page-content"><div class="page-header"><h2>技能模板全局管理</h2><p>此處顯示的是 <code>/skills</code> 集合中的所有通用技能模板。</p></div><div class="rebuild-section" data-type="skill"><h4><i class="fas fa-hammer"></i> 模板健康檢查與修復</h4><p>此功能會掃描所有玩家學會的技能，找出「黑戶」技能並利用AI為其自動創建健全的根模板。</p><button class="btn-rebuild" data-type="skill"><i class="fas fa-cogs"></i> 一鍵修復技能模板</button></div><div id="skill-templates-container" class="grid-container"><p class="loading-text">正在讀取技能模板...</p></div></div>
             
-            <div id="page-npc-templates" class="page-content">
+            <div id="page-relationship-auditor" class="page-content">
                 <div class="page-header">
-                    <h2>NPC 模板全局管理</h2>
-                    <p>此處顯示的是 <code>/npcs</code> 集合中的所有通用角色模板。修改此處的資料將會影響到未來所有玩家新遇到的同名NPC。</p>
+                    <h2>關係鏈審核與修復系統</h2>
+                    <p>此系統會分析指定玩家的數據，找出與主關係網絡「失聯」的孤立NPC，並可使用AI為其創建合理的相遇故事來修復關係鏈。</p>
                 </div>
-                <div class="rebuild-section" data-type="npc">
-                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
-                    <p>此功能會掃描所有玩家的<code>npc_states</code>子集合，找出那些只存在於玩家個人數據中、卻沒有對應根模板的「黑戶」NPC，並利用AI為其自動創建健全的根模板。此過程可能需要數分鐘。</p>
-                    <button class="btn-rebuild" data-type="npc"><i class="fas fa-cogs"></i> 一鍵回填NPC黑戶</button>
+                <div class="rebuild-section">
+                    <h4><i class="fas fa-link"></i> AI一鍵修復</h4>
+                    <p>選擇一位玩家，點擊按鈕，系統將在後台自動為該玩家修復所有孤立的NPC關係。此過程可能需要數分鐘，請在Render日誌中查看進度。</p>
+                    <div class="gm-input-group">
+                         <select id="repair-player-select" class="gm-select" style="max-width: 300px;"><option value="">-- 請先選擇一位玩家 --</option></select>
+                         <button id="btn-repair-relationships" class="btn-rebuild"><i class="fas fa-magic"></i> 開始修復關係鏈</button>
+                    </div>
                 </div>
-                <div id="npc-templates-container" class="grid-container"><p class="loading-text">正在讀取NPC模板...</p></div>
             </div>
 
-            <div id="page-item-templates" class="page-content">
-                 <div class="page-header">
-                    <h2>物品模板全局管理</h2>
-                    <p>此處顯示的是 <code>/items</code> 集合中的所有通用物品模板。修改此處的資料將會影響到所有玩家獲得的同名物品。</p>
-                </div>
-                <div class="rebuild-section" data-type="item">
-                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
-                    <p>此功能會掃描所有玩家的<code>inventory_items</code>子集合，找出那些被玩家擁有、卻沒有對應根模板的「黑戶」物品，並利用AI為其自動創建健全的根模板。</p>
-                    <button class="btn-rebuild" data-type="item"><i class="fas fa-cogs"></i> 一鍵回填物品黑戶</button>
-                </div>
-                <div id="item-templates-container" class="grid-container"><p class="loading-text">正在讀取物品模板...</p></div>
-            </div>
-
-            <div id="page-location-templates" class="page-content">
-                <div class="page-header">
-                    <h2>地點模板全局管理</h2>
-                    <p>此處顯示的是 <code>/locations</code> 集合中的所有通用地點模板。</p>
-                </div>
-                <div class="rebuild-section" data-type="location">
-                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
-                    <p>此功能會掃描所有玩家的<code>location_states</code>子集合，找出那些被玩家探索過、卻沒有對應根模板的「黑戶」地點，並利用AI為其自動創建健全的根模板。</p>
-                    <button class="btn-rebuild" data-type="location"><i class="fas fa-cogs"></i> 一鍵回填地點黑戶</button>
-                </div>
-                <div id="location-templates-container" class="grid-container"><p class="loading-text">正在讀取地點模板...</p></div>
-            </div>
-            
-            <div id="page-skill-templates" class="page-content">
-                <div class="page-header">
-                    <h2>技能模板全局管理</h2>
-                    <p>此處顯示的是 <code>/skills</code> 集合中的所有通用技能模板。</p>
-                </div>
-                 <div class="rebuild-section" data-type="skill">
-                    <h4><i class="fas fa-hammer"></i> 黑戶回填系統</h4>
-                    <p>此功能會掃描所有玩家的<code>skills</code>子集合，找出那些被玩家學會、卻沒有對應根模板的「黑戶」技能，並利用AI為其自動創建健全的根模板。</p>
-                    <button class="btn-rebuild" data-type="skill"><i class="fas fa-cogs"></i> 一鍵回填技能黑戶</button>
-                </div>
-                <div id="skill-templates-container" class="grid-container"><p class="loading-text">正在讀取技能模板...</p></div>
-            </div>
         </main>
     </div>
 
@@ -243,7 +216,7 @@
             <h3 id="modal-title">編輯模板</h3>
             <textarea id="modal-textarea"></textarea>
             <div class="modal-actions">
-                <button id="modal-cancel" class="btn btn-secondary">取消</button>
+                <button id="modal-cancel" class="btn btn-secondary" style="background-color: #7f8c8d; color: white;">取消</button>
                 <button id="modal-save" class="btn btn-edit">儲存變更</button>
             </div>
         </div>
