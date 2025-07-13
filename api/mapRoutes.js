@@ -7,12 +7,13 @@ const db = admin.firestore();
 
 /**
  * @route   GET /api/map/world-map
- * @desc    獲取玩家個人探索過的地圖資料 (重構版)
+ * @desc    獲取玩家個人探索過的地圖資料 (修正版)
  * @access  Private
  */
 router.get('/world-map', async (req, res) => {
     const userId = req.user.id;
     try {
+        // 步驟 1: 只讀取玩家個人的 location_states 集合，確認玩家去過哪些地方。
         const playerLocationsRef = db.collection('users').doc(userId).collection('location_states');
         const playerLocationsSnapshot = await playerLocationsRef.get();
 
@@ -22,10 +23,11 @@ router.get('/world-map', async (req, res) => {
 
         const discoveredLocationNames = playerLocationsSnapshot.docs.map(doc => doc.id);
         
-        // 【核心修正】將單次查詢改為分塊查詢，以突破30個地點的限制
+        // 步驟 2: 根據玩家去過的地點名稱，去全域 locations 集合中分批次撈取這些地點的詳細資料。
+        // 這個修正可以突破 Firestore 'in' 查詢最多30個元素的限制。
         const locationsRef = db.collection('locations');
         const allKnownDocs = [];
-        const chunkSize = 30; // Firestore 'in' 查詢的上限是30
+        const chunkSize = 30;
 
         for (let i = 0; i < discoveredLocationNames.length; i += chunkSize) {
             const chunk = discoveredLocationNames.slice(i, i + chunkSize);
@@ -53,6 +55,7 @@ router.get('/world-map', async (req, res) => {
             });
         });
 
+        // 步驟 3: 根據撈取到的、玩家確實去過的的地點資料，生成 Mermaid 語法。
         let mermaidSyntax = 'graph TD;\n';
         mermaidSyntax += '    %% --- Node Definitions & Styles ---\n';
         const typeStyles = {
@@ -83,6 +86,7 @@ router.get('/world-map', async (req, res) => {
                 else if(loc.address.region && loc.address.country) parentName = loc.address.country;
             }
 
+            // 只在父地點也被玩家探索過的情況下，才繪製連結
             if (parentName && idMap.has(parentName)) {
                 const parentSafeId = idMap.get(parentName);
                 const childSafeId = loc.safeId;
@@ -93,6 +97,7 @@ router.get('/world-map', async (req, res) => {
                 }
             }
 
+            // 只在相鄰地點也被玩家探索過的情況下，才繪製連結
             if (loc.geography && Array.isArray(loc.geography.nearbyLocations)) {
                 loc.geography.nearbyLocations.forEach(neighbor => {
                     if (neighbor.name && idMap.has(neighbor.name)) {
