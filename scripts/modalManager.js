@@ -1,7 +1,7 @@
 // scripts/modalManager.js
 import { api } from './api.js';
 import { initializeTrade, closeTradeUI } from './tradeManager.js'; 
-import { dom } from './dom.js'; // 引入DOM物件
+import { dom } from './dom.js'; 
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
@@ -317,7 +317,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
                     const itemName = itemData.itemName || itemData.templateId;
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'give-item';
-                    itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`;
+                    itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`
                     
                     itemDiv.addEventListener('click', () => {
                         if (itemName === '銀兩') {
@@ -429,55 +429,73 @@ export function closeSkillsModal() {
     if (skillsModal) skillsModal.classList.remove('visible');
 }
 
-// --- 【核心新增】地點詳情彈窗 ---
-function formatObjectForDisplay(obj) {
-    if (!obj || typeof obj !== 'object') return '無';
+/**
+ * 【核心修正 v2.0】
+ * 遞迴地將一個物件格式化為HTML列表，以便在地區情報彈窗中顯示。
+ * @param {object} obj - 要格式化的物件
+ * @param {Array<string>} keysToExclude - 要排除顯示的鍵名列表
+ * @returns {string} - 生成的HTML字串
+ */
+function formatObjectForDisplay(obj, keysToExclude = []) {
+    if (obj === null || typeof obj !== 'object') {
+        return obj || '無';
+    }
+
     let html = '<ul class="location-detail-list">';
     for (const [key, value] of Object.entries(obj)) {
+        if (keysToExclude.includes(key)) continue;
+
         let displayValue;
         if (Array.isArray(value)) {
-            displayValue = value.length > 0 ? value.map(item => typeof item === 'object' ? `<code>${JSON.stringify(item)}</code>` : item).join(', ') : '無';
+            displayValue = value.length > 0 ? value.map(item => {
+                // 如果陣列中的元素是物件，將其轉換為字串顯示
+                return (typeof item === 'object' && item !== null) ? JSON.stringify(item) : item;
+            }).join(', ') : '無';
         } else if (typeof value === 'object' && value !== null) {
-            displayValue = formatObjectForDisplay(value); // 遞迴處理巢狀物件
+            // 遞迴處理巢狀物件
+            displayValue = formatObjectForDisplay(value);
         } else {
-            displayValue = value;
+            displayValue = value !== undefined && value !== null ? value : '未知';
         }
-        html += `<li><span class="key">${key}:</span><span class="value">${displayValue}</span></li>`;
+        
+        // 只有在 displayValue 不是另一個 ul 時才加上 li
+        if (typeof displayValue === 'string' && displayValue.startsWith('<ul')) {
+             html += `<li><span class="key">${key}:</span>${displayValue}</li>`;
+        } else {
+             html += `<li><span class="key">${key}:</span><span class="value">${displayValue}</span></li>`;
+        }
     }
     html += '</ul>';
     return html;
 }
 
 export function openLocationDetailsModal(locationData) {
-    if (!dom.locationDetailsModal) return;
+    if (!dom.locationDetailsModal || !locationData) return;
+
     dom.locationModalTitle.textContent = locationData.locationName || '地區情報';
     
-    let bodyHtml = '';
     const staticData = {
         類型: locationData.locationType,
         層級: locationData.address ? Object.values(locationData.address).join(' > ') : '未知',
-        地理: locationData.geography ? formatObjectForDisplay(locationData.geography) : '未知',
-        經濟: locationData.economy ? formatObjectForDisplay(locationData.economy) : '未知',
+        地理: locationData.geography,
+        經濟潛力: locationData.economy?.prosperityPotential,
+        特產: locationData.economy?.specialty?.join(', ') || '無',
         歷史: locationData.lore?.history,
     };
     
     const dynamicData = {
-        統治: locationData.governance ? formatObjectForDisplay(locationData.governance) : '未知',
-        當前事務: locationData.lore?.currentIssues?.join(', ') || '暫無',
+        當前繁榮度: locationData.economy?.currentProsperity,
+        統治: locationData.governance,
+        當前事務: locationData.lore?.currentIssues?.join('<br>') || '暫無',
         設施: locationData.facilities?.map(f => `${f.name} (${f.type})`).join(', ') || '無',
         建築: locationData.buildings?.map(b => `${b.name} (${b.type})`).join(', ') || '無',
     };
 
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報 (世界設定)</h4>${formatObjectForDisplay(staticData)}</div>`;
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報 (玩家專屬)</h4>${formatObjectForDisplay(dynamicData)}</div>`;
+    let bodyHtml = `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報 (世界設定)</h4>${formatObjectForDisplay(staticData)}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報 (玩家專屬)</h4>${formatObjectForDisplay(dynamicData, ['facilities', 'buildings'])}</div>`; // 排除已單獨處理的
 
     dom.locationModalBody.innerHTML = bodyHtml;
     dom.locationDetailsModal.classList.add('visible');
-
-    dom.closeLocationDetailsBtn.onclick = closeLocationDetailsModal;
-    dom.locationDetailsModal.onclick = (e) => {
-        if (e.target === dom.locationDetailsModal) closeLocationDetailsModal();
-    };
 }
 
 export function closeLocationDetailsModal() {
