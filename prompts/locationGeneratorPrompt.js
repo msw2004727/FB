@@ -93,8 +93,8 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
         "governance": { "ruler": "村長李大山", "allegiance": "無名村自治", "security": "由幾位年輕村民組成的鄉勇隊，裝備簡陋。" },
         "economy": { "currentProsperity": "普通" },
         "facilities": [
-          { "name": "葉家鐵鋪", "type": "商業", "owner": "葉繼安", "status": "營業中" },
-          { "name": "王大夫藥鋪", "type": "商業", "owner": "王大夫", "status": "營業中" }
+          { "name": "葉家鐵鋪", "type": "鐵匠鋪", "owner": "葉繼安", "status": "營業中" },
+          { "name": "王大夫藥鋪", "type": "藥鋪", "owner": "王大夫", "status": "營業中" }
         ],
         "buildings": [],
         "lore": { "currentIssues": ["近來常有黑風寨的山賊下山騷擾，村民對此憂心忡忡。"] }
