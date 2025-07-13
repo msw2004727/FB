@@ -6,13 +6,13 @@ const adminAuth = require('./adminAuth');
 const { getLogs, getPlayersWithLogs } = require('./logService');
 const { getApiBalances } = require('./balanceService');
 
-// 【核心修改】從新的 npcCreationService 引入 generateNpcTemplateData
+// 引入重建模板所需的服務
 const { generateNpcTemplateData } = require('../services/npcCreationService');
 const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../playerStateHelpers');
 const { generateAndCacheLocation } = require('../worldEngine');
 
-// 引入AI關係修復服務
-const { getRelationshipFixPrompt } = require('../prompts/relationshipFixPrompt');
+// 【核心修正】修正了引用路徑，從 '../' 改為 '../../'
+const { getRelationshipFixPrompt } = require('../../prompts/relationshipFixPrompt');
 const { callAI, aiConfig } = require('../services/aiService');
 
 
@@ -201,26 +201,7 @@ router.post('/repair-relationships', async (req, res) => {
 
 
 // --- 黑戶與汙染模板一鍵回填功能 ---
-
-/**
- * 【新增】檢查NPC模板是否被汙染（資料不完整）
- * @param {object} data - NPC模板的資料
- * @returns {boolean} - 如果被汙染則返回true，否則返回false
- */
-const isNpcTainted = (data) => {
-    if (!data) return true; // 如果沒有資料，也視為需要重建
-    const markers = ["生成中", "不詳"];
-    const hasTaintedPersonality = Array.isArray(data.personality) && data.personality.some(p => markers.some(m => (p || '').includes(m)));
-    return markers.some(m => (data.appearance || '').includes(m) || (data.background || '').includes(m)) || hasTaintedPersonality;
-};
-
-/**
- * 【修改】通用回填函式，增加了對汙染數據的判斷
- * @param {string} playerSubCollection - 玩家的子集合名稱，如 'npc_states'
- * @param {string} rootCollection - 根模板集合名稱，如 'npcs'
- * @param {function} createTemplateFunc - 創建模板的函式
- * @param {function} [isTaintedFunc=() => false] - 判斷模板是否被汙染的函式
- */
+const isNpcTainted = (data) => { if (!data) return true; const markers = ["生成中", "不詳"]; return markers.some(m => (data.appearance || '').includes(m) || (data.background || '').includes(m) || (Array.isArray(data.personality) && data.personality.some(p => (p || '').includes(m)))); };
 const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTemplateFunc, isTaintedFunc = () => false) => async (req, res) => {
     res.status(202).json({ message: `任務已接收！${rootCollection} 的全局模板回填任務正在後台執行中。請查看Render後台日誌以獲取詳細進度。` });
     (async () => {
@@ -232,7 +213,6 @@ const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTempl
             for (const userDoc of usersSnapshot.docs) {
                 const subSnapshot = await userDoc.ref.collection(playerSubCollection).get();
                 subSnapshot.forEach(subDoc => {
-                    // 根據集合類型，決定ID是文檔ID還是欄位值
                     const id = rootCollection === 'items' ? subDoc.data().templateId : subDoc.id;
                     if(id) {
                         allMentionedIds.add(id);
@@ -240,12 +220,9 @@ const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTempl
                     }
                 });
             }
-            
             const householdsToRebuild = new Set();
             const mentionedIdsArray = Array.from(allMentionedIds);
             const rootDocs = new Map();
-
-            // 分塊查詢根模板集合
             for (let i = 0; i < mentionedIdsArray.length; i += 30) {
                 const chunk = mentionedIdsArray.slice(i, i + 30);
                 if (chunk.length > 0) {
@@ -253,38 +230,28 @@ const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTempl
                     rootSnapshot.forEach(doc => rootDocs.set(doc.id, doc.data()));
                 }
             }
-
-            // 找出所有黑戶或被汙染的模板ID
             for (const id of allMentionedIds) {
                 const templateData = rootDocs.get(id);
                 if (!templateData || isTaintedFunc(templateData)) {
                     householdsToRebuild.add(id);
                 }
             }
-
-            if (householdsToRebuild.size === 0) {
-                console.log(`[模板回填系統 v3.0] 資料庫健康，未發現任何 ${rootCollection} 黑戶或汙染模板。`);
-                return;
-            }
-
+            if (householdsToRebuild.size === 0) { console.log(`[模板回填系統 v3.0] 數據庫健康，未發現任何 ${rootCollection} 黑戶或汙染模板。`); return; }
             console.log(`[模板回填系統 v3.0] 發現 ${householdsToRebuild.size} 個黑戶或汙染 ${rootCollection} 模板，開始重建...`);
             let successCount = 0, failCount = 0;
-
             for (const id of householdsToRebuild) {
                 try {
                     const contextInfo = allPlayerSubDocs.find(p => p.docId === id);
                     if (contextInfo) {
                         await createTemplateFunc(contextInfo);
                         successCount++;
-                        console.log(`[模板回填系統 v3.0] 成功重建 ${rootCollection} 模板: ${id}`);
+                         console.log(`[模板回填系統 v3.0] 成功重建 ${rootCollection} 模板: ${id}`);
                     } else {
-                        // 對於物品和技能，即使找不到玩家上下文，也嘗試無上下文生成
                         if (['items', 'skills'].includes(rootCollection)) {
                             await createTemplateFunc({ docId: id });
                             successCount++;
                             console.log(`[模板回填系統 v3.0] 成功重建 ${rootCollection} 模板 (無上下文): ${id}`);
                         } else {
-                            // 對於NPC和地點，如果找不到上下文，則跳過
                             failCount++;
                             console.warn(`[模板回填系統 v3.0] 找不到 ${id} 的玩家上下文，跳過重建。`);
                         }
@@ -300,41 +267,11 @@ const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTempl
         }
     })().catch(err => console.error(`[模板回填系統 v3.0] 背景任務執行失敗:`, err));
 };
+const createNpcTemplate = async ({ userId, username, playerData, docId }) => { const allSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get(); const firstMentionRound = allSavesSnapshot.docs.map(d=>d.data()).find(round => round.NPC?.some(npc => npc.name === docId)); const generationResult = await generateNpcTemplateData(username, { name: docId }, firstMentionRound || null, playerData); if (generationResult && generationResult.canonicalName && generationResult.templateData) { await db.collection('npcs').doc(generationResult.canonicalName).set(generationResult.templateData, { merge: true }); } else { throw new Error('AI生成NPC失敗'); } };
+const createItemTemplate = async ({ docId }) => { await getOrGenerateItemTemplate(docId, {}); };
+const createSkillTemplate = async ({ docId }) => { await getOrGenerateSkillTemplate(docId); };
+const createLocationTemplate = async ({ userId, docId }) => { const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get(); const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。'; await generateAndCacheLocation(userId, docId, '未知', worldSummary); };
 
-// --- 為不同類型的模板定義創建函式 ---
-const createNpcTemplate = async ({ userId, username, playerData, docId }) => {
-    const allSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
-    const allSavesData = allSavesSnapshot.docs.map(d => d.data());
-    const firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === docId));
-
-    // 【核心修改】如果找不到初見情境，則傳遞 null，觸發AI的自由發揮模式
-    const generationResult = await generateNpcTemplateData(username, { name: docId }, firstMentionRound || null, playerData);
-    if (generationResult && generationResult.canonicalName && generationResult.templateData) {
-        // 使用 set + merge: true 來覆蓋舊的汙染數據，同時保留可能已存在的其他欄位(如關係)
-        await db.collection('npcs').doc(generationResult.canonicalName).set(generationResult.templateData, { merge: true });
-    } else {
-        throw new Error('AI生成NPC失敗');
-    }
-};
-
-const createItemTemplate = async ({ docId }) => {
-    // getOrGenerateItemTemplate 內部已包含檢查和創建邏輯，直接調用即可
-    await getOrGenerateItemTemplate(docId, {}); 
-};
-
-const createSkillTemplate = async ({ docId }) => {
-    // getOrGenerateSkillTemplate 內部已包含檢查和創建邏輯，直接調用即可
-    await getOrGenerateSkillTemplate(docId);
-};
-
-const createLocationTemplate = async ({ userId, docId }) => {
-    const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get();
-    const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。';
-    // generateAndCacheLocation 內部已包含檢查和創建邏輯，直接調用即可
-    await generateAndCacheLocation(userId, docId, '未知', worldSummary);
-};
-
-// --- 註冊路由 ---
 router.post('/rebuild-npc-templates', rebuildBlackHouseholds('npc_states', 'npcs', createNpcTemplate, isNpcTainted));
 router.post('/rebuild-item-templates', rebuildBlackHouseholds('inventory_items', 'items', createItemTemplate));
 router.post('/rebuild-skill-templates', rebuildBlackHouseholds('skills', 'skills', createSkillTemplate));
