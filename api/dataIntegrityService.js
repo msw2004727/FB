@@ -1,6 +1,6 @@
 // api/dataIntegrityService.js
 const admin = require('firebase-admin');
-const { DEFAULT_USER_FIELDS } = require('./authRoutes'); // 從 authRoutes 導入預設欄位
+const { DEFAULT_USER_FIELDS } = require('./models/userModel'); // 【核心修改】從新的模型檔案讀取預設值
 const { generateNpcTemplateData } = require('../services/npcCreationService');
 const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
@@ -38,7 +38,6 @@ async function checkUserFields(userId) {
     for (const field of fieldsToEnsureNumber) {
         if (userData[field] !== undefined && typeof userData[field] !== 'number') {
             const parsedValue = Number(userData[field]);
-            // 如果無法轉換為數字，則使用預設值；否則使用轉換後的值
             updates[field] = isNaN(parsedValue) ? (DEFAULT_USER_FIELDS[field] || 0) : parsedValue;
             needsUpdate = true;
             console.log(`[健康檢查-玩家] 修正類型錯誤: ${field} 從 "${userData[field]}" (${typeof userData[field]}) 修復為 ${updates[field]} (number)。`);
@@ -106,7 +105,6 @@ async function checkItemTemplates(userId) {
     const promises = inventorySnapshot.docs.map(doc => {
         const itemData = doc.data();
         if (itemData.templateId) {
-            // getOrGenerateItemTemplate 函式內部已包含檢查和創建邏輯
             return getOrGenerateItemTemplate(itemData.templateId);
         }
         return Promise.resolve();
@@ -127,7 +125,6 @@ async function checkSkillTemplates(userId) {
     console.log(`[健康檢查-技能] 開始為玩家 ${userId} 檢查 ${skillsSnapshot.size} 項技能...`);
     const promises = skillsSnapshot.docs.map(doc => {
         const skillName = doc.id;
-        // getOrGenerateSkillTemplate 函式內部已包含檢查和創建邏輯
         return getOrGenerateSkillTemplate(skillName);
     });
 
@@ -149,7 +146,6 @@ async function checkLocationTemplates(userId) {
 
     const promises = locationsSnapshot.docs.map(doc => {
         const locationName = doc.id;
-        // generateAndCacheLocation 函式內部已包含檢查和創建邏輯
         return generateAndCacheLocation(userId, locationName, '未知', worldSummary);
     });
     
@@ -166,7 +162,6 @@ async function checkLocationTemplates(userId) {
 async function runDataHealthCheck(userId, username) {
     console.log(`[健康檢查] 開始為玩家 ${username} 執行登入後資料健康檢查...`);
     try {
-        // 將所有檢查任務並行執行以提高效率
         await Promise.all([
             checkUserFields(userId),
             checkNpcTemplates(userId, username),
