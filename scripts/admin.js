@@ -27,13 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
     let currentEditData = null;
 
-    // --- 【***核心修正***】將頁面載入器(pageLoaders)的宣告提前 ---
+    // --- 頁面載入器 ---
     const pageLoaders = {
         'dashboard': loadBalances,
         'logs': loadLogs,
         'npc-templates': () => loadTemplates('npc'),
         'item-templates': () => loadTemplates('item'),
         'location-templates': () => loadTemplates('location'),
+        'skill-templates': () => loadTemplates('skill'), // 新增技能頁面載入器
     };
     
     // --- 初始化檢查 ---
@@ -93,11 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mainHeaderTitle.textContent = pageTitle;
         pages.forEach(page => page.classList.toggle('active', page.id === `page-${pageId}`));
         menuLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${pageId}`));
-
         const loader = pageLoaders[pageId];
-        if (loader) {
-            loader();
-        }
+        if (loader) loader();
     }
 
     // --- 頁面內容載入器函式 ---
@@ -108,13 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<p class="loading-text">正在獲取API餘額資訊...</p>';
             const balances = await fetchAdminApi('/balances');
             container.innerHTML = Object.values(balances).map(data => `
-                <div class="balance-card">
-                    <h3>${data.service}</h3>
-                    <p><span>餘額/用量:</span><span class="value">${data.balance}</span></p>
-                    <p><span>用量百分比:</span><span class="value">${data.usage}</span></p>
-                    <p><span>限制:</span><span class="value">${data.limit}</span></p>
-                    <p><span>貨幣:</span><span class="value">${data.currency}</span></p>
-                </div>
+                <div class="balance-card"><h3>${data.service}</h3><p><span>餘額/用量:</span><span class="value">${data.balance}</span></p><p><span>用量百分比:</span><span class="value">${data.usage}</span></p><p><span>限制:</span><span class="value">${data.limit}</span></p><p><span>貨幣:</span><span class="value">${data.currency}</span></p></div>
             `).join('');
         } catch (error) {
             container.innerHTML = `<p class="error-message" style="color: var(--error-color);">無法載入餘額資訊: ${error.message}</p>`;
@@ -126,11 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const logsLoadingText = document.getElementById('logs-loading-text');
         const playerFilter = document.getElementById('player-filter');
         if (!logTableBody) return;
-
         logTableBody.innerHTML = '';
         logsLoadingText.textContent = '正在載入日誌...';
         logsLoadingText.classList.remove('hidden');
-
         try {
             const players = await fetchAdminApi('/players');
             const existingPlayers = new Set(Array.from(playerFilter.options).map(opt => opt.value));
@@ -142,25 +132,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     playerFilter.appendChild(option);
                 }
             });
-
             const playerId = playerFilter.value;
             const logs = await fetchAdminApi(`/logs?playerId=${playerId}`);
-            
             if (logs.length === 0) {
                  logsLoadingText.textContent = '找不到符合條件的日誌。';
                  return;
             }
-            
             logTableBody.innerHTML = logs.map(log => {
                 const messageText = typeof log.message === 'object' ? JSON.stringify(log.message, null, 2) : log.message;
-                return `
-                    <tr>
-                        <td>${log.timestamp ? new Date(log.timestamp).toLocaleString() : '未知時間'}</td>
-                        <td><span class="log-level log-level-${(log.level || 'info').toLowerCase()}">${log.level || 'INFO'}</span></td>
-                        <td>${log.userId ? (log.userId.substring(0, 8) + '...') : 'N/A'}</td>
-                        <td class="log-message"><pre>${messageText || ''}</pre></td>
-                    </tr>
-                `;
+                return `<tr><td>${new Date(log.timestamp).toLocaleString()}</td><td><span class="log-level log-level-${(log.level||'info').toLowerCase()}">${log.level||'INFO'}</span></td><td>${log.userId?(log.userId.substring(0,8)+'...'):'N/A'}</td><td class="log-message"><pre>${messageText||''}</pre></td></tr>`;
             }).join('');
             logsLoadingText.classList.add('hidden');
         } catch (error) {
@@ -181,29 +161,20 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = templates.map(template => `
                 <div class="template-card">
                     <h4>${template.id}</h4>
-                    <div class="details">
-                        <pre>${JSON.stringify(template.data, null, 2)}</pre>
-                    </div>
-                    <div class="actions">
-                        <button class="btn btn-edit" data-type="${type}" data-id="${template.id}">編輯</button>
-                    </div>
+                    <div class="details"><pre>${JSON.stringify(template.data, null, 2)}</pre></div>
+                    <div class="actions"><button class="btn btn-edit" data-type="${type}" data-id="${template.id}">編輯</button></div>
                 </div>
             `).join('');
-
-            container.querySelectorAll('.btn-edit').forEach(btn => {
-                btn.addEventListener('click', handleEditClick);
-            });
-
+            container.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', handleEditClick));
         } catch (error) {
             container.innerHTML = `<p class="error-message">讀取 ${type} 模板失敗: ${error.message}</p>`;
         }
     }
     
-    // --- 編輯功能 ---
+    // --- 編輯與重建功能 ---
     async function handleEditClick(e) {
         const type = e.target.dataset.type;
         const id = e.target.dataset.id;
-        
         try {
             const data = await fetchAdminApi(`/${type}-templates/${id}`);
             currentEditData = { type, id };
@@ -217,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleSaveClick() {
         if (!currentEditData) return;
-        
         let updatedData;
         try {
             updatedData = JSON.parse(modalTextarea.value);
@@ -225,19 +195,14 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('JSON格式無效，請檢查您的輸入！');
             return;
         }
-
         modalSaveBtn.textContent = '儲存中...';
         modalSaveBtn.disabled = true;
-
         try {
             const { type, id } = currentEditData;
-            await fetchAdminApi(`/${type}-templates/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify(updatedData)
-            });
+            await fetchAdminApi(`/${type}-templates/${id}`, { method: 'PUT', body: JSON.stringify(updatedData) });
             alert('儲存成功！');
             closeModal();
-            pageLoaders[`${type}-templates`](); // 重新載入頁面
+            pageLoaders[`${type}-templates`]();
         } catch (error) {
             alert(`儲存失敗: ${error.message}`);
         } finally {
@@ -250,6 +215,26 @@ document.addEventListener('DOMContentLoaded', () => {
         editModal.style.display = 'none';
         currentEditData = null;
         modalTextarea.value = '';
+    }
+
+    async function handleRebuildClick(e) {
+        const button = e.target;
+        const type = button.dataset.type;
+        if (!confirm(`您確定要執行【${type}】的全局黑戶回填嗎？\n此操作將掃描所有玩家數據並可能呼叫多次AI，會消耗大量時間與API額度，且無法中斷。`)) {
+            return;
+        }
+        button.textContent = '正在全局掃描與重建中...';
+        button.disabled = true;
+        try {
+            const result = await fetchAdminApi(`/rebuild-${type}-templates`, { method: 'POST' });
+            alert(result.message);
+            pageLoaders[`${type}-templates`](); // 完成後重新整理列表
+        } catch (error) {
+            alert(`重建失敗: ${error.message}`);
+        } finally {
+            button.innerHTML = `<i class="fas fa-cogs"></i> 一鍵回填${type.toUpperCase()}黑戶`;
+            button.disabled = false;
+        }
     }
 
     // --- 事件綁定 ---
@@ -278,11 +263,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modalSaveBtn.addEventListener('click', handleSaveClick);
     modalCancelBtn.addEventListener('click', closeModal);
-    editModal.addEventListener('click', (e) => {
-        if (e.target === editModal) closeModal();
-    });
+    editModal.addEventListener('click', (e) => { if (e.target === editModal) closeModal(); });
 
-    // 為日誌頁面添加篩選和刷新監聽
+    document.querySelectorAll('.btn-rebuild').forEach(btn => btn.addEventListener('click', handleRebuildClick));
+
     const playerFilter = document.getElementById('player-filter');
     const refreshLogsBtn = document.getElementById('refresh-logs-btn');
     if(playerFilter) playerFilter.addEventListener('change', loadLogs);
