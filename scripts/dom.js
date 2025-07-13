@@ -4,7 +4,6 @@
 export const dom = {};
 
 // 導出一個初始化函式
-// 這個函式只會在 main.js 中，當 DOM 完全載入後被呼叫一次
 export function initializeDOM() {
     dom.gameContainer = document.querySelector('.game-container');
     dom.mainContent = document.getElementById('main-content');
@@ -23,9 +22,7 @@ export function initializeDOM() {
     dom.aiModelSelector = document.getElementById('ai-model-selector');
     dom.npcInteractionMenu = document.getElementById('npc-interaction-menu');
 
-    // 【核心修正】補上對主要聊天視窗的引用
     dom.chatModal = document.getElementById('chat-modal'); 
-    
     dom.chatInput = document.getElementById('chat-input');
     dom.chatActionBtn = document.getElementById('chat-action-btn');
     dom.closeChatBtn = document.getElementById('close-chat-btn');
@@ -38,7 +35,12 @@ export function initializeDOM() {
     dom.gmMenu = document.getElementById('gm-menu');
     dom.gmContent = document.getElementById('gm-content');
 
-    // 動態建立讀取動畫
+    // 【核心新增】地點詳情彈窗的DOM元素
+    dom.locationDetailsModal = document.getElementById('location-details-modal');
+    dom.locationModalTitle = document.getElementById('location-modal-title');
+    dom.locationModalBody = document.getElementById('location-modal-body');
+    dom.closeLocationDetailsBtn = document.getElementById('close-location-details-btn');
+
     if (dom.mainContent && !dom.mainContent.querySelector('.ai-thinking-loader')) {
         const aiThinkingLoader = document.createElement('div');
         aiThinkingLoader.className = 'ai-thinking-loader';
