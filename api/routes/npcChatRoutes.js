@@ -28,6 +28,13 @@ router.post('/chat', async (req, res) => {
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
         
+        // --- 【核心修正】在這裡加上守衛，如果找不到NPC檔案，則直接中斷 ---
+        if (!npcProfile) {
+            console.error(`[NPC聊天系統] 嚴重錯誤：玩家 ${req.user.username} 試圖與一個不存在或無法讀取的NPC「${npcName}」聊天。`);
+            return res.status(404).json({ message: `江湖中查無此人：「${npcName}」。` });
+        }
+        // --- 修正結束 ---
+        
         const playerProfile = playerProfileDoc.data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '無';
         const lastRoundData = lastSaveDoc.empty ? {} : lastSaveDoc.docs[0].data();
