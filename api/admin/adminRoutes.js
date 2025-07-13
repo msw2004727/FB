@@ -11,9 +11,9 @@ const { generateNpcTemplateData } = require('../services/npcCreationService');
 const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../playerStateHelpers');
 const { generateAndCacheLocation } = require('../worldEngine');
 
-// 【核心修正】修正了引用路徑，從 '../' 改為 '../../'
+// 【最終修正】修正了所有引用路徑，從 '../' 或 './' 改為正確的 '../../'
 const { getRelationshipFixPrompt } = require('../../prompts/relationshipFixPrompt');
-const { callAI, aiConfig } = require('../services/aiService');
+const { callAI, aiConfig } = require('../../services/aiService');
 
 
 const db = admin.firestore();
@@ -74,7 +74,6 @@ const updateTemplateById = (collectionName) => async (req, res) => {
     try {
         const { id } = req.params;
         const data = req.body;
-        // 使用 set 並搭配 { merge: true } 來確保能更新巢狀欄位而不會覆蓋整個文件
         await db.collection(collectionName).doc(id).set(data, { merge: true });
         res.json({ message: `${collectionName} 模板更新成功。`});
     } catch (error) {
@@ -107,11 +106,8 @@ router.post('/repair-relationships', async (req, res) => {
     if (!playerId) {
         return res.status(400).json({ message: '必須提供玩家ID。' });
     }
-
-    // 立即回應，告知任務已在後台開始
     res.status(202).json({ message: `任務已接收！正在為玩家 ${playerId.substring(0,8)}... 在後台修復關係鏈。請查看Render後台日誌以獲取詳細進度。` });
     
-    // 在背景執行
     (async () => {
         try {
             const playerDoc = await db.collection('users').doc(playerId).get();
