@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameLoop.setLoading(true, '英雄末路，傳奇落幕...');
                 try {
                     const data = await api.forceSuicide({ model: dom.aiModelSelector.value });
-                    updateUI(data.story, data.roundData, null, data.locationData);
+                    gameLoop.processNewRoundData(data); // 使用 processNewRoundData 來確保UI一致性
                     gameLoop.handlePlayerDeath();
                 } catch (error) {
                     handleApiError(error);
@@ -98,10 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // 【核心新增】為地區資訊卡片添加事件委託，以處理動態生成的按鈕
-        const locationInfoContainer = document.getElementById('location-info');
-        if (locationInfoContainer) {
-            locationInfoContainer.addEventListener('click', (e) => {
+        // 【核心修正】為儀表板添加事件委託，以處理動態生成的按鈕
+        const dashboardContent = document.querySelector('.dashboard-content');
+        if (dashboardContent) {
+            dashboardContent.addEventListener('click', (e) => {
                 const button = e.target.closest('#view-location-details-btn');
                 if (button) {
                     if (gameState.currentLocationData) {
@@ -146,6 +146,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dom.cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
         dom.closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
+        
+        // 【核心新增】為新的地點詳情彈窗的關閉按鈕綁定事件
+        if(dom.closeLocationDetailsBtn) {
+            dom.closeLocationDetailsBtn.addEventListener('click', modal.closeLocationDetailsModal);
+        }
+        if(dom.locationDetailsModal) {
+            dom.locationDetailsModal.addEventListener('click', (e) => {
+                if(e.target === dom.locationDetailsModal) {
+                    modal.closeLocationDetailsModal();
+                }
+            });
+        }
 
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);
