@@ -57,6 +57,7 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
     return playerAction;
 };
 
+
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -104,7 +105,7 @@ const interactRouteHandler = async (req, res) => {
                 romanceChanges: [],
                 npcUpdates: [],
                 locationUpdates: [],
-                LOC: player.currentLocation,
+                LOC: player.currentLocation || ['未知之地'],
                 NPC: player.NPC || [],
             };
 
@@ -184,31 +185,32 @@ const interactRouteHandler = async (req, res) => {
 
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
         
-        const {
-            playerState = 'alive',
-            powerChange = {},
-            moralityChange = 0,
-            moneyChange = 0,
-            itemChanges = [],
-            skillChanges = [],
-            romanceChanges = [],
-            npcUpdates = [],
-            locationUpdates = [],
-            ATM = [''],
-            EVT = playerAction.substring(0, 10), 
-            LOC = player.currentLocation || ['未知之地'],
-            PSY = '心如止水',
-            PC = '安然無恙',
-            NPC = [],
-            QST = '',
-            WRD = '晴朗',
-            LOR = '',
-            CLS = '',
-            IMP = '你的行動似乎沒有產生什麼特別的影響。',
-            timeOfDay: aiNextTimeOfDay, 
-            daysToAdvance = 0, 
-            staminaChange = 0
-        } = aiResponse.roundData;
+        // --- 核心修改：建立「金鐘罩」，為所有從AI收到的資料提供預設值，杜絕 `undefined` ---
+        const safeRoundData = aiResponse.roundData;
+        const playerState = safeRoundData.playerState || 'alive';
+        const powerChange = safeRoundData.powerChange || { internal: 0, external: 0, lightness: 0 };
+        const moralityChange = safeRoundData.moralityChange || 0;
+        const moneyChange = safeRoundData.moneyChange || 0;
+        const itemChanges = safeRoundData.itemChanges || [];
+        const skillChanges = safeRoundData.skillChanges || [];
+        const romanceChanges = safeRoundData.romanceChanges || [];
+        const npcUpdates = safeRoundData.npcUpdates || [];
+        const locationUpdates = safeRoundData.locationUpdates || [];
+        const ATM = safeRoundData.ATM || [''];
+        const EVT = safeRoundData.EVT || playerAction.substring(0, 10);
+        const LOC = safeRoundData.LOC || player.currentLocation || ['未知之地'];
+        const PSY = safeRoundData.PSY || '心如止水';
+        const PC = safeRoundData.PC || '安然無恙';
+        const NPC = safeRoundData.NPC || [];
+        const QST = safeRoundData.QST || '';
+        const WRD = safeRoundData.WRD || '晴朗';
+        const LOR = safeRoundData.LOR || '';
+        const CLS = safeRoundData.CLS || '';
+        const IMP = safeRoundData.IMP || '你的行動似乎沒有產生什麼特別的影響。';
+        const aiNextTimeOfDay = safeRoundData.timeOfDay;
+        const daysToAdvance = safeRoundData.daysToAdvance || 0;
+        const staminaChange = safeRoundData.staminaChange || 0;
+        // --- 修改結束 ---
 
         const newRoundNumber = (player.R || 0) + 1;
 
@@ -244,8 +246,6 @@ const interactRouteHandler = async (req, res) => {
         for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
         // --- 核心修改：將存檔操作提前 ---
-
-        // 1. 準備好要存檔的完整資料
         const finalSaveData = { 
             story: aiResponse.story || "江湖靜好，歲月無聲。", 
             R: Number(newRoundNumber), 
@@ -255,20 +255,18 @@ const interactRouteHandler = async (req, res) => {
             day: Number(finalDate.day),
             yearName: finalDate.yearName,
             stamina: Number(newStamina),
-            playerState, powerChange, 
-            moralityChange: Number(moralityChange), 
-            moneyChange: Number(moneyChange),
+            playerState, powerChange, moralityChange: Number(moralityChange), moneyChange: Number(moneyChange),
             itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
             ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
         };
 
-        // 2. **獨立並優先**執行 game_saves 的寫入
-        console.log(`[強制寫入機制] 正在為 R${newRoundNumber} 強制寫入存檔...`);
+        console.log('--- [存檔檢查點] ---');
+        console.log('準備寫入存檔的最終數據:', JSON.stringify(finalSaveData, null, 2));
+        
         const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
         await newSaveRef.set(finalSaveData);
         console.log(`[強制寫入機制] R${newRoundNumber} 存檔成功！`);
 
-        // 3. 繼續執行其餘的批次更新
         const batch = db.batch();
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
@@ -303,8 +301,6 @@ const interactRouteHandler = async (req, res) => {
         
         await batch.commit();
         console.log(`[數據同步] R${newRoundNumber} 的其餘數據已成功同步至資料庫。`);
-        
-        // --- 核心修改結束 ---
         
         const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
             getRawInventory(userId),
