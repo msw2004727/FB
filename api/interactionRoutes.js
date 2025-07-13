@@ -186,21 +186,21 @@ const interactRouteHandler = async (req, res) => {
 
         if (!aiResponse || !aiResponse.roundData) throw new Error("主AI未能生成有效回應。");
         
-        // --- 【核心修正開始】 ---
-        // 使用解構賦值和預設值來安全地處理AI的回應
+        // --- 【最終修正】 ---
+        // 絕對防禦性地處理所有可能來自AI的數值
         const {
             playerState = 'alive',
-            powerChange = { internal: 0, external: 0, lightness: 0 },
-            moralityChange = 0,
-            moneyChange = 0,
+            powerChange = {}, // 預設為空物件
+            moralityChange, // 暫不設預設值，以便下面進行更精確的檢查
+            moneyChange,    // 同上
             itemChanges = [],
             skillChanges = [],
             romanceChanges = [],
             npcUpdates = [],
             locationUpdates = [],
             ATM = [''],
-            EVT = playerAction.substring(0, 10), // 提供一個預設的事件標題
-            LOC = player.currentLocation,
+            EVT = playerAction.substring(0, 10), 
+            LOC = player.currentLocation || ['未知之地'],
             PSY = '心如止水',
             PC = '安然無恙',
             NPC = [],
@@ -219,7 +219,6 @@ const interactRouteHandler = async (req, res) => {
         const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, skillChanges, player);
         if (customSkillCreationResult && !customSkillCreationResult.success) {
             aiResponse.story = customSkillCreationResult.reason;
-            // 如果自創武學失敗，清空相關的 skillChanges 避免出錯
             if(skillChanges.some(s => s.isNewlyAcquired)) {
                  skillChanges.length = 0;
             }
@@ -228,7 +227,7 @@ const interactRouteHandler = async (req, res) => {
             aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
         }
 
-        let newStamina = (player.stamina ?? 100) + staminaChange - (Math.floor(Math.random() * 5) + 1);
+        let newStamina = (player.stamina ?? 100) + (staminaChange || 0) - (Math.floor(Math.random() * 5) + 1);
         const isSleeping = ['睡覺'].some(kw => playerAction.includes(kw));
         const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
         if (isSleeping && timeDidAdvance) newStamina = 100;
@@ -266,23 +265,27 @@ const interactRouteHandler = async (req, res) => {
             shortActionCounter,
             ...finalDate,
             currentLocation: LOC,
-            internalPower: admin.firestore.FieldValue.increment(powerChange.internal || 0),
-            externalPower: admin.firestore.FieldValue.increment(powerChange.external || 0),
-            lightness: admin.firestore.FieldValue.increment(powerChange.lightness || 0),
-            morality: admin.firestore.FieldValue.increment(moralityChange),
-            money: admin.firestore.FieldValue.increment(moneyChange),
+            // 確保所有 increment 的值都是有效的數字
+            internalPower: admin.firestore.FieldValue.increment(powerChange?.internal || 0),
+            externalPower: admin.firestore.FieldValue.increment(powerChange?.external || 0),
+            lightness: admin.firestore.FieldValue.increment(powerChange?.lightness || 0),
+            morality: admin.firestore.FieldValue.increment(typeof moralityChange === 'number' ? moralityChange : 0),
+            money: admin.firestore.FieldValue.increment(typeof moneyChange === 'number' ? moneyChange : 0),
             R: newRoundNumber
         };
         batch.update(userDocRef, playerUpdatesForDb);
 
         // 使用清理過的數據來構建儲存物件
         const finalSaveData = { 
-            story: aiResponse.story, 
+            story: aiResponse.story || "江湖靜好，歲月無聲。", 
             R: newRoundNumber, 
             timeOfDay: finalTimeOfDay, 
             ...finalDate, 
             stamina: newStamina,
-            playerState, powerChange, moralityChange, moneyChange, itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
+            playerState, powerChange, 
+            moralityChange: typeof moralityChange === 'number' ? moralityChange : 0, 
+            moneyChange: typeof moneyChange === 'number' ? moneyChange : 0,
+            itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
             ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
         };
         const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
@@ -292,8 +295,7 @@ const interactRouteHandler = async (req, res) => {
         batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
 
         await batch.commit();
-        
-        // --- 【核心修正結束】 ---
+        // --- 【最終修正結束】 ---
 
         const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
             getRawInventory(userId),
