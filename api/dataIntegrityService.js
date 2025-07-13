@@ -20,20 +20,14 @@ async function checkUserFields(userId) {
     const updates = {};
     let needsUpdate = false;
 
-    // 1. 補全缺失的欄位
     for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
         if (userData[field] === undefined) {
             needsUpdate = true;
-            let value = defaultValue;
-            if (field === 'maxInternalPowerAchieved') value = userData.internalPower || defaultValue;
-            else if (field === 'maxExternalPowerAchieved') value = userData.externalPower || defaultValue;
-            else if (field === 'maxLightnessAchieved') value = userData.lightness || defaultValue;
-            updates[field] = value;
-            console.log(`[健康檢查-玩家] 補齊缺失欄位: ${field} ->`, value);
+            updates[field] = defaultValue;
+            console.log(`[健康檢查-玩家] 補齊缺失欄位: ${field} ->`, defaultValue);
         }
     }
     
-    // 2. 修正錯誤的資料類型
     const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day'];
     for (const field of fieldsToEnsureNumber) {
         if (userData[field] !== undefined && typeof userData[field] !== 'number') {
@@ -44,7 +38,6 @@ async function checkUserFields(userId) {
         }
     }
 
-
     if (needsUpdate) {
         await userDocRef.update(updates);
         console.log(`[健康檢查-玩家] 已為玩家 ${userId} 補全並修正了核心欄位。`);
@@ -52,19 +45,71 @@ async function checkUserFields(userId) {
 }
 
 /**
+ * 【核心新增】修復內容不完整的NPC公用模板
+ * @param {string} userId - 玩家ID
+ * @param {string} username - 玩家名稱
+ * @param {object} playerProfile - 玩家的完整檔案
+ * @param {Array<object>} allSavesData - 玩家的所有存檔記錄
+ */
+async function repairIncompleteNpcTemplates(userId, username, playerProfile, allSavesData) {
+    const npcStatesSnapshot = await db.collection('users').doc(userId).collection('npc_states').get();
+    if (npcStatesSnapshot.empty) return;
+
+    for (const npcStateDoc of npcStatesSnapshot.docs) {
+        const npcName = npcStateDoc.id;
+        const npcTemplateRef = db.collection('npcs').doc(npcName);
+        const npcTemplateDoc = await npcTemplateRef.get();
+
+        if (npcTemplateDoc.exists) {
+            const templateData = npcTemplateDoc.data();
+            // 檢查是否有生成不完整的標記
+            const isIncomplete = Object.values(templateData).some(value => typeof value === 'string' && value.includes('生成中'));
+
+            if (isIncomplete) {
+                console.log(`[健康檢查-NPC修復] 偵測到「${npcName}」的模板不完整，開始修復...`);
+                
+                // 嘗試從 npc_states 中找到初見回合
+                const npcStateData = npcStateDoc.data();
+                const firstMetRoundNumber = npcStateData.firstMet?.round;
+                let firstMentionRound = null;
+
+                if (firstMetRoundNumber !== undefined) {
+                    firstMentionRound = allSavesData.find(save => save.R === firstMetRoundNumber);
+                } else {
+                    // 作為備用方案，掃描所有存檔
+                    firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === npcName));
+                }
+
+                if (firstMentionRound) {
+                    try {
+                        const generationResult = await generateNpcTemplateData(username, { name: npcName }, firstMentionRound, playerProfile);
+                        if (generationResult && generationResult.canonicalName && generationResult.templateData) {
+                            // 使用 update 而不是 set，以防萬一有其他欄位需要保留
+                            await npcTemplateRef.update(generationResult.templateData);
+                            console.log(`[健康檢查-NPC修復] 成功為「${generationResult.canonicalName}」重新生成並覆蓋了完整的公用模板。`);
+                        }
+                    } catch (genError) {
+                        console.error(`[健康檢查-NPC修復] 為「${npcName}」重新生成模板時AI出錯:`, genError);
+                    }
+                } else {
+                    console.warn(`[健康檢查-NPC修復] 警告：在存檔中找不到NPC「${npcName}」的初見情境，無法為其修復模板。`);
+                }
+            }
+        }
+    }
+}
+
+
+/**
  * 檢查玩家所有接觸過的NPC，並為缺少模板的NPC重建檔案
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
+ * @param {object} playerProfile - 玩家的完整檔案
+ * @param {Array<object>} allSavesData - 玩家的所有存檔記錄
  */
-async function checkNpcTemplates(userId, username) {
-    const userDocRef = db.collection('users').doc(userId);
-    const userData = (await userDocRef.get()).data();
-    const npcStatesSnapshot = await userDocRef.collection('npc_states').get();
-
+async function repairMissingNpcTemplates(userId, username, playerProfile, allSavesData) {
+    const npcStatesSnapshot = await db.collection('users').doc(userId).collection('npc_states').get();
     if (npcStatesSnapshot.empty) return;
-
-    const allSavesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'asc').get();
-    const allSavesData = allSavesSnapshot.docs.map(doc => doc.data());
 
     for (const npcStateDoc of npcStatesSnapshot.docs) {
         const npcName = npcStateDoc.id;
@@ -72,87 +117,26 @@ async function checkNpcTemplates(userId, username) {
         const npcTemplateDoc = await npcTemplateRef.get();
 
         if (!npcTemplateDoc.exists) {
-            console.log(`[健康檢查-NPC] 偵測到「${npcName}」缺少模板，開始自動修補...`);
+            console.log(`[健康檢查-NPC創建] 偵測到「${npcName}」缺少模板，開始自動創建...`);
             const firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === npcName));
 
             if (firstMentionRound) {
                 try {
-                    const generationResult = await generateNpcTemplateData(username, { name: npcName }, firstMentionRound, userData);
+                    const generationResult = await generateNpcTemplateData(username, { name: npcName }, firstMentionRound, playerProfile);
                     if (generationResult && generationResult.canonicalName && generationResult.templateData) {
                         const newTemplateData = { ...generationResult.templateData, createdAt: admin.firestore.FieldValue.serverTimestamp() };
                         await db.collection('npcs').doc(generationResult.canonicalName).set(newTemplateData);
-                        console.log(`[健康檢查-NPC] 成功為「${generationResult.canonicalName}」重建了通用模板。`);
+                        console.log(`[健康檢查-NPC創建] 成功為「${generationResult.canonicalName}」創建了通用模板。`);
                     }
                 } catch (genError) {
-                    console.error(`[健康檢查-NPC] 為「${npcName}」生成模板時AI出錯:`, genError);
+                    console.error(`[健康檢查-NPC創建] 為「${npcName}」生成模板時AI出錯:`, genError);
                 }
             } else {
-                console.warn(`[健康檢查-NPC] 警告：在存檔中找不到NPC「${npcName}」的初見情境，無法為其生成模板。`);
+                console.warn(`[健康檢查-NPC創建] 警告：在存檔中找不到NPC「${npcName}」的初見情境，無法為其生成模板。`);
             }
         }
     }
 }
-
-/**
- * 檢查玩家物品，確保所有物品都有對應的模板
- * @param {string} userId - 玩家ID
- */
-async function checkItemTemplates(userId) {
-    const inventorySnapshot = await db.collection('users').doc(userId).collection('inventory_items').get();
-    if (inventorySnapshot.empty) return;
-
-    console.log(`[健康檢查-物品] 開始為玩家 ${userId} 檢查 ${inventorySnapshot.size} 件物品...`);
-    const promises = inventorySnapshot.docs.map(doc => {
-        const itemData = doc.data();
-        if (itemData.templateId) {
-            return getOrGenerateItemTemplate(itemData.templateId);
-        }
-        return Promise.resolve();
-    });
-
-    await Promise.all(promises);
-    console.log(`[健康檢查-物品] 玩家 ${userId} 的物品模板檢查完畢。`);
-}
-
-/**
- * 檢查玩家技能，確保所有技能都有對應的模板
- * @param {string} userId - 玩家ID
- */
-async function checkSkillTemplates(userId) {
-    const skillsSnapshot = await db.collection('users').doc(userId).collection('skills').get();
-    if (skillsSnapshot.empty) return;
-
-    console.log(`[健康檢查-技能] 開始為玩家 ${userId} 檢查 ${skillsSnapshot.size} 項技能...`);
-    const promises = skillsSnapshot.docs.map(doc => {
-        const skillName = doc.id;
-        return getOrGenerateSkillTemplate(skillName);
-    });
-
-    await Promise.all(promises);
-     console.log(`[健康檢查-技能] 玩家 ${userId} 的技能模板檢查完畢。`);
-}
-
-/**
- * 檢查玩家去過的地點，確保所有地點都有對應的模板
- * @param {string} userId - 玩家ID
- */
-async function checkLocationTemplates(userId) {
-    const locationsSnapshot = await db.collection('users').doc(userId).collection('location_states').get();
-    if (locationsSnapshot.empty) return;
-    
-    console.log(`[健康檢查-地點] 開始為玩家 ${userId} 檢查 ${locationsSnapshot.size} 個地點...`);
-    const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get();
-    const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。';
-
-    const promises = locationsSnapshot.docs.map(doc => {
-        const locationName = doc.id;
-        return generateAndCacheLocation(userId, locationName, '未知', worldSummary);
-    });
-    
-    await Promise.all(promises);
-    console.log(`[健康檢查-地點] 玩家 ${userId} 的地點模板檢查完畢。`);
-}
-
 
 /**
  * 總健康檢查函式，用於登入後在背景執行
@@ -162,12 +146,20 @@ async function checkLocationTemplates(userId) {
 async function runDataHealthCheck(userId, username) {
     console.log(`[健康檢查] 開始為玩家 ${username} 執行登入後資料健康檢查...`);
     try {
+        const userDocRef = db.collection('users').doc(userId);
+        const playerDoc = await userDocRef.get();
+        if (!playerDoc.exists) return;
+        const playerProfile = playerDoc.data();
+
+        // 預先獲取所有存檔，供NPC檢查函式共用，避免重複讀取
+        const allSavesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'asc').get();
+        const allSavesData = allSavesSnapshot.docs.map(doc => doc.data());
+
+        // 執行所有檢查
         await Promise.all([
             checkUserFields(userId),
-            checkNpcTemplates(userId, username),
-            checkItemTemplates(userId),
-            checkSkillTemplates(userId),
-            checkLocationTemplates(userId)
+            repairMissingNpcTemplates(userId, username, playerProfile, allSavesData),
+            repairIncompleteNpcTemplates(userId, username, playerProfile, allSavesData) // 【核心新增】執行修復不完整模板的檢查
         ]);
         console.log(`[健康檢查] 玩家 ${username} 的所有資料健康檢查完畢。`);
     } catch (error) {
