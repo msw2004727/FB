@@ -8,7 +8,6 @@ import { gameTips } from './tips.js';
 import * as interaction from './interactionHandlers.js';
 import { dom } from './dom.js';
 
-// --- 【核心修改】新增載入提醒文字陣列 ---
 const loadingDisclaimers = [
     "說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。",
     "天機運轉，世界演化...若初遇奇人、初探秘境，耗時或將近一分鐘，還望少俠耐心等候。",
@@ -18,7 +17,7 @@ const loadingDisclaimers = [
 ];
 
 let tipInterval = null;
-let disclaimerInterval = null; // 【核心新增】為載入提醒創建獨立的計時器
+let disclaimerInterval = null; 
 
 function updateBountyButton(hasNew) {
     if (dom.bountiesBtn) {
@@ -50,9 +49,6 @@ export function setLoading(isLoading, text = '') {
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
-            // --- 【核心修改】同時啟動兩個獨立的輪播 ---
-            
-            // 1. 遊戲技巧輪播
             const rotateTip = () => {
                 if (gameTips.length > 0) {
                     const randomIndex = Math.floor(Math.random() * gameTips.length);
@@ -62,9 +58,8 @@ export function setLoading(isLoading, text = '') {
                 }
             };
             rotateTip();
-            tipInterval = setInterval(rotateTip, 10000); // 技巧提示10秒換一次
+            tipInterval = setInterval(rotateTip, 10000);
 
-            // 2. 載入提醒輪播
             const rotateDisclaimer = () => {
                 if (loadingDisclaimers.length > 0) {
                     const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
@@ -74,10 +69,9 @@ export function setLoading(isLoading, text = '') {
                 }
             };
             rotateDisclaimer();
-            disclaimerInterval = setInterval(rotateDisclaimer, 10000); // 載入提醒10秒換一次
+            disclaimerInterval = setInterval(rotateDisclaimer, 10000);
 
         } else {
-            // --- 【核心修改】同時停止兩個輪播 ---
             clearInterval(tipInterval);
             clearInterval(disclaimerInterval);
         }
@@ -146,7 +140,6 @@ export function processNewRoundData(data) {
     data.roundData.suggestion = data.suggestion;
     addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
     
-    // 更新死亡名單
     if (data.roundData.NPC && Array.isArray(data.roundData.NPC)) {
         data.roundData.NPC.forEach(npc => {
             if (npc.isDeceased && !gameState.deceasedNpcs.includes(npc.name)) {
@@ -155,6 +148,13 @@ export function processNewRoundData(data) {
             }
         });
     }
+
+    // --- 【核心修正】在更新UI前，先將完整的地區情報存入全局狀態 ---
+    if (data.locationData) {
+        gameState.currentLocationData = data.locationData;
+        console.log('[遊戲狀態] 已更新當前地區的詳細情報:', gameState.currentLocationData);
+    }
+    // --- 修正結束 ---
 
     updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
     
@@ -233,6 +233,8 @@ export async function loadInitialGame() {
 
         if (data.gameState === 'deceased') {
             if(data.roundData) {
+                // 【核心修正】初始化時也要儲存地區情報
+                if (data.locationData) gameState.currentLocationData = data.locationData;
                 updateUI('', data.roundData, null, data.locationData);
             }
             handlePlayerDeath();
