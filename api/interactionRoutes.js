@@ -57,37 +57,6 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
     return playerAction;
 };
 
-// 【核心修正】建立一個獨立的資料健康檢查函式，用於錯誤處理
-const runEmergencyHealthCheck = async (userId) => {
-    console.log(`[緊急修復機制] 啟動！為玩家 ${userId} 進行資料健康檢查...`);
-    const userDocRef = db.collection('users').doc(userId);
-    const doc = await userDocRef.get();
-    if (!doc.exists) return;
-
-    const playerData = doc.data();
-    const updates = {};
-    let needsFix = false;
-
-    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day'];
-    
-    for (const field of fieldsToEnsureNumber) {
-        if (playerData[field] !== undefined && typeof playerData[field] !== 'number') {
-            const parsedValue = Number(playerData[field]);
-            updates[field] = isNaN(parsedValue) ? 0 : parsedValue; // 如果無法轉換，則設為0
-            needsFix = true;
-            console.log(`[緊急修復] 發現欄位 ${field} 類型錯誤 (${typeof playerData[field]})，已修正為 -> ${updates[field]}`);
-        }
-    }
-
-    if (needsFix) {
-        await userDocRef.update(updates);
-        console.log(`[緊急修復] 已成功為玩家 ${userId} 修復資料庫中的錯誤類型。`);
-    } else {
-        console.log(`[緊急修復] 玩家 ${userId} 資料健康，無需修復。`);
-    }
-};
-
-
 const interactRouteHandler = async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -112,7 +81,7 @@ const interactRouteHandler = async (req, res) => {
             const nextTimeIndex = (currentTimeIndex + 1) % TIME_SEQUENCE.length;
             const newTimeOfDay = TIME_SEQUENCE[nextTimeIndex];
             let newDate = { year: player.year, month: player.month, day: player.day, yearName: player.yearName };
-            if (nextTimeIndex === 0) { // 時間跨過午夜
+            if (nextTimeIndex === 0) {
                 newDate = advanceDate(newDate);
             }
 
@@ -127,7 +96,7 @@ const interactRouteHandler = async (req, res) => {
                 R: newRoundNumber,
                 timeOfDay: newTimeOfDay,
                 ...newDate,
-                stamina: 100, // 昏迷醒來後，體力完全恢復
+                stamina: 100,
                 moneyChange: 0,
                 powerChange: {},
                 itemChanges: [],
@@ -274,6 +243,32 @@ const interactRouteHandler = async (req, res) => {
         }
         for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
+        // --- 核心修改：將存檔操作提前 ---
+
+        // 1. 準備好要存檔的完整資料
+        const finalSaveData = { 
+            story: aiResponse.story || "江湖靜好，歲月無聲。", 
+            R: Number(newRoundNumber), 
+            timeOfDay: finalTimeOfDay, 
+            year: Number(finalDate.year),
+            month: Number(finalDate.month),
+            day: Number(finalDate.day),
+            yearName: finalDate.yearName,
+            stamina: Number(newStamina),
+            playerState, powerChange, 
+            moralityChange: Number(moralityChange), 
+            moneyChange: Number(moneyChange),
+            itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
+            ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
+        };
+
+        // 2. **獨立並優先**執行 game_saves 的寫入
+        console.log(`[強制寫入機制] 正在為 R${newRoundNumber} 強制寫入存檔...`);
+        const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
+        await newSaveRef.set(finalSaveData);
+        console.log(`[強制寫入機制] R${newRoundNumber} 存檔成功！`);
+
+        // 3. 繼續執行其餘的批次更新
         const batch = db.batch();
         const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
@@ -286,7 +281,6 @@ const interactRouteHandler = async (req, res) => {
         }
         if (romanceEventData && romanceEventData.npcUpdates) await processNpcUpdates(userId, romanceEventData.npcUpdates);
         
-        // --- 核心修改：在寫入前，對所有數字欄位進行淨化，確保它們是數字 ---
         const playerUpdatesForDb = {
             timeOfDay: finalTimeOfDay,
             stamina: Number(newStamina),
@@ -304,30 +298,13 @@ const interactRouteHandler = async (req, res) => {
         };
         batch.update(userDocRef, playerUpdatesForDb);
 
-        const finalSaveData = { 
-            story: aiResponse.story || "江湖靜好，歲月無聲。", 
-            R: Number(newRoundNumber), 
-            timeOfDay: finalTimeOfDay, 
-            year: Number(finalDate.year),
-            month: Number(finalDate.month),
-            day: Number(finalDate.day),
-            yearName: finalDate.yearName,
-            stamina: Number(newStamina),
-            playerState, powerChange, 
-            moralityChange: Number(moralityChange), 
-            moneyChange: Number(moneyChange),
-            itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
-            ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
-        };
-        const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
-        batch.set(newSaveRef, finalSaveData);
-        // --- 核心修改結束 ---
-
         const newSummary = await getAISummary(longTermSummary, finalSaveData);
         batch.set(summaryDocRef, { text: newSummary, lastUpdated: newRoundNumber }, { merge: true });
         
-        // 【核心修正】移除舊的、有缺陷的重試機制，改為直接提交
         await batch.commit();
+        console.log(`[數據同步] R${newRoundNumber} 的其餘數據已成功同步至資料庫。`);
+        
+        // --- 核心修改結束 ---
         
         const [fullInventory, updatedSkills, finalPlayerProfile, suggestion, finalLocationData] = await Promise.all([
             getRawInventory(userId),
