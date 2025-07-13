@@ -12,7 +12,8 @@
     <link rel="stylesheet" href="styles/modals_feedback.css">
     <link rel="stylesheet" href="styles/modals_interaction.css">
     <link rel="stylesheet" href="styles/modals_info.css">
-    <link rel="stylesheet" href="styles/modals_location.css"> <link rel="stylesheet" href="styles/gmPanel.css">
+    <link rel="stylesheet" href="styles/modals_location.css"> 
+    <link rel="stylesheet" href="styles/gmPanel.css">
     <link rel="stylesheet" href="styles/trade.css">
 </head>
 <body class="light-theme">
@@ -123,9 +124,12 @@
                 <div class="info-card">
                     <div class="card-header-flex">
                         <h4><i class="fas fa-map"></i> 當前地區</h4>
-                        <a href="map.html" target="_blank" id="map-btn" class="header-icon-btn" title="查看世界地圖">
-                            <i class="fas fa-globe-asia"></i>
-                        </a>
+                        <div class="header-action-group">
+                            <span class="header-prompt-text">世界地圖→</span>
+                            <a href="map.html" target="_blank" id="map-btn" class="header-icon-btn" title="查看世界地圖">
+                                <i class="fas fa-globe-asia"></i>
+                            </a>
+                        </div>
                     </div>
                     <div id="location-info">讀取中...</div>
                 </div>
@@ -150,9 +154,12 @@
                 <div class="info-card">
                     <div class="card-header-flex">
                         <h4><i class="fas fa-scroll"></i> 任務日誌 (QST)</h4>
-                        <a href="bounties.html" target="_blank" id="bounties-btn" class="header-icon-btn" title="查看懸賞">
-                            <i class="fas fa-scroll"></i>
-                        </a>
+                        <div class="header-action-group">
+                             <span class="header-prompt-text">懸賞告示板→</span>
+                            <a href="bounties.html" target="_blank" id="bounties-btn" class="header-icon-btn" title="查看懸賞">
+                                <i class="fas fa-scroll"></i>
+                            </a>
+                        </div>
                     </div>
                     <div id="qst-content">--</div>
                 </div>
@@ -317,7 +324,7 @@
                     <button id="close-location-details-btn" class="location-modal-close"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="location-modal-body" id="location-modal-body">
-                    </div>
+                </div>
             </div>
         </div>
 
