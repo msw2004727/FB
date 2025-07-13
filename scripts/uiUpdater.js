@@ -3,7 +3,6 @@ import { MAX_POWER } from './config.js';
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 
-// --- DOM元素獲取 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
 const storyTextContainer = document.getElementById('story-text-wrapper');
 const statusBarEl = document.getElementById('status-bar');
@@ -27,7 +26,6 @@ const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
 const moneyContent = document.getElementById('money-content');
 
-// --- 圖示對照表 ---
 const slotConfig = {
     head: { icon: 'fa-user-ninja' },
     body: { icon: 'fa-user-shield' },
@@ -42,8 +40,6 @@ const slotConfig = {
 };
 
 const equipOrder = ['weapon_right', 'weapon_left', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
-
-// --- UI 更新核心函式 ---
 
 export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
@@ -169,18 +165,18 @@ function updateBulkStatus(score) {
     bulkStatus.className = `bulk-status-display ${colorClass}`;
 }
 
-// 【核心修改】重寫此函式以動態生成統治者資訊和按鈕
+// 【核心修正】重寫此函式以動態生成統治者資訊和按鈕
 function updateLocationInfo(locationData) {
      if (locationInfo) {
         if (locationData) {
             locationInfo.innerHTML = `
-                <div class="location-ruler-container">
-                    <span>統治者：<span class="location-ruler">${locationData.governance?.ruler || '未知'}</span></span>
+                <div class="location-ruler-info">統治者：<span class="location-ruler">${locationData.governance?.ruler || '未知'}</span></div>
+                <div class="location-desc-container">
+                    <p class="location-desc">${locationData.description || '此地詳情尚在傳聞之中...'}</p>
                     <button id="view-location-details-btn" class="header-icon-btn" title="查看地區詳情">
                         <i class="fas fa-info-circle"></i>
                     </button>
                 </div>
-                <div class="location-desc">${locationData.description || '此地詳情尚在傳聞之中...'}</div>
             `;
         } else {
             locationInfo.innerHTML = '此地詳情尚在傳聞之中...';
