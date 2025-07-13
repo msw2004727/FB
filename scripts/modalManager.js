@@ -1,44 +1,7 @@
 // scripts/modalManager.js
 import { api } from './api.js';
 import { initializeTrade, closeTradeUI } from './tradeManager.js'; 
-
-// --- 獲取所有彈窗相關的 DOM 元素 ---
-const deceasedOverlay = document.getElementById('deceased-overlay');
-const deceasedTitle = document.getElementById('deceased-title');
-
-const combatModal = document.getElementById('combat-modal');
-const closeCombatBtn = document.getElementById('close-combat-btn');
-const combatLog = document.getElementById('combat-log');
-const combatLoader = document.getElementById('combat-loader');
-const combatTurnCounter = document.getElementById('combat-turn-counter');
-const alliesRoster = document.getElementById('allies-roster');
-const enemiesRoster = document.getElementById('enemies-roster');
-const strategyButtonsContainer = document.getElementById('strategy-buttons');
-const skillSelectionContainer = document.getElementById('skill-selection');
-const confirmActionContainer = document.getElementById('confirm-action');
-
-
-const chatModal = document.getElementById('chat-modal');
-const chatNpcName = document.getElementById('chat-npc-name');
-const chatNpcInfo = document.getElementById('chat-npc-info');
-const chatLog = document.getElementById('chat-log');
-const chatLoader = document.getElementById('chat-loader');
-const chatActionBtn = document.getElementById('chat-action-btn'); // 獲取發話按鈕
-
-const giveItemBtn = document.getElementById('give-item-btn');
-const giveItemModal = document.getElementById('give-item-modal');
-const giveInventoryList = document.getElementById('give-inventory-list');
-const cancelGiveBtn = document.getElementById('cancel-give-btn');
-
-const epilogueModal = document.getElementById('epilogue-modal');
-const epilogueStory = document.getElementById('epilogue-story');
-const closeEpilogueBtn = document.getElementById('close-epilogue-btn');
-
-const skillsModal = document.getElementById('skills-modal');
-const closeSkillsBtn = document.getElementById('close-skills-btn');
-const skillsTabsContainer = document.getElementById('skills-tabs-container');
-const skillsBodyContainer = document.getElementById('skills-body-container');
-
+import { dom } from './dom.js'; // 引入DOM物件
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
@@ -65,11 +28,13 @@ export function closeTradeModal() {
 
 // --- Helper Functions ---
 function displayRomanceValue(value) {
-    if (!value || value <= 0) {
-        const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
-        if (existingHearts) existingHearts.remove();
-        return;
-    }
+    const chatNpcInfo = document.getElementById('chat-npc-info');
+    if (!chatNpcInfo) return;
+    
+    const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
+    if (existingHearts) existingHearts.remove();
+    
+    if (!value || value <= 0) return;
 
     let level = 0;
     if (value >= 90) level = 5;
@@ -86,12 +51,17 @@ function displayRomanceValue(value) {
         heartSpan.className = i < level ? 'fas fa-heart' : 'far fa-heart';
         heartsContainer.appendChild(heartSpan);
     }
-    const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
-    if (existingHearts) existingHearts.remove();
+    
     chatNpcInfo.prepend(heartsContainer);
 }
 
 function displayFriendlinessBar(value) {
+    const chatNpcInfo = document.getElementById('chat-npc-info');
+    if (!chatNpcInfo) return;
+
+    const existingBar = chatNpcInfo.querySelector('.friendliness-bar-container');
+    if (existingBar) existingBar.remove();
+    
     const percentage = ((value || 0) + 100) / 200 * 100;
     const barContainer = document.createElement('div');
     barContainer.className = 'friendliness-bar-container';
@@ -102,8 +72,6 @@ function displayFriendlinessBar(value) {
             <div class="friendliness-bar-indicator" style="left: ${percentage}%;"></div>
         </div>
     `;
-    const existingBar = chatNpcInfo.querySelector('.friendliness-bar-container');
-    if (existingBar) existingBar.remove();
     chatNpcInfo.appendChild(barContainer);
 }
 
@@ -151,12 +119,19 @@ function createCharacterCard(character) {
 
 // --- 死亡與結局 ---
 export function showDeceasedScreen() {
+    const deceasedOverlay = document.getElementById('deceased-overlay');
+    const deceasedTitle = document.getElementById('deceased-title');
+    if (!deceasedOverlay || !deceasedTitle) return;
+
     const username = localStorage.getItem('username');
     deceasedTitle.textContent = `${username || '你'}的江湖路已到盡頭`;
     deceasedOverlay.classList.add('visible');
 }
 
 export function showEpilogueModal(storyHtml, onEpilogueEnd) {
+    const epilogueModal = document.getElementById('epilogue-modal');
+    const epilogueStory = document.getElementById('epilogue-story');
+    const closeEpilogueBtn = document.getElementById('close-epilogue-btn');
     if (epilogueModal && epilogueStory && closeEpilogueBtn) {
         epilogueStory.innerHTML = storyHtml;
         epilogueModal.classList.add('visible');
@@ -170,33 +145,32 @@ export function showEpilogueModal(storyHtml, onEpilogueEnd) {
 }
 
 export function closeEpilogueModal() {
+    const epilogueModal = document.getElementById('epilogue-modal');
     if (epilogueModal) epilogueModal.classList.remove('visible');
 }
 
 // --- 戰鬥彈窗 ---
-
 export function openCombatModal(initialState, onCombatCancel) {
+    const combatModal = document.getElementById('combat-modal');
+    if (!combatModal) return;
+    
+    const alliesRoster = document.getElementById('allies-roster');
+    const enemiesRoster = document.getElementById('enemies-roster');
+    const combatLog = document.getElementById('combat-log');
+    const combatTurnCounter = document.getElementById('combat-turn-counter');
+    const strategyButtonsContainer = document.getElementById('strategy-buttons');
+    const skillSelectionContainer = document.getElementById('skill-selection');
+    const confirmActionContainer = document.getElementById('confirm-action');
+
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
     enemiesRoster.innerHTML = '<h4><i class="fas fa-skull-crossbones"></i> 敵方陣營</h4>';
-    strategyButtonsContainer.innerHTML = '';
-    skillSelectionContainer.innerHTML = '<div class="system-message">請先選擇一個策略</div>';
-    confirmActionContainer.innerHTML = '';
+    
+    if (initialState.player) alliesRoster.appendChild(createCharacterCard(initialState.player));
+    if (initialState.allies) initialState.allies.forEach(ally => alliesRoster.appendChild(createCharacterCard(ally)));
+    if (initialState.enemies) initialState.enemies.forEach(enemy => enemiesRoster.appendChild(createCharacterCard(enemy)));
 
-    if (initialState.player) {
-        alliesRoster.appendChild(createCharacterCard(initialState.player));
-    }
-    if (initialState.allies && initialState.allies.length > 0) {
-        initialState.allies.forEach(ally => alliesRoster.appendChild(createCharacterCard(ally)));
-    }
-    if (initialState.enemies && initialState.enemies.length > 0) {
-        initialState.enemies.forEach(enemy => enemiesRoster.appendChild(createCharacterCard(enemy)));
-    }
-
-    combatLog.innerHTML = '';
-    if (initialState.log && initialState.log.length > 0) {
-        updateCombatLog(`<p>${initialState.log[0]}</p>`);
-    }
-    setTurnCounter(initialState.turn || 1);
+    combatLog.innerHTML = `<p>${initialState.log?.[0] || '戰鬥開始！'}</p>`;
+    combatTurnCounter.textContent = `第 ${initialState.turn || 1} 回合`;
     
     strategyButtonsContainer.innerHTML = `
         <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
@@ -206,32 +180,28 @@ export function openCombatModal(initialState, onCombatCancel) {
         <button class="strategy-btn" data-strategy="heal"><i class="fas fa-briefcase-medical"></i> 治癒</button>
     `;
     
+    skillSelectionContainer.innerHTML = '<div class="system-message">請先選擇一個策略</div>';
     confirmActionContainer.innerHTML = `
         <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
         <button id="combat-surrender-btn" class="surrender-btn">認輸</button>
     `;
     
+    const closeCombatBtn = document.getElementById('close-combat-btn');
     if (closeCombatBtn) {
-        const closeHandler = () => {
+        closeCombatBtn.onclick = () => {
             closeCombatModal();
-            if (typeof onCombatCancel === 'function') {
-                onCombatCancel();
-            }
-            closeCombatBtn.removeEventListener('click', closeHandler);
+            if (typeof onCombatCancel === 'function') onCombatCancel();
         };
-        closeCombatBtn.addEventListener('click', closeHandler);
     }
 
     combatModal.classList.add('visible');
 }
 
 export function updateCombatUI(updatedState) {
-    const allCombatants = [
-        updatedState.player,
-        ...(updatedState.allies || []),
-        ...(updatedState.enemies || [])
-    ];
-
+    const combatModal = document.getElementById('combat-modal');
+    if (!combatModal) return;
+    
+    const allCombatants = [ updatedState.player, ...(updatedState.allies || []), ...(updatedState.enemies || []) ];
     allCombatants.forEach(character => {
         if (!character) return;
         const characterName = character.name || character.username;
@@ -239,15 +209,15 @@ export function updateCombatUI(updatedState) {
         if (card) {
             const hpBar = card.querySelector('.hp-bar-fill');
             const hpValueText = card.querySelector('.hp-bar-container .bar-value-text');
-            const hpPercentage = (character.hp / character.maxHp) * 100;
-            if (hpBar) hpBar.style.width = `${hpPercentage}%`;
-            if (hpValueText) hpValueText.textContent = character.hp;
+            if(hpBar && hpValueText) {
+                hpBar.style.width = `${(character.hp / character.maxHp) * 100}%`;
+                hpValueText.textContent = character.hp;
+            }
             
             const mpBar = card.querySelector('.mp-bar-fill');
             const mpValueText = card.querySelector('.mp-bar-container .bar-value-text');
             if (mpBar && mpValueText && character.mp !== undefined) {
-                const mpPercentage = (character.mp / character.maxMp) * 100;
-                mpBar.style.width = `${mpPercentage}%`;
+                mpBar.style.width = `${(character.mp / character.maxMp) * 100}%`;
                 mpValueText.textContent = character.mp;
             }
         }
@@ -255,6 +225,8 @@ export function updateCombatUI(updatedState) {
 }
 
 export function updateCombatLog(htmlContent, className = '') {
+    const combatLog = document.getElementById('combat-log');
+    if (!combatLog) return;
     const p = document.createElement('div');
     if (className) p.className = className;
     p.innerHTML = htmlContent.replace(/\n/g, '<br>');
@@ -263,56 +235,76 @@ export function updateCombatLog(htmlContent, className = '') {
 }
 
 export function setTurnCounter(turn) {
-    combatTurnCounter.textContent = `第 ${turn} 回合`;
+    const combatTurnCounter = document.getElementById('combat-turn-counter');
+    if(combatTurnCounter) combatTurnCounter.textContent = `第 ${turn} 回合`;
 }
 
 export function closeCombatModal() { 
+    const combatModal = document.getElementById('combat-modal');
     if(combatModal) combatModal.classList.remove('visible'); 
 }
-export function setCombatLoading(isLoading) { if (combatLoader) combatLoader.classList.toggle('visible', isLoading); }
+export function setCombatLoading(isLoading) { 
+    const combatLoader = document.getElementById('combat-loader');
+    if (combatLoader) combatLoader.classList.toggle('visible', isLoading); 
+}
 
 
 // --- 對話彈窗 ---
-
 export function openChatModalUI(profile, mode = 'chat') {
+    const chatModal = document.getElementById('chat-modal');
+    const chatNpcName = document.getElementById('chat-npc-name');
+    const chatNpcInfo = document.getElementById('chat-npc-info');
+    const chatLog = document.getElementById('chat-log');
+    const giveItemBtn = document.getElementById('give-item-btn');
+    const chatFooter = document.querySelector('.chat-footer');
+    const chatActionBtn = document.getElementById('chat-action-btn');
+
+    if (!chatModal || !chatNpcName || !chatNpcInfo || !chatLog || !giveItemBtn || !chatFooter) return;
+    
     if (mode === 'inquiry') {
         chatNpcName.textContent = `向 ${profile.name} 探聽秘聞`;
         chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 花費100銀兩</span>`;
     } else {
         chatNpcName.textContent = `與 ${profile.name} 交談`;
-        chatNpcInfo.innerHTML = profile.appearance || '';
+        chatNpcInfo.innerHTML = profile.status_title || '';
         displayRomanceValue(profile.romanceValue);
         displayFriendlinessBar(profile.friendlinessValue);
     }
     
     giveItemBtn.style.display = mode === 'inquiry' ? 'none' : 'inline-flex';
-    document.querySelector('.chat-footer').style.display = mode === 'inquiry' ? 'none' : 'block';
-
+    chatFooter.style.display = mode === 'inquiry' ? 'none' : 'block';
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
     
-    // 【核心修正】確保每次打開彈窗時，發話按鈕都是可用的
-    if (chatActionBtn) {
-        chatActionBtn.disabled = false;
-    }
+    if (chatActionBtn) chatActionBtn.disabled = false;
 
     chatModal.classList.add('visible');
     chatModal.dataset.mode = mode;
 }
 
 export function closeChatModal() { 
-    chatModal.classList.remove('visible'); 
+    const chatModal = document.getElementById('chat-modal');
+    if(chatModal) chatModal.classList.remove('visible'); 
 }
 export function appendChatMessage(speaker, message) {
+    const chatLog = document.getElementById('chat-log');
+    if(!chatLog) return;
     const messageDiv = document.createElement('div');
     messageDiv.className = `${speaker}-message`;
     messageDiv.innerHTML = message;
     chatLog.appendChild(messageDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
 }
-export function setChatLoading(isLoading) { if (chatLoader) chatLoader.classList.toggle('visible', isLoading); }
+export function setChatLoading(isLoading) { 
+    const chatLoader = document.getElementById('chat-loader');
+    if (chatLoader) chatLoader.classList.toggle('visible', isLoading);
+}
 
 // --- 贈予物品彈窗 ---
 export async function openGiveItemModal(currentNpcName, giveItemCallback) {
+    const giveItemModal = document.getElementById('give-item-modal');
+    const giveInventoryList = document.getElementById('give-inventory-list');
+    if(!giveItemModal || !giveInventoryList) return;
+
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
     try {
@@ -351,11 +343,17 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
         giveInventoryList.innerHTML = `<p class="system-message">翻檢行囊時出錯: ${error.message}</p>`;
     }
 }
-export function closeGiveItemModal() { giveItemModal.classList.remove('visible'); }
+export function closeGiveItemModal() { 
+    const giveItemModal = document.getElementById('give-item-modal');
+    if(giveItemModal) giveItemModal.classList.remove('visible'); 
+}
 
 
 // --- 武學總覽彈窗 ---
 export function openSkillsModal(skillsData) {
+    const skillsModal = document.getElementById('skills-modal');
+    const skillsTabsContainer = document.getElementById('skills-tabs-container');
+    const skillsBodyContainer = document.getElementById('skills-body-container');
     if (!skillsModal || !skillsTabsContainer || !skillsBodyContainer) return;
 
     skillsTabsContainer.innerHTML = '';
@@ -369,21 +367,13 @@ export function openSkillsModal(skillsData) {
 
     const skillsByType = skillsData.reduce((acc, skill) => {
         const type = skill.skillType || '雜學';
-        if (!acc[type]) {
-            acc[type] = [];
-        }
+        if (!acc[type]) acc[type] = [];
         acc[type].push(skill);
         return acc;
     }, {});
 
     const skillTypes = Object.keys(skillsByType);
-
-    const powerTypeMap = {
-        internal: '內功',
-        external: '外功',
-        lightness: '輕功',
-        none: '無'
-    };
+    const powerTypeMap = { internal: '內功', external: '外功', lightness: '輕功', none: '無' };
 
     skillTypes.forEach((type, index) => {
         const tabButton = document.createElement('button');
@@ -398,25 +388,17 @@ export function openSkillsModal(skillsData) {
         skillsByType[type].forEach(skill => {
             const expToNextLevel = (skill.level + 1) * 100;
             const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
-            
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
-
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
             skillEntry.innerHTML = `
-                <div class="skill-entry-header">
-                    <h4>${skill.skillName}</h4>
-                    <span class="skill-type">${translatedPowerType}</span>
-                </div>
+                <div class="skill-entry-header"><h4>${skill.skillName}</h4><span class="skill-type">${translatedPowerType}</span></div>
                 <p class="skill-description">${skill.base_description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
                     <span class="level-label">等級 ${skill.level}</span>
-                    <div class="exp-bar-background">
-                        <div class="exp-bar-fill" style="width: ${expPercentage}%;"></div>
-                    </div>
+                    <div class="exp-bar-background"><div class="exp-bar-fill" style="width: ${expPercentage}%;"></div></div>
                     <span class="exp-text">${skill.exp} / ${expToNextLevel}</span>
-                </div>
-            `;
+                </div>`;
             tabContent.appendChild(skillEntry);
         });
         
@@ -429,23 +411,75 @@ export function openSkillsModal(skillsData) {
         }
     });
 
-    skillsTabsContainer.addEventListener('click', (e) => {
+    skillsTabsContainer.onclick = (e) => {
         if (e.target.classList.contains('skill-tab')) {
             const tabName = e.target.dataset.tab;
-            
             skillsTabsContainer.querySelectorAll('.skill-tab').forEach(tab => tab.classList.remove('active'));
             skillsBodyContainer.querySelectorAll('.skill-tab-content').forEach(content => content.classList.remove('active'));
-            
             e.target.classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
         }
-    });
+    };
 
     skillsModal.classList.add('visible');
 }
 
 export function closeSkillsModal() {
-    if (skillsModal) {
-        skillsModal.classList.remove('visible');
+    const skillsModal = document.getElementById('skills-modal');
+    if (skillsModal) skillsModal.classList.remove('visible');
+}
+
+// --- 【核心新增】地點詳情彈窗 ---
+function formatObjectForDisplay(obj) {
+    if (!obj || typeof obj !== 'object') return '無';
+    let html = '<ul class="location-detail-list">';
+    for (const [key, value] of Object.entries(obj)) {
+        let displayValue;
+        if (Array.isArray(value)) {
+            displayValue = value.length > 0 ? value.map(item => typeof item === 'object' ? `<code>${JSON.stringify(item)}</code>` : item).join(', ') : '無';
+        } else if (typeof value === 'object' && value !== null) {
+            displayValue = formatObjectForDisplay(value); // 遞迴處理巢狀物件
+        } else {
+            displayValue = value;
+        }
+        html += `<li><span class="key">${key}:</span><span class="value">${displayValue}</span></li>`;
     }
+    html += '</ul>';
+    return html;
+}
+
+export function openLocationDetailsModal(locationData) {
+    if (!dom.locationDetailsModal) return;
+    dom.locationModalTitle.textContent = locationData.locationName || '地區情報';
+    
+    let bodyHtml = '';
+    const staticData = {
+        類型: locationData.locationType,
+        層級: locationData.address ? Object.values(locationData.address).join(' > ') : '未知',
+        地理: locationData.geography ? formatObjectForDisplay(locationData.geography) : '未知',
+        經濟: locationData.economy ? formatObjectForDisplay(locationData.economy) : '未知',
+        歷史: locationData.lore?.history,
+    };
+    
+    const dynamicData = {
+        統治: locationData.governance ? formatObjectForDisplay(locationData.governance) : '未知',
+        當前事務: locationData.lore?.currentIssues?.join(', ') || '暫無',
+        設施: locationData.facilities?.map(f => `${f.name} (${f.type})`).join(', ') || '無',
+        建築: locationData.buildings?.map(b => `${b.name} (${b.type})`).join(', ') || '無',
+    };
+
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報 (世界設定)</h4>${formatObjectForDisplay(staticData)}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報 (玩家專屬)</h4>${formatObjectForDisplay(dynamicData)}</div>`;
+
+    dom.locationModalBody.innerHTML = bodyHtml;
+    dom.locationDetailsModal.classList.add('visible');
+
+    dom.closeLocationDetailsBtn.onclick = closeLocationDetailsModal;
+    dom.locationDetailsModal.onclick = (e) => {
+        if (e.target === dom.locationDetailsModal) closeLocationDetailsModal();
+    };
+}
+
+export function closeLocationDetailsModal() {
+    if(dom.locationDetailsModal) dom.locationDetailsModal.classList.remove('visible');
 }
