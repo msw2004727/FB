@@ -36,7 +36,7 @@ const DEFAULT_USER_FIELDS = {
     externalPower: 5,
     lightness: 5,
     morality: 0,
-    stamina: 25,
+    stamina: 100, // 修正：新玩家初始精力應為100
     bulkScore: 0,
     isDeceased: false,
     equipment: {
@@ -101,6 +101,13 @@ router.post('/register', async (req, res) => {
             description: '來自另一個世界的格鬥技巧，招式直接有效，講求一擊制敵，但似乎缺少內力運轉的法門。',
             acquiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
+        
+        // 為新玩家創建初始銀兩物品
+        await newUserRef.collection('inventory_items').doc('銀兩').set({
+            templateId: '銀兩',
+            quantity: 50,
+            itemType: '財寶'
+        });
 
         console.log(`[註冊流程] 正在為新玩家 ${username} 主動建立初始地點「無名村」...`);
         await generateAndCacheLocation(newUserRef.id, '無名村', '村莊', '玩家初入江湖，身在無名村。');
@@ -112,7 +119,7 @@ router.post('/register', async (req, res) => {
             timeOfDay: '上午',
             powerChange: { internal: 0, external: 0, lightness: 0 },
             moralityChange: 0,
-            moneyChange: 50,
+            moneyChange: 0, // moneyChange 應為0, 因為初始金錢已在 inventory_items 中
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
             EVT: '從天旋地轉中醒來，靈魂墜入陌生的時代',
             LOC: ['無名村'],
@@ -186,7 +193,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
         
-        // --- 登入時的資料完整性健康檢查 ---
+        // --- 【核心】登入時的資料完整性健康檢查 ---
         // 這個函式會在背景執行，不會延遲登入回應
         runDataHealthCheck(userId, username).catch(err => {
             console.error(`[背景健康檢查] 為玩家 ${username} 執行時發生錯誤:`, err);
@@ -207,47 +214,61 @@ router.post('/login', async (req, res) => {
 
 
 /**
- * 【***核心重構 v3.0***】資料健康檢查與遷移函式
+ * 【***最終修復版 v4.0***】資料健康檢查與遷移函式
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  */
 async function runDataHealthCheck(userId, username) {
-    console.log(`[健康檢查 v3.0] 開始為玩家 ${username} 執行登入後資料健康檢查與遷移...`);
+    console.log(`[健康檢查 v4.0] 開始為玩家 ${username} 執行登入後資料健康檢查與遷移...`);
     const userDocRef = db.collection('users').doc(userId);
-    let playerProfile = (await userDocRef.get()).data();
-    
-    const batch = db.batch();
-    let needsUpdate = false;
+    let playerProfile;
+    try {
+        playerProfile = (await userDocRef.get()).data();
+        if (!playerProfile) {
+            console.error(`[健康檢查 v4.0] 嚴重錯誤：找不到玩家 ${username} 的檔案！`);
+            return;
+        }
+    } catch (e) {
+        console.error(`[健康檢查 v4.0] 讀取玩家 ${username} 檔案時發生錯誤:`, e);
+        return;
+    }
     
     // --- 檢查點 1: 修補核心欄位與【資料類型】---
-    console.log(`[健康檢查 v3.0] 階段1: 檢查並修復玩家核心欄位...`);
-    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R'];
+    console.log(`[健康檢查 v4.0] 階段1: 檢查並修復玩家核心欄位...`);
+    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day'];
     const updates = {};
+    let needsUpdate = false;
 
+    // 補全缺失的欄位
     for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
         if (playerProfile[field] === undefined) {
             needsUpdate = true;
             updates[field] = defaultValue;
-            console.log(`[健康檢查 v3.0] 缺失欄位: ${field}，已補上預設值。`);
+            console.log(`[健康檢查 v4.0] 補齊缺失欄位: ${field} ->`, defaultValue);
         }
     }
+
+    // 修正錯誤的資料類型
     for (const field of fieldsToEnsureNumber) {
         if (playerProfile[field] !== undefined && typeof playerProfile[field] !== 'number') {
             needsUpdate = true;
             const parsedValue = Number(playerProfile[field]);
+            // 如果無法轉換為數字，則使用預設值；否則使用轉換後的值
             updates[field] = isNaN(parsedValue) ? (DEFAULT_USER_FIELDS[field] || 0) : parsedValue;
-            console.log(`[健康檢查 v3.0] 類型錯誤: ${field} 從 "${playerProfile[field]}" (${typeof playerProfile[field]}) 修復為 ${updates[field]} (number)。`);
+            console.log(`[健康檢查 v4.0] 修正類型錯誤: ${field} 從 "${playerProfile[field]}" (${typeof playerProfile[field]}) 修復為 ${updates[field]} (number)。`);
         }
     }
 
-    if(needsUpdate) {
-        // 注意：這裡不使用 batch，而是直接 update，確保後續操作能讀取到最新資料
+    if (needsUpdate) {
         await userDocRef.update(updates);
-        console.log(`[健康檢查 v3.0] 核心欄位與類型修復完成。`);
-        playerProfile = (await userDocRef.get()).data(); // 重新獲取最新的玩家資料
+        console.log(`[健康檢查 v4.0] 核心欄位與類型修復完成，已更新資料庫。`);
+        // 重新獲取最新的玩家資料以供後續檢查使用
+        playerProfile = (await userDocRef.get()).data();
+    } else {
+        console.log(`[健康檢查 v4.0] 核心欄位健康，無需修復。`);
     }
 
-    // --- 【核心】檢查點 2: 處理舊版物品資料遷移 ---
+    // --- 檢查點 2: 處理舊版物品資料遷移 ---
     const oldInventoryDocRef = userDocRef.collection('game_state').doc('inventory');
     const oldInventoryDoc = await oldInventoryDocRef.get();
 
@@ -259,19 +280,27 @@ async function runDataHealthCheck(userId, username) {
         let migratedCount = 0;
 
         for (const [itemName, itemData] of Object.entries(oldInventoryData)) {
-            // 為每個舊物品創建新格式的文檔
-            const template = await getOrGenerateItemTemplate(itemName);
-            if(template && template.template) {
-                 const isStackable = ['材料', '財寶', '道具', '其他', '秘笈', '書籍'].includes(template.template.itemType);
-                 if(isStackable || itemName === '銀兩') {
+            // 跳過無效的項目
+            if (!itemName || !itemData || typeof itemData.quantity !== 'number' || itemData.quantity <= 0) continue;
+
+            const templateResult = await getOrGenerateItemTemplate(itemName);
+            if (templateResult?.template) {
+                 const isStackable = !['武器', '裝備'].includes(templateResult.template.itemType);
+                 if (isStackable) {
                      migrationBatch.set(newInventoryCollectionRef.doc(itemName), {
                          templateId: itemName,
-                         quantity: itemData.quantity || 1,
-                         itemType: template.template.itemType
+                         quantity: itemData.quantity,
+                         itemType: templateResult.template.itemType
                      }, { merge: true });
                  } else {
-                     for(let i=0; i < (itemData.quantity || 1); i++) {
-                         migrationBatch.set(newInventoryCollectionRef.doc(uuidv4()), { templateId: itemName, quantity: 1, itemType: template.template.itemType, isEquipped: false, equipSlot: null });
+                     for(let i = 0; i < itemData.quantity; i++) {
+                         migrationBatch.set(newInventoryCollectionRef.doc(uuidv4()), { 
+                             templateId: itemName, 
+                             quantity: 1, 
+                             itemType: templateResult.template.itemType, 
+                             isEquipped: false, 
+                             equipSlot: null 
+                         });
                      }
                  }
                  migratedCount++;
@@ -283,9 +312,8 @@ async function runDataHealthCheck(userId, username) {
         console.log(`[資料遷移] 成功為玩家 ${username} 遷移了 ${migratedCount} 種物品到新的 inventory_items 集合，並已刪除舊資料。`);
     }
 
-
     // --- 檢查點 3: 確保所有接觸過的NPC、物品、技能、地點都有模板 ---
-    console.log(`[健康檢查 v3.0] 階段2: 檢查模板完整性...`);
+    console.log(`[健康檢查 v4.0] 階段2: 檢查模板完整性...`);
     const allSavesData = (await userDocRef.collection('game_saves').orderBy('R', 'asc').get()).docs.map(doc => doc.data());
     
     // 檢查NPC
@@ -294,13 +322,15 @@ async function runDataHealthCheck(userId, username) {
         const npcTemplateRef = db.collection('npcs').doc(doc.id);
         const templateDoc = await npcTemplateRef.get();
         if (!templateDoc.exists) {
-            console.log(`[健康檢查 v3.0] NPC模板缺失: ${doc.id}，嘗試重建...`);
+            console.log(`[健康檢查 v4.0] NPC模板缺失: ${doc.id}，嘗試重建...`);
             const firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === doc.id));
             if(firstMentionRound) {
                 const genData = await generateNpcTemplateData(username, { name: doc.id }, firstMentionRound, playerProfile);
                 if(genData) {
                     await npcTemplateRef.set(genData.templateData, { merge: true });
                 }
+            } else {
+                 console.warn(`[健康檢查 v4.0] 警告：在存檔中找不到NPC「${doc.id}」的初見情境，無法為其生成模板。`);
             }
         }
     }
@@ -312,7 +342,7 @@ async function runDataHealthCheck(userId, username) {
         if(itemData.templateId) await getOrGenerateItemTemplate(itemData.templateId);
     }
     
-    console.log(`[健康檢查 v3.0] 玩家 ${username} 的資料完整性檢查與遷移全部完成。`);
+    console.log(`[健康檢查 v4.0] 玩家 ${username} 的資料完整性檢查與遷移全部完成。`);
 }
 
 
