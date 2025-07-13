@@ -7,6 +7,63 @@ const { generateAndCacheLocation } = require('./worldEngine');
 
 const db = admin.firestore();
 
+// 【核心新增】定義一個NPC狀態檔案應有的預設欄位和值
+const DEFAULT_NPC_STATE_FIELDS = {
+    interactionSummary: "你與此人的交往尚淺。",
+    isDeceased: false,
+    inventory: {},
+    equipment: [],
+    romanceValue: 0,
+    friendlinessValue: 0,
+    triggeredRomanceEvents: []
+};
+
+
+/**
+ * 【核心新增】為指定玩家的所有舊NPC狀態檔案，補全缺失的欄位
+ * @param {string} userId - 玩家ID
+ */
+async function backfillNpcStates(userId) {
+    const npcStatesRef = db.collection('users').doc(userId).collection('npc_states');
+    const snapshot = await npcStatesRef.get();
+
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    let updatesMade = 0;
+
+    snapshot.forEach(doc => {
+        const npcData = doc.data();
+        const updates = {};
+        let needsUpdate = false;
+
+        for (const [field, defaultValue] of Object.entries(DEFAULT_NPC_STATE_FIELDS)) {
+            if (npcData[field] === undefined) {
+                updates[field] = defaultValue;
+                needsUpdate = true;
+            }
+        }
+        
+        // 特別處理 firstMet，因為它是一個物件
+        if (npcData.firstMet === undefined) {
+            updates.firstMet = { round: 0, time: '未知', location: '未知', event: '一次未被記錄的相遇' };
+            needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+            batch.update(doc.ref, updates);
+            updatesMade++;
+            console.log(`[健康檢查-NPC戶籍] 將為 NPC「${doc.id}」補全缺失的欄位。`);
+        }
+    });
+
+    if (updatesMade > 0) {
+        await batch.commit();
+        console.log(`[健康檢查-NPC戶籍] 任務完成！共為 ${updatesMade} 個舊NPC檔案補全了戶籍。`);
+    }
+}
+
+
 /**
  * 檢查並修補玩家資料中的預設欄位和資料類型
  * @param {string} userId - 玩家ID
@@ -62,21 +119,18 @@ async function repairIncompleteNpcTemplates(userId, username, playerProfile, all
 
         if (npcTemplateDoc.exists) {
             const templateData = npcTemplateDoc.data();
-            // 檢查是否有生成不完整的標記
             const isIncomplete = Object.values(templateData).some(value => typeof value === 'string' && value.includes('生成中'));
 
             if (isIncomplete) {
                 console.log(`[健康檢查-NPC修復] 偵測到「${npcName}」的模板不完整，開始修復...`);
                 
-                // 嘗試從 npc_states 中找到初見回合
                 const npcStateData = npcStateDoc.data();
                 const firstMetRoundNumber = npcStateData.firstMet?.round;
                 let firstMentionRound = null;
 
-                if (firstMetRoundNumber !== undefined) {
+                if (firstMetRoundNumber !== undefined && firstMetRoundNumber > 0) {
                     firstMentionRound = allSavesData.find(save => save.R === firstMetRoundNumber);
                 } else {
-                    // 作為備用方案，掃描所有存檔
                     firstMentionRound = allSavesData.find(round => round.NPC?.some(npc => npc.name === npcName));
                 }
 
@@ -84,7 +138,6 @@ async function repairIncompleteNpcTemplates(userId, username, playerProfile, all
                     try {
                         const generationResult = await generateNpcTemplateData(username, { name: npcName }, firstMentionRound, playerProfile);
                         if (generationResult && generationResult.canonicalName && generationResult.templateData) {
-                            // 使用 update 而不是 set，以防萬一有其他欄位需要保留
                             await npcTemplateRef.update(generationResult.templateData);
                             console.log(`[健康檢查-NPC修復] 成功為「${generationResult.canonicalName}」重新生成並覆蓋了完整的公用模板。`);
                         }
@@ -151,15 +204,14 @@ async function runDataHealthCheck(userId, username) {
         if (!playerDoc.exists) return;
         const playerProfile = playerDoc.data();
 
-        // 預先獲取所有存檔，供NPC檢查函式共用，避免重複讀取
         const allSavesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'asc').get();
         const allSavesData = allSavesSnapshot.docs.map(doc => doc.data());
 
-        // 執行所有檢查
         await Promise.all([
             checkUserFields(userId),
             repairMissingNpcTemplates(userId, username, playerProfile, allSavesData),
-            repairIncompleteNpcTemplates(userId, username, playerProfile, allSavesData) // 【核心新增】執行修復不完整模板的檢查
+            repairIncompleteNpcTemplates(userId, username, playerProfile, allSavesData),
+            backfillNpcStates(userId) // 【核心新增】執行NPC狀態檔案的回填
         ]);
         console.log(`[健康檢查] 玩家 ${username} 的所有資料健康檢查完畢。`);
     } catch (error) {
