@@ -14,7 +14,11 @@ const db = admin.firestore();
  * @param {admin.firestore.WriteBatch} batch - Firestore的批次寫入對象
  */
 async function removeItemFromNpc(userId, npcName, itemName, quantity, batch) {
-    if (!npcName || !itemName || !quantity) return;
+    // 【修正】確保所有參數都有效
+    if (!npcName || !itemName || typeof quantity !== 'number' || quantity <= 0) {
+        console.warn(`[物品管理器] removeItemFromNpc 收到無效參數，中止操作。`, { npcName, itemName, quantity });
+        return;
+    }
     
     console.log(`[物品管理器 v2] 準備從NPC「${npcName}」處轉移 ${quantity} 個「${itemName}」...`);
     const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
@@ -73,7 +77,11 @@ async function removeItemFromNpc(userId, npcName, itemName, quantity, batch) {
  * @param {object} roundData - 當前回合數據，用於生成新物品模板
  */
 async function addItemToPlayer(userId, itemName, quantity, batch, roundData = {}) {
-    if (!itemName || !quantity) return;
+    // 【修正】確保所有參數都有效
+    if (!itemName || typeof quantity !== 'number' || quantity <= 0) {
+        console.warn(`[物品管理器] addItemToPlayer 收到無效參數，中止操作。`, { itemName, quantity });
+        return;
+    }
     
     console.log(`[物品管理器 v2] 準備為玩家 ${userId} 添加 ${quantity} 個「${itemName}」...`);
     const itemTemplateResult = await getOrGenerateItemTemplate(itemName, roundData);
@@ -129,7 +137,15 @@ async function processItemChanges(userId, itemChanges, batch, roundData, sourceN
     console.log(`[物品管理器 v2] 開始處理來自 ${sourceNpcName ? `NPC「${sourceNpcName}」` : '系統'} 的 ${itemChanges.length} 項物品變更...`);
 
     for (const change of itemChanges) {
-        const { action, itemName, quantity = 1 } = change;
+        // --- 【核心修正】 ---
+        // 確保 quantity 是數字且有效，否則預設為 1
+        const { action, itemName } = change;
+        const quantity = (typeof change.quantity === 'number' && change.quantity > 0) ? change.quantity : 1;
+
+        if (!itemName) {
+            console.warn('[物品管理器] 偵測到無效的物品變更 (缺少 itemName)，已略過:', change);
+            continue; // 略過此無效項目
+        }
         
         if (action === 'add') {
             await addItemToPlayer(userId, itemName, quantity, batch, roundData);
