@@ -1,9 +1,9 @@
-// /services/npcCreationService.js
+// api/services/npcCreationService.js
 const admin = require('firebase-admin');
-const { callAI, aiConfig } = require('./aiService'); 
-const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
-const { processNpcRelationships } = require('../api/relationshipManager');
-const { findReusableNpc } = require('../api/templateManager'); // 引入新的模板管理器
+const { callAI, aiConfig } = require('../../services/aiService'); 
+const { getNpcCreatorPrompt } = require('../../prompts/npcCreatorPrompt.js');
+const { processNpcRelationships } = require('../relationshipManager');
+const { findReusableNpc } = require('../templateManager'); // 引入新的模板管理器
 
 const db = admin.firestore();
 
