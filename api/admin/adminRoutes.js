@@ -3,18 +3,13 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const adminAuth = require('./adminAuth');
-const { getLogs, getPlayersWithLogs } = require('./logService');
+const { getLogs, getPlayersWithLogs } = require('./logService'); // getPlayersWithLogs 仍用於日誌篩選
 const { getApiBalances } = require('./balanceService');
-
-// 引入重建模板所需的服務
-const { generateNpcTemplateData } = require('../services/npcCreationService');
-const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../playerStateHelpers');
-const { generateAndCacheLocation } = require('../worldEngine');
-
-// 【最終修正】修正了所有引用路徑，從 '../' 或 './' 改為正確的 '../../'
+const { generateNpcTemplateData } = require('../../services/npcCreationService');
+const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../../playerStateHelpers');
+const { generateAndCacheLocation } = require('../../worldEngine');
 const { getRelationshipFixPrompt } = require('../../prompts/relationshipFixPrompt');
 const { callAI, aiConfig } = require('../../services/aiService');
-
 
 const db = admin.firestore();
 
@@ -30,23 +25,38 @@ router.get('/balances', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
 router.get('/logs', async (req, res) => {
     try {
         const { playerId, limit = 150 } = req.query;
+        // 為了日誌篩選，這裡仍然可以使用舊的函式
         const logs = await getLogs(playerId || null, parseInt(limit));
         res.json(logs);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
+
+/**
+ * @route   GET /api/admin/players
+ * @desc    獲取所有玩家列表
+ * @access  Private (Admin)
+ */
 router.get('/players', async (req, res) => {
     try {
-        const players = await getPlayersWithLogs();
-        res.json(players);
+        // 【核心修正】直接從 /users 集合獲取所有玩家ID
+        const usersSnapshot = await db.collection('users').get();
+        if (usersSnapshot.empty) {
+            return res.json([]);
+        }
+        const playerIds = usersSnapshot.docs.map(doc => doc.id);
+        res.json(playerIds);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('[Admin API] 獲取所有玩家列表時發生錯誤:', error);
+        res.status(500).json({ message: '從資料庫獲取完整玩家列表時失敗。' });
     }
 });
+
 
 // --- 模板管理通用函式 ---
 const getTemplates = (collectionName) => async (req, res) => {
@@ -62,9 +72,7 @@ const getTemplateById = (collectionName) => async (req, res) => {
     try {
         const { id } = req.params;
         const doc = await db.collection(collectionName).doc(id).get();
-        if (!doc.exists) {
-            return res.status(404).json({ message: `找不到ID為 ${id} 的 ${collectionName} 模板。`});
-        }
+        if (!doc.exists) return res.status(404).json({ message: `找不到ID為 ${id} 的 ${collectionName} 模板。`});
         res.json(doc.data());
     } catch (error) {
         res.status(500).json({ message: `獲取 ${collectionName} 模板失敗：${error.message}` });
@@ -107,30 +115,21 @@ router.post('/repair-relationships', async (req, res) => {
         return res.status(400).json({ message: '必須提供玩家ID。' });
     }
     res.status(202).json({ message: `任務已接收！正在為玩家 ${playerId.substring(0,8)}... 在後台修復關係鏈。請查看Render後台日誌以獲取詳細進度。` });
-    
     (async () => {
         try {
             const playerDoc = await db.collection('users').doc(playerId).get();
-            if (!playerDoc.exists) {
-                console.error(`[關係修復系統] 錯誤：找不到玩家 ${playerId}。`);
-                return;
-            }
+            if (!playerDoc.exists) { console.error(`[關係修復系統] 錯誤：找不到玩家 ${playerId}。`); return; }
             const playerData = playerDoc.data();
             const playerName = playerData.username;
-
             const npcsSnapshot = await db.collection('npcs').get();
             const allNpcs = new Map(npcsSnapshot.docs.map(doc => [doc.id, doc.data()]));
-            
             const connected = new Set([playerName]);
             let queue = [];
-            
             const playerNpcStates = await db.collection('users').doc(playerId).collection('npc_states').get();
             playerNpcStates.forEach(doc => queue.push(doc.id));
-
             while (queue.length > 0) {
                 const currentNpcName = queue.shift();
                 if (!currentNpcName || connected.has(currentNpcName)) continue;
-                
                 connected.add(currentNpcName);
                 const npcData = allNpcs.get(currentNpcName);
                 if (npcData && npcData.relationships) {
@@ -138,60 +137,35 @@ router.post('/repair-relationships', async (req, res) => {
                         if (typeof target === 'string' && !connected.has(target)) {
                             queue.push(target);
                         } else if (Array.isArray(target)) {
-                            target.forEach(t => {
-                                if(typeof t === 'string' && !connected.has(t)) queue.push(t);
-                            });
+                            target.forEach(t => { if(typeof t === 'string' && !connected.has(t)) queue.push(t); });
                         }
                     }
                 }
             }
-
             const orphans = [];
-            allNpcs.forEach((data, name) => {
-                if (!connected.has(name)) {
-                    orphans.push(name);
-                }
-            });
-
-            if (orphans.length === 0) {
-                console.log('[關係修復系統] 關係網絡健康，沒有發現任何孤立的NPC。');
-                return;
-            }
-
+            allNpcs.forEach((data, name) => { if (!connected.has(name)) { orphans.push(name); } });
+            if (orphans.length === 0) { console.log('[關係修復系統] 關係網絡健康，沒有發現任何孤立的NPC。'); return; }
             console.log(`[關係修復系統] 發現 ${orphans.length} 個孤立NPC，開始AI修復...`);
             let repairedCount = 0;
             const summaryDocRef = db.collection('users').doc(playerId).collection('game_state').doc('summary');
-
             for (const orphanName of orphans) {
                 try {
                     const orphanData = allNpcs.get(orphanName);
                     const prompt = getRelationshipFixPrompt(playerData, orphanData);
                     const resultJson = await callAI(aiConfig.relationGraph || 'openai', prompt, true);
-                    
                     const { story, relationship } = JSON.parse(resultJson);
-                    
                     const summarySnapshot = await summaryDocRef.get();
                     const oldSummary = summarySnapshot.exists ? summarySnapshot.data().text || '' : '';
                     const newSummary = oldSummary + `\n\n【補記】：${story}`;
                     await summaryDocRef.set({ text: newSummary }, { merge: true });
-                    
                     const playerNpcStateRef = db.collection('users').doc(playerId).collection('npc_states').doc(orphanName);
-                    await playerNpcStateRef.set({
-                        friendlinessValue: 10,
-                        interactionSummary: story,
-                        firstMet: { event: story, round: '補記' }
-                    }, { merge: true });
-                    
+                    await playerNpcStateRef.set({ friendlinessValue: 10, interactionSummary: story, firstMet: { event: story, round: '補記' } }, { merge: true });
                     console.log(`[關係修復系統] 已為 ${playerName} 和 ${orphanName} 建立新的關係: ${relationship}`);
                     repairedCount++;
-                } catch(e) {
-                    console.error(`修復 ${orphanName} 的關係時失敗:`, e.message);
-                }
+                } catch(e) { console.error(`修復 ${orphanName} 的關係時失敗:`, e.message); }
             }
             console.log(`[關係修復系統] 任務完成！共發現 ${orphans.length} 個孤立NPC，成功修復了 ${repairedCount} 個。`);
-        } catch (error) {
-            console.error('[關係修復系統] 背景執行時發生嚴重錯誤:', error);
-        }
+        } catch (error) { console.error('[關係修復系統] 背景執行時發生嚴重錯誤:', error); }
     })().catch(err => console.error('[關係修復系統] 背景任務未能正確啟動:', err));
 });
 
@@ -263,7 +237,7 @@ const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTempl
         }
     })().catch(err => console.error(`[模板回填系統 v3.0] 背景任務執行失敗:`, err));
 };
-const createNpcTemplate = async ({ userId, username, playerData, docId }) => { const allSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get(); const firstMentionRound = allSavesSnapshot.docs.map(d=>d.data()).find(round => round.NPC?.some(npc => npc.name === docId)); const generationResult = await generateNpcTemplateData(username, { name: docId }, firstMentionRound || null, playerData); if (generationResult && generationResult.canonicalName && generationResult.templateData) { await db.collection('npcs').doc(generationResult.canonicalName).set(generationResult.templateData, { merge: true }); } else { throw new Error('AI生成NPC失敗'); } };
+const createNpcTemplate = async ({ userId, username, playerData, docId }) => { const allSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get(); const firstMentionRound = allSavesSnapshot.docs.map(d=>d.data()).find(round => round.NPC?.some(npc => npc.name === docId)); if (firstMentionRound) { const generationResult = await generateNpcTemplateData(username, { name: docId }, firstMentionRound, playerData); if (generationResult && generationResult.templateData) { await db.collection('npcs').doc(generationResult.canonicalName).set(generationResult.templateData); } else { throw new Error('AI生成NPC失敗'); } } else { throw new Error('找不到NPC初見情境'); } };
 const createItemTemplate = async ({ docId }) => { await getOrGenerateItemTemplate(docId, {}); };
 const createSkillTemplate = async ({ docId }) => { await getOrGenerateSkillTemplate(docId); };
 const createLocationTemplate = async ({ userId, docId }) => { const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get(); const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。'; await generateAndCacheLocation(userId, docId, '未知', worldSummary); };
