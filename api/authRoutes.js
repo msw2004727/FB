@@ -5,62 +5,11 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
-const { generateNpcTemplateData } = require('../services/npcCreationService');
-const { getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { v4: uuidv4 } = require('uuid');
-const { runDataHealthCheck } = require('./dataIntegrityService'); // 【核心新增】引入新的健康檢查服務
+const { runDataHealthCheck } = require('./dataIntegrityService');
+const { DEFAULT_USER_FIELDS } = require('./models/userModel'); // 【核心修改】從新的模型檔案讀取
 
 const db = admin.firestore();
-
-// 統治者名稱生成器保持不變...
-const SURNAMES = [
-  '趙', '錢', '孫', '李', '周', '吳', '鄭', '王', '馮', '陳', '褚', '衛', '蔣', '沈', '韓', '楊', 
-  '朱', '秦', '尤', '許', '何', '呂', '施', '張', '孔', '曹', '嚴', '華', '金', '魏', '陶', '姜'
-];
-const GIVEN_NAMES = [
-  '霸', '天', '龍', '傲', '風', '雲', '海', '山', '河', '川', '林', '武', '文', '斌', '哲', '威', 
-  '雄', '傑', '豪', '英', '毅', '誠', '信', '義', '輝', '光', '明', '遠', '博', '軒', '宇', '峰'
-];
-function generateRulerName() {
-  const surname = SURNAMES[Math.floor(Math.random() * SURNAMES.length)];
-  const givenName1 = GIVEN_NAMES[Math.floor(Math.random() * GIVEN_NAMES.length)];
-  const givenName2 = GIVEN_NAMES[Math.floor(Math.random() * GIVEN_NAMES.length)];
-  return givenName1 === givenName2 ? `${surname}${givenName1}` : `${surname}${givenName1}${givenName2}`;
-}
-
-// 預設玩家欄位，這部分也導出，讓 dataIntegrityService 可以引用
-const DEFAULT_USER_FIELDS = {
-    money: 50,
-    internalPower: 5,
-    externalPower: 5,
-    lightness: 5,
-    morality: 0,
-    stamina: 100,
-    bulkScore: 0,
-    isDeceased: false,
-    equipment: {
-        head: null,
-        body: null,
-        hands: null,
-        feet: null,
-        weapon_right: null,
-        weapon_left: null,
-        weapon_back: null,
-        accessory1: null,
-        accessory2: null,
-        manuscript: null,
-    },
-    maxInternalPowerAchieved: 5,
-    maxExternalPowerAchieved: 5,
-    maxLightnessAchieved: 5,
-    customSkillsCreated: {
-        internal: 0,
-        external: 0,
-        lightness: 0,
-        none: 0
-    },
-    shortActionCounter: 0,
-};
 
 router.post('/register', async (req, res) => {
     try {
@@ -185,7 +134,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
         
-        // --- 【核心修改】登入時，在後台啟動「資料完整性檢查」服務 ---
+        // 【核心修改】登入時，在後台啟動「資料完整性檢查」服務
         runDataHealthCheck(userId, username).catch(err => {
             console.error(`[背景健康檢查] 為玩家 ${username} 執行時發生錯誤:`, err);
         });
@@ -203,7 +152,5 @@ router.post('/login', async (req, res) => {
     }
 });
 
-
-// 將 DEFAULT_USER_FIELDS 導出，以便其他模組引用
+// 【核心修改】移除對 DEFAULT_USER_FIELDS 的導出，現在由 userModel.js 負責
 module.exports = router;
-module.exports.DEFAULT_USER_FIELDS = DEFAULT_USER_FIELDS;
