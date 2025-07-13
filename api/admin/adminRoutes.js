@@ -11,9 +11,9 @@ const { generateNpcTemplateData } = require('../services/npcCreationService');
 const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('../playerStateHelpers');
 const { generateAndCacheLocation } = require('../worldEngine');
 
-// 引入AI關係修復服務
-const { getRelationshipFixPrompt } = require('../prompts/relationshipFixPrompt');
-const { callAI, aiConfig } = require('../services/aiService');
+// 【核心修正】修正了引用路徑，從 '../' 改為 '../../'
+const { getRelationshipFixPrompt } = require('../../prompts/relationshipFixPrompt');
+const { callAI, aiConfig } = require('../../services/aiService');
 
 
 const db = admin.firestore();
@@ -74,7 +74,6 @@ const updateTemplateById = (collectionName) => async (req, res) => {
     try {
         const { id } = req.params;
         const data = req.body;
-        // 使用 set 並搭配 { merge: true } 來確保能更新巢狀欄位而不會覆蓋整個文件
         await db.collection(collectionName).doc(id).set(data, { merge: true });
         res.json({ message: `${collectionName} 模板更新成功。`});
     } catch (error) {
@@ -107,34 +106,22 @@ router.post('/repair-relationships', async (req, res) => {
     if (!playerId) {
         return res.status(400).json({ message: '必須提供玩家ID。' });
     }
-
-    // 立即回應，告知任務已在後台開始
     res.status(202).json({ message: `任務已接收！正在為玩家 ${playerId.substring(0,8)}... 在後台修復關係鏈。請查看Render後台日誌以獲取詳細進度。` });
-    
-    // 在背景執行
     (async () => {
         try {
             const playerDoc = await db.collection('users').doc(playerId).get();
-            if (!playerDoc.exists) {
-                console.error(`[關係修復系統] 錯誤：找不到玩家 ${playerId}。`);
-                return;
-            }
+            if (!playerDoc.exists) { console.error(`[關係修復系統] 錯誤：找不到玩家 ${playerId}。`); return; }
             const playerData = playerDoc.data();
             const playerName = playerData.username;
-
             const npcsSnapshot = await db.collection('npcs').get();
             const allNpcs = new Map(npcsSnapshot.docs.map(doc => [doc.id, doc.data()]));
-            
             const connected = new Set([playerName]);
             let queue = [];
-            
             const playerNpcStates = await db.collection('users').doc(playerId).collection('npc_states').get();
             playerNpcStates.forEach(doc => queue.push(doc.id));
-
             while (queue.length > 0) {
                 const currentNpcName = queue.shift();
                 if (!currentNpcName || connected.has(currentNpcName)) continue;
-                
                 connected.add(currentNpcName);
                 const npcData = allNpcs.get(currentNpcName);
                 if (npcData && npcData.relationships) {
@@ -142,60 +129,35 @@ router.post('/repair-relationships', async (req, res) => {
                         if (typeof target === 'string' && !connected.has(target)) {
                             queue.push(target);
                         } else if (Array.isArray(target)) {
-                            target.forEach(t => {
-                                if(typeof t === 'string' && !connected.has(t)) queue.push(t);
-                            });
+                            target.forEach(t => { if(typeof t === 'string' && !connected.has(t)) queue.push(t); });
                         }
                     }
                 }
             }
-
             const orphans = [];
-            allNpcs.forEach((data, name) => {
-                if (!connected.has(name)) {
-                    orphans.push(name);
-                }
-            });
-
-            if (orphans.length === 0) {
-                console.log('[關係修復系統] 關係網絡健康，沒有發現任何孤立的NPC。');
-                return;
-            }
-
+            allNpcs.forEach((data, name) => { if (!connected.has(name)) { orphans.push(name); } });
+            if (orphans.length === 0) { console.log('[關係修復系統] 關係網絡健康，沒有發現任何孤立的NPC。'); return; }
             console.log(`[關係修復系統] 發現 ${orphans.length} 個孤立NPC，開始AI修復...`);
             let repairedCount = 0;
             const summaryDocRef = db.collection('users').doc(playerId).collection('game_state').doc('summary');
-
             for (const orphanName of orphans) {
                 try {
                     const orphanData = allNpcs.get(orphanName);
                     const prompt = getRelationshipFixPrompt(playerData, orphanData);
                     const resultJson = await callAI(aiConfig.relationGraph || 'openai', prompt, true);
-                    
                     const { story, relationship } = JSON.parse(resultJson);
-                    
                     const summarySnapshot = await summaryDocRef.get();
                     const oldSummary = summarySnapshot.exists ? summarySnapshot.data().text || '' : '';
                     const newSummary = oldSummary + `\n\n【補記】：${story}`;
                     await summaryDocRef.set({ text: newSummary }, { merge: true });
-                    
                     const playerNpcStateRef = db.collection('users').doc(playerId).collection('npc_states').doc(orphanName);
-                    await playerNpcStateRef.set({
-                        friendlinessValue: 10,
-                        interactionSummary: story,
-                        firstMet: { event: story, round: '補記' }
-                    }, { merge: true });
-                    
+                    await playerNpcStateRef.set({ friendlinessValue: 10, interactionSummary: story, firstMet: { event: story, round: '補記' } }, { merge: true });
                     console.log(`[關係修復系統] 已為 ${playerName} 和 ${orphanName} 建立新的關係: ${relationship}`);
                     repairedCount++;
-                } catch(e) {
-                    console.error(`修復 ${orphanName} 的關係時失敗:`, e.message);
-                }
+                } catch(e) { console.error(`修復 ${orphanName} 的關係時失敗:`, e.message); }
             }
             console.log(`[關係修復系統] 任務完成！共發現 ${orphans.length} 個孤立NPC，成功修復了 ${repairedCount} 個。`);
-        } catch (error) {
-            console.error('[關係修復系統] 背景執行時發生嚴重錯誤:', error);
-        }
+        } catch (error) { console.error('[關係修復系統] 背景執行時發生嚴重錯誤:', error); }
     })().catch(err => console.error('[關係修復系統] 背景任務未能正確啟動:', err));
 });
 
