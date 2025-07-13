@@ -1,8 +1,7 @@
 // api/npcHelpers.js
 const admin = require('firebase-admin');
-const { getAIPerNpcSummary, getRomanceEventPrompt } = require('../services/aiService');
+const { getAIPerNpcSummary, getRomanceEventPrompt, callAI, aiConfig } = require('../services/aiService');
 const { createNewNpc } = require('../services/npcCreationService');
-const { getIdentityForNewNpc } = require('./identityManager');
 
 const db = admin.firestore();
 
@@ -49,6 +48,15 @@ function getFriendlinessLevel(value) {
     return 'neutral';
 }
 
+/**
+ * 【核心修正 v2.0】
+ * 獲取NPC的合併檔案 (通用模板 + 玩家專屬狀態)
+ * 當通用模板不存在時，此函式不再創建佔位符，而是直接返回 null，
+ * 將創建的責任完全交給 createNewNpc。
+ * @param {string} userId - 玩家ID
+ * @param {string} npcName - NPC姓名
+ * @returns {Promise<object|null>} - 返回合併後的NPC檔案，或在找不到模板時返回null
+ */
 async function getMergedNpcProfile(userId, npcName) {
     if (!userId || !npcName) {
         console.error('[NPC助手] getMergedNpcProfile缺少userId或npcName參數');
@@ -56,72 +64,41 @@ async function getMergedNpcProfile(userId, npcName) {
     }
 
     try {
-        const npcRef = db.collection('npcs').doc(npcName);
-        let npcDoc = await npcRef.get();
-        let baseProfile;
+        const npcTemplateRef = db.collection('npcs').doc(npcName);
+        const npcTemplateDoc = await npcTemplateRef.get();
 
-        if (!npcDoc.exists) {
-            console.log(`[NPC助手] 基礎檔案 for "${npcName}" 不存在，開始即時創建...`);
-            
-            const { identity, location } = await getIdentityForNewNpc(npcName);
-
-            const newProfile = {
-                name: npcName,
-                status_title: identity,
-                friendlinessValue: 50,
-                romanceValue: 0,
-                isDeceased: false,
-                status: '安好',
-                currentLocation: location || '未知',
-                inventory: {},
-                equipment: [],
-                skills: [],
-                personality: ["性格生成中..."],
-                appearance: "外貌生成中...",
-                age: "年齡不詳",
-                background: `關於${npcName}的過去，江湖上流傳著許多版本，但無人知曉真相。`
-            };
-
-            await npcRef.set(newProfile);
-            console.log(`[NPC助手] 已為 "${npcName}" 成功創建基礎檔案，身份為: ${identity}`);
-            
-            npcDoc = await npcRef.get();
-            baseProfile = npcDoc.data();
-
-        } else {
-            baseProfile = npcDoc.data();
+        // 如果通用模板不存在，直接返回 null，不執行任何寫入操作。
+        if (!npcTemplateDoc.exists) {
+            console.log(`[NPC助手] 偵測到NPC「${npcName}」的通用模板不存在。`);
+            return null;
         }
+        
+        const baseProfile = npcTemplateDoc.data();
 
+        // 繼續獲取玩家專屬狀態
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
         const npcStateDoc = await npcStateRef.get();
 
         if (npcStateDoc.exists) {
             const userSpecificState = npcStateDoc.data();
+            // 合併檔案，並確保 name 欄位來自通用模板
             return { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
         } else {
+            // 玩家雖然還沒有與他互動的紀錄，但通用模板存在，直接返回通用模板
             return { ...baseProfile, name: baseProfile.name || npcName };
         }
 
     } catch (error) {
-        console.error(`[NPC助手] 在獲取 "${npcName}" 的資料時發生錯誤:`, error);
+        console.error(`[NPC助手] 在獲取「${npcName}」的合併資料時發生錯誤:`, error);
         return null;
     }
 }
 
-/**
- * 【核心修正】統一處理所有NPC友好度更新和檔案創建的函式
- * @param {string} userId - 玩家ID
- * @param {string} username - 玩家名稱
- * @param {Array<object>} npcChanges - 從AI主函式傳來的NPC變化陣列
- * @param {object} roundData - 當前回合數據
- * @param {object} playerProfile - 玩家的完整檔案
- * @param {admin.firestore.WriteBatch} batch - 從主流程傳遞過來的 Firestore 批次寫入物件
- */
+
 async function updateFriendlinessValues(userId, username, npcChanges, roundData, playerProfile, batch) {
     if (!npcChanges || npcChanges.length === 0) return;
 
     const playerNpcStatesRef = db.collection('users').doc(userId).collection('npc_states');
-    const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[roundData.LOC.length - 1] : '未知之地';
     const existingNpcIdsSnapshot = await playerNpcStatesRef.get();
     const existingNpcIds = new Set(existingNpcIdsSnapshot.docs.map(doc => doc.id));
 
@@ -133,13 +110,11 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
 
         const isTrulyNew = !existingNpcIds.has(change.name);
         
-        // 【***核心修正***】isNew 標籤現在只用來判斷是否需要創建新檔案，而不再是字面上的新NPC
         if (change.isNew && isTrulyNew) {
-            // 【***核心修正***】移除最後一個多餘的參數
             await createNewNpc(userId, username, change, roundData, playerProfile, batch);
         } else {
             const npcStateDocRef = playerNpcStatesRef.doc(change.name);
-            const updatePayload = { currentLocation: playerLocation };
+            const updatePayload = {};
 
             if (typeof change.friendlinessChange === 'number' && change.friendlinessChange !== 0) {
                 try {
@@ -154,8 +129,6 @@ async function updateFriendlinessValues(userId, username, npcChanges, roundData,
                 } catch (e) {
                      console.error(`[友好度系統] Transaction for ${change.name} failed: `, e);
                 }
-            } else {
-                 batch.set(npcStateDocRef, updatePayload, { merge: true });
             }
         }
     }
@@ -192,8 +165,8 @@ async function checkAndTriggerRomanceEvent(userId, playerProfile) {
     for (const stateDoc of statesSnapshot.docs) {
         const npcName = stateDoc.id;
         const npcState = stateDoc.data();
-        const npcProfile = await getMergedNpcProfile(userId, npcName);
-        if (!npcProfile) continue;
+        const fullNpcProfile = await getMergedNpcProfile(userId, npcName);
+        if (!fullNpcProfile) continue;
 
         const { romanceValue = 0, triggeredRomanceEvents = [] } = npcState;
         const eventTriggers = [{ level: 'level_2_confession', threshold: 150 }];
@@ -201,8 +174,9 @@ async function checkAndTriggerRomanceEvent(userId, playerProfile) {
         for (const trigger of eventTriggers) {
             if (romanceValue >= trigger.threshold && !triggeredRomanceEvents.includes(trigger.level)) {
                 console.log(`[戀愛系統] 偵測到與 ${npcName} 的 ${trigger.level} 事件觸發條件！`);
-                const romanceEventResultText = await getAIEpilogue(playerProfile, npcProfile, trigger.level);
+                const prompt = getRomanceEventPrompt(playerProfile, fullNpcProfile, trigger.level);
                 try {
+                    const romanceEventResultText = await callAI(aiConfig.romanceEvent, prompt, true);
                     const romanceEventResult = JSON.parse(romanceEventResultText);
                     if (romanceEventResult && romanceEventResult.story) {
                         await stateDoc.ref.update({ triggeredRomanceEvents: admin.firestore.FieldValue.arrayUnion(trigger.level) });
