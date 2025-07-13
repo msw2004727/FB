@@ -1,9 +1,8 @@
-// /services/npcCreationService.js
+// api/services/npcCreationService.js
 const admin = require('firebase-admin');
-const { callAI, aiConfig } = require('./aiService'); // 【修正】路徑從 '../../services/aiService' 改為 './aiService'
-const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
-const { processNpcRelationships } = require('../api/relationshipManager');
-const { findReusableNpc } = require('../api/templateManager'); 
+const { callAI, aiConfig } = require('../../services/aiService'); 
+const { getNpcCreatorPrompt } = require('../../prompts/npcCreatorPrompt.js');
+const { processNpcRelationships } = require('../relationshipManager');
 
 const db = admin.firestore();
 
@@ -74,72 +73,66 @@ async function generateNpcTemplateData(username, npcDataFromStory, roundData, pl
 
 
 /**
- * 【核心創建函式 v2.0】採用「模板優先」策略處理新NPC的完整資料庫寫入流程
+ * 【核心創建函式 v3.0】採用「模板專屬」策略處理新NPC的完整資料庫寫入流程
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
- * @param {object} npcDataFromStory - 從故事AI得到的NPC基礎數據 (必須包含 name 和 status_title)
+ * @param {object} npcDataFromStory - 從故事AI得到的NPC基礎數據 (必須包含 name 和 status)
  * @param {object} roundData - 當前回合數據
  * @param {object} playerProfile - 玩家的完整檔案
  * @param {admin.firestore.WriteBatch} batch - Firestore的批次寫入物件
- * @param {Array<string>} existingNpcIds - 玩家在本局遊戲中已遇到的所有NPC的ID列表
  * @returns {Promise<string|null>} 成功時返回NPC的權威名稱，失敗時返回null
  */
-async function createNewNpc(userId, username, npcDataFromStory, roundData, playerProfile, batch, existingNpcIds) {
-    const { name: npcName, status: npcStatus } = npcDataFromStory;
-    // 從 status 中提取身份，例如 "人稱「葉大師」的葉繼安正專注地打鐵。" -> 身份可能是 "鐵匠"
-    // 這是一個簡化邏輯，可以根據需要變得更複雜
-    const requiredIdentity = npcStatus.includes('鐵匠') ? '鐵匠' : 
-                             npcStatus.includes('郎中') ? '郎中' :
-                             npcStatus.includes('商人') ? '商人' :
-                             npcStatus.includes('官差') ? '官差' : '浪人'; // 預設身份
+async function createNewNpc(userId, username, npcDataFromStory, roundData, playerProfile, batch) {
+    const initialName = npcDataFromStory.name;
+    console.log(`[NPC 創建服務 v3.0] 偵測到新NPC「${initialName}」，開始建檔流程...`);
+    
+    const npcTemplateRef = db.collection('npcs').doc(initialName);
+    const templateDoc = await npcTemplateRef.get();
 
-    console.log(`[NPC創建服務 v2.0] 接到請求：為 ${username} 創建新NPC「${npcName}」(推斷身份: ${requiredIdentity})`);
+    let canonicalName = initialName;
+    let npcTemplateData;
 
-    // --- 核心修改：模板優先 ---
-    // 1. 嘗試從模板池中尋找可復用的NPC
-    const reusableNpcProfile = await findReusableNpc(requiredIdentity, existingNpcIds);
-    let finalNpcProfile;
-    let canonicalName = npcName; // 預設使用劇情指定的名字
-
-    if (reusableNpcProfile) {
-        // 2a. 如果找到了可復用的模板
-        console.log(`[NPC創建服務 v2.0] 成功復用模板NPC「${reusableNpcProfile.name}」來扮演「${npcName}」。`);
-        finalNpcProfile = { ...reusableNpcProfile };
-        canonicalName = finalNpcProfile.name; // 使用模板的權威名稱
-    } else {
-        // 2b. 如果找不到模板，則啟動AI生成全新的NPC
-        console.log(`[NPC創建服務 v2.0] 未找到身份為「${requiredIdentity}」的可用模板，啟動AI為「${npcName}」生成新檔案...`);
+    if (!templateDoc.exists) {
+        // --- 模板不存在，啟動AI生成全新的NPC ---
+        console.log(`[NPC 創建服務 v3.0] NPC「${initialName}」的通用模板不存在，啟動AI生成...`);
         
         const generationResult = await generateNpcTemplateData(username, npcDataFromStory, roundData, playerProfile);
         
         if (generationResult && generationResult.canonicalName && generationResult.templateData) {
-            finalNpcProfile = generationResult.templateData;
+            // AI可能回傳一個稍微不同的標準名稱(例如修正錯別字)，我們尊重這個結果
             canonicalName = generationResult.canonicalName;
+            npcTemplateData = generationResult.templateData;
             
-            const newNpcTemplateRef = db.collection('npcs').doc(canonicalName);
-            finalNpcProfile.createdAt = admin.firestore.FieldValue.serverTimestamp();
+            // 使用AI回傳的標準名稱來建立最終的模板引用
+            const finalTemplateRef = db.collection('npcs').doc(canonicalName);
+            npcTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             
-            // 將這個全新的NPC存入 'npcs' 集合，使其成為未來可用的模板
-            batch.set(newNpcTemplateRef, finalNpcProfile);
-            console.log(`[NPC創建服務 v2.0] AI生成完畢，新NPC「${canonicalName}」已存入全局模板池。`);
+            // 將這個全新的NPC模板加入批次寫入佇列
+            batch.set(finalTemplateRef, npcTemplateData);
+            console.log(`[NPC 創建服務 v3.0] AI生成完畢，新模板「${canonicalName}」已加入批次創建佇列。`);
             
-            // 如果新生成的NPC有關係，則觸發關係處理
-            if (finalNpcProfile.relationships) {
-                processNpcRelationships(userId, canonicalName, finalNpcProfile.relationships)
+            // 如果新生成的NPC有關係，則觸發關係處理 (非同步，不阻塞主流程)
+            if (npcTemplateData.relationships) {
+                processNpcRelationships(userId, canonicalName, npcTemplateData.relationships)
                     .catch(err => console.error(`[關係引擎背景錯誤] NPC: ${canonicalName}, UserID: ${userId}, 錯誤:`, err));
             }
         } else {
-            console.error(`[嚴重錯誤] 無法為NPC "${npcName}" 生成有效的模板數據，建檔中止。`);
+            console.error(`[嚴重錯誤] 無法為NPC "${initialName}" 生成有效的模板數據，建檔中止。`);
             return null; // 中止創建流程
         }
+    } else {
+        // --- 模板已存在，直接使用 ---
+        npcTemplateData = templateDoc.data();
+        canonicalName = npcTemplateData.name || initialName; // 確保使用模板中的權威名稱
+        console.log(`[NPC 創建服務 v3.0] 「${initialName}」的通用模板已存在，權威名稱為「${canonicalName}」，跳過AI生成。`);
     }
 
-    // 3. 為玩家創建這個NPC的個人狀態檔案 (npc_states)
+    // --- 為玩家創建這個NPC的個人狀態檔案 (npc_states) ---
     const playerLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[roundData.LOC.length - 1] : '未知之地';
     const npcStateDocRef = db.collection('users').doc(userId).collection('npc_states').doc(canonicalName);
     
     const encounterTime = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日 ${roundData.timeOfDay || '未知時辰'}`;
-    const initialMoney = getMoneyForNpc(finalNpcProfile);
+    const initialMoney = getMoneyForNpc(npcTemplateData);
     
     const initialStatePayload = {
         currentLocation: playerLocation, // NPC的初始位置就是玩家遇到他的地方
@@ -152,7 +145,7 @@ async function createNewNpc(userId, username, npcDataFromStory, roundData, playe
         },
         isDeceased: false,
         inventory: { '銀兩': initialMoney },
-        equipment: finalNpcProfile.initialEquipment || [], 
+        equipment: npcTemplateData.initialEquipment || [], 
         romanceValue: 0,
         // 根據劇情互動，設定初始好感度
         friendlinessValue: npcDataFromStory.friendlinessChange || 0,
@@ -160,7 +153,7 @@ async function createNewNpc(userId, username, npcDataFromStory, roundData, playe
     };
 
     batch.set(npcStateDocRef, initialStatePayload);
-    console.log(`[NPC創建服務 v2.0] 已為玩家 ${username} 建立與NPC「${canonicalName}」的個人關聯檔案。`);
+    console.log(`[NPC 創建服務 v3.0] 已為玩家 ${username} 建立與NPC「${canonicalName}」的個人關聯檔案。`);
 
     return canonicalName;
 }
