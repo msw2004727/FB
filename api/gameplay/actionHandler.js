@@ -69,7 +69,32 @@ async function handleAction(req, res, player, newRoundNumber) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
-        const aiResponse = await getAIStory(playerModelChoice, longTermSummary, JSON.stringify(recentHistory), playerAction, player, username, player.timeOfDay, player.power, player.morality, [], null, null, locationContext, npcContext, bulkScore, []);
+        // 【核心新增】黑影人出現機率判斷
+        let blackShadowEvent = null;
+        if (Math.random() < 0.10) { // 10% 的機率
+            blackShadowEvent = { trigger: true };
+            console.log(`[隨機系統] 觸發神秘黑影人事件！`);
+        }
+
+        const aiResponse = await getAIStory(
+            playerModelChoice, 
+            longTermSummary, 
+            JSON.stringify(recentHistory), 
+            playerAction, 
+            player, 
+            username, 
+            player.timeOfDay, 
+            player.power, 
+            player.morality, 
+            [], 
+            null, 
+            null, 
+            locationContext, 
+            npcContext, 
+            bulkScore, 
+            [],
+            blackShadowEvent // 將觸發指令傳遞給Prompt
+        );
 
         if (!aiResponse || !aiResponse.roundData) {
             throw new Error("主AI未能生成有效回應。");
