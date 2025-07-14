@@ -1,6 +1,5 @@
 /* styles/skills.css */
 
-/* --- 武學彈窗 --- */
 .skills-modal-overlay {
     position: fixed;
     top: 0;
@@ -27,9 +26,9 @@
     background-color: var(--light-surface-bg);
     border-radius: 12px;
     width: 90%;
-    max-width: 700px; /* 修改：寬度與交談窗接近 */
-    height: 80%; /* 修改：高度與交談窗一致 */
-    max-height: 700px; /* 新增：最大高度限制 */
+    max-width: 700px;
+    height: 80%;
+    max-height: 700px;
     display: flex;
     flex-direction: column;
     box-shadow: 0 10px 40px rgba(0,0,0,0.3);
@@ -89,7 +88,6 @@ body.dark-theme .skills-modal-close:hover {
     color: var(--dark-text-primary);
 }
 
-/* --- 頁籤系統 --- */
 .skills-modal-tabs {
     flex-shrink: 0;
     display: flex;
@@ -97,7 +95,7 @@ body.dark-theme .skills-modal-close:hover {
     border-bottom: 1px solid var(--light-border);
     gap: 1rem;
     background-color: var(--light-bg);
-    overflow-x: auto; /* 新增：當武學種類過多時可以橫向滾動 */
+    overflow-x: auto;
 }
 
 body.dark-theme .skills-modal-tabs {
@@ -116,7 +114,7 @@ body.dark-theme .skills-modal-tabs {
     color: var(--light-text-secondary);
     border-bottom: 3px solid transparent;
     transition: color 0.3s, border-color 0.3s;
-    flex-shrink: 0; /* 新增：防止頁籤被壓縮 */
+    flex-shrink: 0;
 }
 
 .skill-tab.active {
@@ -129,7 +127,6 @@ body.dark-theme .skill-tab.active {
     border-bottom-color: var(--dark-accent);
 }
 
-/* --- 武學內容區塊 --- */
 .skills-modal-body {
     flex-grow: 1;
     overflow-y: auto;
@@ -164,16 +161,36 @@ body.dark-theme .skill-entry {
     margin-bottom: 0.75rem;
 }
 
-.skill-entry-header h4 {
+/* 【核心新增】用於將標題和自創標籤並排的容器 */
+.skill-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.skill-title-group h4 {
     margin: 0;
     font-family: var(--font-serif);
     font-size: 1.3rem;
     color: var(--light-text-primary);
 }
 
-body.dark-theme .skill-entry-header h4 {
+body.dark-theme .skill-title-group h4 {
     color: var(--dark-text-primary);
 }
+
+/* 【核心新增】自創標籤的樣式 */
+.skill-custom-tag {
+    background-color: #ffd700; /* 金色 */
+    color: #4b3a00;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 0.2rem 0.8rem;
+    border-radius: 20px; /* 橢圓形 */
+    border: 1px solid #cda400;
+}
+
 
 .skill-entry-header .skill-type {
     font-size: 0.85rem;
@@ -196,7 +213,6 @@ body.dark-theme .skill-entry-header .skill-type {
     font-style: italic;
 }
 
-/* --- 經驗值計量條 --- */
 .skill-progress-container {
     display: flex;
     align-items: center;
