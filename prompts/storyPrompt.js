@@ -9,7 +9,7 @@ const { getWorldviewAndProgressionRule } = require('./story_components/worldview
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = []) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = [], blackShadowEvent = null) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -19,25 +19,24 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心新增】神秘黑影人系統
-    const blackShadowRule = `
-## 【新增鐵律】神秘黑影人系統
-你現在必須在你的故事中，引入一個神秘的「黑影人」。
+    // 【核心修正 v2.0】神秘黑影人系統 - 改為指令觸發
+    const blackShadowRule = blackShadowEvent ? `
+## 【最高優先級特殊劇情指令：神秘黑影人】
+在本回合的故事中，你**必須**讓一個神秘的「黑影人」登場。這不是一個可選項，而是必須完成的核心任務！
 
-1.  **出現機率**: 你有 **10% 的機率** 在本回合的 "story" 敘述中，讓這位黑影人登場。這是一個**隨機事件**，與玩家的任何行動都無關。
-2.  **登場方式**:
+1.  **登場方式**:
     * 他總是在不經意間出現，例如：在遠處的屋頂、陰暗的巷口、人群的縫隙中。
     * 他只是**靜靜地觀察**玩家，從不與玩家有任何直接的互動或對話。
     * 在他的觀察結束後，他會以一種不合常理的方式**悄然消失**，例如：融入陰影、化為一縷青煙、或是在玩家眨眼間便不見蹤影。
-3.  **身份與目的**:
+2.  **身份與目的**:
     * 這個黑影人**不是NPC**。他沒有姓名、沒有背景、沒有實體。他是一個超越這個世界常理的存在。
     * **絕對禁止**在你的任何回傳資料（特別是 \`roundData.NPC\` 陣列）中，為這個黑影人建立任何實體檔案。他只存在於 "story" 的文字描述中。
     * 他的目的永遠是個謎。你的描述應當營造出懸疑、詭異、被監視的緊張感。
-4.  **調查與互動的處理**:
+3.  **調查與互動的處理**:
     * 如果玩家的行動是試圖追蹤、攻擊、或與黑影人對話，你**必須**將此行動視為**無效**。
-    * 你的 "story" 敘述必須描寫玩家的嘗試**完全失敗**的場景。例如：「你試圖追上前去，但那道黑影只是幾個閃爍，便徹底消失在你的感知範圍內，彷彿從未存在過。」或是「你的劍鋒穿過黑影，卻沒有任何實感，那影子只是扭曲了一下，便消散無蹤。」
+    * 你的 "story" 敘述必須描寫玩家的嘗試**完全失敗**的場景。例如：「你試圖追上前去，但那道黑影只是幾個閃爍，便徹底消失在你的感知範圍內，彷彿從未存在過。」
     * 你的回傳資料中，\`roundData\` 的所有 \`...Change\` 欄位都應為0或空陣列，因為玩家的嘗試沒有造成任何實質影響。
-`;
+` : '';
 
     const spatialContextRule = `
 ## 【空間情境與移動鐵律 (極高優先級)】
