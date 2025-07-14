@@ -127,6 +127,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dom.menuToggle.addEventListener('click', () => dom.gameContainer.classList.toggle('sidebar-open'));
 
+        // 【核心新增】點擊主內容區域時，如果側邊欄是開啟的，則將其關閉
+        // 這讓使用者在窄視窗模式下可以方便地收回儀表板
+        dom.mainContent.addEventListener('click', () => {
+            if (window.innerWidth <= 1024 && dom.gameContainer.classList.contains('sidebar-open')) {
+                dom.gameContainer.classList.remove('sidebar-open');
+            }
+        });
+
         dom.logoutButton.addEventListener('click', () => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
