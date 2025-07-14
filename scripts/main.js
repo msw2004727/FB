@@ -26,7 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.playerInput.placeholder = '接下來...';
     }
     
-    // 【核心新增】獲取新彈窗的元素
+    // =========================================================================
+    // 【核心修正：物品詳情彈窗的完整邏輯】
+    // =========================================================================
     const itemDetailsModal = document.getElementById('item-details-modal');
     const itemDetailsTitle = document.getElementById('item-details-title');
     const itemDetailsDescription = document.getElementById('item-details-description');
@@ -34,19 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemDetailsDeleteBtn = document.getElementById('item-details-delete-btn');
     const closeItemDetailsBtn = document.getElementById('close-item-details-btn');
 
-    function setGameContainerHeight() {
-        if (dom.gameContainer) {
-            dom.gameContainer.style.height = `${window.innerHeight}px`;
-        }
-    }
-    
-    // 【核心新增】打開物品詳情彈窗的函式
+    // 1. 打開物品詳情彈窗的函式
     function openItemDetailsModal(itemId) {
         if (!itemDetailsModal || !gameState.roundData || !gameState.roundData.inventory) return;
         
         const item = gameState.roundData.inventory.find(i => i.instanceId === itemId);
         if (!item) {
-            console.error(`找不到 ID 為 ${itemId} 的物品。`);
+            console.error(`在遊戲狀態中找不到 ID 為 ${itemId} 的物品。`);
             return;
         }
 
@@ -63,23 +59,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         itemDetailsStats.innerHTML = statsHtml;
         
-        // 為了避免重複綁定事件，先移除舊的，再綁定新的
-        const newDeleteBtn = itemDetailsDeleteBtn.cloneNode(true);
-        itemDetailsDeleteBtn.parentNode.replaceChild(newDeleteBtn, itemDetailsDeleteBtn);
-        newDeleteBtn.dataset.itemId = itemId; // 將ID存到按鈕上
-        newDeleteBtn.addEventListener('click', handleDropItemClick);
+        // 將物品ID暫存到刪除按鈕上，以便後續操作
+        itemDetailsDeleteBtn.dataset.itemId = itemId;
 
         itemDetailsModal.classList.add('visible');
     }
     
-    // 【核心新增】關閉物品詳情彈窗的函式
+    // 2. 關閉物品詳情彈窗的函式
     function closeItemDetailsModal() {
         if (itemDetailsModal) {
             itemDetailsModal.classList.remove('visible');
         }
     }
     
-    // 【核心新增】處理丟棄物品按鈕點擊的函式
+    // 3. 處理丟棄物品按鈕點擊的函式
     async function handleDropItemClick(event) {
         const itemId = event.currentTarget.dataset.itemId;
         if (!itemId) return;
@@ -94,18 +87,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     gameState.roundData.inventory = result.inventory;
                     gameState.roundData.bulkScore = result.bulkScore;
                     gameLoop.appendMessageToStory(result.message, 'system-message');
-                    modal.updateUI(null, gameState.roundData, null, gameState.currentLocationData);
+                    // 直接調用 uiUpdater 中的 renderInventory 和 updateBulkStatus 進行局部更新
+                    interaction.uiUpdater.renderInventory(gameState.roundData.inventory);
+                    interaction.uiUpdater.updateBulkStatus(gameState.roundData.bulkScore);
                 } else {
                     throw new Error(result.message);
                 }
             } catch(error) {
-                gameLoop.handleApiError(error);
+                interaction.handleApiError(error);
             } finally {
                 gameLoop.setLoading(false);
             }
         }
     }
+    // =========================================================================
+    // 修正結束
+    // =========================================================================
 
+
+    function setGameContainerHeight() {
+        if (dom.gameContainer) {
+            dom.gameContainer.style.height = `${window.innerHeight}px`;
+        }
+    }
 
     function initialize() {
         let currentTheme = localStorage.getItem('game_theme') || 'light';
@@ -173,28 +177,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // 【核心修改】將儀表板的點擊事件監聽器，從 dashboardContent 改為更外層的 gameContainer
-        // 這樣可以確保即使點擊物品連結，事件也能被捕捉到
-        if (dom.gameContainer) {
-            dom.gameContainer.addEventListener('click', (e) => {
-                const locationBtn = e.target.closest('#view-location-details-btn');
-                if (locationBtn) {
-                    if (gameState.currentLocationData) {
-                        modal.openLocationDetailsModal(gameState.currentLocationData);
-                    } else {
-                        alert("當前地區的詳細情報尚未載入。");
-                    }
+        // 【核心修正】使用 document 進行事件委託，這是最穩定的方式
+        document.addEventListener('click', (e) => {
+            // 地點詳情按鈕
+            const locationBtn = e.target.closest('#view-location-details-btn');
+            if (locationBtn) {
+                if (gameState.currentLocationData) {
+                    modal.openLocationDetailsModal(gameState.currentLocationData);
+                } else {
+                    alert("當前地區的詳細情報尚未載入。");
                 }
-                
-                // 【核心新增】使用事件委託處理物品連結點擊
-                const itemLink = e.target.closest('.item-link');
-                if(itemLink) {
-                    e.preventDefault();
-                    const itemId = itemLink.dataset.itemId;
-                    openItemDetailsModal(itemId);
-                }
-            });
-        }
+            }
+            
+            // 物品連結點擊
+            const itemLink = e.target.closest('.item-link');
+            if(itemLink) {
+                e.preventDefault(); // 阻止<a>標籤的預設跳轉行為
+                const itemId = itemLink.dataset.itemId;
+                openItemDetailsModal(itemId);
+            }
+        });
         
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
@@ -241,9 +243,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // 【核心新增】為物品詳情彈窗綁定關閉事件
+        // 綁定物品彈窗的關閉和刪除按鈕事件
         if(closeItemDetailsBtn) {
             closeItemDetailsBtn.addEventListener('click', closeItemDetailsModal);
+        }
+        if(itemDetailsDeleteBtn) {
+            itemDetailsDeleteBtn.addEventListener('click', handleDropItemClick);
         }
         if(itemDetailsModal) {
             itemDetailsModal.addEventListener('click', (e) => {
