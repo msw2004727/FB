@@ -8,7 +8,6 @@ const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt.js'
 const db = admin.firestore();
 const skillTemplateCache = new Map();
 
-// 【核心新增】將計算負重分數的函式移至此處並導出
 const BULK_TO_SCORE_MAP = { '輕': 0, '中': 2, '重': 5, '極重': 10 };
 
 function calculateBulkScore(inventoryList) {
@@ -33,34 +32,18 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
             if (templateData.bulk === undefined) {
                 templateData.bulk = '中'; 
                 needsUpdate = true;
-                console.log(`[資料庫維護] 物品「${itemName}」缺少 bulk 欄位，自動修補為 "中"。`);
             }
             if (templateData.equipSlot === undefined) {
-                switch (templateData.itemType) {
-                    case '武器':
-                        templateData.equipSlot = 'weapon_right';
-                        break;
-                    case '裝備':
-                        templateData.equipSlot = 'body';
-                        break;
-                    case '秘笈':
-                        templateData.equipSlot = 'manuscript';
-                        break;
-                    default:
-                        templateData.equipSlot = null;
-                }
+                templateData.equipSlot = null;
                 needsUpdate = true;
-                console.log(`[資料庫維護] 物品「${itemName}」缺少 equipSlot 欄位，自動修補為 "${templateData.equipSlot}"。`);
             }
             if (templateData.hands === undefined) {
-                templateData.hands = templateData.itemType === '武器' ? 1 : null;
+                templateData.hands = null;
                 needsUpdate = true;
-                console.log(`[資料庫維護] 物品「${itemName}」缺少 hands 欄位，自動修補為 "${templateData.hands}"。`);
             }
 
             if(needsUpdate) {
                 await templateRef.set(templateData, { merge: true });
-                console.log(`[資料庫維護] 已成功將物品「${itemName}」的模板更新至最新結構。`);
             }
 
             return { template: templateData, isNew: false };
@@ -86,7 +69,6 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
 
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await templateRef.set(newTemplateData);
-        console.log(`[物品系統] 成功為「${itemName}」建立並儲存了設計圖。`);
         const newDoc = await templateRef.get();
         return { template: newDoc.data(), isNew: true };
     } catch (error) {
@@ -110,25 +92,19 @@ async function getOrGenerateSkillTemplate(skillName) {
             if (templateData.cost === undefined) {
                 templateData.cost = 10;
                 needsUpdate = true;
-                console.log(`[資料庫維護] 武學「${skillName}」缺少 cost 欄位，自動修補為 10。`);
             }
             if (templateData.combatCategory === undefined) {
-                templateData.combatCategory = (templateData.skillType === '醫術' || templateData.skillType === '治癒') ? '治癒' : '攻擊';
+                templateData.combatCategory = '攻擊';
                 needsUpdate = true;
-                console.log(`[資料庫維護] 武學「${skillName}」缺少 combatCategory 欄位，自動修補為 ${templateData.combatCategory}。`);
             }
             
-            // --- 【核心修改】 ---
             if (templateData.requiredWeaponType === undefined) {
-                // 如果舊模板沒有武器需求欄位，給一個預設值 "無"
                 templateData.requiredWeaponType = '無';
                 needsUpdate = true;
-                console.log(`[資料庫維護] 武學「${skillName}」缺少 requiredWeaponType 欄位，自動修補為 "無"。`);
             }
             
             if (needsUpdate) {
                 await skillTemplateRef.set(templateData, { merge: true });
-                console.log(`[資料庫維護] 已成功將武學「${skillName}」的模板更新至最新結構。`);
             }
 
             skillTemplateCache.set(skillName, templateData);
@@ -141,9 +117,8 @@ async function getOrGenerateSkillTemplate(skillName) {
         const newTemplateData = JSON.parse(skillJsonString);
         if (!newTemplateData.skillName) throw new Error('AI生成的武學模板缺少skillName。');
         
-        // --- 【核心修改】 ---
         if (newTemplateData.requiredWeaponType === undefined) {
-             newTemplateData.requiredWeaponType = '無'; // 確保新生成的模板也有預設值
+             newTemplateData.requiredWeaponType = '無';
         }
 
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
@@ -180,7 +155,7 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
                 equipSlot: null, 
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
-            if (isStackable) {
+            if (isStackable || template.itemName === '銀兩') {
                 batch.set(userInventoryRef.doc(itemName), {
                     ...newItemData,
                     quantity: admin.firestore.FieldValue.increment(quantity)
@@ -204,25 +179,6 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
     console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 }
 
-async function getInventoryState(userId) {
-    const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
-    const snapshot = await playerInventoryRef.get();
-    if (snapshot.empty) return { money: 0, itemsString: '身無長物' };
-    let money = 0;
-    const itemCounts = {};
-    for(const doc of snapshot.docs){
-        const item = doc.data();
-        const itemName = item.templateId;
-        if (itemName === '銀兩' || itemName === '賞金') {
-            money += item.quantity || 0;
-        } else {
-            itemCounts[itemName] = (itemCounts[itemName] || 0) + (item.quantity || 1);
-        }
-    }
-    const otherItems = Object.entries(itemCounts).map(([name, count]) => `${name} x${count}`);
-    return { money, itemsString: otherItems.length > 0 ? otherItems.join('、') : '身無長物' };
-}
-
 async function getRawInventory(userId) {
     const playerInventoryRef = db.collection('users').doc(userId).collection('inventory_items');
     const snapshot = await playerInventoryRef.get();
@@ -236,18 +192,12 @@ async function getRawInventory(userId) {
         const templateDataResult = await getOrGenerateItemTemplate(templateId);
         if (templateDataResult?.template) {
             const templateData = templateDataResult.template;
-            const finalItem = {
+            return {
                 ...templateData, 
                 ...instanceData,  
                 instanceId: doc.id,
                 itemName: templateData.itemName, 
             };
-            
-            if (templateData.equipSlot && !instanceData.equipSlot) {
-                finalItem.equipSlot = templateData.equipSlot;
-            }
-
-            return finalItem;
         }
         return null;
     });
@@ -256,18 +206,12 @@ async function getRawInventory(userId) {
     return results.filter(item => item !== null);
 }
 
-/**
- * 【核心新增】獲取NPC的完整物品列表（背包+裝備）
- * @param {object} npcProfile - 從 getMergedNpcProfile 獲取的NPC完整檔案
- * @returns {Promise<Array<object>>}
- */
 async function getRawNpcInventory(npcProfile) {
     if (!npcProfile) return [];
 
     const allItems = [];
     const itemPromises = [];
 
-    // 1. 處理背包中的物品 (inventory)
     if (npcProfile.inventory && typeof npcProfile.inventory === 'object') {
         for (const [itemName, quantity] of Object.entries(npcProfile.inventory)) {
             if (quantity > 0) {
@@ -278,7 +222,7 @@ async function getRawNpcInventory(npcProfile) {
                                 ...res.template,
                                 itemName: res.template.itemName || itemName,
                                 quantity: quantity,
-                                instanceId: itemName, // 對於可堆疊物品，用模板ID作為唯一標識
+                                instanceId: itemName,
                                 isEquipped: false
                             });
                         }
@@ -288,7 +232,6 @@ async function getRawNpcInventory(npcProfile) {
         }
     }
     
-    // 2. 處理裝備中的物品 (equipment)
     if (npcProfile.equipment && Array.isArray(npcProfile.equipment)) {
          for (const equip of npcProfile.equipment) {
             if (equip.templateId) {
@@ -300,7 +243,7 @@ async function getRawNpcInventory(npcProfile) {
                                 ...equip,
                                 itemName: res.template.itemName || equip.templateId,
                                 quantity: 1,
-                                isEquipped: true // 標記為已裝備
+                                isEquipped: true
                             });
                         }
                     })
@@ -312,7 +255,6 @@ async function getRawNpcInventory(npcProfile) {
     await Promise.all(itemPromises);
     return allItems;
 }
-
 
 async function updateSkills(userId, skillChanges, playerProfile) {
     if (!skillChanges || skillChanges.length === 0) return { levelUpEvents: [], customSkillCreationResult: null };
@@ -331,10 +273,7 @@ async function updateSkills(userId, skillChanges, playerProfile) {
 
                     if (acquisitionMethod === 'created') {
                         const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
-                        if (!templateResult || !templateResult.template) {
-                            console.error(`無法為「${skillChange.skillName}」獲取或生成模板，跳過。`);
-                            return;
-                        }
+                        if (!templateResult || !templateResult.template) return;
 
                         if (templateResult.isNew) {
                             const powerType = templateResult.template.power_type || 'none';
@@ -361,7 +300,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                     if (customSkillCreationResult === null || customSkillCreationResult.success) {
                         const playerSkillData = { level: skillChange.level || 0, exp: skillChange.exp || 0, lastPractice: admin.firestore.FieldValue.serverTimestamp() };
                         transaction.set(playerSkillDocRef, playerSkillData);
-                        console.log(`[武學系統] 玩家 ${userId} 習得新武學: ${skillChange.skillName}`);
                     }
 
                 } else if (skillChange.expChange > 0) {
@@ -386,7 +324,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         requiredExp = level * 100 + 100;
                     }
                     transaction.update(playerSkillDocRef, { level, exp });
-                    console.log(`[武學系統] 玩家 ${userId} 修練 ${skillChange.skillName}，熟練度增加 ${skillChange.expChange}。`);
                 }
             });
         } catch (error) {
@@ -419,9 +356,8 @@ module.exports = {
     getOrGenerateItemTemplate,
     getOrGenerateSkillTemplate,
     updateInventory,
-    getInventoryState,
     getRawInventory,
-    getRawNpcInventory, // 導出新函式
+    getRawNpcInventory,
     updateSkills,
     getPlayerSkills,
     calculateBulkScore
