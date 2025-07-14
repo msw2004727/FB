@@ -12,13 +12,19 @@
         :root {
             --font-serif: 'Noto Serif TC', serif;
             --font-sans: 'Noto Sans TC', sans-serif;
-            --light-bg: #f8f6f2;
-            --light-surface-bg: #ffffff;
-            --light-text-primary: #3a2d21;
-            --light-text-secondary: #7a6e62;
-            --light-accent: #8c6f54;
-            --light-border: #e0d8cd;
-            --transition-speed: 0.3s;
+            --light-bg: #fdfaf6; /* 柔和的米色背景 */
+            --light-surface-bg: #ffffff; /* 卡片背景 */
+            --light-text-primary: #3a2d21; /* 深棕色主文字 */
+            --light-text-secondary: #7a6e62; /* 淺棕色次要文字 */
+            --light-accent: #8c6f54; /* 核心強調色 */
+            --light-border: #e0d8cd; /* 邊框顏色 */
+            --highlight-bg: #f5f1ea; /* 高亮區塊背景 */
+            --transition-speed: 0.4s;
+        }
+
+        /* --- 基礎與佈局 --- */
+        html {
+            scroll-behavior: smooth;
         }
 
         body {
@@ -31,17 +37,18 @@
         }
 
         .manual-container {
-            max-width: 900px;
+            max-width: 960px;
             margin: 0 auto;
             padding: 2rem 1rem;
         }
 
         @media (min-width: 992px) {
             .manual-container {
-                padding: 3rem 2rem;
+                padding: 4rem 2rem;
             }
         }
 
+        /* --- 頁首 --- */
         .manual-header {
             text-align: center;
             padding-bottom: 2rem;
@@ -51,19 +58,72 @@
 
         .manual-header h1 {
             font-family: var(--font-serif);
-            font-size: clamp(2.5rem, 5vw, 3.5rem);
+            font-size: clamp(2.8rem, 6vw, 4rem);
             font-weight: 700;
             color: var(--light-accent);
             margin: 0;
+            letter-spacing: 2px;
         }
 
         .manual-header p {
-            font-size: clamp(1rem, 2vw, 1.1rem);
+            font-size: clamp(1rem, 2.5vw, 1.2rem);
             color: var(--light-text-secondary);
-            margin-top: 0.5rem;
+            margin-top: 0.75rem;
             font-style: italic;
         }
+        
+        /* --- 特色介紹卡片 --- */
+        .featured-section {
+            background: linear-gradient(135deg, #fffaf0, #fdf6e8);
+            border: 1px solid var(--light-border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 8px 30px rgba(140, 111, 84, 0.1);
+            text-align: center;
+        }
+        .featured-section h2 {
+            font-family: var(--font-serif);
+            font-size: 2.2rem;
+            color: var(--light-accent);
+            margin-top: 0;
+            margin-bottom: 1rem;
+        }
+        .featured-section p {
+            font-size: 1.1rem;
+            color: var(--light-text-secondary);
+            max-width: 700px;
+            margin: 0 auto 1.5rem auto;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            text-align: left;
+        }
+        .feature-item {
+            background: var(--light-surface-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--light-border);
+        }
+        .feature-item h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.2rem;
+            color: var(--light-text-primary);
+        }
+        .feature-item h3 i {
+            color: var(--light-accent);
+            margin-right: 0.75rem;
+        }
+        .feature-item p {
+            font-size: 0.95rem;
+            color: var(--light-text-secondary);
+            margin: 0;
+        }
 
+
+        /* --- 手風琴問答區 --- */
         .manual-card {
             background-color: var(--light-surface-bg);
             border: 1px solid var(--light-border);
@@ -71,10 +131,14 @@
             margin-bottom: 2rem;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             overflow: hidden;
+            transition: box-shadow var(--transition-speed) ease;
+        }
+        .manual-card:hover {
+             box-shadow: 0 6px 20px rgba(140, 111, 84, 0.1);
         }
 
         .accordion-header {
-            padding: 1.25rem 1.5rem;
+            padding: 1.5rem;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
@@ -86,12 +150,14 @@
             transition: background-color var(--transition-speed) ease;
         }
         .accordion-header:hover {
-            background-color: #fdfaf6;
+            background-color: var(--highlight-bg);
         }
         
         .accordion-header i.fa-solid {
             font-size: 1.6rem;
             margin-right: 1rem;
+            width: 30px; /* 固定圖示寬度以對齊 */
+            text-align: center;
         }
         
         .accordion-header .toggle-icon {
@@ -107,7 +173,7 @@
         .accordion-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.4s ease-out;
+            transition: max-height 0.5s ease-out;
         }
         .accordion-content-inner {
             padding: 0 1.5rem 1.5rem 1.5rem;
@@ -128,26 +194,29 @@
             font-weight: 700;
             color: var(--light-text-primary);
             margin-bottom: 0.5rem;
+            font-size: 1.1rem;
         }
         
         .qa-answer {
             color: var(--light-text-secondary);
-            padding-left: 1rem;
+            padding-left: 1.25rem;
             border-left: 3px solid var(--light-accent);
         }
         
         .qa-answer code {
-            background-color: var(--light-bg);
+            background-color: var(--highlight-bg);
             color: var(--light-accent);
             padding: 0.2em 0.5em;
             border-radius: 4px;
             font-family: monospace;
             font-size: 0.9em;
+            font-weight: bold;
         }
         .qa-answer .fas {
             color: var(--light-accent);
         }
 
+        /* --- 頁尾 --- */
         .manual-footer {
             text-align: center;
             margin-top: 4rem;
@@ -156,18 +225,38 @@
             color: var(--light-text-secondary);
             font-size: 0.9rem;
         }
-        
     </style>
 </head>
 <body>
 
     <div class="manual-container">
         <header class="manual-header">
-            <h1>AI文字江湖玩家秘笈</h1>
+            <h1><i class="fas fa-scroll" style="margin-right: 1rem; transform: rotate(-15deg);"></i>AI文字江湖玩家秘笈</h1>
             <p>此乃汝闖蕩江湖、成就霸業之必備寶典</p>
         </header>
 
+        <!-- 特色與必玩理由 -->
+        <section class="featured-section">
+            <h2><i class="fas fa-star" style="margin-right: 1rem;"></i>為何你必須體驗這個江湖？</h2>
+            <p>這不僅僅是一個遊戲，更是一場與AI共同創作的、獨一無二的文字冒險。忘掉固定的劇本與選項，迎接一個真正由你主宰的動態世界。</p>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <h3><i class="fas fa-infinity"></i>真正的自由</h3>
+                    <p>沒有預設的選項，沒有看不見的牆。你可以用任何文字下達指令，從「拔劍四顧心茫然」的內心戲，到「翻過牆頭潛入府邸」的實際行動，AI將理解你的意圖，並為你譜寫接下來的篇章。</p>
+                </div>
+                <div class="feature-item">
+                    <h3><i class="fas fa-feather-alt"></i>與AI共創史詩</h3>
+                    <p>你的每一個決定，都會被AI記錄、學習、並融入到後續的劇情中。你與NPC的每一次互動，都可能改變他們的命運。這是一本你與AI共同執筆的、專屬於你的武俠小說。</p>
+                </div>
+                <div class="feature-item">
+                    <h3><i class="fas fa-users"></i>有血有肉的靈魂</h3>
+                    <p>這個世界的NPC不再是冰冷的程式。他們擁有AI賦予的獨特個性、記憶與人際關係。他們會記住你的恩情，也會對你的惡行懷恨在心，甚至會因為你的出現，走出完全不同的人生軌跡。</p>
+                </div>
+            </div>
+        </section>
+
         <div class="accordion">
+            <!-- 核心概念與基礎操作 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
                     <span><i class="fa-solid fa-book-sparkles"></i>核心概念與基礎操作</span>
@@ -179,7 +268,7 @@
                         <div class="qa-pair"><div class="qa-question">Q: 這個遊戲的世界觀是什麼？</div><div class="qa-answer">A: 你是一位來自21世紀的現代靈魂，意外穿越到一個名為「元祐」年間的架空古代世界。你將從一個名為「無名村」的偏遠之地，在一具潛力無窮但身受重傷的年輕軀體中，開始你的第二人生。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲的核心驅動是什麼？</div><div class="qa-answer">A: 遊戲由名為「江湖百曉生」的AI核心驅動。它會根據你的文字輸入，以沉穩的武俠小說風格，為你生成獨一無二的劇情。你的描述越生動、越符合邏輯，AI生成的故事就越精彩。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 我可以切換不同的AI模型嗎？</div><div class="qa-answer">A: 可以。在儀表板右下角的「AI核心」下拉選單中，你可以在Gemini(快&穩)、GPT(強&貴)、DeepSeek(強&奇)、Grok(快&怪)之間自由切換，體驗不同AI帶來的迥異文筆和想像力。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如果我不知道該做什麼怎麼辦？</div><div class="qa-answer">A: 你可以參考輸入框上方，你的「書僮」為你提供的行動建議。或者查看儀表板右側的「任務日誌(QST)」和「關鍵線索(CLS)」。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 如果我不知道該做什麼怎麼辦？</div><div class="qa-answer">A: 你可以參考輸入框上方的「書僮」為你提供的行動建議。或者查看儀表板右側的「任務日誌(QST)」和「關鍵線索(CLS)」。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲會自動存檔嗎？</div><div class="qa-answer">A: 會。你的每一個回合都會被安全地記錄在雲端。你可以隨時關閉遊戲，下次登入時會從最新的進度繼續。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 什麼是回合？</div><div class="qa-answer">A: 你每成功執行一次動作，就算一個回合。遊戲中的時間流逝、事件觸發等，都與回合數有關。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲中的時間如何流逝？</div><div class="qa-answer">A: 遊戲中的時間會根據你的行動（如長途跋涉、練功）而自動推移。時辰順序為：<code>清晨 -> 上午 -> 中午 -> 下午 -> 黃昏 -> 夜晚 -> 深夜</code>。深夜之後會進入第二天。</div></div>
@@ -191,14 +280,15 @@
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲有地圖嗎？</div><div class="qa-answer">A: 有。點擊儀表板的「地球」圖示 <i class="fas fa-globe-asia"></i>，即可查看你已探索過的所有地點及其地理關係的世界地圖。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲有結局嗎？</div><div class="qa-answer">A: 遊戲沒有固定的「通關」結局。你的目標由你自己定義。當你的角色死亡或你選擇「了卻此生」時，AI會為你的人生撰寫一段獨特的終章，這便是你這趟江湖路的結局。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 我可以重置遊戲或重新開始嗎？</div><div class="qa-answer">A: 可以。在角色死亡後，或是在儀表板點擊「骷髏頭」圖示 <i class="fas fa-skull"></i> 主動結束人生後，你可以選擇「註冊新名號」來開啟一段全新的輪迴。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 遊戲的後端是如何運作的？</div><div class="qa-answer">A: 遊戲後端部署在Render雲端平台上，使用Node.js和Express構建，並以Firebase Firestore作為數據庫，確保你的江湖傳奇被安全地儲存。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 儀表板上的資訊太多了，可以收起來嗎？</div><div class="qa-answer">A: 可以。在遊戲主介面頂部的狀態欄右側，有一個向上的箭頭按鈕，點擊即可收起/展開詳細的狀態資訊。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 我輸入的指令有什麼限制嗎？</div><div class="qa-answer">A: 遊戲鼓勵富有想像力的輸入，但請盡量使用符合武俠世界觀的語言。如果輸入「手機」、「開車」等超時代的詞彙，AI會以巧妙的方式化解你的指令，而不會讓它實現。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲的開發理念是什麼？</div><div class="qa-answer">A: 遊戲的核心理念是「高自由度」與「故事性」的結合。我們希望提供一個框架，讓玩家與AI共同創作，每一位玩家都能體驗到獨一無二、專屬於自己的武俠故事。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我在哪裡可以看到最新的遊戲更新日誌？</div><div class="qa-answer">A: 最新的更新與功能說明，都會即時反映在這份操作手冊中。我們會持續擴充與優化遊戲系統，讓你的江湖之旅永遠充滿驚喜。</div></div>
                     </div>
                 </div>
             </div>
 
+            <!-- 角色屬性與成長 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
                     <span><i class="fa-solid fa-user-shield"></i>角色屬性與成長</span>
@@ -230,40 +320,10 @@
                 </div>
             </div>
 
+            <!-- 武學與戰鬥系統 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
-                    <span><i class="fa-solid fa-briefcase"></i>物品與裝備</span>
-                    <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
-                </div>
-                <div class="accordion-content">
-                    <div class="accordion-content-inner">
-                        <div class="qa-pair"><div class="qa-question">Q: 如何獲得物品和金錢？</div><div class="qa-answer">A: 完成NPC的委託、探索未知區域、搜查敵人屍體，或是...採取一些不那麼光彩的手段，例如「偷竊」。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 遊戲中的貨幣是什麼？</div><div class="qa-answer">A: 主要貨幣是「銀兩」。你可以透過交易、任務獎勵或探索獲得。錢可以用於購買物品、賄賂NPC或觸發特定事件。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我的背包有容量限制嗎？</div><div class="qa-answer">A: 有。遊戲採用「負重系統」。每個物品都有「輕、中、重、極重」四個份量等級。你的總負重會顯示在儀表板物品欄標題旁。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 負重太高會怎麼樣？</div><div class="qa-answer">A: 你的總負重會影響故事描述。當「不堪重負」時，AI在生成劇情時會體現你的遲緩與不便，在戰鬥或需要敏捷的場合將處於巨大劣勢。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何裝備或卸下物品？</div><div class="qa-answer">A: 在儀表板的物品欄中，點擊物品卡片右側的開關即可穿上或卸下裝備。已裝備的物品會自動置頂，並顯示其裝備部位的圖示。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是裝備槽位？</div><div class="qa-answer">A: 你的角色有固定的裝備槽位，如頭、身、手、腳、主手武器、副手武器等。大部分部位都是唯一的，穿上新的會自動替換舊的。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 飾品可以戴幾個？</div><div class="qa-answer">A: 你有兩個飾品槽位。飾品採用「先進先出」規則，當你裝備第三個飾品時，最早裝備的那個會被自動卸下。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 單手和雙手武器有什麼區別？</div><div class="qa-answer">A: 裝備雙手武器（如巨劍、長槍）會自動卸下你雙手的所有物品（包括主手和副手武器）。請謹慎操作。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何查看物品的詳細資訊？</div><div class="qa-answer">A: 將滑鼠懸停在物品欄的物品上，通常會顯示其詳細描述或屬性。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 物品的稀有度（普通、稀有、史詩、傳說）有什麼意義？</div><div class="qa-answer">A: 稀有度直接決定了物品的基礎價值和屬性強度。傳說級的物品通常擁有強大的力量或獨特的背景故事。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以丟棄物品嗎？</div><div class="qa-answer">A: 可以。在物品欄中點擊物品，通常會有「丟棄」選項。但請注意，此操作通常無法復原。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何交易？</div><div class="qa-answer">A: 點擊NPC姓名打開互動選單，選擇「交易」。在交易視窗中，你可以將自己的物品或金錢拖入出價區，對方也會根據你的出價和他的需求，提出他的交易物品。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 交易時的「價值差」是什麼？</div><div class="qa-answer">A: 這是系統根據雙方出價物品的基礎價值，計算出的差額。當價值差接近0或為正數時，NPC才更有可能同意交易。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 為什麼有些NPC不願意和我交易？</div><div class="qa-answer">A: NPC的個性、對你的友好度、以及你出價的物品是否他所需要，都會影響交易的成功率。一個視金錢如糞土的俠客，可能不會接受你的金錢交易。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 秘笈或書籍可以直接使用嗎？</div><div class="qa-answer">A: 獲得秘笈或書籍後，你需要下達「閱讀[書籍名稱]」的指令來學習其中的內容。閱讀後，秘笈通常會消失，並轉化為你的武學或知識。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以自己製作物品嗎？</div><div class="qa-answer">A: 可以。如果你學會了「鍛造」、「縫紉」、「煉丹」等生活技能，並收集了足夠的材料，就可以嘗試製作物品。例如，對著鐵匠鋪的熔爐下達「我要用這塊玄鐵打造一把劍」。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 物品可以升級或強化嗎？</div><div class="qa-answer">A: 某些特殊的武器或裝備在描述中可能會提到「預留了鑲嵌凹槽」或「材質特異，似有提升空間」。你可以嘗試尋找特定的材料或工匠來進行升級。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 財寶類物品有什麼用？</div><div class="qa-answer">A: 「財寶」如玉佩、金錠、古董等，主要價值在於出售給商人換取大量銀兩，或是作為珍貴的禮物贈送給特定的NPC以大幅提升好感。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我身上的「碎銀」和「銀兩」有什麼不同？</div><div class="qa-answer">A: 在系統中它們是同一種貨幣。遊戲會自動將您的所有「碎銀」、「賞金」、「銀票」等都統一計算為「銀兩」總額。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何修理損壞的裝備？</div><div class="qa-answer">A: 遊戲中裝備沒有耐久度設定。但AI可能會在劇情中描述你的武器出現了「缺口」或防具出現了「破損」，這時你可以尋找鐵匠或皮匠進行「修理」。</div></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="manual-card accordion-item">
-                <div class="accordion-header">
-                    <span><i class="fa-solid fa-khanda"></i>武學與戰鬥</span>
+                    <span><i class="fa-solid fa-khanda"></i>武學與戰鬥系統</span>
                     <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
                 </div>
                 <div class="accordion-content">
@@ -292,6 +352,7 @@
                 </div>
             </div>
 
+            <!-- 社交互動與人際關係 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
                     <span><i class="fa-solid fa-comments"></i>社交互動與人際關係</span>
@@ -305,7 +366,7 @@
                         <div class="qa-pair"><div class="qa-question">Q: 如何給NPC送禮？</div><div class="qa-answer">A: 首先點擊NPC姓名進入密談模式，然後點擊輸入框旁邊的「禮物」圖示，選擇你想贈送的物品或金錢即可。送對禮物能大幅提升友好度，反之亦然。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 友好度和心動值有什麼區別？</div><div class="qa-answer">A: 友好度是一般的人際關係，代表信賴和親近程度。心動值則是獨立的戀愛指標。一個NPC可能很信任你（高友好度），但未必對你有戀愛的情感（低心動值）。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 如何攻略一個NPC？</div><div class="qa-answer">A: 提升心動值是關鍵。你需要透過「密談」深入了解對方的個性和喜好，說出能觸動他/她內心的話，贈送有特殊意義的禮物，並在劇情中做出符合其價值觀的選擇。當心動值達到一定門檻，就會觸發特殊的戀愛事件。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以攻略有家室的NPC嗎？</div><div class="qa-answer">A: 可以。遊戲鼓勵探索各種複雜的關係，但難度會非常高。你需要付出極大的努力，甚至可能需要經歷特殊的劇情事件（例如其伴侶背叛或身故），才有可能打動對方。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我可以攻略有家室的NPC嗎？</div><div class="qa-answer">A: 可以。遊戲鼓勵探索各種複雜的關係，但難度會非常高。你需要付出極大的努力，甚至可能需要特殊的劇情事件（例如其伴侶背叛或身故），才有可能打動對方。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 如何知道NPC喜歡什麼禮物？</div><div class="qa-answer">A: 透過「密談」！在對話中仔細傾聽他們的煩惱和願望。一個抱怨兵器鈍了的劍客，會喜歡一塊好的「磨刀石」；一個為母親病情發愁的孝子，會對珍稀的「藥材」感激不盡。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: NPC對我的初印象重要嗎？</div><div class="qa-answer">A: 至關重要。你與NPC的「初見」會直接影響AI為他創造出的「個性」。如果你初見時彬彬有禮，他可能就是個正人君子；如果你初見時就惡言相向，他可能就會成為你的宿敵。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: NPC會主動找我互動嗎？</div><div class="qa-answer">A: 會。當你與某位NPC的友好度或心動值達到一定門檻時，他們可能會主動上前與你交談、贈送禮物，甚至觸發特殊事件。這是遊戲「主動互動引擎」的一部分。</div></div>
@@ -323,9 +384,10 @@
                 </div>
             </div>
             
+            <!-- 世界探索與動態系統 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
-                    <span><i class="fa-solid fa-map-signs"></i>世界探索與特殊系統</span>
+                    <span><i class="fa-solid fa-map-signs"></i>世界探索與動態系統</span>
                     <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
                 </div>
                 <div class="accordion-content">
@@ -338,10 +400,7 @@
                         <div class="qa-pair"><div class="qa-question">Q: 什麼是懸賞任務？</div><div class="qa-answer">A: 點擊儀表板的「卷軸」圖示 <i class="fas fa-scroll"></i>，可以查看當前所有可接取的懸賞任務。按鈕發光時，代表有新的懸賞發布了。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 如何完成懸賞任務？</div><div class="qa-answer">A: 根據懸賞內容，達成指定目標（例如擊殺目標人物、尋找特定物品）。完成後，下達「領取懸賞」或「回報任務」等指令，即可獲得獎勵。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 我可以不理會懸賞任務嗎？</div><div class="qa-answer">A: 當然。懸賞任務是完全可選的，它們提供了額外的挑戰和獎勵，但你可以自由決定是否參與。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「丐幫情報網」系統？</div><div class="qa-answer">A: 當你身處困境，或想打聽某人某事的絕密情報時，可以嘗試在指令中加入「丐幫」、「打聽」等關鍵字。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 呼叫丐幫後會發生什麼？</div><div class="qa-answer">A: 一位丐幫弟子會以隨機的方式立刻出現在你面前。點擊他的名字，支付100銀兩後，就可以進入特殊的「情報問答」模式。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 丐幫的情報可靠嗎？</div><div class="qa-answer">A: 不一定。丐幫弟子給出的情報有50%的機率是從資料庫獲取的真實秘聞，另外50%則是他道聽塗說、添油加醋的虛假謠言。你需要自行判斷真偽。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 丐幫弟子會一直跟著我嗎？</div><div class="qa-answer">A: 不會。丐幫弟子是臨時NPC，在你關閉與他的聊天視窗後，他就會自行離去，不會記錄在你的關係中，也不會影響你的主線劇情。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 殺人會有什麼後果？</div><div class="qa-answer">A: 殺人是改變世界最直接的方式，但後果嚴重。首先，你的立場值會大幅下降。其次，死者的親友會將你視為仇敵，展開無盡的追殺。最後，若在城鎮中殺人，會引來官府的通緝。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 我可以探索所有的房屋或房間嗎？</div><div class="qa-answer">A: 你可以嘗試。但如果房屋是私人民宅，未經允許闖入可能會被視為非法侵入，降低你的立場值，甚至引來主人的攻擊。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲中有隨機事件嗎？</div><div class="qa-answer">A: 有。在你探索世界的過程中，隨時可能觸發各種奇遇。可能是在路邊撿到錢袋，也可能是被毒蛇咬傷，為你的旅途增添變數。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 天氣會對遊戲產生影響嗎？</div><div class="qa-answer">A: 會。AI會根據天氣生成不同的場景描述。例如，下雨天趕路可能會讓你的精力消耗加倍，也可能讓你意外發現一個可以避雨的山洞，從而觸發新的劇情。</div></div>
@@ -350,10 +409,12 @@
                         <div class="qa-pair"><div class="qa-question">Q: 我可以回到之前去過的地方嗎？</div><div class="qa-answer">A: 當然可以。只要你還記得那個地方的名字，就可以透過指令再次前往。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲世界是靜態的嗎？</div><div class="qa-answer">A: 不是。遊戲世界會因為你的行動、NPC的死亡、以及隨機的世界事件而動態演化。你今天看到的江湖，明天可能已是另一番景象。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 遊戲中的NPC之間會互相影響嗎？</div><div class="qa-answer">A: 會。NPC之間有著複雜的人際關係網。如果你幫助了A，A的朋友可能會對你產生好感，而A的敵人則可能會對你產生敵意。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我可以建造自己的房屋嗎？</div><div class="qa-answer">A: 可以。當你在一個地方停留足夠久，並與當地人建立良好關係後，可以嘗試下達「我想在這裡蓋一間茅草屋」之類的指令。建造需要時間和材料，但能為你提供一個安全的庇護所。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 地點的「靜態情報」和「動態情報」是什麼意思？</div><div class="qa-answer">A: 在地點詳情彈窗中，「靜態情報」是該地點的固有設定，如地理、歷史，無法被改變。「動態情報」則是專屬於你的遊戲存檔的狀態，如當前的統治者、繁榮度、發生的事件，這些都可以被你的行動所影響。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「黑影人」？</div><div class="qa-answer">A: 當有其他玩家在「江湖圖書館」閱讀你的故事時，你可能會在遊戲中隨機遭遇神秘的「黑影人」。他只是靜靜地觀察，不會與你互動，隨後便會消失。這代表你的傳奇，正被世人所傳頌。</div></div>
                     </div>
                 </div>
             </div>
-
         </div>
 
         <footer class="manual-footer">
@@ -374,13 +435,13 @@
                     const content = item.querySelector('.accordion-content');
                     const isActive = item.classList.contains('active');
 
-                    // 如果你想實現一次只展開一個的效果，可以取消下面這段註解
-                    // document.querySelectorAll('.accordion-item.active').forEach(activeItem => {
-                    //     if (activeItem !== item) {
-                    //         activeItem.classList.remove('active');
-                    //         activeItem.querySelector('.accordion-content').style.maxHeight = null;
-                    //     }
-                    // });
+                    // 手風琴效果：點擊一個時，關閉其他已打開的
+                    document.querySelectorAll('.accordion-item.active').forEach(activeItem => {
+                        if (activeItem !== item) {
+                            activeItem.classList.remove('active');
+                            activeItem.querySelector('.accordion-content').style.maxHeight = null;
+                        }
+                    });
 
                     item.classList.toggle('active');
                     if (item.classList.contains('active')) {
