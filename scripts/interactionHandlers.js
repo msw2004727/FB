@@ -222,10 +222,8 @@ function handleStrategySelection(strategy) {
     const skillSelectionContainer = document.getElementById('skill-selection');
     const confirmBtn = document.getElementById('combat-confirm-btn');
     skillSelectionContainer.innerHTML = '';
-    if (confirmBtn) confirmBtn.disabled = true;
-
+    
     const playerSkills = gameState.combat.state?.player?.skills || [];
-    // 【新增】從gameState中獲取當前裝備的武器類型
     const currentWeaponType = gameState.combat.state?.player?.currentWeaponType;
     
     const categoryMap = { 
@@ -241,11 +239,11 @@ function handleStrategySelection(strategy) {
 
     if (relevantSkills.length > 0) {
         relevantSkills.forEach(skill => {
-            // 【核心修改】判斷技能是否可用
             const requiredWeapon = skill.requiredWeaponType;
+            // 【核心邏輯修正】'無' (Unarmed) 技能在 `currentWeaponType` 為 null 或 undefined 時也應可用
             const isUsable = !requiredWeapon || requiredWeapon === '無' || requiredWeapon === currentWeaponType;
             const disabledClass = isUsable ? '' : 'disabled';
-            const disabledAttr = isUsable ? 'disabled' : ''; // 注意這裡反過來了，因為按鈕要禁用
+            const disabledAttr = isUsable ? '' : 'disabled'; // 屬性是 disabled
 
             let weaponStatusHtml = '';
             if (requiredWeapon && requiredWeapon !== '無') {
@@ -257,11 +255,11 @@ function handleStrategySelection(strategy) {
             }
 
             const skillControl = document.createElement('div');
-            skillControl.className = `skill-controls ${disabledClass}`; // 為容器添加禁用class
+            skillControl.className = `skill-controls ${disabledClass}`;
             skillControl.dataset.skillName = skill.skillName;
 
             skillControl.innerHTML = `
-                <button class="skill-btn" ${disabledAttr}>
+                <button class="skill-btn" ${isUsable ? '' : 'disabled'}>
                     <span class="skill-name">${skill.skillName} (L${skill.level})</span>
                     ${weaponStatusHtml}
                     <span class="skill-cost" data-base-cost="${skill.cost || 5}">內力 ${skill.cost || 5}</span>
@@ -272,7 +270,6 @@ function handleStrategySelection(strategy) {
                 </div>
             `;
             
-            // 【核心修改】只有在技能可用時才添加事件監聽器
             if (isUsable) {
                 skillControl.querySelector('.skill-btn').addEventListener('click', () => handleSkillSelection(skill.skillName));
                 
@@ -297,8 +294,9 @@ function handleStrategySelection(strategy) {
          skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
     }
     
-    if (strategy === 'evade' || relevantSkills.length === 0) {
-         if (confirmBtn) confirmBtn.disabled = false;
+    // 【核心修正】即使沒有可用技能，也允許玩家點擊「確定」以執行普通攻擊
+    if (confirmBtn) {
+        confirmBtn.disabled = false;
     }
 }
 
@@ -308,7 +306,6 @@ function handleSkillSelection(skillName) {
         gameState.combat.selectedSkill = null;
         gameState.combat.selectedPowerLevel = null;
         document.querySelector(`.skill-controls[data-skill-name="${skillName}"]`)?.classList.remove('selected');
-        document.getElementById('combat-confirm-btn').disabled = true;
         return;
     }
 
@@ -560,6 +557,8 @@ export async function handleConfirmCombatAction() {
     const relevantSkills = (gameState.combat.state?.player?.skills || []).filter(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避', support: '輔助', heal: '治癒'}[gameState.combat.selectedStrategy]);
 
     if (gameState.combat.selectedStrategy !== 'evade' && relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
+         // 【核心修正】如果沒有選擇技能，也允許執行，視為普通攻擊
+    } else if (relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
         alert('請選擇一門武學！');
         return;
     }
