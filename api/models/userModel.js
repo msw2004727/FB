@@ -1,10 +1,7 @@
 // api/models/userModel.js
 
-// 這個檔案專門存放與玩家角色模型相關的預設資料結構。
-// 將其獨立出來，可以避免模組間的循環依賴問題。
-
 const DEFAULT_USER_FIELDS = {
-    money: 50,
+    // 【核心修正】移除 money 欄位
     internalPower: 5,
     externalPower: 5,
     lightness: 5,
