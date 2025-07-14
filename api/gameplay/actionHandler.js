@@ -4,7 +4,7 @@ const { getAIStory, getAISuggestion } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
 
-// 【核心修正】指令預處理函式 v2.0
+// 【核心修正】指令預處理函式 v2.0 - 帶有嚴格的本地設施搜尋邏輯
 const preprocessPlayerAction = (playerAction, locationContext) => {
     // 通用設施關鍵字與其標準類型的對應表
     const facilityKeywords = {
@@ -17,16 +17,17 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
 
     for (const [keyword, type] of Object.entries(facilityKeywords)) {
         if (playerAction.includes(keyword)) {
+            // 從傳入的、已經合併好的當前地點上下文中，搜尋設施列表
             const facilities = locationContext?.facilities || [];
             const targetFacility = facilities.find(f => f.type === type);
 
             if (targetFacility) {
-                // 情況一：本地存在該設施。將指令修正為前往具體地點。
+                // 情況一：本地存在該設施。將指令修正為前往具體地點，AI無法再進行跨地圖的自由發揮。
                 const newAction = `前往${targetFacility.name}`;
                 console.log(`[指令預處理] 偵測到本地設施，已將 "${playerAction}" 修正為 "${newAction}"`);
                 return newAction;
             } else {
-                // 情況二：本地不存在該設施。將指令修正為觸發建築邏輯。
+                // 情況二：本地不存在該設施。將指令修正為觸發建築或探索邏輯，而不是讓AI去尋找其他城鎮的模板。
                 const currentLocationName = locationContext?.locationName || '此地';
                 const newAction = `我環顧四周，發現${currentLocationName}似乎沒有${type}。我心想，這或許是個機會，決定四處看看，尋找一個合適的地點來開設一間${type}。`;
                 console.log(`[指令預處理] 地點「${currentLocationName}」無「${type}」，已將玩家行動修正為觸發建築邏輯。`);
