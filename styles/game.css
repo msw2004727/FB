@@ -212,11 +212,9 @@ body.dark-theme #submit-button {
 
 .dashboard-header {
     display: flex;
-    /* 【核心修改】根據用戶要求，將按鈕組從 flex-end (靠右) 改為 flex-start (靠左) */
-    justify-content: flex-start;
+    justify-content: flex-end;
     align-items: center;
-    /* 【核心修改】調整內邊距，給左側對齊的按鈕提供合適的空間 */
-    padding: 1rem 1.5rem;
+    padding: 1rem 2rem 1rem 1.5rem; /* 【***核心修改***】調整右側內邊距，將按鈕組稍微向左移動 */
     border-bottom: 1px solid var(--light-border);
     flex-shrink: 0;
 }
@@ -227,9 +225,9 @@ body.dark-theme .dashboard-header {
 .dashboard-header .header-buttons {
     display: flex;
     align-items: center;
-    /* 【核心修改】根據用戶要求，縮小按鈕間距使其更靠近 */
-    gap: 0.3rem;
-    /* 【核心修改】移除多餘的 justify-content，由父元素 .dashboard-header 控制對齊 */
+    gap: 0.75rem; /* 【***核心修改***】增加按鈕間距 */
+    justify-content: flex-end;
+    /* 移除了 flex-wrap: wrap; 確保按鈕始終在一行顯示，解決對齊問題 */
 }
 
 /* 【***核心新增***】統一儀表板頭部按鈕的大小與樣式 */
