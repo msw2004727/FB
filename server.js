@@ -29,30 +29,27 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- 【核心修正】更強健的CORS配置 ---
-// 定義允許的來源
+// --- CORS 配置 ---
 const allowedOrigins = [
     'https://msw2004727.github.io', 
-    'http://localhost:5500', // 方便本地開發測試
-    'http://127.0.0.1:5500'  // 方便本地開發測試
+    'http://localhost:5500', 
+    'http://127.0.0.1:5500'  
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // 允許沒有來源的請求 (例如伺服器間的請求或Postman) 或 來源在白名單中的請求
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error('此來源不被CORS策略允許'));
     }
   },
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // 允許所有HTTP方法
-  credentials: true, // 如果您將來需要處理cookies或session，這會很有用
-  optionsSuccessStatus: 204 // 對於預檢請求(OPTIONS)直接回傳204 No Content
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE", 
+  credentials: true, 
+  optionsSuccessStatus: 204
 };
 
 app.use(cors(corsOptions));
-// 在所有路由之前處理OPTIONS請求
 app.options('*', cors(corsOptions));
 
 app.use(express.json());
@@ -68,6 +65,7 @@ const gmRoutes = require('./api/gmRoutes');
 const mapRoutes = require('./api/mapRoutes');
 const adminRoutes = require('./api/admin/adminRoutes');
 const beggarRoutes = require('./api/beggarRoutes');
+const inventoryRoutes = require('./api/inventoryRoutes'); // 【核心新增】引入我們新的背包路由
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -79,14 +77,27 @@ app.use('/api/gm', gmRoutes);
 app.use('/api/map', authMiddleware, mapRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/beggar', beggarRoutes);
+app.use('/api/inventory', inventoryRoutes); // 【核心新增】掛載背包路由
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
     res.send('AI 武俠世界伺服器已啟動並採用最新模組化架構！');
 });
 
+// --- 啟動時執行數據遷移 ---
+const { runEquipmentMigration } = require('./api/migrations/equipmentMigration');
+
 // 啟動伺服器
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
+    
+    // 初始化快取
     cacheManager.initializeNpcNameCache();
+    
+    // 執行數據遷移腳本
+    try {
+        await runEquipmentMigration();
+    } catch (error) {
+        console.error('[數據遷移] 啟動時執行遷移腳本失敗:', error);
+    }
 });
