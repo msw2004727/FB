@@ -51,6 +51,7 @@ body.dark-theme .location-modal-content {
     padding: 1.5rem 2rem;
     border-bottom: 1px solid var(--light-border);
     text-align: center;
+    position: relative; /* 為關閉按鈕提供定位基準 */
 }
 
 body.dark-theme .location-modal-header {
@@ -95,18 +96,21 @@ body.dark-theme .location-modal-close:hover {
     padding: 2rem;
 }
 
+/* 卡片式佈局核心 */
 .location-section {
+    background-color: var(--light-bg);
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    padding: 1.5rem;
     margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px dashed var(--light-border);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 .location-section:last-child {
     margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
 }
 body.dark-theme .location-section {
-    border-bottom-color: var(--dark-border);
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
 }
 
 .location-section h4 {
@@ -115,29 +119,53 @@ body.dark-theme .location-section {
     color: var(--light-text-primary);
     margin-top: 0;
     margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--light-border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 body.dark-theme .location-section h4 {
     color: var(--dark-text-primary);
+    border-bottom-color: var(--dark-border);
 }
+.location-section h4 .fas {
+    color: var(--light-accent);
+}
+body.dark-theme .location-section h4 .fas {
+    color: var(--dark-accent);
+}
+
 
 .location-detail-list {
     list-style: none;
     padding: 0;
     margin: 0;
-    font-size: 1rem;
-    line-height: 1.8;
+    font-size: 0.95rem;
+    line-height: 1.9;
 }
 
 .location-detail-list li {
     display: flex;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px dashed var(--light-border);
 }
+.location-detail-list li:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+body.dark-theme .location-detail-list li {
+    border-bottom-color: var(--dark-border);
+}
+
 
 .location-detail-list .key {
     font-weight: bold;
     color: var(--light-text-secondary);
     flex-shrink: 0;
-    width: 100px;
+    width: 90px; /* 固定鍵的寬度以對齊 */
 }
 body.dark-theme .location-detail-list .key {
     color: var(--dark-text-secondary);
@@ -145,7 +173,24 @@ body.dark-theme .location-detail-list .key {
 
 .location-detail-list .value {
     color: var(--light-text-primary);
+    word-break: break-word; /* 讓長內容可以換行 */
 }
 body.dark-theme .location-detail-list .value {
     color: var(--dark-text-primary);
+}
+
+/* 針對巢狀列表的樣式調整 */
+.location-detail-list .value ul {
+    margin-top: 0.5rem;
+    padding-left: 1rem;
+    border-left: 2px solid var(--light-border);
+}
+body.dark-theme .location-detail-list .value ul {
+     border-left-color: var(--dark-border);
+}
+
+.location-detail-list .value ul li {
+    padding-bottom: 0.2rem;
+    margin-bottom: 0.2rem;
+    border-bottom: none;
 }
