@@ -36,6 +36,12 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **觸發條件**: 只有在玩家的指令中包含**明確的、不存在於當前地點層級中的地名**（如 "前往開封府"），或者當玩家的「內部移動」指令在當前地點找不到對應設施時，你才能將其視為一次外部移動。
     * **執行鐵律**: 當你判定為外部移動時，你可以發揮想像力，創造前往新地點的過程，並在 \`roundData.LOC\` 中設定新的地點層級。
 `;
+    
+    // 【核心修改】新增創功資料連動鐵律
+    const customSkillRule = `
+## 【創功資料連動鐵律 (極高優先級)】
+當你的 \`story\` 敘述中明確描寫了玩家正在「自創」或「領悟」一門全新的武學時，你**必須**在回傳的 \`roundData.skillChanges\` 陣列中，為這門新武學添加一個對應的物件。此物件的 \`isNewlyAcquired\` 必須為 \`true\`，且初始等級 \`level\` 必須為 \`0\`。故事描述與數據生成必須同步，任何情況下都不能遺漏此數據。
+`;
 
     const specialEventInstruction = worldEventToWeave ? `
 ## 【最高優先級特殊劇情指令：世界事件編織】
@@ -148,6 +154,7 @@ ${romanceInstruction}
 ${dyingInstruction}
 ${worldviewAndProgressionRules}
 ${spatialContextRule}
+${customSkillRule} 
 ${encumbranceInstruction}
 ${staminaSystemRule}
 ${playerAttributeRules}
