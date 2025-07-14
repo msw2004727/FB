@@ -4,8 +4,9 @@ const { getAIStory, getAISuggestion } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
 
-// 指令預處理函式
+// 【核心修正】指令預處理函式 v2.0
 const preprocessPlayerAction = (playerAction, locationContext) => {
+    // 通用設施關鍵字與其標準類型的對應表
     const facilityKeywords = {
         '鐵匠鋪': '鐵匠鋪', '打鐵鋪': '鐵匠鋪',
         '藥鋪': '藥鋪', '藥房': '藥鋪', '醫館': '藥鋪',
@@ -18,13 +19,23 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
         if (playerAction.includes(keyword)) {
             const facilities = locationContext?.facilities || [];
             const targetFacility = facilities.find(f => f.type === type);
+
             if (targetFacility) {
+                // 情況一：本地存在該設施。將指令修正為前往具體地點。
                 const newAction = `前往${targetFacility.name}`;
-                console.log(`[指令預處理] 偵測到通用指令，已將 "${playerAction}" 修正為 "${newAction}"`);
+                console.log(`[指令預處理] 偵測到本地設施，已將 "${playerAction}" 修正為 "${newAction}"`);
+                return newAction;
+            } else {
+                // 情況二：本地不存在該設施。將指令修正為觸發建築邏輯。
+                const currentLocationName = locationContext?.locationName || '此地';
+                const newAction = `我環顧四周，發現${currentLocationName}似乎沒有${type}。我心想，這或許是個機會，決定四處看看，尋找一個合適的地點來開設一間${type}。`;
+                console.log(`[指令預處理] 地點「${currentLocationName}」無「${type}」，已將玩家行動修正為觸發建築邏輯。`);
                 return newAction;
             }
         }
     }
+    
+    // 如果沒有匹配的關鍵字，返回原始指令
     return playerAction;
 };
 
@@ -45,6 +56,7 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         }
         
+        // 在呼叫AI前，對玩家指令進行預處理
         playerAction = preprocessPlayerAction(playerAction, context.locationContext);
         
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame } = context;
@@ -61,8 +73,7 @@ async function handleAction(req, res, player, newRoundNumber) {
         if (!aiResponse || !aiResponse.roundData) {
             throw new Error("主AI未能生成有效回應。");
         }
-
-        // 【核心修正】將 playerAction 傳遞給 updateGameState
+        
         const finalRoundData = await updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber);
         
         const suggestion = await getAISuggestion(finalRoundData);
