@@ -243,7 +243,6 @@ function handleStrategySelection(strategy) {
             // 【核心邏輯修正】'無' (Unarmed) 技能在 `currentWeaponType` 為 null 或 undefined 時也應可用
             const isUsable = !requiredWeapon || requiredWeapon === '無' || requiredWeapon === currentWeaponType;
             const disabledClass = isUsable ? '' : 'disabled';
-            const disabledAttr = isUsable ? '' : 'disabled'; // 屬性是 disabled
 
             let weaponStatusHtml = '';
             if (requiredWeapon && requiredWeapon !== '無') {
@@ -265,7 +264,7 @@ function handleStrategySelection(strategy) {
                     <span class="skill-cost" data-base-cost="${skill.cost || 5}">內力 ${skill.cost || 5}</span>
                 </button>
                 <div class="power-level-adjuster">
-                    <input type="range" class="power-level-slider" min="1" max="${skill.level}" value="1" step="1">
+                    <input type="range" class="power-level-slider" min="1" max="${skill.level}" value="1" step="1" ${isUsable ? '' : 'disabled'}>
                     <span class="power-level-display">1 成</span>
                 </div>
             `;
@@ -414,8 +413,9 @@ export async function sendChatMessage() {
                 const paymentResult = await api.startBeggarInquiry();
                 // 付款成功，更新本地的錢錢顯示
                 if (gameState.roundData) {
-                    gameState.roundData.money = paymentResult.newBalance;
-                    updateUI(null, gameState.roundData, null, null); 
+                    // 這是一個簡化的更新，實際可能需要更全面的UI刷新
+                    const moneyContent = document.getElementById('money-content');
+                    if (moneyContent) moneyContent.textContent = `${paymentResult.newBalance} 兩銀子`;
                 }
             } catch (error) {
                 // 處理錢不夠的狀況
@@ -556,11 +556,8 @@ export async function handleConfirmCombatAction() {
     
     const relevantSkills = (gameState.combat.state?.player?.skills || []).filter(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避', support: '輔助', heal: '治癒'}[gameState.combat.selectedStrategy]);
 
-    if (gameState.combat.selectedStrategy !== 'evade' && relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
-         // 【核心修正】如果沒有選擇技能，也允許執行，視為普通攻擊
-    } else if (relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
-        alert('請選擇一門武學！');
-        return;
+    if (relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
+         // 允許不選技能，視為普通攻擊
     }
 
     gameLoop.setLoading(true);
