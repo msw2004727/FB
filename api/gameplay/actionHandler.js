@@ -3,36 +3,14 @@ const { buildContext } = require('../contextBuilder');
 const { getAIStory, getAISuggestion } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
-// 【核心新增】引入新建的閉關管理器
 const { handleCultivation } = require('./cultivationManager');
+// 【核心修改】移除 tutorialHelper 的引用，因為我們將在 gameLoop.js 控制提示
+// const { appendTutorialHint } = require('../utils/tutorialHelper'); 
 
-// 【核心修改】簡化解析邏輯，只專注於意圖和天數
-function parseCultivationCommand(action) {
-    const keywords = ['閉關', '靜修', '修行', '修練'];
-    const timeUnits = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '月': 30, '年': 365 };
-    const dayKeyword = '日';
-
-    if (!keywords.some(kw => action.includes(kw))) {
-        return null;
-    }
-
-    let days = 0;
-    const dayMatch = action.match(new RegExp(`([一二三四五六七八九十]+)${dayKeyword}`));
-    if (dayMatch && dayMatch[1] && timeUnits[dayMatch[1]]) {
-        days = timeUnits[dayMatch[1]];
-    } else {
-        // 如果有閉關關鍵字但沒有天數，預設為1天
-        days = 1;
-    }
-
-    // 嘗試解析武學名稱，但不強求。如果沒有，則回傳 null
-    let skillName = null;
-    const practiceMatch = action.match(/(?:修練|練習|鑽研)\s*「?([^」]+?)」?(?:心法|劍法|拳法|掌法|刀法|身法)?/);
-    if (practiceMatch && practiceMatch[1]) {
-        skillName = practiceMatch[1].trim();
-    }
-
-    return { isCultivation: true, days, skillName };
+// 【核心修改】極度簡化指令判斷，只檢查關鍵字
+function isCultivationAttempt(action) {
+    const keywords = ['閉關', '靜修', '修行', '修練', '練習'];
+    return keywords.some(kw => action.includes(kw));
 }
 
 
@@ -66,13 +44,6 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
     return playerAction;
 };
 
-/**
- * 核心互動處理器
- * @param {object} req - Express request object
- * @param {object} res - Express response object
- * @param {object} player - 玩家數據
- * @param {number} newRoundNumber - 新的回合數
- */
 async function handleAction(req, res, player, newRoundNumber) {
     const { id: userId, username } = req.user;
     let { action: playerAction, model: playerModelChoice } = req.body;
@@ -83,20 +54,15 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         }
         
-        // --- 閉關指令攔截 ---
-        const cultivationCommand = parseCultivationCommand(playerAction);
-        if (cultivationCommand && cultivationCommand.isCultivation) {
-            // 【核心修改】將 skillName 傳遞給管理器，即使它是 null
-            const cultivationResult = await handleCultivation(userId, username, context.player, cultivationCommand.days, cultivationCommand.skillName);
+        // --- 【核心修改】閉關指令攔截 ---
+        if (isCultivationAttempt(playerAction)) {
+            // 直接將最原始的玩家指令傳遞給管理器，讓管理器全權負責解析
+            const cultivationResult = await handleCultivation(userId, username, context.player, playerAction);
             
             if (!cultivationResult.success) {
-                // 【核心修改】使用輔助函式包裝錯誤訊息
                 return res.status(400).json({ message: cultivationResult.message });
-                const tutorialMessage = appendTutorialHint(cultivationResult.message);
-                return res.status(400).json({ message: tutorialMessage });
             }
             
-            // 條件滿足，使用閉關模組生成的數據來更新遊戲狀態
             const finalRoundData = await updateGameState(userId, username, player, playerAction, { roundData: cultivationResult.data }, newRoundNumber);
             const suggestion = await getAISuggestion(finalRoundData);
             finalRoundData.suggestion = suggestion;
