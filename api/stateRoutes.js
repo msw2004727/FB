@@ -9,6 +9,44 @@ const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
+// 【核心修改】新增的物品丟棄路由
+router.post('/drop-item', async (req, res) => {
+    const { itemId } = req.body;
+    const userId = req.user.id;
+
+    if (!itemId) {
+        return res.status(400).json({ success: false, message: '未提供要丟棄的物品ID。' });
+    }
+
+    try {
+        const itemRef = db.collection('users').doc(userId).collection('inventory_items').doc(itemId);
+        const itemDoc = await itemRef.get();
+
+        if (!itemDoc.exists) {
+            return res.status(404).json({ success: false, message: '在你的背包中找不到這個物品。' });
+        }
+        
+        // 刪除物品文件
+        await itemRef.delete();
+        
+        // 獲取更新後的完整背包數據並回傳
+        const updatedInventory = await getRawInventory(userId);
+        const newBulkScore = calculateBulkScore(updatedInventory);
+
+        res.json({
+            success: true,
+            message: `已丟棄「${itemDoc.data().templateId || '物品'}」。`,
+            inventory: updatedInventory,
+            bulkScore: newBulkScore,
+        });
+
+    } catch (error) {
+        console.error(`[丟棄物品API] 玩家 ${userId} 丟棄物品 ${itemId} 時出錯:`, error);
+        res.status(500).json({ success: false, message: '丟棄物品時發生未知錯誤。' });
+    }
+});
+
+
 router.post('/equip', async (req, res) => {
     const { itemId, equip } = req.body;
     const userId = req.user.id;
@@ -69,9 +107,6 @@ router.get('/latest-game', async (req, res) => {
         const locationData = await getMergedLocationData(userId, latestGameData.LOC);
         const bulkScore = calculateBulkScore(fullInventory);
 
-        // ** 核心修正開始 **
-        // 確保回傳給前端的 `money` 是 user document 中的「文錢」
-        // `silver` 則是從物品庫中計算的「銀兩」
         const silverItem = fullInventory.find(item => item.templateId === '銀兩');
         const silverAmount = silverItem ? silverItem.quantity : 0;
         
@@ -80,10 +115,9 @@ router.get('/latest-game', async (req, res) => {
             skills: skills,
             inventory: fullInventory,
             bulkScore: bulkScore,
-            money: userData.money || 0, // 確保 money 是 userDoc 中的文錢
-            silver: silverAmount         // 新增 silver 欄位代表銀兩
+            money: userData.money || 0,
+            silver: silverAmount
         });
-        // ** 核心修正結束 **
 
         const [prequelText, suggestion] = await Promise.all([
             getAIPrequel(userData.preferredModel, [latestGameData]),
