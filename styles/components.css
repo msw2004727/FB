@@ -410,7 +410,6 @@ body.dark-theme .morality-bar-indicator {
     background-color: var(--morality-neutral-dark);
 }
 
-/* --- 【核心修正】補全所有進度條樣式 --- */
 .power-display {
     display: flex;
     align-items: center;
@@ -475,7 +474,6 @@ body.dark-theme #stamina-bar {
 body.dark-theme .power-value {
     color: var(--dark-text-secondary);
 }
-/* --- 修正結束 --- */
 
 .random-event-message {
     padding: 1rem 1.5rem;
@@ -847,4 +845,11 @@ body.dark-theme .npc-interaction-btn:disabled:hover {
 
 body.dark-theme #stamina-bar.pulsing-danger {
     background-color: var(--stamina-danger-color-dark);
+}
+
+/* 【核心新增】物品連結樣式 */
+.item-link {
+    text-decoration: none !important; /* 強制移除底線 */
+    color: inherit !important; /* 強制繼承父元素顏色 */
+    cursor: pointer;
 }
