@@ -1,6 +1,6 @@
 // /api/gameplay/preActionChecks.js
 const { getRawInventory, getPlayerSkills, calculateBulkScore, getInventoryState } = require('../playerStateHelpers');
-const { checkAndHandleStaminaDepletion } = require('./staminaManager'); // 【核心修正】引入精力總管
+const { checkAndHandleStaminaDepletion } = require('./staminaManager'); 
 const beggarService = require('../../services/beggarService');
 const admin = require('firebase-admin');
 const db = admin.firestore();
@@ -63,13 +63,16 @@ async function handleBeggarSummon(req, res) {
  * @returns {Promise<boolean>} - 如果有任何預先檢查處理了請求，返回 true，否則返回 false
  */
 async function handlePreActionChecks(req, res, player, newRoundNumber) {
-    // 【核心修正】將精力耗盡的檢查，全權交給精力總管
+    // 檢查精力耗盡的情況
     if (await checkAndHandleStaminaDepletion(req, res, player, newRoundNumber)) {
         return true;
     }
-    if (await handleBeggarSummon(req, res)) {
-        return true;
-    }
+
+    // 【核心修改】將丐幫召喚功能關閉
+    // if (await handleBeggarSummon(req, res)) {
+    //     return true;
+    // }
+    
     return false;
 }
 
