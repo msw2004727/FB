@@ -15,6 +15,10 @@ const equipItemHandler = async (req, res) => {
     
     console.log(`[API路由] 收到玩家 ${userId} 的裝備請求，物品實例ID: ${instanceId}`);
 
+    if (!instanceId) {
+        return res.status(400).json({ success: false, message: '請求中缺少物品實例ID。' });
+    }
+
     try {
         const result = await inventoryModel.equipItem(userId, instanceId);
         
@@ -31,7 +35,7 @@ const equipItemHandler = async (req, res) => {
 
     } catch (error) {
         console.error(`[API路由-錯誤] 玩家 ${userId} 裝備物品 ${instanceId} 時出錯:`, error);
-        res.status(400).json({ success: false, message: error.message || "裝備操作失敗" });
+        res.status(500).json({ success: false, message: error.message || "裝備操作失敗" });
     }
 };
 
@@ -41,6 +45,10 @@ const unequipItemHandler = async (req, res) => {
     const { instanceId } = req.params;
 
     console.log(`[API路由] 收到玩家 ${userId} 的卸下請求，物品實例ID: ${instanceId}`);
+    
+    if (!instanceId) {
+        return res.status(400).json({ success: false, message: '請求中缺少物品實例ID。' });
+    }
 
     try {
         const result = await inventoryModel.unequipItem(userId, instanceId);
@@ -58,7 +66,7 @@ const unequipItemHandler = async (req, res) => {
 
     } catch (error) {
         console.error(`[API路由-錯誤] 玩家 ${userId} 卸下物品 ${instanceId} 時出錯:`, error);
-        res.status(400).json({ success: false, message: error.message || "卸下操作失敗" });
+        res.status(500).json({ success: false, message: error.message || "卸下操作失敗" });
     }
 };
 
