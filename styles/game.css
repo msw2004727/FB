@@ -210,12 +210,6 @@ body.dark-theme #submit-button {
     cursor: not-allowed;
 }
 
-/*
-  【清理說明】
-  原有的 .dashboard-header 和 .dashboard-header .header-buttons 樣式已從此檔案中移除。
-  這些樣式現在統一由 styles/components.css 管理，以解決樣式覆蓋（權重）問題。
-*/
-
 .dashboard-content {
     padding: 1.5rem;
     overflow-y: auto;
@@ -225,7 +219,6 @@ body.dark-theme #submit-button {
 }
 
 @media (max-width: 1024px) {
-    /* 在小螢幕上，讓主遊戲區的 menu-toggle 按鈕顯示出來 */
     .game-container > .menu-toggle {
         display: block;
         position: fixed;
@@ -252,13 +245,35 @@ body.dark-theme #submit-button {
         z-index: 1002;
     }
 }
-/* --- 【核心新增】丐幫弟子專屬顏色 --- */
+
 .npc-name-beggar {
-    color: #8B4513; /* 深咖啡色 (SaddleBrown) */
+    color: #8B4513;
     font-weight: bold;
     cursor: pointer;
     transition: color 0.2s ease;
 }
 body.dark-theme .npc-name-beggar {
-    color: #D2B48C; /* 淺咖啡色 (Tan) */
+    color: #D2B48C;
+}
+
+/* --- 【核心新增】閉關系統錯誤提示樣式 --- */
+.cultivation-error {
+    background-color: #ffd700; /* 金色 (Gold) */
+    color: #4b3a00; /* 深金色文字，確保對比度 */
+    padding: 0.75rem 1.5rem;
+    border-radius: 30px; /* 橢圓形 */
+    font-family: var(--font-sans);
+    font-weight: bold;
+    font-size: 1rem;
+    border: 1px solid #d4b100;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+    display: inline-block; /* 讓寬度自適應內容 */
+    margin: 0.5rem auto; /* 使其在 P 標籤內也能居中 */
+    text-align: center;
+}
+
+body.dark-theme .cultivation-error {
+    background-color: #a1883c;
+    color: #fff;
+    border-color: #ffd700;
 }
