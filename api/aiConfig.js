@@ -21,7 +21,7 @@ const aiConfig = {
     // --- 核心故事與敘事 ---
     story: 'openai',          // 主線故事生成器
     narrative: 'openai',      // 將數據轉換為小說旁白
-    prequel: 'grok',        // 前情提要生成器
+    prequel: 'openai',        // 前情提要生成器
     epilogue: 'deepseek',     // 角色結局（身後事）生成器
     deathCause: 'deepseek',   // 為自殺角色生成一個合理的死因
 
@@ -35,8 +35,8 @@ const aiConfig = {
     surrender: 'openai',    // 認輸情境裁決
 
     // --- NPC與互動 ---
-    npcProfile: 'grok',   // 新NPC的詳細人設生成
-    npcChat: 'grok',        // NPC密談時的回應
+    npcProfile: 'openai',   // 新NPC的詳細人設生成
+    npcChat: 'openai',        // NPC密談時的回應
     npcChatSummary: 'openai', // 總結密談內容
     giveItem: 'grok',       // 贈予NPC物品時的反應
     giveNarrative: 'openai',  // 贈予事件的小說化描述
@@ -49,7 +49,7 @@ const aiConfig = {
     bounty: 'deepseek',       // 懸賞任務生成
     itemTemplate: 'openai', // 新物品的設計圖生成
     location: 'openai',     // 新地點的檔案生成
-    reward: 'openai',         // 領取懸賞時的獎勵生成
+    reward: 'deepseek',         // 領取懸賞時的獎勵生成
 };
 
 module.exports = { aiConfig };
