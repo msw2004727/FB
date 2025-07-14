@@ -5,8 +5,7 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateAndCacheLocation } = require('./worldEngine');
-const { v4: uuidv4 } = require('uuid');
-const { runDataHealthCheck } = require('./dataIntegrityService'); // 【核心新增】引入新的健康檢查服務
+const { runDataHealthCheck } = require('./dataIntegrityService');
 const { DEFAULT_USER_FIELDS } = require('./models/userModel');
 
 const db = admin.firestore();
@@ -39,6 +38,14 @@ router.post('/register', async (req, res) => {
             ...DEFAULT_USER_FIELDS,
         });
         
+        // 【核心修正】直接在背包中創建初始的50兩銀子
+        const inventoryRef = newUserRef.collection('inventory_items');
+        await inventoryRef.doc('銀兩').set({
+            templateId: '銀兩',
+            itemType: '財寶',
+            quantity: 50,
+        });
+
         const skillsCollectionRef = newUserRef.collection('skills');
         await skillsCollectionRef.doc('現代搏擊').set({
             name: '現代搏擊',
@@ -60,7 +67,8 @@ router.post('/register', async (req, res) => {
             timeOfDay: '上午',
             powerChange: { internal: 0, external: 0, lightness: 0 },
             moralityChange: 0,
-            moneyChange: 50,
+            // 【核心修正】移除 moneyChange，改為 itemChanges
+            itemChanges: [{ action: 'add', itemName: '銀兩', quantity: 50 }],
             ATM: ['幽暗', '濃重藥草味', '一絲血腥味'],
             EVT: '從天旋地轉中醒來，靈魂墜入陌生的時代',
             LOC: ['無名村'],
@@ -74,7 +82,6 @@ router.post('/register', async (req, res) => {
                 friendlinessValue: 10,
                 isNew: true
             }],
-            itemChanges: [],
             QST: '探查自身與周遭的處境。',
             WRD: '天色陰沉，細雨濛濛。',
             LOR: '你似乎被一位郎中所救。',
@@ -85,8 +92,6 @@ router.post('/register', async (req, res) => {
             lightness: 5,
             stamina: 25,
             morality: 0,
-            money: 50,
-            silver: 0,
             yearName: '元祐',
             year: 1,
             month: 1,
@@ -134,7 +139,6 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
         
-        // 【核心修改】登入成功後，在背景非同步執行資料健康檢查，不影響登入速度
         runDataHealthCheck(userId, username).catch(err => {
             console.error(`[背景健康檢查] 為玩家 ${username} 執行時發生錯誤:`, err);
         });
