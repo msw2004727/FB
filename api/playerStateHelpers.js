@@ -121,7 +121,6 @@ async function getOrGenerateSkillTemplate(skillName) {
              newTemplateData.requiredWeaponType = '無';
         }
         
-        // 【核心修正】為AI新創的武學模板打上「自創」標籤
         newTemplateData.isCustom = true;
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await skillTemplateRef.set(newTemplateData);
@@ -270,34 +269,33 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                 const latestPlayerProfile = (await transaction.get(userDocRef)).data();
 
                 if (skillChange.isNewlyAcquired) {
-                    const acquisitionMethod = skillChange.acquisitionMethod || 'created'; 
+                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                    if (!templateResult || !templateResult.template) return;
 
-                    if (acquisitionMethod === 'created') {
-                        const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
-                        if (!templateResult || !templateResult.template) return;
+                    // 【核心修正】將判斷條件從 isNew 改為 isCustom
+                    // 現在，只要這門武學是自創的，無論模板是否已存在，都會進行資格審查
+                    if (templateResult.template.isCustom) {
+                        const powerType = templateResult.template.power_type || 'none';
+                        const maxPowerAchieved = latestPlayerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
+                        const createdSkillsCount = latestPlayerProfile.customSkillsCreated?.[powerType] || 0;
+                        const totalCreatedSkills = Object.values(latestPlayerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
+                        const availableSlots = Math.floor(maxPowerAchieved / 100);
 
-                        if (templateResult.isNew) {
-                            const powerType = templateResult.template.power_type || 'none';
-                            const maxPowerAchieved = latestPlayerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
-                            const createdSkillsCount = latestPlayerProfile.customSkillsCreated?.[powerType] || 0;
-                            const totalCreatedSkills = Object.values(latestPlayerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
-                            const availableSlots = Math.floor(maxPowerAchieved / 100);
-
-                            if (totalCreatedSkills >= 10) {
-                                customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
-                                return;
-                            }
-
-                            if (createdSkillsCount >= availableSlots) {
-                                customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
-                                return;
-                            }
-
-                            transaction.update(userDocRef, { [`customSkillsCreated.${powerType}`]: admin.firestore.FieldValue.increment(1) });
-                            customSkillCreationResult = { success: true };
+                        if (totalCreatedSkills >= 10) {
+                            customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
+                            return; // 中止事務
                         }
+
+                        if (createdSkillsCount >= availableSlots) {
+                            customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                            return; // 中止事務
+                        }
+
+                        transaction.update(userDocRef, { [`customSkillsCreated.${powerType}`]: admin.firestore.FieldValue.increment(1) });
+                        customSkillCreationResult = { success: true };
                     }
                     
+                    // 只有在資格審查通過或非自創武學時，才寫入技能
                     if (customSkillCreationResult === null || customSkillCreationResult.success) {
                         const playerSkillData = { level: skillChange.level || 0, exp: skillChange.exp || 0, lastPractice: admin.firestore.FieldValue.serverTimestamp() };
                         transaction.set(playerSkillDocRef, playerSkillData);
