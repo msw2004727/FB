@@ -14,6 +14,8 @@ function sanitizeLocationData(template) {
     template.economy = template.economy || {};
     template.lore = template.lore || {};
     template.address = template.address || {};
+    // 【核心修正】確保 governance 物件永遠存在，杜絕 undefined 錯誤
+    template.governance = template.governance || {};
 
     // 為lore.history提供預設值，防止undefined
     if (!template.lore.history) {
@@ -53,7 +55,6 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
                 const locRef = db.collection('locations').doc(loc.locationName);
                 const docToCheck = await locRef.get();
                 if (!docToCheck.exists) {
-                    // 【核心修正】在寫入前，對AI生成的數據進行淨化
                     const sanitizedTemplate = sanitizeLocationData(loc.staticTemplate);
                     if (sanitizedTemplate) {
                         batch.set(locRef, sanitizedTemplate);
