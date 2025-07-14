@@ -32,130 +32,119 @@ async function getRequiredDocumentsForEquip(transaction, userId, instanceId) {
 
 
 /**
- * 【核心重構 v9.1 - 已修復】裝備一件物品
+ * 【核心重構 v9.2 - 規則強化版】裝備一件物品
  * @param {string} userId - 玩家ID
  * @param {string} instanceId - 要裝備的物品的唯一實例ID
  * @returns {Promise<object>} 返回操作結果
  */
 async function equipItem(userId, instanceId) {
-    console.log(`[模型層 v9.1] equipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
+    console.log(`[模型層 v9.2] equipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
     
     return db.runTransaction(async (transaction) => {
-        // --- 讀取階段 (已修復) ---
-        // 【錯誤修正】原版本遺漏了 itemDoc 的解構，導致後續程式碼出錯。此處已補全。
         const { userRef, userDoc, itemRef, itemDoc, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
         
-        const itemTemplateData = itemTemplateDoc.data();
-        const { equipSlot, hands, itemName, itemType } = itemTemplateData;
+        const itemToEquipData = itemTemplateDoc.data();
+        const { equipSlot, hands, itemName, itemType } = itemToEquipData;
 
         if (itemType !== '武器' && itemType !== '裝備') {
             throw new Error(`「${itemName}」不是可裝備的物品。`);
         }
         
-        const currentEquipmentState = { ...(userDoc.data().equipment || {}) };
-        
-        // 預備要卸下的物品引用
-        const itemsToUnequipRefs = new Map();
-        
-        // 預讀取所有可能衝突的物品，以便後續判斷
-        const conflictingItemIds = [];
-        if (equipSlot && currentEquipmentState[equipSlot]) conflictingItemIds.push(currentEquipmentState[equipSlot]);
-        if (hands === 2) {
-             if (currentEquipmentState.weapon_right) conflictingItemIds.push(currentEquipmentState.weapon_right);
-             if (currentEquipmentState.weapon_left) conflictingItemIds.push(currentEquipmentState.weapon_left);
-        } else if (equipSlot && equipSlot.startsWith('weapon') && currentEquipmentState.weapon_right) {
-             conflictingItemIds.push(currentEquipmentState.weapon_right);
-        }
+        const currentEquipment = { ...(userDoc.data().equipment || {}) };
+        const itemsToUnequip = new Map(); // 使用Map來防止重複卸下同一件物品
 
-        const uniqueConflictingIds = [...new Set(conflictingItemIds.filter(id => id && id !== instanceId))];
-        const conflictingItemDocs = uniqueConflictingIds.length > 0 
-            ? await transaction.getAll(...uniqueConflictingIds.map(id => userRef.collection('inventory_items').doc(id)))
-            : [];
-        const conflictingItemTemplates = new Map();
-        for(const doc of conflictingItemDocs) {
-            if (doc.exists) {
-                const templateId = doc.data().templateId;
-                if(templateId) {
-                    const template = (await transaction.get(db.collection('items').doc(templateId))).data();
-                    conflictingItemTemplates.set(doc.id, template);
-                }
+        // --- 核心規則判斷 ---
+
+        // 1. 如果要裝備的是非武器裝備（頭、身、手、腳等）
+        if (itemType === '裝備') {
+            if (currentEquipment[equipSlot]) {
+                itemsToUnequip.set(currentEquipment[equipSlot], `卸下原本的${equipSlot}`);
             }
         }
 
-        // --- 判斷與寫入階段 ---
-        let newEquipmentState = { ...currentEquipmentState };
-
-        // 卸下目標槽位的物品
-        if (equipSlot && newEquipmentState[equipSlot]) {
-             if (newEquipmentState[equipSlot] !== instanceId) {
-                itemsToUnequipRefs.set(newEquipmentState[equipSlot], userRef.collection('inventory_items').doc(newEquipmentState[equipSlot]));
-             }
-        }
-        
-        // 處理雙手武器衝突
-        if (hands === 2) {
-            if (newEquipmentState.weapon_right) itemsToUnequipRefs.set(newEquipmentState.weapon_right, userRef.collection('inventory_items').doc(newEquipmentState.weapon_right));
-            if (newEquipmentState.weapon_left) itemsToUnequipRefs.set(newEquipmentState.weapon_left, userRef.collection('inventory_items').doc(newEquipmentState.weapon_left));
-        } else if (equipSlot && equipSlot.startsWith('weapon')) {
-            if (newEquipmentState.weapon_right) {
-                const rightHandTemplate = conflictingItemTemplates.get(newEquipmentState.weapon_right);
-                if (rightHandTemplate && rightHandTemplate.hands === 2) {
-                     itemsToUnequipRefs.set(newEquipmentState.weapon_right, userRef.collection('inventory_items').doc(newEquipmentState.weapon_right));
+        // 2. 如果要裝備的是武器
+        if (itemType === '武器') {
+            // 2a. 如果要裝備的是【雙手武器】
+            if (hands === 2) {
+                // 無論目標槽位是什麼，雙手武器都會佔用左右腰部，並卸下這兩個位置的任何東西
+                if (currentEquipment.weapon_right) itemsToUnequip.set(currentEquipment.weapon_right, '為雙手武器騰出右腰');
+                if (currentEquipment.weapon_left) itemsToUnequip.set(currentEquipment.weapon_left, '為雙手武器騰出左腰');
+            }
+            // 2b. 如果要裝備的是【單手武器】
+            else {
+                // 如果目標槽位（左/右腰）已經有【雙手武器】，則必須卸下該雙手武器
+                if ((equipSlot === 'weapon_left' || equipSlot === 'weapon_right') && currentEquipment.weapon_right && currentEquipment.weapon_right === currentEquipment.weapon_left) {
+                     itemsToUnequip.set(currentEquipment.weapon_right, '為單手武器騰出空間');
+                }
+                // 如果目標槽位已有其他物品，卸下它
+                else if (currentEquipment[equipSlot]) {
+                    itemsToUnequip.set(currentEquipment[equipSlot], `卸下原本的${equipSlot}`);
                 }
             }
         }
         
-        // 批次執行卸下
-        itemsToUnequipRefs.forEach((ref, id) => {
-            transaction.update(ref, { isEquipped: false });
-            for(const slot in newEquipmentState) {
+        // --- 執行變更 ---
+
+        // 建立一個新的裝備狀態物件
+        let newEquipmentState = { ...currentEquipment };
+
+        // 批次卸下需要卸下的物品
+        itemsToUnequip.forEach((reason, id) => {
+            console.log(`[裝備邏輯] 預計卸下 ${id}，原因: ${reason}`);
+            const itemToUnequipRef = userRef.collection('inventory_items').doc(id);
+            transaction.update(itemToUnequipRef, { isEquipped: false, equipSlot: null });
+            // 從新的裝備狀態中移除
+            for (const slot in newEquipmentState) {
                 if (newEquipmentState[slot] === id) {
                     newEquipmentState[slot] = null;
                 }
             }
         });
-        
+
         // 裝備新物品
-        transaction.update(itemRef, { isEquipped: true });
-        newEquipmentState[equipSlot] = instanceId;
+        transaction.update(itemRef, { isEquipped: true, equipSlot: equipSlot });
         
+        // 更新新的裝備狀態
         if (hands === 2) {
+            // 雙手武器同時佔用左右兩個邏輯槽位，但都指向同一個物品實例ID
             newEquipmentState.weapon_right = instanceId;
-            newEquipmentState.weapon_left = null;
+            newEquipmentState.weapon_left = instanceId;
+        } else {
+            newEquipmentState[equipSlot] = instanceId;
         }
         
+        // 將最終的裝備狀態寫回玩家檔案
         transaction.update(userRef, { equipment: newEquipmentState });
 
-        console.log(`[模型層 v9.1] 事務成功：裝備「${itemName}」，卸下了 ${itemsToUnequipRefs.size} 件物品。`);
-        return { success: true, message: `已成功裝備 ${itemName}。` };
+        console.log(`[模型層 v9.2] 事務成功：裝備「${itemName}」。`);
+        return { success: true, message: `已成功佩掛 ${itemName}。` };
     });
 }
 
+
 /**
- * 【核心重構 v9.1 - 已修復】卸下一件裝備
+ * 【核心重構 v9.2 - 規則強化版】卸下一件裝備
  * @param {string} userId - 玩家ID
  * @param {string} instanceId - 要卸下的裝備的實例ID
  * @returns {Promise<object>} 返回操作結果
  */
 async function unequipItem(userId, instanceId) {
-    console.log(`[模型層 v9.1] unequipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
+    console.log(`[模型層 v9.2] unequipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
 
     return db.runTransaction(async (transaction) => {
-        // --- 讀取階段 (已修復) ---
-        // 【錯誤修正】雖然你提供的程式碼中此處是正確的，但為了確保與伺服器上的版本一致並解決錯誤日誌中的問題，
-        // 我們再次明確地寫出正確的解構賦值，確保 itemDoc 變數被正確定義。
         const { userRef, userDoc, itemRef, itemDoc, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
 
-        // --- 寫入階段 ---
         if (!itemDoc.data().isEquipped) {
-            console.log(`[模型層 v9.1] 物品「${itemTemplateDoc.data().itemName}」已經是未裝備狀態。`);
+            console.log(`[模型層 v9.2] 物品「${itemTemplateDoc.data().itemName}」已經是未裝備狀態。`);
             return { success: true, message: `${itemTemplateDoc.data().itemName} 已在背包中。` };
         }
         
         let newEquipmentState = { ...(userDoc.data().equipment || {}) };
         
-        transaction.update(itemRef, { isEquipped: false });
+        // 標記物品為未裝備，並清除其槽位資訊
+        transaction.update(itemRef, { isEquipped: false, equipSlot: null });
         
+        // 從玩家的裝備狀態中移除該物品
         let foundAndRemoved = false;
         for (const slot in newEquipmentState) {
             if (newEquipmentState[slot] === instanceId) {
@@ -165,16 +154,15 @@ async function unequipItem(userId, instanceId) {
         }
         
         if (!foundAndRemoved) {
-             console.warn(`[模型層 v9.1] 警告：要卸下的物品 ${instanceId} 在玩家的 equipment 物件中未被找到！但仍將其標記為未裝備。`);
+             console.warn(`[模型層 v9.2] 警告：要卸下的物品 ${instanceId} 在玩家的 equipment 物件中未被找到！但仍將其標記為未裝備。`);
         }
 
         transaction.update(userRef, { equipment: newEquipmentState });
         
-        console.log(`[模型層 v9.1] 事務成功：卸下「${itemTemplateDoc.data().itemName}」。`);
+        console.log(`[模型層 v9.2] 事務成功：卸下「${itemTemplateDoc.data().itemName}」。`);
         return { success: true, message: `${itemTemplateDoc.data().itemName} 已卸下。` };
     });
 }
-
 
 module.exports = {
     equipItem,
