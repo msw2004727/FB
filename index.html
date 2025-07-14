@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="styles/modals_location.css"> 
     <link rel="stylesheet" href="styles/gmPanel.css">
     <link rel="stylesheet" href="styles/trade.css">
+    <link rel="stylesheet" href="styles/modals_item.css">
 </head>
 <body class="light-theme">
     <div class="game-container">
@@ -435,6 +436,22 @@
             </div>
         </div>
 
+        <div id="item-details-modal" class="item-details-modal-overlay">
+            <div class="item-details-modal-content">
+                <header class="item-details-header">
+                    <h3 id="item-details-title">物品詳情</h3>
+                    <button id="close-item-details-btn" title="關閉"><i class="fas fa-times"></i></button>
+                </header>
+                <div class="item-details-body">
+                    <p id="item-details-description">物品的描述會顯示在這裡。</p>
+                    <ul id="item-details-stats">
+                        </ul>
+                </div>
+                <footer class="item-details-footer">
+                    <button id="item-details-delete-btn"><i class="fas fa-trash-alt"></i> 丟棄</button>
+                </footer>
+            </div>
+        </div>
 
     </div>
 
