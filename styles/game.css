@@ -258,7 +258,7 @@ body.dark-theme .npc-name-beggar {
 
 /* --- 【核心新增】閉關系統錯誤提示樣式 --- */
 .cultivation-error {
-    background-color: #ffd700; /* 金色 (Gold) */
+    background-color: #f7f5dd;
     color: #4b3a00; /* 深金色文字，確保對比度 */
     padding: 0.75rem 1.5rem;
     border-radius: 30px; /* 橢圓形 */
@@ -273,7 +273,7 @@ body.dark-theme .npc-name-beggar {
 }
 
 body.dark-theme .cultivation-error {
-    background-color: #a1883c;
+    background-color: #6e684a;
     color: #fff;
     border-color: #ffd700;
 }
