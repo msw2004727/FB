@@ -75,8 +75,8 @@ async function handleCultivation(userId, username, playerProfile, playerAction) 
             console.log(`[閉關系統] 玩家未指定武學，自動選擇其唯一的武學：「${skillToPractice.skillName}」。`);
         } else {
             const skillList = playerSkills.map(s => `「${s.skillName}」`).join('、');
-            // 【核心修改】提供帶有範例的錯誤訊息
-            const exampleCommand = `例如：「閉關修練${playerSkills[0].skillName}」`;
+            // 【核心修改】提供帶有完整格式的指令範例
+            const exampleCommand = `指令範例：「閉關修練${playerSkills[0].skillName}三日」`;
             return { success: false, message: `你身負數門絕學 (${skillList})，請明確指定要修練哪一門。\n\n${exampleCommand}`, data: null };
         }
     }
