@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     gameLoop.processNewRoundData(data);
                     gameLoop.handlePlayerDeath();
                 } catch (error) {
-                    handleApiError(error);
+                    interaction.handleApiError(error);
                     gameLoop.setLoading(false);
                 }
             }
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const skills = await api.getSkills();
                     modal.openSkillsModal(skills);
                 } catch (error) {
-                    handleApiError(error);
+                    interaction.handleApiError(error);
                 } finally {
                     gameLoop.setLoading(false);
                 }
@@ -173,9 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        const dashboardContent = document.querySelector('.dashboard-content');
-        if (dashboardContent) {
-            dashboardContent.addEventListener('click', (e) => {
+        // 【核心修改】將儀表板的點擊事件監聽器，從 dashboardContent 改為更外層的 gameContainer
+        // 這樣可以確保即使點擊物品連結，事件也能被捕捉到
+        if (dom.gameContainer) {
+            dom.gameContainer.addEventListener('click', (e) => {
                 const locationBtn = e.target.closest('#view-location-details-btn');
                 if (locationBtn) {
                     if (gameState.currentLocationData) {
