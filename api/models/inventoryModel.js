@@ -141,11 +141,10 @@ async function unequipItem(userId, instanceId) {
 
     return db.runTransaction(async (transaction) => {
         // --- 讀取階段 ---
-        const { userRef, userDoc, itemRef, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
+        const { userRef, userDoc, itemRef, itemDoc, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
 
         // --- 寫入階段 ---
         if (!itemDoc.data().isEquipped) {
-            // 如果物品已經是未裝備狀態，為避免不必要的寫入，直接返回成功
             console.log(`[模型層 v9.0] 物品「${itemTemplateDoc.data().itemName}」已經是未裝備狀態。`);
             return { success: true, message: `${itemTemplateDoc.data().itemName} 已在背包中。` };
         }
