@@ -81,17 +81,8 @@ const initiateCombatHandler = async (req, res) => {
         // 2. 判斷玩家當前裝備的武器類型
         const equippedWeapon = playerInventory.find(item => item.isEquipped && item.equipSlot && item.equipSlot.startsWith('weapon'));
         const currentWeaponType = equippedWeapon ? equippedWeapon.weaponType : null;
-
-        // 3. 篩選出可用的技能
-        const usableSkills = allPlayerSkills.filter(skill => {
-            const requiredType = skill.requiredWeaponType;
-            if (requiredType === '無' || !requiredType) {
-                return true; // 拳腳功夫或內功心法永遠可用
-            }
-            return requiredType === currentWeaponType; // 武器類型匹配
-        });
         
-        console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。可用技能數量: ${usableSkills.length}/${allPlayerSkills.length}`);
+        console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。可用技能數量: ${allPlayerSkills.length}/${allPlayerSkills.length}`);
 
         // --- 【核心修改結束】 ---
 
@@ -129,7 +120,8 @@ const initiateCombatHandler = async (req, res) => {
             turn: 1, 
             player: { 
                 username, 
-                skills: usableSkills, // <-- 將篩選後的技能傳給前端
+                skills: allPlayerSkills,          // 【修改】傳遞所有技能
+                currentWeaponType: currentWeaponType, // 【新增】傳遞當前武器類型
                 hp: maxHp, 
                 maxHp, 
                 mp: maxMp, 
