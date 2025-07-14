@@ -2,9 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-// 【核心修正】修正了 handlePreActionChecks 的引用路徑
 const { handlePreActionChecks } = require('./gameplay/preActionChecks');
 const { handleAction } = require('./gameplay/actionHandler');
+// 【核心修正】修正了 backgroundTaskProcessor 的引用路徑
 const { getTaskStatus } = require('../services/backgroundTaskProcessor');
 
 const db = admin.firestore();
