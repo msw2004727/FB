@@ -7,8 +7,8 @@ import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
-// 【核心修正】從 uiUpdater.js 中直接導入需要的函式
-import { handleApiError, renderInventory, updateBulkStatus } from './uiUpdater.js';
+// 【核心修正】從 uiUpdater.js 中直接導入所有需要的函式
+import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory } from './uiUpdater.js';
 
 
 interaction.setGameLoop(gameLoop);
@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const item = gameState.roundData.inventory.find(i => i.instanceId === itemId);
         if (!item) {
+            // 【核心修正】這裡的錯誤提示現在會正常顯示
+            appendMessageToStory(`在你的背包中找不到ID為 ${itemId} 的物品。`, 'system-message');
             console.error(`在遊戲狀態中找不到 ID 為 ${itemId} 的物品。`);
             return;
         }
@@ -85,17 +87,18 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const result = await api.dropItem({ itemId });
                 if (result.success) {
+                    // 更新全域狀態
                     gameState.roundData.inventory = result.inventory;
                     gameState.roundData.bulkScore = result.bulkScore;
-                    gameLoop.appendMessageToStory(result.message, 'system-message');
-                    // 【核心修正】直接調用已導入的函式
+                    // 【核心修正】直接調用正確的函式顯示訊息與刷新UI
+                    appendMessageToStory(result.message, 'system-message');
                     renderInventory(gameState.roundData.inventory);
                     updateBulkStatus(gameState.roundData.bulkScore);
                 } else {
                     throw new Error(result.message);
                 }
             } catch (error) {
-                // 【核心修正】直接調用已導入的函式
+                // 【核心修正】直接調用正確的函式
                 handleApiError(error);
             } finally {
                 gameLoop.setLoading(false);
@@ -180,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // 【核心修正】將物品點擊的監聽器也放在這裡，確保其穩定性
             const itemLink = e.target.closest('.item-link');
             if (itemLink) {
                 e.preventDefault();
