@@ -3,6 +3,49 @@ const { buildContext } = require('../contextBuilder');
 const { getAIStory, getAISuggestion } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
+// 【核心新增】引入新建的閉關管理器
+const { handleCultivation } = require('./cultivationManager');
+
+// 【核心新增】用於從玩家指令中解析閉關參數的輔助函式
+function parseCultivationCommand(action) {
+    const keywords = ['閉關', '靜修', '修練'];
+    const timeUnits = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '月': 30, '年': 365 };
+    const dayKeyword = '日';
+
+    // 檢查是否包含閉關關鍵字
+    if (!keywords.some(kw => action.includes(kw))) {
+        return null;
+    }
+
+    let days = 0;
+    let skillName = null;
+
+    // 解析天數
+    const dayMatch = action.match(new RegExp(`([一二三四五六七八九十]+)${dayKeyword}`));
+    if (dayMatch) {
+        days = timeUnits[dayMatch[1]] || 0;
+    } else {
+        // 如果沒有明確天數，但有「閉關」關鍵字，預設為一天
+        if (action.includes('閉關')) {
+            days = 1;
+        }
+    }
+    
+    // 如果沒有解析到天數，則不視為閉關指令
+    if (days === 0) return null;
+
+    // 解析修練的武學
+    // 簡單的邏輯：取「修練」後面的詞
+    const practiceMatch = action.match(/(?:修練|練習|鑽研)(.+)/);
+    if (practiceMatch && practiceMatch[1]) {
+        skillName = practiceMatch[1].trim();
+        // 移除可能的結尾詞，如「心法」、「劍法」
+        skillName = skillName.replace(/(心法|劍法|拳法|掌法|刀法|身法)$/, '');
+    }
+
+    return { isCultivation: true, days, skillName };
+}
+
 
 // 【核心修正】指令預處理函式 v2.0 - 帶有嚴格的本地設施搜尋邏輯
 const preprocessPlayerAction = (playerAction, locationContext) => {
@@ -57,7 +100,34 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         }
         
-        // 在呼叫AI前，對玩家指令進行預處理
+        // --- 閉關指令攔截 ---
+        const cultivationCommand = parseCultivationCommand(playerAction);
+        if (cultivationCommand && cultivationCommand.isCultivation) {
+            if (!cultivationCommand.skillName) {
+                return res.status(400).json({ message: "指令錯誤：請明確指出要修練的武學名稱。例如：『閉關修練基礎劍法七日』。" });
+            }
+            const cultivationResult = await handleCultivation(userId, username, context.player, cultivationCommand.days, cultivationCommand.skillName);
+            
+            if (!cultivationResult.success) {
+                // 如果條件不滿足，直接返回失敗訊息，不生成新回合
+                return res.status(400).json({ message: cultivationResult.message });
+            }
+            
+            // 條件滿足，使用閉關模組生成的數據來更新遊戲狀態
+            const finalRoundData = await updateGameState(userId, username, player, playerAction, { roundData: cultivationResult.data }, newRoundNumber);
+            const suggestion = await getAISuggestion(finalRoundData);
+            finalRoundData.suggestion = suggestion;
+            const finalLocationData = await getMergedLocationData(userId, finalRoundData.LOC);
+            
+            return res.json({
+                story: finalRoundData.story,
+                roundData: finalRoundData,
+                suggestion: suggestion,
+                locationData: finalLocationData
+            });
+        }
+        // --- 閉關邏輯結束 ---
+        
         playerAction = preprocessPlayerAction(playerAction, context.locationContext);
         
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame } = context;
@@ -69,9 +139,8 @@ async function handleAction(req, res, player, newRoundNumber) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
-        // 【核心新增】黑影人出現機率判斷
         let blackShadowEvent = null;
-        if (Math.random() < 0.10) { // 10% 的機率
+        if (Math.random() < 0.10) { 
             blackShadowEvent = { trigger: true };
             console.log(`[隨機系統] 觸發神秘黑影人事件！`);
         }
@@ -93,7 +162,7 @@ async function handleAction(req, res, player, newRoundNumber) {
             npcContext, 
             bulkScore, 
             [],
-            blackShadowEvent // 將觸發指令傳遞給Prompt
+            blackShadowEvent 
         );
 
         if (!aiResponse || !aiResponse.roundData) {
