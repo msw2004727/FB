@@ -149,12 +149,10 @@ export function processNewRoundData(data) {
         });
     }
 
-    // --- 【核心修正】在更新UI前，先將完整的地區情報存入全局狀態 ---
     if (data.locationData) {
         gameState.currentLocationData = data.locationData;
         console.log('[遊戲狀態] 已更新當前地區的詳細情報:', gameState.currentLocationData);
     }
-    // --- 修正結束 ---
 
     updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
     
@@ -214,9 +212,12 @@ export async function handlePlayerAction() {
 
     } catch (error) {
         console.error('API 錯誤或通訊中斷:', error);
-        appendMessageToStory(`[系統] 通訊似乎發生了中斷... 正在嘗試為您同步最新的江湖狀態...`, 'system-message');
-        await loadInitialGame();
+        // 【核心修改】無論是什麼錯誤，都直接將後端傳來的訊息顯示在劇情中
+        // 使用 replace 將換行符 \n 轉換為 <br>，讓「江湖指引」能正確換行顯示
+        appendMessageToStory(`[系統提示]<br>${error.message.replace(/\n/g, '<br>')}`, 'system-message');
+
     } finally {
+        // 無論成功或失敗，最後都應停止載入動畫
         if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
              setLoading(false);
         }
@@ -233,7 +234,6 @@ export async function loadInitialGame() {
 
         if (data.gameState === 'deceased') {
             if(data.roundData) {
-                // 【核心修正】初始化時也要儲存地區情報
                 if (data.locationData) gameState.currentLocationData = data.locationData;
                 updateUI('', data.roundData, null, data.locationData);
             }
