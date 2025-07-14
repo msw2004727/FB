@@ -274,12 +274,27 @@ async function updateSkills(userId, skillChanges, playerProfile) {
 
                     if (templateResult.template.isCustom) {
                         const powerType = templateResult.template.power_type || 'none';
-                        const maxPowerAchieved = latestPlayerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
+                        let maxPowerAchieved = 0;
+                        
+                        // 【核心修正】使用明確的 switch 語句代替動態字串組合，杜絕錯誤
+                        switch(powerType) {
+                            case 'internal':
+                                maxPowerAchieved = latestPlayerProfile.maxInternalPowerAchieved || 0;
+                                break;
+                            case 'external':
+                                maxPowerAchieved = latestPlayerProfile.maxExternalPowerAchieved || 0;
+                                break;
+                            case 'lightness':
+                                maxPowerAchieved = latestPlayerProfile.maxLightnessAchieved || 0;
+                                break;
+                            default:
+                                maxPowerAchieved = 0;
+                        }
+
                         const createdSkillsCount = latestPlayerProfile.customSkillsCreated?.[powerType] || 0;
                         const totalCreatedSkills = Object.values(latestPlayerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
                         const availableSlots = Math.floor(maxPowerAchieved / 100);
 
-                        // --- 【真言鏡】植入開始 ---
                         console.log(`[創功資格審查] 正在為「${skillChange.skillName}」進行判定...`);
                         console.log(`  - 功體 (power_type): ${powerType}`);
                         console.log(`  - 功體歷史最高成就 (maxPowerAchieved): ${maxPowerAchieved}`);
@@ -287,7 +302,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         console.log(`  - 已創的同類武學數量 (createdSkillsCount): ${createdSkillsCount}`);
                         console.log(`  - 總自創武學數量 (totalCreatedSkills): ${totalCreatedSkills}`);
                         console.log(`  - 判定條件: (${createdSkillsCount} >= ${availableSlots})`);
-                        // --- 【真言鏡】植入結束 ---
 
                         if (totalCreatedSkills >= 10) {
                             customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
@@ -295,7 +309,12 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         }
 
                         if (createdSkillsCount >= availableSlots) {
-                            customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : powerType === 'lightness' ? '輕功' : '基礎'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                            // 【核心修正】錯誤訊息也使用明確判斷，顯示正確的功體名稱
+                             let powerTypeName = '基礎';
+                             if (powerType === 'internal') powerTypeName = '內功';
+                             if (powerType === 'external') powerTypeName = '外功';
+                             if (powerType === 'lightness') powerTypeName = '輕功';
+                            customSkillCreationResult = { success: false, reason: `你的${powerTypeName}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
                             return;
                         }
 
