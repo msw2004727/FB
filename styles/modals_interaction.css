@@ -288,6 +288,7 @@ body.dark-theme .skill-controls.selected {
 .skill-btn {
     display: flex;
     justify-content: space-between;
+    align-items: center; /* 【新增】確保所有內容垂直居中 */
     width: 100%;
     padding: 0.5rem 0.7rem;
     text-align: left;
@@ -309,7 +310,7 @@ body.dark-theme .skill-controls.selected .skill-btn {
     color: var(--dark-bg);
 }
 .skill-btn .skill-name { font-weight: bold; font-size: 0.85rem; }
-.skill-btn .skill-cost { color: var(--light-text-secondary); font-size: 0.75rem; }
+.skill-btn .skill-cost { color: var(--light-text-secondary); font-size: 0.75rem; flex-shrink: 0; }
 .skill-controls.selected .skill-cost { color: #fff; opacity: 0.8; }
 
 .power-level-adjuster {
@@ -583,6 +584,54 @@ body.dark-theme .friendliness-bar-indicator { background-color: var(--dark-surfa
 }
 .beggar-inquiry-btn.cancel:hover {
     background-color: #c82333;
+}
+
+/* 【核心新增】武器需求狀態樣式 */
+.skill-controls.disabled {
+    opacity: 0.5;
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+body.dark-theme .skill-controls.disabled {
+    background-color: #343a40;
+}
+
+.skill-controls.disabled .skill-btn {
+    cursor: not-allowed;
+}
+
+.weapon-status {
+    font-size: 0.75rem;
+    font-style: italic;
+    font-weight: bold;
+    margin: 0 0.5rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-grow: 1; /* 讓它可以佔據一些空間 */
+    text-align: center;
+}
+
+.weapon-status.equipped {
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+body.dark-theme .weapon-status.equipped {
+    color: #74f2a7;
+    background-color: #1a4a2f;
+    border-color: #297746;
+}
+
+.weapon-status.missing {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+body.dark-theme .weapon-status.missing {
+    color: #ff8787;
+    background-color: #5d2b30;
+    border-color: #8c4a51;
 }
 
 
