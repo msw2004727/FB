@@ -272,8 +272,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                     const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
                     if (!templateResult || !templateResult.template) return;
 
-                    // 【核心修正】將判斷條件從 isNew 改為 isCustom
-                    // 現在，只要這門武學是自創的，無論模板是否已存在，都會進行資格審查
                     if (templateResult.template.isCustom) {
                         const powerType = templateResult.template.power_type || 'none';
                         const maxPowerAchieved = latestPlayerProfile[`max${powerType.charAt(0).toUpperCase() + powerType.slice(1)}PowerAchieved`] || 0;
@@ -281,21 +279,30 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         const totalCreatedSkills = Object.values(latestPlayerProfile.customSkillsCreated || {}).reduce((a, b) => a + b, 0);
                         const availableSlots = Math.floor(maxPowerAchieved / 100);
 
+                        // --- 【真言鏡】植入開始 ---
+                        console.log(`[創功資格審查] 正在為「${skillChange.skillName}」進行判定...`);
+                        console.log(`  - 功體 (power_type): ${powerType}`);
+                        console.log(`  - 功體歷史最高成就 (maxPowerAchieved): ${maxPowerAchieved}`);
+                        console.log(`  - 計算出的資格槽位 (availableSlots): ${availableSlots}`);
+                        console.log(`  - 已創的同類武學數量 (createdSkillsCount): ${createdSkillsCount}`);
+                        console.log(`  - 總自創武學數量 (totalCreatedSkills): ${totalCreatedSkills}`);
+                        console.log(`  - 判定條件: (${createdSkillsCount} >= ${availableSlots})`);
+                        // --- 【真言鏡】植入結束 ---
+
                         if (totalCreatedSkills >= 10) {
                             customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
-                            return; // 中止事務
+                            return; 
                         }
 
                         if (createdSkillsCount >= availableSlots) {
-                            customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : '輕功'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
-                            return; // 中止事務
+                            customSkillCreationResult = { success: false, reason: `你的${powerType === 'internal' ? '內功' : powerType === 'external' ? '外功' : powerType === 'lightness' ? '輕功' : '基礎'}修為尚淺，根基不穩，無法支撐你創造出新的招式。` };
+                            return;
                         }
 
                         transaction.update(userDocRef, { [`customSkillsCreated.${powerType}`]: admin.firestore.FieldValue.increment(1) });
                         customSkillCreationResult = { success: true };
                     }
                     
-                    // 只有在資格審查通過或非自創武學時，才寫入技能
                     if (customSkillCreationResult === null || customSkillCreationResult.success) {
                         const playerSkillData = { level: skillChange.level || 0, exp: skillChange.exp || 0, lastPractice: admin.firestore.FieldValue.serverTimestamp() };
                         transaction.set(playerSkillDocRef, playerSkillData);
