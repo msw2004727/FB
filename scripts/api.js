@@ -51,6 +51,8 @@ export const api = {
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
     equipItem: (body) => fetchApi('/api/game/state/equip', { method: 'POST', body: JSON.stringify(body) }),
+    // 【核心新增】新增的丟棄物品 API 函式
+    dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
 
     // Bounty Route
     getBounties: () => fetchApi('/api/bounties'),
@@ -61,10 +63,10 @@ export const api = {
     // Map Route
     getMap: () => fetchApi('/api/map/world-map'),
     
-    // 【核心修改】Beggar (丐幫) Routes
+    // Beggar (丐幫) Routes
     summonBeggar: (body) => fetchApi('/api/beggar/summon', { method: 'POST', body: JSON.stringify(body) }),
-    startBeggarInquiry: (body) => fetchApi('/api/beggar/start-inquiry', { method: 'POST', body: JSON.stringify(body) }), // 新增：付費API
-    askBeggarQuestion: (body) => fetchApi('/api/beggar/ask', { method: 'POST', body: JSON.stringify(body) }), // 修改：提問API
+    startBeggarInquiry: (body) => fetchApi('/api/beggar/start-inquiry', { method: 'POST', body: JSON.stringify(body) }),
+    askBeggarQuestion: (body) => fetchApi('/api/beggar/ask', { method: 'POST', body: JSON.stringify(body) }),
 
     // GM Panel Routes
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
