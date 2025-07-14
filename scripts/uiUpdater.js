@@ -65,7 +65,11 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateNpcList(roundData.NPC);
     renderInventory(roundData.inventory); 
     
-    moneyContent.textContent = `${roundData.money || 0} 文錢`;
+    // 【核心修正】從完整的背包資料中尋找銀兩並顯示
+    const silverItem = (roundData.inventory || []).find(item => item.itemName === '銀兩' || item.templateId === '銀兩');
+    const silverAmount = silverItem ? silverItem.quantity : 0;
+    moneyContent.textContent = `${silverAmount} 兩銀子`;
+
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
@@ -165,7 +169,6 @@ function updateBulkStatus(score) {
     bulkStatus.className = `bulk-status-display ${colorClass}`;
 }
 
-// 【核心修正】重寫此函式以動態生成統治者資訊和按鈕
 function updateLocationInfo(locationData) {
      if (locationInfo) {
         if (locationData) {
