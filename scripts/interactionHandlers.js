@@ -3,7 +3,8 @@
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 import * as modal from './modalManager.js';
-import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError } from './uiUpdater.js';
+// 【核心修正】移除不存在的 updateUI，並加入新的 updateStory 和 updateDashboard
+import { updateStory, updateDashboard, appendMessageToStory, addRoundTitleToStory, handleApiError } from './uiUpdater.js';
 import { dom } from './dom.js';
 
 let gameLoop = {};
@@ -126,9 +127,12 @@ async function handleTradeButtonClick(event) {
             modal.closeTradeModal(); 
             if (newRound && newRound.roundData) {
                 addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
-                updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
+                // 【核心修正】替換掉不存在的 updateUI 函式
+                updateStory(newRound.story, newRound.suggestion, newRound.roundData);
+                updateDashboard(newRound.roundData, newRound.locationData);
                 gameState.currentRound = newRound.roundData.R;
                 gameState.roundData = newRound.roundData;
+                gameState.currentLocationData = newRound.locationData; // 同步更新全域地點狀態
             }
         };
 
@@ -396,7 +400,7 @@ export async function sendChatMessage() {
                 // 付款成功，更新本地的錢錢顯示
                 if (gameState.roundData) {
                     gameState.roundData.money = paymentResult.newBalance;
-                    updateUI(null, gameState.roundData, null, null); 
+                    updateDashboard(gameState.roundData, gameState.currentLocationData); 
                 }
             } catch (error) {
                 // 處理錢不夠的狀況
