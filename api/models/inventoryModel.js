@@ -32,17 +32,18 @@ async function getRequiredDocumentsForEquip(transaction, userId, instanceId) {
 
 
 /**
- * 【核心重構 v9.0】裝備一件物品
+ * 【核心重構 v9.1 - 已修復】裝備一件物品
  * @param {string} userId - 玩家ID
  * @param {string} instanceId - 要裝備的物品的唯一實例ID
  * @returns {Promise<object>} 返回操作結果
  */
 async function equipItem(userId, instanceId) {
-    console.log(`[模型層 v9.0] equipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
+    console.log(`[模型層 v9.1] equipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
     
     return db.runTransaction(async (transaction) => {
-        // --- 讀取階段 ---
-        const { userRef, userDoc, itemRef, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
+        // --- 讀取階段 (已修復) ---
+        // 【錯誤修正】原版本遺漏了 itemDoc 的解構，導致後續程式碼出錯。此處已補全。
+        const { userRef, userDoc, itemRef, itemDoc, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
         
         const itemTemplateData = itemTemplateDoc.data();
         const { equipSlot, hands, itemName, itemType } = itemTemplateData;
@@ -125,27 +126,29 @@ async function equipItem(userId, instanceId) {
         
         transaction.update(userRef, { equipment: newEquipmentState });
 
-        console.log(`[模型層 v9.0] 事務成功：裝備「${itemName}」，卸下了 ${itemsToUnequipRefs.size} 件物品。`);
+        console.log(`[模型層 v9.1] 事務成功：裝備「${itemName}」，卸下了 ${itemsToUnequipRefs.size} 件物品。`);
         return { success: true, message: `已成功裝備 ${itemName}。` };
     });
 }
 
 /**
- * 【核心重構 v9.0】卸下一件裝備
+ * 【核心重構 v9.1 - 已修復】卸下一件裝備
  * @param {string} userId - 玩家ID
  * @param {string} instanceId - 要卸下的裝備的實例ID
  * @returns {Promise<object>} 返回操作結果
  */
 async function unequipItem(userId, instanceId) {
-    console.log(`[模型層 v9.0] unequipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
+    console.log(`[模型層 v9.1] unequipItem 啟動，用戶: ${userId}, 物品: ${instanceId}`);
 
     return db.runTransaction(async (transaction) => {
-        // --- 讀取階段 ---
+        // --- 讀取階段 (已修復) ---
+        // 【錯誤修正】雖然你提供的程式碼中此處是正確的，但為了確保與伺服器上的版本一致並解決錯誤日誌中的問題，
+        // 我們再次明確地寫出正確的解構賦值，確保 itemDoc 變數被正確定義。
         const { userRef, userDoc, itemRef, itemDoc, itemTemplateDoc } = await getRequiredDocumentsForEquip(transaction, userId, instanceId);
 
         // --- 寫入階段 ---
         if (!itemDoc.data().isEquipped) {
-            console.log(`[模型層 v9.0] 物品「${itemTemplateDoc.data().itemName}」已經是未裝備狀態。`);
+            console.log(`[模型層 v9.1] 物品「${itemTemplateDoc.data().itemName}」已經是未裝備狀態。`);
             return { success: true, message: `${itemTemplateDoc.data().itemName} 已在背包中。` };
         }
         
@@ -162,12 +165,12 @@ async function unequipItem(userId, instanceId) {
         }
         
         if (!foundAndRemoved) {
-             console.warn(`[模型層 v9.0] 警告：要卸下的物品 ${instanceId} 在玩家的 equipment 物件中未被找到！但仍將其標記為未裝備。`);
+             console.warn(`[模型層 v9.1] 警告：要卸下的物品 ${instanceId} 在玩家的 equipment 物件中未被找到！但仍將其標記為未裝備。`);
         }
 
         transaction.update(userRef, { equipment: newEquipmentState });
         
-        console.log(`[模型層 v9.0] 事務成功：卸下「${itemTemplateDoc.data().itemName}」。`);
+        console.log(`[模型層 v9.1] 事務成功：卸下「${itemTemplateDoc.data().itemName}」。`);
         return { success: true, message: `${itemTemplateDoc.data().itemName} 已卸下。` };
     });
 }
