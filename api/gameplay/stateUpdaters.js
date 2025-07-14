@@ -25,7 +25,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const userDocRef = db.collection('users').doc(userId);
     const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
-    // 【核心新增】黑影人出現日誌提醒
     if (aiResponse.story && (aiResponse.story.includes('黑影') || aiResponse.story.includes('影子'))) {
         console.log(`[!!!] 系統警示：神秘黑影人已在玩家 [${username}] 的第 ${newRoundNumber} 回合劇情中出現！`);
     }
@@ -132,15 +131,24 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         userDocRef.get().then(doc => doc.data()),
     ]);
     
-    // 【核心修正】調整物件合併順序，確保 finalSaveData 中的最新時間戳不會被 finalPlayerProfile 的舊資料覆蓋。
-    // 將 finalSaveData 放在後面，這樣它的屬性（如 year, month, day, timeOfDay）會覆蓋掉 finalPlayerProfile 中可能存在的舊值。
-    return {
-         ...finalPlayerProfile, 
-         ...finalSaveData, 
-         skills: updatedSkills, 
-         inventory: fullInventory, 
-         bulkScore: calculateBulkScore(fullInventory)
+    // 【核心修正 v2.0】明確地建構回傳給前端的物件，確保最新的時間數據(finalDate, finalTimeOfDay)不會被覆蓋。
+    const finalRoundDataForClient = {
+        // 先放入從DB讀取的最新玩家頂層數據(如總功力、立場等)
+        ...finalPlayerProfile,
+        // 再放入本回合存檔的所有數據(故事、地點、NPC狀態等)
+        ...finalSaveData,
+        // 最後再明確放入最新的、動態獲取的陣列型數據和時間，確保它們是最準確的
+        skills: updatedSkills, 
+        inventory: fullInventory, 
+        bulkScore: calculateBulkScore(fullInventory),
+        year: finalDate.year,
+        month: finalDate.month,
+        day: finalDate.day,
+        yearName: finalDate.yearName,
+        timeOfDay: finalTimeOfDay,
     };
+    
+    return finalRoundDataForClient;
 }
 
 module.exports = { updateGameState };
