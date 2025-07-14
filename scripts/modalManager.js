@@ -389,10 +389,19 @@ export function openSkillsModal(skillsData) {
             const expToNextLevel = (skill.level + 1) * 100;
             const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
+            
+            const customTagHtml = skill.isCustom ? '<span class="skill-custom-tag">自創</span>' : '';
+
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
             skillEntry.innerHTML = `
-                <div class="skill-entry-header"><h4>${skill.skillName}</h4><span class="skill-type">${translatedPowerType}</span></div>
+                <div class="skill-entry-header">
+                    <div class="skill-title-group">
+                        <h4>${skill.skillName}</h4>
+                        ${customTagHtml}
+                    </div>
+                    <span class="skill-type">${translatedPowerType}</span>
+                </div>
                 <p class="skill-description">${skill.base_description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
                     <span class="level-label">等級 ${skill.level}</span>
@@ -429,13 +438,7 @@ export function closeSkillsModal() {
     if (skillsModal) skillsModal.classList.remove('visible');
 }
 
-/**
- * 【核心修正 v2.0】
- * 遞迴地將一個物件格式化為HTML列表，以便在地區情報彈窗中顯示。
- * @param {object} obj - 要格式化的物件
- * @param {Array<string>} keysToExclude - 要排除顯示的鍵名列表
- * @returns {string} - 生成的HTML字串
- */
+// --- 地點詳情彈窗 ---
 function formatObjectForDisplay(obj, keysToExclude = []) {
     if (obj === null || typeof obj !== 'object') {
         return obj || '無';
@@ -448,17 +451,14 @@ function formatObjectForDisplay(obj, keysToExclude = []) {
         let displayValue;
         if (Array.isArray(value)) {
             displayValue = value.length > 0 ? value.map(item => {
-                // 如果陣列中的元素是物件，將其轉換為字串顯示
                 return (typeof item === 'object' && item !== null) ? JSON.stringify(item) : item;
             }).join(', ') : '無';
         } else if (typeof value === 'object' && value !== null) {
-            // 遞迴處理巢狀物件
             displayValue = formatObjectForDisplay(value);
         } else {
             displayValue = value !== undefined && value !== null ? value : '未知';
         }
         
-        // 只有在 displayValue 不是另一個 ul 時才加上 li
         if (typeof displayValue === 'string' && displayValue.startsWith('<ul')) {
              html += `<li><span class="key">${key}:</span>${displayValue}</li>`;
         } else {
@@ -471,9 +471,9 @@ function formatObjectForDisplay(obj, keysToExclude = []) {
 
 export function openLocationDetailsModal(locationData) {
     if (!dom.locationDetailsModal || !locationData) return;
-
     dom.locationModalTitle.textContent = locationData.locationName || '地區情報';
     
+    let bodyHtml = '';
     const staticData = {
         類型: locationData.locationType,
         層級: locationData.address ? Object.values(locationData.address).join(' > ') : '未知',
@@ -491,8 +491,8 @@ export function openLocationDetailsModal(locationData) {
         建築: locationData.buildings?.map(b => `${b.name} (${b.type})`).join(', ') || '無',
     };
 
-    let bodyHtml = `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報 (世界設定)</h4>${formatObjectForDisplay(staticData)}</div>`;
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報 (玩家專屬)</h4>${formatObjectForDisplay(dynamicData, ['facilities', 'buildings'])}</div>`; // 排除已單獨處理的
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報 (世界設定)</h4>${formatObjectForDisplay(staticData)}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報 (玩家專屬)</h4>${formatObjectForDisplay(dynamicData, ['facilities', 'buildings'])}</div>`;
 
     dom.locationModalBody.innerHTML = bodyHtml;
     dom.locationDetailsModal.classList.add('visible');
