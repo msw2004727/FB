@@ -65,7 +65,8 @@ const gmRoutes = require('./api/gmRoutes');
 const mapRoutes = require('./api/mapRoutes');
 const adminRoutes = require('./api/admin/adminRoutes');
 const beggarRoutes = require('./api/beggarRoutes');
-const inventoryRoutes = require('./api/inventoryRoutes'); // 【核心新增】引入我們新的背包路由
+// 【核心修正】引入我們新的背包路由
+const inventoryRoutes = require('./api/inventoryRoutes'); 
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -77,7 +78,8 @@ app.use('/api/gm', gmRoutes);
 app.use('/api/map', authMiddleware, mapRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/beggar', beggarRoutes);
-app.use('/api/inventory', inventoryRoutes); // 【核心新增】掛載背包路由
+// 【核心修正】掛載背包路由
+app.use('/api/inventory', inventoryRoutes);
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
