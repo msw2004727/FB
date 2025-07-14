@@ -1,10 +1,10 @@
 // /api/gameplay/actionHandler.js
 const { buildContext } = require('../contextBuilder');
 const { getAIStory, getAISuggestion } = require('../../services/aiService');
-const { updateGameState } = require('./stateUpdaters');
+// 【核心修改】引入新的背景任務處理器
+const { submitTask } = require('../services/backgroundTaskProcessor'); 
 const { getMergedLocationData } = require('../worldStateHelpers');
 
-// 指令預處理函式
 const preprocessPlayerAction = (playerAction, locationContext) => {
     const facilityKeywords = {
         '鐵匠鋪': '鐵匠鋪', '打鐵鋪': '鐵匠鋪',
@@ -29,11 +29,7 @@ const preprocessPlayerAction = (playerAction, locationContext) => {
 };
 
 /**
- * 核心互動處理器
- * @param {object} req - Express request object
- * @param {object} res - Express response object
- * @param {object} player - 玩家數據
- * @param {number} newRoundNumber - 新的回合數
+ * 【核心重構 2.0】輕量級的「劇情優先」互動處理器
  */
 async function handleAction(req, res, player, newRoundNumber) {
     const { id: userId, username } = req.user;
@@ -62,19 +58,26 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("主AI未能生成有效回應。");
         }
 
-        // 【核心修正】將 playerAction 傳遞給 updateGameState
-        const finalRoundData = await updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber);
+        // 【核心修改】將耗時任務提交到背景隊列
+        const taskId = `${userId}_${newRoundNumber}`;
+        const jobData = {
+            userId,
+            username,
+            player,
+            playerAction,
+            aiResponse,
+            newRoundNumber
+        };
+        submitTask(taskId, jobData);
         
-        const suggestion = await getAISuggestion(finalRoundData);
-        finalRoundData.suggestion = suggestion;
-        
-        const finalLocationData = await getMergedLocationData(userId, finalRoundData.LOC);
-
-        res.json({
-            story: finalRoundData.story,
-            roundData: finalRoundData,
-            suggestion: suggestion,
-            locationData: finalLocationData
+        // 【核心修改】立即回傳第一階段的結果
+        // 包含劇情文字、建議，以及一個 taskId 讓前端後續可以查詢
+        const suggestion = await getAISuggestion(aiResponse.roundData);
+        res.status(202).json({
+            status: 'processing',
+            taskId: taskId,
+            story: aiResponse.story,
+            suggestion: suggestion
         });
 
     } catch (error) {
