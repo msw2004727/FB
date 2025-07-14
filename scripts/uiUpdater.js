@@ -314,21 +314,19 @@ async function handleEquipToggle(itemId, shouldEquip) {
     gameState.isRequesting = true;
     try {
         let result;
-        // 根據是裝備還是卸下，呼叫不同的API端點
+        // 根據是裝備還是卸下，呼叫不同的API函式
         if (shouldEquip) {
-            result = await api.equipItem(itemId); 
+            result = await api.equipItem(itemId);
         } else {
             result = await api.unequipItem(itemId);
         }
 
-        // 後端成功後，會返回最新的背包和負重數據
         if (result.success && result.inventory) {
              gameState.roundData.inventory = result.inventory;
              if (result.bulkScore !== undefined) {
                  gameState.roundData.bulkScore = result.bulkScore;
                  updateBulkStatus(gameState.roundData.bulkScore);
              }
-             // 根據新數據重新渲染UI
              renderInventory(gameState.roundData.inventory); 
         } else {
             throw new Error(result.message || '操作失敗');
@@ -336,7 +334,6 @@ async function handleEquipToggle(itemId, shouldEquip) {
     } catch (error) {
         console.error('裝備操作失敗:', error);
         handleApiError(error);
-        // 如果操作失敗，強制用舊數據重新渲染一次，以還原開關的狀態
         renderInventory(gameState.roundData.inventory); 
     } finally {
         gameState.isRequesting = false;
