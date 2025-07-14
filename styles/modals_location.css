@@ -147,6 +147,7 @@ body.dark-theme .location-section h4 .fas {
 
 .location-detail-list li {
     display: flex;
+    flex-wrap: wrap; /* 【新增】允許內容換行 */
     margin-bottom: 0.6rem;
     padding-bottom: 0.6rem;
     border-bottom: 1px dashed var(--light-border);
@@ -174,23 +175,38 @@ body.dark-theme .location-detail-list .key {
 .location-detail-list .value {
     color: var(--light-text-primary);
     word-break: break-word; /* 讓長內容可以換行 */
+    flex-grow: 1; /* 【新增】讓值區域佔滿剩餘空間 */
 }
 body.dark-theme .location-detail-list .value {
     color: var(--dark-text-primary);
 }
 
-/* 針對巢狀列表的樣式調整 */
-.location-detail-list .value ul {
-    margin-top: 0.5rem;
-    padding-left: 1rem;
-    border-left: 2px solid var(--light-border);
+/* 【核心新增】針對巢狀列表的樣式調整 */
+.location-detail-list li.nested-object {
+    display: block; /* 讓包含物件的 li 變為區塊佈局 */
 }
-body.dark-theme .location-detail-list .value ul {
-     border-left-color: var(--dark-border);
+
+.location-detail-list li.nested-object .key {
+    margin-bottom: 0.5rem;
+    display: block; /* 讓標題單獨佔一行 */
+    width: auto;
+}
+
+.location-detail-list li.nested-object .value {
+    padding-left: 1rem; /* 為巢狀內容增加縮排 */
+}
+
+.location-detail-list .value ul.nested-list,
+.location-detail-list .value ul.location-detail-list {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 .location-detail-list .value ul li {
+    border-bottom: none;
     padding-bottom: 0.2rem;
     margin-bottom: 0.2rem;
-    border-bottom: none;
+    display: list-item; /* 確保巢狀 li 正常顯示 */
 }
