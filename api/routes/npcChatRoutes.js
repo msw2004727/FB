@@ -4,18 +4,14 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIChatResponse, getAIGiveItemResponse, getAINarrativeForGive, getAIChatSummary, getAISuggestion, getAISummary, getAIPerNpcSummary } = require('../../services/aiService');
 const { getMergedNpcProfile, getFriendlinessLevel, updateNpcMemoryAfterInteraction } = require('../npcHelpers');
-const { getInventoryState } = require('../playerStateHelpers');
+const { getRawInventory } = require('../playerStateHelpers'); // 【核心修正】移除不再存在的 getInventoryState
 const { invalidateNovelCache, updateLibraryNovel } = require('../worldStateHelpers');
 const { getKnownNpcNames } = require('../cacheManager');
 const { processItemChanges } = require('../itemManager');
+const { spendCurrency, addCurrency } = require('../economyManager');
 
 const db = admin.firestore();
 
-/**
- * @route   POST /api/game/npc/chat
- * @desc    處理NPC聊天
- * @access  Private
- */
 router.post('/chat', async (req, res) => {
     const userId = req.user.id;
     const { npcName, chatHistory, playerMessage, model = 'gemini' } = req.body;
@@ -28,12 +24,10 @@ router.post('/chat', async (req, res) => {
             db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
         
-        // --- 【核心修正】在這裡加上守衛，如果找不到NPC檔案，則直接中斷 ---
         if (!npcProfile) {
             console.error(`[NPC聊天系統] 嚴重錯誤：玩家 ${req.user.username} 試圖與一個不存在或無法讀取的NPC「${npcName}」聊天。`);
             return res.status(404).json({ message: `江湖中查無此人：「${npcName}」。` });
         }
-        // --- 修正結束 ---
         
         const playerProfile = playerProfileDoc.data();
         const longTermSummary = summaryDoc.exists ? summaryDoc.data().text : '無';
@@ -74,7 +68,7 @@ router.post('/chat', async (req, res) => {
                 
                 if (aiResponse.friendlinessChange) {
                     const newFriendliness = (currentData.friendlinessValue || 0) + aiResponse.friendlinessChange;
-                    updateData.friendlinessValue = Math.min(100, newFriendliness);
+                    updateData.friendlinessValue = Math.max(-100, Math.min(100, newFriendliness));
                 }
 
                 if (aiResponse.romanceChange) {
@@ -87,7 +81,6 @@ router.post('/chat', async (req, res) => {
         }
         
         if (aiResponse.itemChanges && aiResponse.itemChanges.length > 0) {
-            console.log(`[密談系統] 偵測到 NPC「${npcName}」想要給予物品，啟動物品管理器...`);
             const batch = db.batch();
             await processItemChanges(userId, aiResponse.itemChanges, batch, lastRoundData, npcName);
             await batch.commit();
@@ -109,11 +102,6 @@ router.post('/chat', async (req, res) => {
 });
 
 
-/**
- * @route   POST /api/game/npc/give-item
- * @desc    處理贈予物品
- * @access  Private
- */
 router.post('/give-item', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -142,24 +130,25 @@ router.post('/give-item', async (req, res) => {
         
         const batch = db.batch();
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
-
-        const itemKey = type === 'money' ? '銀兩' : itemName;
-        const itemToRemove = { action: 'remove', itemName: itemKey, quantity: type === 'money' ? amount : (amount || 1) };
         
-        const playerItemRef = db.collection('users').doc(userId).collection('inventory_items').doc(itemToRemove.itemName);
-        batch.update(playerItemRef, { quantity: admin.firestore.FieldValue.increment(-itemToRemove.quantity) });
-        batch.set(npcStateRef, { [`inventory.${itemKey}`]: admin.firestore.FieldValue.increment(itemToRemove.quantity) }, { merge: true });
-
+        // 處理玩家付出的物品/銀兩
+        if (type === 'money') {
+            await spendCurrency(userId, amount, batch);
+        } else {
+            // 對於普通物品，我們仍然使用 itemManager
+            const itemToRemove = { action: 'remove', itemName: itemName, quantity: 1 };
+            await processItemChanges(userId, [itemToRemove], batch, lastRoundData);
+        }
+        
+        // 處理NPC收到的物品/銀兩 (這裡可以簡化，假設NPC總能收到)
+        if (type === 'money') {
+             batch.set(npcStateRef, { [`inventory.銀兩`]: admin.firestore.FieldValue.increment(amount) }, { merge: true });
+        } else {
+             batch.set(npcStateRef, { [`inventory.${itemName}`]: admin.firestore.FieldValue.increment(1) }, { merge: true });
+        }
+        
         if(friendlinessChange) {
-            await db.runTransaction(async (transaction) => {
-                const npcStateDoc = await transaction.get(npcStateRef);
-                if (!npcStateDoc.exists) { return; }
-                const currentFriendliness = npcStateDoc.data()?.friendlinessValue || 0;
-                const newFriendliness = currentFriendliness + friendlinessChange;
-                transaction.set(npcStateRef, { 
-                    friendlinessValue: Math.min(100, newFriendliness)
-                }, { merge: true });
-            });
+            batch.set(npcStateRef, { friendlinessValue: admin.firestore.FieldValue.increment(friendlinessChange) }, { merge: true });
         }
         
         if (npcItemGifts && npcItemGifts.length > 0) {
@@ -169,10 +158,23 @@ router.post('/give-item', async (req, res) => {
         await batch.commit();
         
         const newRoundNumber = lastRoundData.R + 1;
-        const inventoryState = await getInventoryState(userId);
         
-        let newRoundData = { ...lastRoundData, R: newRoundNumber, ITM: inventoryState.itemsString, money: inventoryState.money };
-        newRoundData.PC = `${username}將${itemName || amount + '文錢'}贈予了${npcName}。`;
+        // 【核心修正】使用 getRawInventory 獲取最新的背包狀態來生成 ITM 字符串
+        const updatedInventory = await getRawInventory(userId);
+        const silverItem = updatedInventory.find(item => item.templateId === '銀兩');
+        const silverAmount = silverItem ? silverItem.quantity : 0;
+        const otherItems = updatedInventory
+            .filter(item => item.templateId !== '銀兩')
+            .map(item => `${item.itemName} x${item.quantity}`);
+        const newItmString = otherItems.length > 0 ? otherItems.join('、') : '身無長物';
+
+        let newRoundData = { 
+            ...lastRoundData, 
+            R: newRoundNumber, 
+            ITM: newItmString,
+            money: silverAmount // 雖然前端不用money了，但為了數據結構完整性，暫時保留
+        };
+        newRoundData.PC = `${username}將${itemName || amount + '兩銀子'}贈予了${npcName}。`;
         newRoundData.EVT = `贈予${npcName}物品`;
         
         const updatedNpcProfile = await getMergedNpcProfile(userId, npcName);
@@ -184,11 +186,11 @@ router.post('/give-item', async (req, res) => {
             newRoundData.NPC.push({ name: npcName, status: npc_response, friendliness: getFriendlinessLevel(updatedNpcProfile.friendlinessValue) });
         }
         
-        const baseNarrative = await getAINarrativeForGive(lastRoundData, username, npcName, itemName || `${amount}文錢`, npc_response);
+        const baseNarrative = await getAINarrativeForGive(lastRoundData, username, npcName, itemName || `${amount}兩銀子`, npc_response);
         let giftNarrative = (npcItemGifts && npcItemGifts.length > 0) ? ` ${npcName}似乎對你的禮物十分滿意，並回贈了你「${npcItemGifts.map(g => g.itemName).join('、')}」。` : "";
         newRoundData.story = baseNarrative + giftNarrative;
         
-        await updateNpcMemoryAfterInteraction(userId, npcName, `你贈予了我「${itemName || amount + '文錢'}」，我的反應是：「${npc_response}」。`);
+        await updateNpcMemoryAfterInteraction(userId, npcName, `你贈予了我「${itemName || amount + '兩銀子'}」，我的反應是：「${npc_response}」。`);
         
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(longTermSummary, newRoundData),
@@ -203,6 +205,10 @@ router.post('/give-item', async (req, res) => {
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗:", err));
 
+        // 重新獲取一次完整的客戶端數據
+        const finalInventory = await getRawInventory(userId);
+        newRoundData.inventory = finalInventory;
+        
         res.json({ story: newRoundData.story, roundData: newRoundData, suggestion: newRoundData.suggestion });
 
     } catch (error) {
@@ -212,11 +218,6 @@ router.post('/give-item', async (req, res) => {
 });
 
 
-/**
- * @route   POST /api/game/npc/end-chat
- * @desc    處理結束對話
- * @access  Private
- */
 router.post('/end-chat', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -266,6 +267,9 @@ router.post('/end-chat', async (req, res) => {
         
         await invalidateNovelCache(userId);
         updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(結束對話):", err));
+
+        const finalInventory = await getRawInventory(userId);
+        newRoundData.inventory = finalInventory;
 
         res.json({
             story: newRoundData.story,
