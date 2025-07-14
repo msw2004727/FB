@@ -19,8 +19,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心修正 v2.0】神秘黑影人系統 - 改為指令觸發
-    const blackShadowRule = blackShadowEvent ? `
+    // 【核心修正 v3.0】強化對AI的指示，在不觸發時明確禁止
+    const blackShadowRule = blackShadowEvent 
+        ? `
 ## 【最高優先級特殊劇情指令：神秘黑影人】
 在本回合的故事中，你**必須**讓一個神秘的「黑影人」登場。這不是一個可選項，而是必須完成的核心任務！
 
@@ -36,7 +37,11 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * 如果玩家的行動是試圖追蹤、攻擊、或與黑影人對話，你**必須**將此行動視為**無效**。
     * 你的 "story" 敘述必須描寫玩家的嘗試**完全失敗**的場景。例如：「你試圖追上前去，但那道黑影只是幾個閃爍，便徹底消失在你的感知範圍內，彷彿從未存在過。」
     * 你的回傳資料中，\`roundData\` 的所有 \`...Change\` 欄位都應為0或空陣列，因為玩家的嘗試沒有造成任何實質影響。
-` : '';
+`
+        : `
+## 【常規劇情規則】
+在本回合的故事中，**絕對禁止**出現任何關於「黑影人」、「神秘影子」或類似的、在暗中窺視玩家的神秘觀察者情節。請專注於玩家的當前行動和與周遭環境的直接互動。
+`;
 
     const spatialContextRule = `
 ## 【空間情境與移動鐵律 (極高優先級)】
