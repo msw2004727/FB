@@ -17,7 +17,7 @@ const loadingDisclaimers = [
 ];
 
 let tipInterval = null;
-let disclaimerInterval = null; 
+let disclaimerInterval = null;
 
 function updateBountyButton(hasNew) {
     if (dom.bountiesBtn) {
@@ -43,9 +43,9 @@ export function setLoading(isLoading, text = '') {
         const loaderDisclaimerElement = dom.aiThinkingLoader.querySelector('.loader-disclaimer');
         const loaderTextElement = dom.aiThinkingLoader.querySelector('.loader-text');
         const loaderTipElement = dom.aiThinkingLoader.querySelector('.loader-tip');
-        
+
         if(loaderTextElement) loaderTextElement.textContent = text;
-        
+
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
@@ -53,7 +53,7 @@ export function setLoading(isLoading, text = '') {
                 if (gameTips.length > 0) {
                     const randomIndex = Math.floor(Math.random() * gameTips.length);
                     if (loaderTipElement) {
-                        loaderTipElement.innerHTML = gameTips[randomIndex];
+                        loaderTipElement.innerHTML = gameTips.length > 0 ? gameTips.sort(() => 0.5 - Math.random())[0] : '';
                     }
                 }
             };
@@ -64,7 +64,7 @@ export function setLoading(isLoading, text = '') {
                 if (loadingDisclaimers.length > 0) {
                     const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
                     if(loaderDisclaimerElement) {
-                        loaderDisclaimerElement.innerHTML = loadingDisclaimers[randomIndex];
+                        loaderDisclaimerElement.innerHTML = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
                     }
                 }
             };
@@ -77,7 +77,7 @@ export function setLoading(isLoading, text = '') {
         }
         dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }
-    
+
     modal.setCombatLoading(isLoading && gameState.isInCombat);
     modal.setChatLoading(isLoading && gameState.isInChat);
 }
@@ -107,16 +107,16 @@ export async function handlePlayerDeath() {
 
 async function startProactiveChat(proactiveData) {
     const { npcName, openingLine, itemChanges } = proactiveData;
-    
+
     try {
         const profile = await api.getNpcProfile(npcName);
-        
+
         gameState.isInChat = true;
         gameState.currentChatNpc = npcName;
         gameState.chatHistory = [];
 
-        modal.openChatModalUI(profile); 
-        
+        modal.openChatModalUI(profile);
+
         modal.appendChatMessage('npc', openingLine);
         gameState.chatHistory.push({ speaker: 'npc', message: openingLine });
 
@@ -130,32 +130,32 @@ async function startProactiveChat(proactiveData) {
         dom.chatInput.focus();
     } catch (error) {
         console.error(`啟動與 ${npcName} 的主動對話失敗:`, error);
-        appendMessageToStory(`[系統] ${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
+        appendMessageToStory(`【系統】${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
     }
 }
 
 export function processNewRoundData(data) {
     if(!data.roundData) return;
-    
+
     data.roundData.suggestion = data.suggestion;
     addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-    
+
     if (data.roundData.NPC && Array.isArray(data.roundData.NPC)) {
         data.roundData.NPC.forEach(npc => {
             if (npc.isDeceased && !gameState.deceasedNpcs.includes(npc.name)) {
                 gameState.deceasedNpcs.push(npc.name);
-                console.log(`[生死簿] 已記錄死亡NPC: ${npc.name}`);
+                console.log(`【生死簿】已記錄死亡NPC: ${npc.name}`);
             }
         });
     }
 
     if (data.locationData) {
         gameState.currentLocationData = data.locationData;
-        console.log('[遊戲狀態] 已更新當前地區的詳細情報:', gameState.currentLocationData);
+        console.log('【遊戲狀態】已更新當前地區的詳細情報:', gameState.currentLocationData);
     }
 
     updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
-    
+
     gameState.currentRound = data.roundData.R;
     gameState.roundData = data.roundData;
 
@@ -166,7 +166,7 @@ export function processNewRoundData(data) {
         handlePlayerDeath();
         return;
     }
-    
+
     if (data.proactiveChat) {
         startProactiveChat(data.proactiveChat);
     }
@@ -212,12 +212,21 @@ export async function handlePlayerAction() {
 
     } catch (error) {
         console.error('API 錯誤或通訊中斷:', error);
-        // 【核心修改】無論是什麼錯誤，都直接將後端傳來的訊息顯示在劇情中
-        // 使用 replace 將換行符 \n 轉換為 <br>，讓「江湖指引」能正確換行顯示
-        appendMessageToStory(`[系統提示]<br>${error.message.replace(/\n/g, '<br>')}`, 'system-message');
+
+        const errorMessage = error.message.replace(/\n/g, '<br>');
+
+        const cultivationErrorKeywords = ["閉關", "靜修", "修行", "糧食飲水不足", "身心俱疲", "尚未習得", "身無長技", "身負數門絕學", "人多嘴雜"];
+        const isCultivationError = cultivationErrorKeywords.some(keyword => errorMessage.includes(keyword));
+
+        if (isCultivationError) {
+            // 對於閉關錯誤，使用特殊的CSS class來渲染
+            appendMessageToStory(`<div class="cultivation-error">${errorMessage}</div>`, 'system-message');
+        } else {
+            // 對於其他錯誤，使用通用的系統訊息樣式
+            appendMessageToStory(`【系統提示】<br>${errorMessage}`, 'system-message');
+        }
 
     } finally {
-        // 無論成功或失敗，最後都應停止載入動畫
         if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
              setLoading(false);
         }
@@ -226,11 +235,11 @@ export async function handlePlayerAction() {
 
 export async function loadInitialGame() {
     setLoading(true, '正在連接你的世界，讀取記憶中...');
-    
+
     try {
         const data = await api.getLatestGame();
-        
-        dom.storyTextContainer.innerHTML = ''; 
+
+        dom.storyTextContainer.innerHTML = '';
 
         if (data.gameState === 'deceased') {
             if(data.roundData) {
@@ -252,7 +261,7 @@ export async function loadInitialGame() {
             dom.storyTextContainer.innerHTML = '';
             const initialMessage = '你的旅程似乎尚未開始。請在下方輸入你的第一個動作，例如「睜開眼睛，環顧四周」。';
             const roundZeroData = { R: 0, EVT: '楔子', ATM: ['迷茫'], WRD: '未知', LOC: ['未知之地'], PC: '身體虛弱，內息紊亂', NPC: [], ITM: '行囊空空', QST: '', PSY: '我是誰...我在哪...', CLS: '', timeOfDay: '上午', internalPower: 5, externalPower: 5, lightness: 5, morality: 0, yearName: '元祐', year: 1, month: 1, day: 1, stamina: 100, suggestion: '先檢查一下自己的身體狀況吧。' };
-            
+
             addRoundTitleToStory(roundZeroData.EVT);
             appendMessageToStory(initialMessage, 'system-message');
             updateUI(null, roundZeroData, null, null);
