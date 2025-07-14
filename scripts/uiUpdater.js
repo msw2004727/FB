@@ -3,6 +3,7 @@ import { MAX_POWER } from './config.js';
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 
+// --- DOM元素獲取 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
 const storyTextContainer = document.getElementById('story-text-wrapper');
 const statusBarEl = document.getElementById('status-bar');
@@ -26,6 +27,7 @@ const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
 const moneyContent = document.getElementById('money-content');
 
+// --- 圖示對照表 ---
 const slotConfig = {
     head: { icon: 'fa-user-ninja' },
     body: { icon: 'fa-user-shield' },
@@ -39,7 +41,22 @@ const slotConfig = {
     weapon_back: { icon: 'fa-archive' },
 };
 
+// 【核心修正】增加一個根據物品類型判斷通用圖示的對照表
+const itemTypeConfig = {
+    '武器': { icon: 'fa-gavel' },
+    '裝備': { icon: 'fa-user-shield' },
+    '秘笈': { icon: 'fa-book-reader' },
+    '書籍': { icon: 'fa-book' },
+    '道具': { icon: 'fa-flask-potion' },
+    '材料': { icon: 'fa-gem' },
+    '財寶': { icon: 'fa-coins' },
+    '其他': { icon: 'fa-box' }
+};
+
+
 const equipOrder = ['weapon_right', 'weapon_left', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
+
+// --- UI 更新核心函式 ---
 
 export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
@@ -65,7 +82,6 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateNpcList(roundData.NPC);
     renderInventory(roundData.inventory); 
     
-    // 【核心修正】從完整的背包資料中尋找銀兩並顯示
     const silverItem = (roundData.inventory || []).find(item => item.itemName === '銀兩' || item.templateId === '銀兩');
     const silverAmount = silverItem ? silverItem.quantity : 0;
     moneyContent.textContent = `${silverAmount} 兩銀子`;
@@ -252,12 +268,19 @@ function createItemEntry(item) {
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
-    let iconClass = item.icon || 'fa-box';
-    if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
-        iconClass = slotConfig[item.equipSlot].icon;
+    // --- 【核心修正】重寫圖示判斷邏輯 ---
+    let iconClass = 'fa-box'; // 預設圖示
+    if (item.itemType && itemTypeConfig[item.itemType]) {
+        iconClass = itemTypeConfig[item.itemType].icon; // 根據物品類型設定通用圖示
     }
+    if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
+        iconClass = slotConfig[item.equipSlot].icon; // 如果已裝備，則覆蓋為更精確的部位圖示
+    }
+    // --- 修正結束 ---
 
+    // --- 【核心修正】重寫裝備開關的判斷邏輯 ---
     let equipControls = '';
+    // 只要 equipSlot 存在 (不為 null 或 undefined)，就代表此物可裝備，應該顯示開關
     if (item.equipSlot) {
         equipControls = `
             <div class="item-controls">
@@ -268,6 +291,7 @@ function createItemEntry(item) {
             </div>
         `;
     }
+    // --- 修正結束 ---
 
     entry.innerHTML = `
         <div class="item-info">
