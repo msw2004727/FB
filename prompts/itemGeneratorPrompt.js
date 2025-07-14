@@ -92,3 +92,7 @@ ${contextDescription}
 ---
 
 現在，請遵循上述所有鐵律，開始你的設計工作，為「${itemName}」生成一份詳細且**平衡**的JSON設計圖。
+`;
+};
+
+module.exports = { getItemGeneratorPrompt };
