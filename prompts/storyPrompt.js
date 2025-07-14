@@ -19,7 +19,26 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心新增】空間情境與移動鐵律
+    // 【核心新增】神秘黑影人系統
+    const blackShadowRule = `
+## 【新增鐵律】神秘黑影人系統
+你現在必須在你的故事中，引入一個神秘的「黑影人」。
+
+1.  **出現機率**: 你有 **10% 的機率** 在本回合的 "story" 敘述中，讓這位黑影人登場。這是一個**隨機事件**，與玩家的任何行動都無關。
+2.  **登場方式**:
+    * 他總是在不經意間出現，例如：在遠處的屋頂、陰暗的巷口、人群的縫隙中。
+    * 他只是**靜靜地觀察**玩家，從不與玩家有任何直接的互動或對話。
+    * 在他的觀察結束後，他會以一種不合常理的方式**悄然消失**，例如：融入陰影、化為一縷青煙、或是在玩家眨眼間便不見蹤影。
+3.  **身份與目的**:
+    * 這個黑影人**不是NPC**。他沒有姓名、沒有背景、沒有實體。他是一個超越這個世界常理的存在。
+    * **絕對禁止**在你的任何回傳資料（特別是 \`roundData.NPC\` 陣列）中，為這個黑影人建立任何實體檔案。他只存在於 "story" 的文字描述中。
+    * 他的目的永遠是個謎。你的描述應當營造出懸疑、詭異、被監視的緊張感。
+4.  **調查與互動的處理**:
+    * 如果玩家的行動是試圖追蹤、攻擊、或與黑影人對話，你**必須**將此行動視為**無效**。
+    * 你的 "story" 敘述必須描寫玩家的嘗試**完全失敗**的場景。例如：「你試圖追上前去，但那道黑影只是幾個閃爍，便徹底消失在你的感知範圍內，彷彿從未存在過。」或是「你的劍鋒穿過黑影，卻沒有任何實感，那影子只是扭曲了一下，便消散無蹤。」
+    * 你的回傳資料中，\`roundData\` 的所有 \`...Change\` 欄位都應為0或空陣列，因為玩家的嘗試沒有造成任何實質影響。
+`;
+
     const spatialContextRule = `
 ## 【空間情境與移動鐵律 (極高優先級)】
 你必須嚴格區分「內部移動」和「外部移動」，以確保空間的邏輯性。
@@ -37,7 +56,6 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     * **執行鐵律**: 當你判定為外部移動時，你可以發揮想像力，創造前往新地點的過程，並在 \`roundData.LOC\` 中設定新的地點層級。
 `;
     
-    // 【核心修改】新增創功資料連動鐵律
     const customSkillRule = `
 ## 【創功資料連動鐵律 (極高優先級)】
 當你的 \`story\` 敘述中明確描寫了玩家正在「自創」或「領悟」或「習得」一門全新的武學時，你**必須**在回傳的 \`roundData.skillChanges\` 陣列中，為這門新武學添加一個對應的物件。此物件的 \`isNewlyAcquired\` 必須為 \`true\`，且初始等級 \`level\` 必須為 \`0\`。故事描述與數據生成必須同步，任何情況下都不能遺漏此數據。
@@ -149,6 +167,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     return `
 你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
 
+${blackShadowRule}
 ${specialEventInstruction}
 ${romanceInstruction}
 ${dyingInstruction}
