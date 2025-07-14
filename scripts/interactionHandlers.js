@@ -225,6 +225,8 @@ function handleStrategySelection(strategy) {
     if (confirmBtn) confirmBtn.disabled = true;
 
     const playerSkills = gameState.combat.state?.player?.skills || [];
+    // 【新增】從gameState中獲取當前裝備的武器類型
+    const currentWeaponType = gameState.combat.state?.player?.currentWeaponType;
     
     const categoryMap = { 
         'attack': '攻擊', 
@@ -239,13 +241,29 @@ function handleStrategySelection(strategy) {
 
     if (relevantSkills.length > 0) {
         relevantSkills.forEach(skill => {
+            // 【核心修改】判斷技能是否可用
+            const requiredWeapon = skill.requiredWeaponType;
+            const isUsable = !requiredWeapon || requiredWeapon === '無' || requiredWeapon === currentWeaponType;
+            const disabledClass = isUsable ? '' : 'disabled';
+            const disabledAttr = isUsable ? 'disabled' : ''; // 注意這裡反過來了，因為按鈕要禁用
+
+            let weaponStatusHtml = '';
+            if (requiredWeapon && requiredWeapon !== '無') {
+                if (isUsable) {
+                    weaponStatusHtml = `<span class="weapon-status equipped">&lt;已裝備兵器&gt;</span>`;
+                } else {
+                    weaponStatusHtml = `<span class="weapon-status missing">需裝備：${requiredWeapon}</span>`;
+                }
+            }
+
             const skillControl = document.createElement('div');
-            skillControl.className = 'skill-controls';
+            skillControl.className = `skill-controls ${disabledClass}`; // 為容器添加禁用class
             skillControl.dataset.skillName = skill.skillName;
 
             skillControl.innerHTML = `
-                <button class="skill-btn">
+                <button class="skill-btn" ${disabledAttr}>
                     <span class="skill-name">${skill.skillName} (L${skill.level})</span>
+                    ${weaponStatusHtml}
                     <span class="skill-cost" data-base-cost="${skill.cost || 5}">內力 ${skill.cost || 5}</span>
                 </button>
                 <div class="power-level-adjuster">
@@ -254,21 +272,24 @@ function handleStrategySelection(strategy) {
                 </div>
             `;
             
-            skillControl.querySelector('.skill-btn').addEventListener('click', () => handleSkillSelection(skill.skillName));
-            
-            const slider = skillControl.querySelector('.power-level-slider');
-            slider.addEventListener('input', () => {
-                const powerLevel = slider.value;
-                skillControl.querySelector('.power-level-display').textContent = `${powerLevel} 成`;
+            // 【核心修改】只有在技能可用時才添加事件監聽器
+            if (isUsable) {
+                skillControl.querySelector('.skill-btn').addEventListener('click', () => handleSkillSelection(skill.skillName));
                 
-                const costSpan = skillControl.querySelector('.skill-cost');
-                const baseCost = parseInt(costSpan.dataset.baseCost, 10);
-                costSpan.textContent = `內力 ${baseCost * powerLevel}`;
+                const slider = skillControl.querySelector('.power-level-slider');
+                slider.addEventListener('input', () => {
+                    const powerLevel = slider.value;
+                    skillControl.querySelector('.power-level-display').textContent = `${powerLevel} 成`;
+                    
+                    const costSpan = skillControl.querySelector('.skill-cost');
+                    const baseCost = parseInt(costSpan.dataset.baseCost, 10);
+                    costSpan.textContent = `內力 ${baseCost * powerLevel}`;
 
-                if (gameState.combat.selectedSkill === skill.skillName) {
-                    gameState.combat.selectedPowerLevel = parseInt(powerLevel, 10);
-                }
-            });
+                    if (gameState.combat.selectedSkill === skill.skillName) {
+                        gameState.combat.selectedPowerLevel = parseInt(powerLevel, 10);
+                    }
+                });
+            }
 
             skillSelectionContainer.appendChild(skillControl);
         });
@@ -280,6 +301,7 @@ function handleStrategySelection(strategy) {
          if (confirmBtn) confirmBtn.disabled = false;
     }
 }
+
 
 function handleSkillSelection(skillName) {
     if (gameState.combat.selectedSkill === skillName) {
