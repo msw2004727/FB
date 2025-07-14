@@ -28,6 +28,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
     * **\`parentLocation\`**: 必須正確設定上級地點的名稱。
     * **\`address\`**: 必須包含從 \`country\` (國家) 到此地點的完整層級。
     * **\`geography.nearbyLocations\`**: 你可以在此處定義與此地點相鄰的**同級地點**，並標註旅行時間。時間單位應使用「一炷香」、「半個時辰」、「半日」、「一日」等武俠風格的描述。
+    * **【新增鐵律】isPrivate 的定義**: 「isPrivate」欄位代表此地是否為一個私密的、不受打擾的空間。如果地點是客棧房間、門派靜室、個人住宅、隱秘山洞等，此值必須為 \`true\`。如果地點是城鎮廣場、野外道路、商店大廳、酒館等公共場所，此值必須為 \`false\`。
 * **\`initialDynamicState\` (初始動態狀態)**: 定義了地點的**可變屬性**，這些是玩家未來可以透過行動來影響的。
     * **【核心新增鐵律】設施命名規則**：當你在此處生成 \`facilities\` 陣列時，每一個設施的 \`name\` **都必須是獨一無二且與地點相關的**。例如，為「無名村」創造的鐵匠鋪，應命名為「無名村鐵匠鋪」或「老李鐵鋪」，**絕對禁止**直接使用一個已知的、屬於其他城鎮的設施名稱（如「葉家鐵舖」）。
 
@@ -46,13 +47,14 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
         "locationName": "豐城縣",
         "parentLocation": "洪州",
         "locationType": "縣城",
+        "isPrivate": false,
         "address": {
           "country": "大宋",
           "region": "江南西路",
           "city": "洪州",
           "district": "豐城縣"
         },
-        "geography": { 
+        "geography": {
             "terrain": "平原與丘陵交錯",
             "nearbyLocations": [
                 { "name": "豫章鎮", "travelTime": "半日" }
@@ -74,6 +76,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary) =>
         "locationName": "無名村",
         "parentLocation": "豐城縣",
         "locationType": "村莊",
+        "isPrivate": false,
         "address": {
           "country": "大宋",
           "region": "江南西路",
