@@ -6,7 +6,8 @@ const { updateSkills, getRawInventory, calculateBulkScore, getPlayerSkills } = r
 const { TIME_SEQUENCE, advanceDate, invalidateNovelCache, updateLibraryNovel } = require('../worldStateHelpers');
 const { processLocationUpdates } = require('../locationManager');
 const { processItemChanges } = require('../itemManager');
-const { calculateNewStamina } = require('./staminaManager'); // 【核心修正】引入精力總管的計算函式
+const { calculateNewStamina } = require('./staminaManager');
+const { addCurrency } = require('../economyManager'); // 【核心新增】引入戶部尚書
 
 const db = admin.firestore();
 
@@ -38,7 +39,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
     }
     
-    // 【核心修正】將精力計算全權交給精力總管
     const newStamina = calculateNewStamina(player, playerAction, safeRoundData);
 
     const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
@@ -69,6 +69,16 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     console.log(`[存檔系統] 已成功寫入 R${newRoundNumber} 的存檔。`);
 
     const batch = db.batch();
+
+    // 【核心修正】將 moneyChange 轉換為對「銀兩」的操作
+    if (moneyChange > 0) {
+        await addCurrency(userId, moneyChange, batch);
+    } else if (moneyChange < 0) {
+        // 注意：這裡假設AI不會返回負的moneyChange來扣錢，因為扣錢應走交易或事件流程
+        // 為安全起見，我們只處理增加
+        console.warn(`[經濟系統] 偵測到一個負數的moneyChange (${moneyChange})，已被忽略。`);
+    }
+
     await processItemChanges(userId, itemChanges, batch, finalSaveData);
     await updateFriendlinessValues(userId, username, NPC, finalSaveData, player, batch);
     await updateRomanceValues(userId, romanceChanges);
@@ -94,7 +104,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         maxExternalPowerAchieved: Math.max(player.maxExternalPowerAchieved || 0, newExternalPower),
         maxLightnessAchieved: Math.max(player.maxLightnessAchieved || 0, newLightnessPower),
         morality: admin.firestore.FieldValue.increment(Number(moralityChange || 0)),
-        money: admin.firestore.FieldValue.increment(Number(moneyChange || 0)),
+        // 【核心修正】移除對 money 欄位的更新
         R: newRoundNumber
     };
     batch.update(userDocRef, playerUpdatesForDb);
