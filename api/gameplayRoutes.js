@@ -2,9 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { handlePreActionChecks } = require('./preActionChecks');
-const { handleAction } = require('./actionHandler');
-// 【核心修改】引入背景任務處理器的狀態查詢功能
+// 【核心修正】修正了 handlePreActionChecks 的引用路徑
+const { handlePreActionChecks } = require('./gameplay/preActionChecks');
+const { handleAction } = require('./gameplay/actionHandler');
 const { getTaskStatus } = require('../services/backgroundTaskProcessor');
 
 const db = admin.firestore();
@@ -44,7 +44,7 @@ const interactRouteHandler = async (req, res) => {
 router.post('/interact', interactRouteHandler);
 
 
-// 【核心新增】前端輪詢數據更新結果的API路由
+// 前端輪詢數據更新結果的API路由
 router.get('/poll-update/:taskId', (req, res) => {
     const { taskId } = req.params;
     const result = getTaskStatus(taskId);
