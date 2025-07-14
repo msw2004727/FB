@@ -18,8 +18,8 @@ const CULTIVATION_CHANCES = {
 
 // 2. 閉關每日基礎經驗值 (會再乘上閉關天數)
 const DAILY_BASE_EXP = {
-    GREAT_SUCCESS: 100,
-    SUCCESS: 40,
+    GREAT_SUCCESS: 200,
+    SUCCESS: 100,
     NO_PROGRESS: 0,
     DISASTER: -50 // 走火入魔會倒扣經驗
 };
@@ -27,10 +27,10 @@ const DAILY_BASE_EXP = {
 // 3. 閉關每日基礎功力值獎勵 (會再乘上閉關天數)
 // 這裡的數值代表「潛力」，實際增加哪個功力值，取決於玩家修練的武學類型。
 const DAILY_BASE_POWER_GAIN = {
-    GREAT_SUCCESS: 5,
-    SUCCESS: 2,
+    GREAT_SUCCESS: 50,
+    SUCCESS: 20,
     NO_PROGRESS: 0,
-    DISASTER: -3 // 走火入魔會倒扣功力
+    DISASTER: -30 // 走火入魔會倒扣功力
 };
 
 // 4. 精力值修正係數
