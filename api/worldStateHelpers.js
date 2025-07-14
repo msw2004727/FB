@@ -7,13 +7,40 @@ const db = admin.firestore();
 const TIME_SEQUENCE = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
 const DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
+/**
+ * 檢查是否為閏年
+ * @param {number} year - 年份
+ * @returns {boolean}
+ */
+function isLeapYear(year) {
+    return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+
+/**
+ * 【核心修正 v2.0 - 已加入閏年判斷】
+ * 將日期推進一天
+ * @param {object} currentDate - 當前日期物件 { year, month, day, yearName }
+ * @returns {object} - 新的日期物件
+ */
 function advanceDate(currentDate) {
     let { year, month, day, yearName } = currentDate;
+    
     day++;
-    if (day > DAYS_IN_MONTH[month]) {
+
+    // 獲取當前月份的天數，考慮閏年
+    let daysInCurrentMonth = DAYS_IN_MONTH[month];
+    if (month === 2 && isLeapYear(year)) {
+        daysInCurrentMonth = 29;
+    }
+
+    if (day > daysInCurrentMonth) {
         day = 1;
         month++;
-        if (month > 12) { month = 1; year++; }
+        if (month > 12) {
+            month = 1;
+            year++;
+            // 這裡可以加入更換年號的邏輯，如果需要的話
+        }
     }
     return { year, month, day, yearName };
 }
