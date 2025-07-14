@@ -52,8 +52,8 @@ const itemTypeConfig = {
     '其他': { icon: 'fa-box' }
 };
 
-
-const equipOrder = ['weapon_right', 'weapon_left', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
+// 【規則修正】調整裝備顯示順序，以符合 "左腰 > 右腰 > 背後" 的規則
+const equipOrder = ['weapon_left', 'weapon_right', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
 
 // --- UI 更新核心函式 ---
 
