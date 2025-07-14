@@ -120,7 +120,9 @@ async function getOrGenerateSkillTemplate(skillName) {
         if (newTemplateData.requiredWeaponType === undefined) {
              newTemplateData.requiredWeaponType = '無';
         }
-
+        
+        // 【核心修正】為AI新創的武學模板打上「自創」標籤
+        newTemplateData.isCustom = true;
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await skillTemplateRef.set(newTemplateData);
         const finalTemplateData = (await skillTemplateRef.get()).data();
@@ -176,7 +178,6 @@ async function updateInventory(userId, itemChanges, roundData = {}) {
         }
     }
     await batch.commit();
-    console.log(`[物品系統] 已為玩家 ${userId} 完成批次庫存更新。`);
 }
 
 async function getRawInventory(userId) {
