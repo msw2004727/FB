@@ -16,7 +16,19 @@ async function fetchApi(endpoint, options = {}) {
         headers,
     });
     
-    const data = await response.json();
+    // 修正：即使回應不ok，也嘗試解析JSON以獲取後端錯誤訊息
+    const responseBody = await response.text();
+    let data;
+    try {
+        data = JSON.parse(responseBody);
+    } catch (e) {
+        // 如果解析失敗，表示回傳的不是JSON，將原始文本作為錯誤訊息
+        if (!response.ok) {
+            throw new Error(responseBody || `伺服器錯誤: ${response.status}`);
+        }
+        return responseBody; // 對於非JSON的成功回應，直接返回文本
+    }
+
     if (!response.ok) {
         throw new Error(data.message || `伺服器錯誤: ${response.status}`);
     }
@@ -50,9 +62,11 @@ export const api = {
     getNovel: () => fetchApi('/api/game/state/get-novel'),
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
-    equipItem: (body) => fetchApi('/api/game/state/equip', { method: 'POST', body: JSON.stringify(body) }),
-    // 【核心新增】新增的丟棄物品 API 函式
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
+    
+    // 【核心修正】新增並修正裝備/卸下物品的 API 函式
+    equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
+    unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
 
     // Bounty Route
     getBounties: () => fetchApi('/api/bounties'),
