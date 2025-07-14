@@ -16,25 +16,16 @@ async function fetchApi(endpoint, options = {}) {
         headers,
     });
     
-    // 【核心修改】允許非200的狀態碼通過，交給呼叫者處理
-    if (!response.ok && response.status !== 202) {
-        const data = await response.json();
+    const data = await response.json();
+    if (!response.ok) {
         throw new Error(data.message || `伺服器錯誤: ${response.status}`);
     }
-    
-    // 如果是 204 No Content，也返回一個成功的標記
-    if (response.status === 204) {
-        return { success: true };
-    }
-    
-    return response.json();
+    return data;
 }
 
 export const api = {
     // Gameplay Routes
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
-    // 【核心新增】輪詢更新狀態的 API
-    pollUpdate: (taskId) => fetchApi(`/api/game/play/poll-update/${taskId}`),
 
     // Combat Routes
     initiateCombat: (body) => fetchApi('/api/game/combat/initiate', { method: 'POST', body: JSON.stringify(body) }),
@@ -60,6 +51,7 @@ export const api = {
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
     equipItem: (body) => fetchApi('/api/game/state/equip', { method: 'POST', body: JSON.stringify(body) }),
+    // 【核心新增】新增的丟棄物品 API 函式
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
 
     // Bounty Route

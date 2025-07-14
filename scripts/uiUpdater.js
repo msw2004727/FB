@@ -1,5 +1,6 @@
 // scripts/uiUpdater.js
 import { MAX_POWER } from './config.js';
+import { api } from './api.js';
 import { gameState } from './gameState.js';
 
 // --- DOM元素獲取 ---
@@ -51,23 +52,23 @@ const itemTypeConfig = {
     '其他': { icon: 'fa-box' }
 };
 
+
 const equipOrder = ['weapon_right', 'weapon_left', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
 
 // --- UI 更新核心函式 ---
 
-// 【核心修改】輕量級的劇情更新函式
-export function updateStory(storyText, suggestion, roundData = {}) {
+export function updateUI(storyText, roundData, randomEvent, locationData) {
+    if (randomEvent && randomEvent.description) {
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'random-event-message';
+        eventDiv.innerHTML = `<strong>【奇遇】</strong> ${randomEvent.description}`;
+        storyTextContainer.appendChild(eventDiv);
+    }
+
     if (storyText) {
         const processedStory = highlightNpcNames(storyText, roundData.NPC);
         appendMessageToStory(processedStory, 'story-text');
     }
-    if (actionSuggestion) {
-        actionSuggestion.textContent = suggestion ? `書僮小聲說：${suggestion}` : '';
-    }
-}
-
-// 【核心修改】專門更新儀表板數據的函式
-export function updateDashboard(roundData, locationData) {
     if (!roundData) return;
 
     updateStatusBar(roundData);
@@ -87,8 +88,8 @@ export function updateDashboard(roundData, locationData) {
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
+    actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
 }
-
 
 export function appendMessageToStory(htmlContent, className) {
     const p = document.createElement('p');

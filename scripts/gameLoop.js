@@ -2,7 +2,7 @@
 
 import { api } from './api.js';
 import { gameState } from './gameState.js';
-import { updateStory, updateDashboard, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
+import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 import * as interaction from './interactionHandlers.js';
@@ -29,8 +29,7 @@ export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
     dom.playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
     dom.submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    // 【核心修改】調整載入提示文字
-    dom.submitButton.textContent = isLoading ? '事態演變中...' : '動作';
+    dom.submitButton.textContent = isLoading ? '撰寫中...' : '動作';
     dom.chatInput.disabled = isLoading;
     dom.chatActionBtn.disabled = isLoading;
     dom.endChatBtn.disabled = isLoading;
@@ -39,26 +38,44 @@ export function setLoading(isLoading, text = '') {
     if (combatSurrenderBtn) {
         combatSurrenderBtn.disabled = isLoading;
     }
-    
-    // 【核心修改】分離全局載入動畫與按鈕狀態
-    const showGlobalLoader = gameState.isRequesting && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
-    if (showGlobalLoader) {
+    if (dom.aiThinkingLoader) {
+        const loaderDisclaimerElement = dom.aiThinkingLoader.querySelector('.loader-disclaimer');
         const loaderTextElement = dom.aiThinkingLoader.querySelector('.loader-text');
-        if (loaderTextElement) loaderTextElement.textContent = text || '江湖百曉生正在構思...';
+        const loaderTipElement = dom.aiThinkingLoader.querySelector('.loader-tip');
         
-        const rotateTip = () => { /* ... */ };
-        const rotateDisclaimer = () => { /* ... */ };
-        rotateTip();
-        rotateDisclaimer();
-        tipInterval = setInterval(rotateTip, 10000);
-        disclaimerInterval = setInterval(rotateDisclaimer, 10000);
+        if(loaderTextElement) loaderTextElement.textContent = text;
+        
+        const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
-        dom.aiThinkingLoader.classList.add('visible');
-    } else {
-        clearInterval(tipInterval);
-        clearInterval(disclaimerInterval);
-        if (dom.aiThinkingLoader) dom.aiThinkingLoader.classList.remove('visible');
+        if (showGlobalLoader) {
+            const rotateTip = () => {
+                if (gameTips.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * gameTips.length);
+                    if (loaderTipElement) {
+                        loaderTipElement.innerHTML = gameTips[randomIndex];
+                    }
+                }
+            };
+            rotateTip();
+            tipInterval = setInterval(rotateTip, 10000);
+
+            const rotateDisclaimer = () => {
+                if (loadingDisclaimers.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
+                    if(loaderDisclaimerElement) {
+                        loaderDisclaimerElement.innerHTML = loadingDisclaimers[randomIndex];
+                    }
+                }
+            };
+            rotateDisclaimer();
+            disclaimerInterval = setInterval(rotateDisclaimer, 10000);
+
+        } else {
+            clearInterval(tipInterval);
+            clearInterval(disclaimerInterval);
+        }
+        dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }
     
     modal.setCombatLoading(isLoading && gameState.isInCombat);
@@ -89,59 +106,84 @@ export async function handlePlayerDeath() {
 }
 
 async function startProactiveChat(proactiveData) {
-    // (此函式保持不變)
+    const { npcName, openingLine, itemChanges } = proactiveData;
+    
+    try {
+        const profile = await api.getNpcProfile(npcName);
+        
+        gameState.isInChat = true;
+        gameState.currentChatNpc = npcName;
+        gameState.chatHistory = [];
+
+        modal.openChatModalUI(profile); 
+        
+        modal.appendChatMessage('npc', openingLine);
+        gameState.chatHistory.push({ speaker: 'npc', message: openingLine });
+
+        if (itemChanges && itemChanges.length > 0) {
+            const itemNames = itemChanges.map(item => `${item.itemName} x${item.quantity}`).join('、');
+            const giftMessage = `你獲得了來自 ${npcName} 的贈禮：${itemNames}。`;
+            modal.appendChatMessage('system', giftMessage);
+            gameState.chatHistory.push({ speaker: 'system', message: giftMessage });
+        }
+
+        dom.chatInput.focus();
+    } catch (error) {
+        console.error(`啟動與 ${npcName} 的主動對話失敗:`, error);
+        appendMessageToStory(`[系統] ${npcName}似乎想對你說些什麼，但你沒有聽清。`, 'system-message');
+    }
 }
 
-function processFinalData(data) {
-    if (!data || !data.roundData) return;
+export function processNewRoundData(data) {
+    if(!data.roundData) return;
+    
+    data.roundData.suggestion = data.suggestion;
+    addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
+    
+    if (data.roundData.NPC && Array.isArray(data.roundData.NPC)) {
+        data.roundData.NPC.forEach(npc => {
+            if (npc.isDeceased && !gameState.deceasedNpcs.includes(npc.name)) {
+                gameState.deceasedNpcs.push(npc.name);
+                console.log(`[生死簿] 已記錄死亡NPC: ${npc.name}`);
+            }
+        });
+    }
 
-    // 【核心修改】現在只處理數據更新
-    updateDashboard(data.roundData, data.locationData);
+    // --- 【核心修正】在更新UI前，先將完整的地區情報存入全局狀態 ---
+    if (data.locationData) {
+        gameState.currentLocationData = data.locationData;
+        console.log('[遊戲狀態] 已更新當前地區的詳細情報:', gameState.currentLocationData);
+    }
+    // --- 修正結束 ---
+
+    updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
     
     gameState.currentRound = data.roundData.R;
     gameState.roundData = data.roundData;
-    gameState.currentLocationData = data.locationData;
-    
+
     updateBountyButton(data.hasNewBounties);
 
     if (data.roundData.playerState === 'dead') {
         setLoading(false);
         handlePlayerDeath();
+        return;
+    }
+    
+    if (data.proactiveChat) {
+        startProactiveChat(data.proactiveChat);
     }
 }
-
-// 【核心新增】輪詢函式，用於在背景等待數據更新完成
-async function pollForCompletion(taskId, retries = 10, delay = 2000) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await api.pollUpdate(taskId);
-            if (response.status === 'completed') {
-                console.log('[輪詢成功] 後端數據已處理完畢，正在更新儀表板...');
-                processFinalData(response.data);
-                setLoading(false); // 所有流程結束，解鎖UI
-                return;
-            } else if (response.status === 'error') {
-                throw new Error(response.message || '後台處理任務時發生錯誤。');
-            }
-            // 如果狀態是 'processing'，則等待後繼續輪詢
-        } catch (error) {
-            // 處理輪詢本身的錯誤
-            console.error(`[輪詢失敗] 第 ${i + 1} 次嘗試失敗:`, error);
-            if (i === retries - 1) {
-                handleApiError(new Error('與伺服器的數據同步超時，請刷新頁面再試。'));
-                setLoading(false);
-                return;
-            }
-        }
-        await new Promise(resolve => setTimeout(resolve, delay));
-    }
-}
-
 
 export async function handlePlayerAction() {
     interaction.hideNpcInteractionMenu();
     const actionText = dom.playerInput.value.trim();
     if (!actionText || gameState.isRequesting) return;
+
+    if (actionText.toUpperCase() === '/*GM') {
+        dom.playerInput.value = '';
+        dom.gmPanel.classList.add('visible');
+        return;
+    }
 
     dom.playerInput.value = '';
 
@@ -150,40 +192,34 @@ export async function handlePlayerAction() {
         dom.storyTextContainer.innerHTML = '';
     }
 
-    // 【核心重構】兩階段加載流程
-    // 1. 立即鎖定UI並顯示第一階段提示
     setLoading(true, '江湖百曉生正在構思...');
     appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
     try {
-        // 2. 發送交互請求，只期望獲得即時的劇情回應
-        const initialResponse = await api.interact({
+        const data = await api.interact({
             action: actionText,
             round: gameState.currentRound,
             model: dom.aiModelSelector.value
         });
 
-        // 3. 處理第一階段的回應
-        if (initialResponse && initialResponse.status === 'processing') {
-            // 立刻顯示劇情文字，但UI保持鎖定
-            addRoundTitleToStory(`第 ${gameState.currentRound + 1} 回`);
-            updateStory(initialResponse.story, initialResponse.suggestion);
-            
-            // 啟動後台輪詢來獲取最終的數據更新
-            pollForCompletion(initialResponse.taskId);
-
-        } else if (initialResponse && initialResponse.roundData) {
-            // 對於某些直接返回完整數據的舊流程（如丐幫），直接處理
-            processFinalData(initialResponse);
-            setLoading(false);
+        if (data && data.roundData) {
+            processNewRoundData(data);
         } else {
             throw new Error("從伺服器收到的回應格式不正確。");
         }
 
+        if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
+            interaction.startCombat(data.combatInfo.initialState);
+        }
+
     } catch (error) {
         console.error('API 錯誤或通訊中斷:', error);
-        handleApiError(error);
-        setLoading(false); // 出錯時解鎖UI
+        appendMessageToStory(`[系統] 通訊似乎發生了中斷... 正在嘗試為您同步最新的江湖狀態...`, 'system-message');
+        await loadInitialGame();
+    } finally {
+        if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
+             setLoading(false);
+        }
     }
 }
 
@@ -197,8 +233,9 @@ export async function loadInitialGame() {
 
         if (data.gameState === 'deceased') {
             if(data.roundData) {
+                // 【核心修正】初始化時也要儲存地區情報
                 if (data.locationData) gameState.currentLocationData = data.locationData;
-                updateDashboard(data.roundData, data.locationData);
+                updateUI('', data.roundData, null, data.locationData);
             }
             handlePlayerDeath();
         } else {
@@ -208,9 +245,7 @@ export async function loadInitialGame() {
                 prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                 dom.storyTextContainer.appendChild(prequelDiv);
             }
-            addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
-            updateStory(data.story, data.suggestion, data.roundData);
-            processFinalData(data);
+            processNewRoundData(data);
         }
     } catch (error) {
         if (error.message.includes('找不到存檔')) {
@@ -220,7 +255,7 @@ export async function loadInitialGame() {
             
             addRoundTitleToStory(roundZeroData.EVT);
             appendMessageToStory(initialMessage, 'system-message');
-            updateDashboard(roundZeroData, null);
+            updateUI(null, roundZeroData, null, null);
         } else {
             handleApiError(error);
         }
