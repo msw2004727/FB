@@ -351,17 +351,53 @@
                     </div>
                 </div>
             </div>
-
-            <!-- 社交互動與人際關係 -->
+            
+            <!-- 物品、交易與建設 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
-                    <span><i class="fa-solid fa-comments"></i>社交互動與人際關係</span>
+                    <span><i class="fa-solid fa-house-chimney-window"></i>物品、交易與建設</span>
+                    <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-content-inner">
+                        <div class="qa-pair"><div class="qa-question">Q: 如何獲得物品和金錢？</div><div class="qa-answer">A: 完成NPC的委託、探索未知區域、搜查敵人屍體，或是...採取一些不那麼光彩的手段，例如「偷竊」。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 遊戲中的貨幣是什麼？</div><div class="qa-answer">A: 主要貨幣是「銀兩」。你可以透過交易、任務獎勵或探索獲得。錢可以用於購買物品、賄賂NPC或觸發特定事件。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我的背包有容量限制嗎？</div><div class="qa-answer">A: 有。遊戲採用「負重系統」。每個物品都有「輕、中、重、極重」四個份量等級。你的總負重會顯示在儀表板物品欄標題旁。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 負重太高會怎麼樣？</div><div class="qa-answer">A: 你的總負重會影響故事描述。當「不堪重負」時，AI在生成劇情時會體現你的遲緩與不便，在戰鬥或需要敏捷的場合將處於巨大劣勢。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 如何裝備或卸下物品？</div><div class="qa-answer">A: 在儀表板的物品欄中，點擊物品卡片右側的開關即可穿上或卸下裝備。已裝備的物品會自動置頂，並顯示其裝備部位的圖示。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是裝備槽位？</div><div class="qa-answer">A: 你的角色有固定的裝備槽位，如頭、身、手、腳、主手武器、副手武器等。大部分部位都是唯一的，穿上新的會自動替換舊的。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 飾品可以戴幾個？</div><div class="qa-answer">A: 你有兩個飾品槽位。飾品採用「先進先出」規則，當你裝備第三個飾品時，最早裝備的那個會被自動卸下。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 單手和雙手武器有什麼區別？</div><div class="qa-answer">A: 裝備雙手武器（如巨劍、長槍）會自動卸下你雙手的所有物品（包括主手和副手武器）。請謹慎操作。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 如何查看物品的詳細資訊？</div><div class="qa-answer">A: 將滑鼠懸停在物品欄的物品上，通常會顯示其詳細描述或屬性。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 物品的稀有度（普通、稀有、史詩、傳說）有什麼意義？</div><div class="qa-answer">A: 稀有度直接決定了物品的基礎價值和屬性強度。傳說級的物品通常擁有強大的力量或獨特的背景故事。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我可以丟棄物品嗎？</div><div class="qa-answer">A: 可以。在物品欄中點擊物品，通常會有「丟棄」選項。但請注意，此操作通常無法復原。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 如何交易？</div><div class="qa-answer">A: 點擊NPC姓名打開互動選單，選擇「交易」。在交易視窗中，你可以將自己的物品或金錢拖入出價區，對方也會根據你的出價和他的需求，提出他的交易物品。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 交易時的「價值差」是什麼？</div><div class="qa-answer">A: 這是系統根據雙方出價物品的基礎價值，計算出的差額。當價值差接近0或為正數時，NPC才更有可能同意交易。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 為什麼有些NPC不願意和我交易？</div><div class="qa-answer">A: NPC的個性、對你的友好度、以及你出價的物品是否他所需要，都會影響交易的成功率。一個視金錢如糞土的俠客，可能不會接受你的金錢交易。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 秘笈或書籍可以直接使用嗎？</div><div class="qa-answer">A: 獲得秘笈或書籍後，你需要下達「閱讀[書籍名稱]」的指令來學習其中的內容。閱讀後，秘笈通常會消失，並轉化為你的武學或知識。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我可以自己製作物品嗎？</div><div class="qa-answer">A: 可以。如果你學會了「鍛造」、「縫紉」、「煉丹」等生活技能，並收集了足夠的材料，就可以嘗試製作物品。例如，對著鐵匠鋪的熔爐下達「我要用這塊玄鐵打造一把劍」。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 物品可以升級或強化嗎？</div><div class="qa-answer">A: 某些特殊的武器或裝備在描述中可能會提到「預留了鑲嵌凹槽」或「材質特異，似有提升空間」。你可以嘗試尋找特定的材料或工匠來進行升級。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 財寶類物品有什麼用？</div><div class="qa-answer">A: 「財寶」如玉佩、金錠、古董等，主要價值在於出售給商人換取大量銀兩，或是作為珍貴的禮物贈送給特定的NPC以大幅提升好感。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我身上的「碎銀」和「銀兩」有什麼不同？</div><div class="qa-answer">A: 在系統中它們是同一種貨幣。遊戲會自動將您的所有「碎銀」、「賞金」、「銀票」等都統一計算為「銀兩」總額。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 如何修理損壞的裝備？</div><div class="qa-answer">A: 遊戲中裝備沒有耐久度設定。但AI可能會在劇情中描述你的武器出現了「缺口」或防具出現了「破損」，這時你可以尋找鐵匠或皮匠進行「修理」。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 如何觸發建設系統？</div><div class="qa-answer">A: 當你在一個地點，並下達包含「建造」、「開設」、「修建」等關鍵字的指令時，就有機會觸發。例如：「我想在村子裡開一間客棧」。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 建設有什麼要求嗎？</div><div class="qa-answer">A: 有。首先，AI會判斷你的指令是否合理。其次，建設通常需要花費大量的時間和金錢，甚至需要特定的材料或人際關係（例如得到村長的同意）。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 建設是立即完成的嗎？</div><div class="qa-answer">A: 不是。簡單的設施（如籬笆）可能在幾天內完成。複雜的建築（如石屋、店鋪）則需要多個回合來逐步完成，AI會在任務日誌中記錄你的建設進度。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 建設完成後有什麼用？</div><div class="qa-answer">A: 你建造的設施將會永久地成為該地點的一部分！例如，你建造的「客棧」會出現在地點詳情中，並可能為你帶來持續的收入或觸發新的劇情。</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 戀愛與人際關係 -->
+            <div class="manual-card accordion-item">
+                <div class="accordion-header">
+                    <span><i class="fa-solid fa-heart-pulse"></i>戀愛與人際關係</span>
                     <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
                 </div>
                 <div class="accordion-content">
                     <div class="accordion-content-inner">
                         <div class="qa-pair"><div class="qa-question">Q: NPC名字的顏色代表什麼？</div><div class="qa-answer">A: 代表他對你的「友好度」。從綠色系(友善)到灰色(中立)再到紅色系(敵對)，讓你一目了然。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「密談」模式？</div><div class="qa-answer">A: 在故事中點擊NPC的姓名，即可進入「密談」模式，與其進行一對一的深入交流。這是培養感情、打探情報、觸發個人任務的唯一途徑。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「密談」模式？</div><div class="qa-answer">A: 在故事中點擊NPC的姓名，即可進入「密談」模式，與其進行一對一的深入交流。這是培養感情、打探情报、觸發個人任務的唯一途徑。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 如何提升與NPC的友好度？</div><div class="qa-answer">A: 幫助他們、完成他們的委託、與他們進行友善的交談、贈送他們喜歡的禮物，都可以提升友好度。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 如何給NPC送禮？</div><div class="qa-answer">A: 首先點擊NPC姓名進入密談模式，然後點擊輸入框旁邊的「禮物」圖示，選擇你想贈送的物品或金錢即可。送對禮物能大幅提升友好度，反之亦然。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 友好度和心動值有什麼區別？</div><div class="qa-answer">A: 友好度是一般的人際關係，代表信賴和親近程度。心動值則是獨立的戀愛指標。一個NPC可能很信任你（高友好度），但未必對你有戀愛的情感（低心動值）。</div></div>
@@ -383,67 +419,35 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- 閉關修練與時間流逝 -->
+
+            <!-- 特色系統詳解 -->
             <div class="manual-card accordion-item">
                 <div class="accordion-header">
-                    <span><i class="fa-solid fa-door-closed"></i>閉關修練與時間流逝</span>
+                    <span><i class="fa-solid fa-star-of-life"></i>特色系統詳解</span>
                     <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
                 </div>
                 <div class="accordion-content">
                     <div class="accordion-content-inner">
+                        <div class="qa-pair"><div class="qa-question">Q: AI核心是什麼？我可以切換嗎？</div><div class="qa-answer">A: 當然可以！這是遊戲的核心特色。儀表板右下角的「AI核心」選單讓你在四種頂級AI模型間自由切換，每種模型都有獨特的「性格」與文筆，為你的江湖帶來截然不同的體驗。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 四種AI核心有什麼不同？</div><div class="qa-answer">A: <b>GPT(強&貴)</b>：如同經驗豐富的宗師，文筆沉穩，邏輯嚴謹，故事最為經典。<b>DeepSeek(強&奇)</b>：想像力天馬行空，如同鬼才，常有出人意料的奇詭發展。<b>Grok(快&怪)</b>：反應極快，不按牌理出牌，如同性情乖張的邪派高手，故事風格最為獨特。<b>Gemini(快&穩)</b>：如同穩重的掌門，速度與穩定性兼具，是平衡的選擇。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我應該什麼時候切換AI核心？</div><div class="qa-answer">A: 任何時候！當你覺得劇情陷入瓶頸，或想體驗不同風格時，不妨換個AI核心，或許能激盪出全新的火花。與不同性格的說書人合作，正是本遊戲的樂趣所在。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「動態世界」？</div><div class="qa-answer">A: 這個江湖是「活」的。NPC並非靜止不動，他們會根據AI的判斷在世界各地移動、生活。你今天在村裡遇到的鐵匠，明天可能就出門遠行了。世界事件也會不斷發生，深刻影響各地局勢。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 我該如何追蹤NPC的位置？</div><div class="qa-answer">A: 透過與其他NPC「密談」來打聽消息是主要方式。例如，你可以向酒館的店小二打聽「你知道林婉兒去哪了嗎？」。此外，某些關鍵NPC的動向也可能出現在任務線索中。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「NPC即時生成」？</div><div class="qa-answer">A: 當你在故事中首次遇到一位新的人物時，AI會根據你們相遇的情境，在後台為這位NPC生成一份獨一無二的、包含詳細背景、個性、秘密與人際關係的「人物檔案」。你與他的初見，將決定他的一生。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「地點即時生成」？</div><div class="qa-answer">A: 當你決定前往一個從未被探索過的新地點時，AI同樣會為這個地點創造一份完整的設定檔案，包括其地理、歷史、統治者、設施與當前發生的事件。你的每一次探索，都是在真正地擴展這個世界的邊界。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 「人物關係圖」有什麼用？</div><div class="qa-answer">A: 它可以將你複雜的人際網絡視覺化。誰是你的摯友？誰又是你的殺父仇人？誰與誰之間又有著不為人知的秘密關係？關係圖將一目了然地為你呈現，是你制定策略、合縱連橫的重要參考。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 「世界地圖」和「地點詳情」有什麼用？</div><div class="qa-answer">A: 世界地圖 (<i class="fas fa-globe-asia"></i>) 宏觀地展示了你所有探索過地點的地理位置與連接關係。而地點詳情 (<i class="fas fa-info-circle"></i>) 則深入展示了當前地點的統治者、設施、近期傳聞等動態資訊，助你快速融入環境。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 「江湖百科」和「個人小說」有什麼不同？</div><div class="qa-answer">A: 「江湖百科」(<i class="fas fa-atlas"></i>) 像一本索引，分門別類地記錄了你遇到的所有人、事、物，方便你快速查閱。而「個人小說」(<i class="fas fa-book-open"></i>) 則是將你的所有經歷，按照時間順序，匯集成一本完整的、可供沉浸式閱讀的傳記故事。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「江湖圖書館」？</div><div class="qa-answer">A: 這是一個跨越所有玩家的公共空間。當任何一位玩家的角色死亡後，他那段完整的人生故事將會被收錄進圖書館，供所有後來的玩家瞻仰與閱讀。你的傳奇，將可能成為他人眼中的上古神話。</div></div>
+                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「黑影人」事件？</div><div class="qa-answer">A: 當有其他玩家正在「江湖圖書館」中閱讀你的故事時，你可能會在遊戲中隨機遭遇一位神秘的「黑影人」。他只是靜靜地觀察你，不會與你互動，隨後便會消失。這代表你的傳奇，正被世人所傳頌，是一種獨特的榮譽彩蛋。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 什麼是閉關系統？</div><div class="qa-answer">A: 閉關是一種高風險、高回報的特殊修練方式，能讓您在短時間內大幅提升武學境界與自身功力，但需要滿足特定條件才能進行。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 如何發起閉關？</div><div class="qa-answer">A: 您需要下達一個包含明確**時間**與**修練目標**的指令。例如：<code>我決定在此地閉關修練基礎劍法七日</code>。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 閉關需要什麼條件？</div><div class="qa-answer">A: 您必須滿足四大條件：1.身處一個**私密的、不受打擾**的地點（如客棧房間、個人居所）；2.精力值必須**高於80%**；3.攜帶**足夠天數的食物與飲水**；4.必須已經學會了想修練的武學。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 閉關的結果是固定的嗎？</div><div class="qa-answer">A: 不是。閉關的結果完全由機率決定，分為四種：大功告成（15%）、略有小成（60%）、毫無進展（20%）和走火入魔（5%）。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「大功告成」？</div><div class="qa-answer">A: 這是最好的結果。您的武學熟練度和對應的功力值將會獲得**巨幅**提升，AI也會生成一段您神功大成的精彩故事。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「略有小成」？</div><div class="qa-answer">A: 這是最常見的結果。您的武學熟練度和功力值會獲得**穩定**的提升，代表一次成功的修練。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「毫無進展」？</div><div class="qa-answer">A: 您在閉關期間心浮氣躁，一無所獲。除了消耗了時間和糧水，您的能力不會有任何變化。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 什麼是「走火入魔」？</div><div class="qa-answer">A: 這是最壞的結果！您的武學熟練度和功力值不僅不會提升，反而會**倒扣**！AI會描述您真氣逆行、身受重創，需要花費更多時間來療傷。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 我的狀態會影響閉關結果嗎？</div><div class="qa-answer">A: 會。您的精力值是影響機率的關鍵因素。精力越充沛，大成的機率越高，走火入魔的風險則越低。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 閉關期間會發生什麼事？</div><div class="qa-answer">A: 閉關期間您將與世隔絕。遊戲時間會直接跳轉到您出關的那一天，AI會根據閉關的結果，為您生成一段閉關期間的心路歷程或身體變化的故事。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關修練的功力值會加在哪裡？</div><div class="qa-answer">A: 增加的功力值會根據您修練的武學「功體屬性」而定。例如，修練劍法會增加「外功」，而修練內功心法則會增加「內功」。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以中途停止閉關嗎？</div><div class="qa-answer">A: 不可以。一旦下達閉關指令並成功執行，您就必須完成整個閉關過程。這是一次性的、不可逆轉的決定。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關會消耗很多真實時間嗎？</div><div class="qa-answer">A: 不會。閉關的計算和故事生成與普通指令的耗時相當。遊戲內的時間會跳躍，但您在現實世界中無需等待太久。</div></div>
                         <div class="qa-pair"><div class="qa-question">Q: 閉關和其他修練方式有何不同？</div><div class="qa-answer">A: 閉關是唯一一種可以「以時間換取大幅成長」的方式。普通的修練指令（如「我練了一下劍」）只會增加少量經驗，而閉關則是用數天的時間來換取數倍的收益，當然也伴隨著風險。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關失敗後我該怎麼辦？</div><div class="qa-answer">A: 如果走火入魔，您的角色狀態會變為「重傷」，功力也會下降。您需要像處理其他傷勢一樣，透過療傷、服藥等方式來恢復。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 有沒有增加閉關成功率的方法？</div><div class="qa-answer">A: 除了保持高精力值，某些特殊的丹藥、在靈氣充沛的寶地閉關、或是獲得高人護法，都可能在未來的更新中成為提高成功率的途徑。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關期間，外面的世界會變化嗎？</div><div class="qa-answer">A: 會的。當您出關時，江湖可能已經發生了翻天覆地的變化。這是閉關的另一個隱藏風險與魅力所在。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關指令的關鍵字有哪些？</div><div class="qa-answer">A: 主要關鍵字是<code>閉關</code>、<code>靜修</code>，並搭配明確的天數，如<code>三日</code>、<code>七日</code>、<code>一個月</code>。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關系統的設計理念是什麼？</div><div class="qa-answer">A: 旨在模擬武俠小說中主角們透過閉關苦修而功力大進的經典橋段，為玩家提供一個高風險、高回報的快速成長通道，增加遊戲的策略性和沉浸感。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 閉關後我的糧食和水會被消耗嗎？</div><div class="qa-answer">A: 會的。系統會自動從您的背包中扣除閉關天數所對應的食物和飲水。如果資源不足，閉關將無法開始。</div></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 世界探索與動態系統 -->
-            <div class="manual-card accordion-item">
-                <div class="accordion-header">
-                    <span><i class="fa-solid fa-map-signs"></i>世界探索與動態系統</span>
-                    <span class="toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
-                </div>
-                <div class="accordion-content">
-                    <div class="accordion-content-inner">
-                        <div class="qa-pair"><div class="qa-question">Q: 如何移動到其他地方？</div><div class="qa-answer">A: 使用描述性的指令，例如「前往開封府」、「離開村子，往東邊的大路走」、「進入森林深處」。AI會根據你的描述，將你移動到對應的地點。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何與環境互動？</div><div class="qa-answer">A: 嘗試對你看到的任何事物進行互動。例如「檢查桌上的信件」、「推開那扇沉重的石門」、「搜尋敵人的屍體」。探索是獲得線索和物品的重要途徑。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 為什麼NPC有時候不在我以為的地方？</div><div class="qa-answer">A: NPC是「活」的。AI会根據故事發展更新他們的位置。如果你想與某人互動，需要透過探索或打聽，確保你們在同一地點。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: NPC會死嗎？</div><div class="qa-answer">A: 會。NPC可能會因為劇情、你的行動、或是與其他NPC的衝突而死亡。他們的死亡可能會對世界產生深遠的影響。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 遊戲世界有多大？</div><div class="qa-answer">A: 遊戲世界是動態生成的。當你在故事中首次提及或決定前往一個新地點時，AI會為這個地點生成完整的背景設定，讓你的探索永無止境。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是懸賞任務？</div><div class="qa-answer">A: 點擊儀表板的「卷軸」圖示 <i class="fas fa-scroll"></i>，可以查看當前所有可接取的懸賞任務。按鈕發光時，代表有新的懸賞發布了。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何完成懸賞任務？</div><div class="qa-answer">A: 根據懸賞內容，達成指定目標（例如擊殺目標人物、尋找特定物品）。完成後，下達「領取懸賞」或「回報任務」等指令，即可獲得獎勵。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以不理會懸賞任務嗎？</div><div class="qa-answer">A: 當然。懸賞任務是完全可選的，它們提供了額外的挑戰和獎勵，但你可以自由決定是否參與。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 殺人會有什麼後果？</div><div class="qa-answer">A: 殺人是改變世界最直接的方式，但後果嚴重。首先，你的立場值會大幅下降。其次，死者的親友會將你視為仇敵，展開無盡的追殺。最後，若在城鎮中殺人，會引來官府的通緝。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以探索所有的房屋或房間嗎？</div><div class="qa-answer">A: 你可以嘗試。但如果房屋是私人民宅，未經允許闖入可能會被視為非法侵入，降低你的立場值，甚至引來主人的攻擊。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 遊戲中有隨機事件嗎？</div><div class="qa-answer">A: 有。在你探索世界的過程中，隨時可能觸發各種奇遇。可能是在路邊撿到錢袋，也可能是被毒蛇咬傷，為你的旅途增添變數。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 天氣會對遊戲產生影響嗎？</div><div class="qa-answer">A: 會。AI會根據天氣生成不同的場景描述。例如，下雨天趕路可能會讓你的精力消耗加倍，也可能讓你意外發現一個可以避雨的山洞，從而觸發新的劇情。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以改變一個地區的狀態嗎？</div><div class="qa-answer">A: 可以。你的行動可能會對地區產生永久性的影響。例如，如果你殺死了某個山寨的寨主，這個山寨的統治者就會改變，其勢力範圍也可能因此變動。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 如何發現新的地點？</div><div class="qa-answer">A: 除了親身前往，你還可以透過與NPC交談、閱讀書籍或查看地圖等方式，得知新地點的存在。這些地點會被記錄下來，並出現在你的世界地圖上。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以回到之前去過的地方嗎？</div><div class="qa-answer">A: 當然可以。只要你還記得那個地方的名字，就可以透過指令再次前往。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 遊戲世界是靜態的嗎？</div><div class="qa-answer">A: 不是。遊戲世界會因為你的行動、NPC的死亡、以及隨機的世界事件而動態演化。你今天看到的江湖，明天可能已是另一番景象。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 遊戲中的NPC之間會互相影響嗎？</div><div class="qa-answer">A: 會。NPC之間有著複雜的人際關係網。如果你幫助了A，A的朋友可能會對你產生好感，而A的敵人則可能會對你產生敵意。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 我可以建造自己的房屋嗎？</div><div class="qa-answer">A: 可以。當你在一個地方停留足夠久，並與當地人建立良好關係後，可以嘗試下達「我想在這裡蓋一間茅草屋」之類的指令。建造需要時間和材料，但能為你提供一個安全的庇護所。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 地點的「靜態情報」和「動態情報」是什麼意思？</div><div class="qa-answer">A: 在地點詳情彈窗中，「靜態情報」是該地點的固有設定，如地理、歷史，無法被改變。「動態情報」則是專屬於你的遊戲存檔的狀態，如當前的統治者、繁榮度、發生的事件，這些都可以被你的行動所影響。</div></div>
-                        <div class="qa-pair"><div class="qa-question">Q: 什麼是「黑影人」？</div><div class="qa-answer">A: 當有其他玩家在「江湖圖書館」閱讀你的故事時，你可能會在遊戲中隨機遭遇神秘的「黑影人」。他只是靜靜地觀察，不會與你互動，隨後便會消失。這代表你的傳奇，正被世人所傳頌。</div></div>
                     </div>
                 </div>
             </div>
