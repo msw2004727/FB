@@ -7,7 +7,7 @@ const { TIME_SEQUENCE, advanceDate, invalidateNovelCache, updateLibraryNovel } =
 const { processLocationUpdates } = require('../locationManager');
 const { processItemChanges } = require('../itemManager');
 const { calculateNewStamina } = require('./staminaManager');
-const { addCurrency } = require('../economyManager'); // 【核心新增】引入戶部尚書
+const { addCurrency } = require('../economyManager');
 
 const db = admin.firestore();
 
@@ -24,6 +24,11 @@ const db = admin.firestore();
 async function updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber) {
     const userDocRef = db.collection('users').doc(userId);
     const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+
+    // 【核心新增】黑影人出現日誌提醒
+    if (aiResponse.story && (aiResponse.story.includes('黑影') || aiResponse.story.includes('影子'))) {
+        console.log(`[!!!] 系統警示：神秘黑影人已在玩家 [${username}] 的第 ${newRoundNumber} 回合劇情中出現！`);
+    }
 
     const safeRoundData = aiResponse.roundData;
     const { playerState = 'alive', powerChange = {}, moralityChange = 0, moneyChange = 0, itemChanges = [], skillChanges = [], romanceChanges = [], npcUpdates = [], locationUpdates = [], ATM = [''], EVT = '江湖軼事', LOC = player.currentLocation || ['未知之地'], PSY = '心如止水', PC = '安然無恙', NPC = [], QST = '', WRD = '晴朗', LOR = '', CLS = '', IMP = '你的行動似乎沒有產生什麼特別的影響。', timeOfDay: aiNextTimeOfDay, daysToAdvance = 0 } = safeRoundData;
@@ -70,12 +75,9 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
 
     const batch = db.batch();
 
-    // 【核心修正】將 moneyChange 轉換為對「銀兩」的操作
     if (moneyChange > 0) {
         await addCurrency(userId, moneyChange, batch);
     } else if (moneyChange < 0) {
-        // 注意：這裡假設AI不會返回負的moneyChange來扣錢，因為扣錢應走交易或事件流程
-        // 為安全起見，我們只處理增加
         console.warn(`[經濟系統] 偵測到一個負數的moneyChange (${moneyChange})，已被忽略。`);
     }
 
@@ -104,7 +106,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         maxExternalPowerAchieved: Math.max(player.maxExternalPowerAchieved || 0, newExternalPower),
         maxLightnessAchieved: Math.max(player.maxLightnessAchieved || 0, newLightnessPower),
         morality: admin.firestore.FieldValue.increment(Number(moralityChange || 0)),
-        // 【核心修正】移除對 money 欄位的更新
         R: newRoundNumber
     };
     batch.update(userDocRef, playerUpdatesForDb);
