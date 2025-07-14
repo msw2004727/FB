@@ -16,17 +16,15 @@ async function fetchApi(endpoint, options = {}) {
         headers,
     });
     
-    // 修正：即使回應不ok，也嘗試解析JSON以獲取後端錯誤訊息
     const responseBody = await response.text();
     let data;
     try {
         data = JSON.parse(responseBody);
     } catch (e) {
-        // 如果解析失敗，表示回傳的不是JSON，將原始文本作為錯誤訊息
         if (!response.ok) {
             throw new Error(responseBody || `伺服器錯誤: ${response.status}`);
         }
-        return responseBody; // 對於非JSON的成功回應，直接返回文本
+        return responseBody;
     }
 
     if (!response.ok) {
@@ -64,7 +62,7 @@ export const api = {
     getSkills: () => fetchApi('/api/game/state/skills'),
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
     
-    // 【核心修正 v3.0】修正裝備/卸下物品的 API 函式
+    // 【核心修正 v4.0】修正並確認裝備/卸下物品的 API 函式
     equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
     unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
 
