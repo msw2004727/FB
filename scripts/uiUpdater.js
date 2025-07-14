@@ -268,17 +268,25 @@ function createItemEntry(item) {
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
-    // --- 【核心修正】重寫圖示判斷邏輯 ---
-    let iconClass = 'fa-box'; // 預設圖示
-    if (item.itemType && itemTypeConfig[item.itemType]) {
-        iconClass = itemTypeConfig[item.itemType].icon; // 根據物品類型設定通用圖示
+    // --- 【全新修正】重寫圖示判斷邏輯 ---
+    let iconClass = 'fa-box'; // 預設圖示為小木盒
+
+    // 判斷是否為武器或裝備，如果是，則使用其專屬圖示
+    if (item.itemType === '武器') {
+        iconClass = 'fa-gavel';
+    } else if (item.itemType === '裝備') {
+        iconClass = 'fa-user-shield';
+    } else if (item.itemType === '財寶') {
+        iconClass = 'fa-coins';
     }
+    // 對於其他所有類型（秘笈、道具、材料等），都會維持預設的 'fa-box' 圖示。
+
+    // 如果物品「已裝備」，則使用更精確的「部位圖示」覆蓋前面的設定
     if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
-        iconClass = slotConfig[item.equipSlot].icon; // 如果已裝備，則覆蓋為更精確的部位圖示
+        iconClass = slotConfig[item.equipSlot].icon;
     }
     // --- 修正結束 ---
 
-    // --- 【本次問題修正】---
     let equipControls = '';
     // 判斷物品類型是否為「武器」或「裝備」，只要是，就顯示開關
     if (item.itemType === '武器' || item.itemType === '裝備') {
@@ -291,7 +299,6 @@ function createItemEntry(item) {
             </div>
         `;
     }
-    // --- 修正結束 ---
 
     entry.innerHTML = `
         <div class="item-info">
