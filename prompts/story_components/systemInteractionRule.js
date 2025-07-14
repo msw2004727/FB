@@ -21,7 +21,6 @@ const getSystemInteractionRule = (promptData) => {
 如果你的故事中，發生了足以**永久性改變**當前地點「${locationName || '未知之地'}」狀態的重大事件，你**必須**在回傳的 \`roundData\` 物件中，額外加入一個名為 \`"locationUpdates"\` 的**物件陣列**。陣列中的每一個物件都代表一次具體的修改。
 - **結構**: \`{ "fieldToUpdate": "要更新的欄位路徑", "newValue": "新的值", "updateType": "set | arrayUnion" }\`
 - **欄位路徑**: 使用點表示法，例如 \`governance.ruler\` 或 \`lore.currentIssues\`。
-- **更新類型**: \`set\` 用於直接覆蓋欄位值，\`arrayUnion\` 用於向陣列欄位中添加新元素。
 - **範例**:
     - 故事講述了村長死亡，由王二接任：\`"locationUpdates": [{ "fieldToUpdate": "governance.ruler", "newValue": "王二", "updateType": "set" }]\`
     - 故事中打聽到了神兵的線索：\`"locationUpdates": [{ "fieldToUpdate": "lore.currentIssues", "newValue": "傳聞本地的後山深處藏有神兵『玄鐵劍』", "updateType": "arrayUnion" }]\`
@@ -53,10 +52,10 @@ const getSystemInteractionRule = (promptData) => {
 2.  **【數據記錄】** 當你判定一個建築**在本回合被完成**時，你**必須**在 \`roundData.locationUpdates\` 陣列中，為這個新建築添加一個對應的指令。
     * **結構**: \`{ "fieldToUpdate": "buildings", "newValue": { "name": "你為建築取的名字", "type": "建築的類型", "owner": "玩家姓名" }, "updateType": "arrayUnion" }\`
     * **欄位說明**:
-        * `fieldToUpdate`: 玩家自建的私人居所，應使用 `"buildings"`。如果是店鋪等公共設施，則用 `"facilities"`。
-        * `name`: 你必須為這個建築取一個獨特的名字，例如「阿金的茅舍」。
-        * `type`: 建築的類型，例如「茅舍」、「木屋」。
-        * `owner`: 建造者的名字，也就是玩家的姓名。
+        * \`fieldToUpdate\`: 玩家自建的私人居所，應使用 "buildings"。如果是店鋪等公共設施，則用 "facilities"。
+        * \`name\`: 你必須為這個建築取一個獨特的名字，例如「阿金的茅舍」。
+        * \`type\`: 建築的類型，例如「茅舍」、「木屋」。
+        * \`owner\`: 建造者的名字，也就是玩家的姓名。
     * **範例**: 故事中玩家「阿金」花費數日蓋好了一座茅舍。
         \`\`\`json
         "daysToAdvance": 3,
