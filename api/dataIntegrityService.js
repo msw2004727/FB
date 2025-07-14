@@ -77,15 +77,21 @@ async function checkUserFields(userId) {
     const updates = {};
     let needsUpdate = false;
 
+    // 1. 補全缺失的欄位
     for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
         if (userData[field] === undefined) {
             needsUpdate = true;
-            updates[field] = defaultValue;
-            console.log(`[健康檢查-玩家] 補齊缺失欄位: ${field} ->`, defaultValue);
+            let value = defaultValue;
+            if (field === 'maxInternalPowerAchieved') value = userData.internalPower || defaultValue;
+            else if (field === 'maxExternalPowerAchieved') value = userData.externalPower || defaultValue;
+            else if (field === 'maxLightnessAchieved') value = userData.lightness || defaultValue;
+            updates[field] = value;
+            console.log(`[健康檢查-玩家] 補齊缺失欄位: ${field} ->`, value);
         }
     }
     
-    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day'];
+    // 2. 修正錯誤的資料類型
+    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day', 'maxInternalPowerAchieved', 'maxExternalPowerAchieved', 'maxLightnessAchieved'];
     for (const field of fieldsToEnsureNumber) {
         if (userData[field] !== undefined && typeof userData[field] !== 'number') {
             const parsedValue = Number(userData[field]);
@@ -94,6 +100,23 @@ async function checkUserFields(userId) {
             console.log(`[健康檢查-玩家] 修正類型錯誤: ${field} 從 "${userData[field]}" (${typeof userData[field]}) 修復為 ${updates[field]} (number)。`);
         }
     }
+
+    // 3. 修正歷史巔峰值
+    const finalData = { ...userData, ...updates }; // 合併已修正的資料
+    const powerTypes = ['Internal', 'External', 'Lightness'];
+
+    powerTypes.forEach(type => {
+        const currentPowerKey = type.toLowerCase() + 'Power';
+        const maxPowerKey = 'max' + type + 'PowerAchieved';
+        const currentPower = finalData[currentPowerKey] || 0;
+        const maxPower = finalData[maxPowerKey] || 0;
+
+        if (currentPower > maxPower) {
+            updates[maxPowerKey] = currentPower;
+            needsUpdate = true;
+            console.log(`[健康檢查-玩家] 修正歷史巔峰記錄: ${maxPowerKey} 從 ${maxPower} 修復為 ${currentPower}。`);
+        }
+    });
 
     if (needsUpdate) {
         await userDocRef.update(updates);
@@ -211,7 +234,7 @@ async function runDataHealthCheck(userId, username) {
             checkUserFields(userId),
             repairMissingNpcTemplates(userId, username, playerProfile, allSavesData),
             repairIncompleteNpcTemplates(userId, username, playerProfile, allSavesData),
-            backfillNpcStates(userId) // 【核心新增】執行NPC狀態檔案的回填
+            backfillNpcStates(userId)
         ]);
         console.log(`[健康檢查] 玩家 ${username} 的所有資料健康檢查完畢。`);
     } catch (error) {
