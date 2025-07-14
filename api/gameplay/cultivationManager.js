@@ -4,10 +4,11 @@ const { getPlayerSkills, getRawInventory } = require('../playerStateHelpers');
 const { getMergedLocationData } = require('../worldStateHelpers');
 const { calculateCultivationOutcome } = require('../config/cultivationFormulas');
 const { getAICultivationResult } = require('../../services/aiService');
-const { processItemChanges } = require('../itemManager'); // 引入物品管理器
+const { processItemChanges } = require('../itemManager');
+const { appendTutorialHint } = require('../utils/tutorialHelper'); // 【核心新增】引入教學提示模組
 
 /**
- * 【核心】處理閉關修練請求的總控制器 v2.0
+ * 【核心】處理閉關修練請求的總控制器 v2.1
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} playerProfile - 當前的玩家完整檔案
@@ -25,28 +26,29 @@ async function handleCultivation(userId, username, playerProfile, days, skillNam
     if (skillName) {
         skillToPractice = playerSkills.find(s => s.skillName === skillName);
         if (!skillToPractice) {
-            return { success: false, message: `你尚未習得「${skillName}」，無法進行修練。`, data: null };
+            // 【核心修改】使用輔助函式包裝所有回傳給玩家的錯誤訊息
+            return { success: false, message: appendTutorialHint(`你尚未習得「${skillName}」，無法進行修練。`), data: null };
         }
     } else {
         if (playerSkills.length === 0) {
-            return { success: false, message: "你身無長技，不知從何練起。", data: null };
+            return { success: false, message: appendTutorialHint("你身無長技，不知從何練起。"), data: null };
         }
         if (playerSkills.length === 1) {
             skillToPractice = playerSkills[0];
             console.log(`[閉關系統] 玩家未指定武學，自動選擇其唯一的武學：「${skillToPractice.skillName}」。`);
         } else {
             const skillList = playerSkills.map(s => `「${s.skillName}」`).join('、');
-            return { success: false, message: `你身負數門絕學 (${skillList})，請明確指定要修練哪一門。`, data: null };
+            return { success: false, message: appendTutorialHint(`你身負數門絕學 (${skillList})，請明確指定要修練哪一門。`), data: null };
         }
     }
 
     // --- 2. 前置條件檢查 ---
     const locationContext = await getMergedLocationData(userId, playerProfile.currentLocation);
     if (!locationContext || !locationContext.isPrivate) {
-        return { success: false, message: "此地人多嘴雜，非是靜修的絕佳之所，還是換個地方吧。", data: null };
+        return { success: false, message: appendTutorialHint("此地人多嘴雜，非是靜修的絕佳之所，還是換個地方吧。"), data: null };
     }
     if ((playerProfile.stamina || 0) < 80) {
-        return { success: false, message: "你現在身心俱疲，強行閉關恐有不測，還是先歇息一番吧。", data: null };
+        return { success: false, message: appendTutorialHint("你現在身心俱疲，強行閉關恐有不測，還是先歇息一番吧。"), data: null };
     }
 
     const inventory = await getRawInventory(userId);
@@ -55,7 +57,7 @@ async function handleCultivation(userId, username, playerProfile, days, skillNam
     const totalFood = foodItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const totalDrinks = drinkItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     if (totalFood < days || totalDrinks < days) {
-        return { success: false, message: `糧食飲水不足，無法支撐長達 ${days} 天的閉關。`, data: null };
+        return { success: false, message: appendTutorialHint(`糧食飲水不足，無法支撐長達 ${days} 天的閉關。`), data: null };
     }
 
     // --- 3. 準備資源扣除列表 ---
@@ -94,7 +96,7 @@ async function handleCultivation(userId, username, playerProfile, days, skillNam
             expChange: expChange
         }],
         powerChange: powerChange,
-        staminaChange: 100, // 閉關後精力充沛
+        stamina: 100, // 閉關後精力充沛
         EVT: `閉關修練「${skillToPractice.skillName}」`,
         PC: `經過${days}日苦修，你對「${skillToPractice.skillName}」的領悟更深一層。`,
         moralityChange: 0,
