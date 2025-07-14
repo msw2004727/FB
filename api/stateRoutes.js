@@ -9,7 +9,7 @@ const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
-// 【核心修改】新增的物品丟棄路由
+// 【核心新增】新增的物品丟棄路由
 router.post('/drop-item', async (req, res) => {
     const { itemId } = req.body;
     const userId = req.user.id;
@@ -43,39 +43,6 @@ router.post('/drop-item', async (req, res) => {
     } catch (error) {
         console.error(`[丟棄物品API] 玩家 ${userId} 丟棄物品 ${itemId} 時出錯:`, error);
         res.status(500).json({ success: false, message: '丟棄物品時發生未知錯誤。' });
-    }
-});
-
-
-router.post('/equip', async (req, res) => {
-    const { itemId, equip } = req.body;
-    const userId = req.user.id;
-
-    if (!itemId) {
-        return res.status(400).json({ success: false, message: '未提供操作的物品ID。' });
-    }
-
-    try {
-        let result;
-        if (equip) {
-            result = await inventoryModel.equipItem(userId, itemId);
-        } else {
-            result = await inventoryModel.unequipItem(userId, itemId);
-        }
-
-        const fullInventory = await getRawInventory(userId);
-        const newBulkScore = calculateBulkScore(fullInventory);
-        
-        res.json({
-            success: true,
-            message: result.message,
-            inventory: fullInventory,
-            bulkScore: newBulkScore,
-        });
-
-    } catch (error) {
-        console.error(`[裝備API] 玩家 ${userId} 操作物品 ${itemId} 時出錯:`, error);
-        res.status(500).json({ success: false, message: error.message || '裝備操作時發生未知錯誤。' });
     }
 });
 
