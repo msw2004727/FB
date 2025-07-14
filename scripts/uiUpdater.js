@@ -278,10 +278,10 @@ function createItemEntry(item) {
     }
     // --- 修正結束 ---
 
-    // --- 【核心修正】重寫裝備開關的判斷邏輯 ---
+    // --- 【本次問題修正】---
     let equipControls = '';
-    // 只要 equipSlot 存在 (不為 null 或 undefined)，就代表此物可裝備，應該顯示開關
-    if (item.equipSlot) {
+    // 判斷物品類型是否為「武器」或「裝備」，只要是，就顯示開關
+    if (item.itemType === '武器' || item.itemType === '裝備') {
         equipControls = `
             <div class="item-controls">
                 <label class="switch">
