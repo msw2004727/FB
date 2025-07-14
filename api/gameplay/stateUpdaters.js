@@ -46,7 +46,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const IMP = safeRoundData.IMP || '你的行動似乎沒有產生什麼特別的影響。';
     const aiNextTimeOfDay = safeRoundData.timeOfDay;
     const daysToAdvance = safeRoundData.daysToAdvance || 0;
-    const staminaChange = safeRoundData.staminaChange || 0;
+    const staminaChange = safeRoundData.staminaChange || 0; 
 
     const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, skillChanges, player);
     if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -126,15 +126,22 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         await processLocationUpdates(userId, finalSaveData.LOC[0], locationUpdates);
     }
 
+    const newInternalPower = (player.internalPower || 0) + (powerChange?.internal || 0);
+    const newExternalPower = (player.externalPower || 0) + (powerChange?.external || 0);
+    const newLightnessPower = (player.lightness || 0) + (powerChange?.lightness || 0);
+
     const playerUpdatesForDb = {
         timeOfDay: finalTimeOfDay,
         stamina: newStamina,
         shortActionCounter,
         ...finalDate,
         currentLocation: LOC,
-        internalPower: admin.firestore.FieldValue.increment(Number(powerChange?.internal || 0)),
-        externalPower: admin.firestore.FieldValue.increment(Number(powerChange?.external || 0)),
-        lightness: admin.firestore.FieldValue.increment(Number(powerChange?.lightness || 0)),
+        internalPower: newInternalPower,
+        externalPower: newExternalPower,
+        lightness: newLightnessPower,
+        maxInternalPowerAchieved: Math.max(player.maxInternalPowerAchieved || 0, newInternalPower),
+        maxExternalPowerAchieved: Math.max(player.maxExternalPowerAchieved || 0, newExternalPower),
+        maxLightnessAchieved: Math.max(player.maxLightnessAchieved || 0, newLightnessPower),
         morality: admin.firestore.FieldValue.increment(Number(moralityChange || 0)),
         money: admin.firestore.FieldValue.increment(Number(moneyChange || 0)),
         R: newRoundNumber
