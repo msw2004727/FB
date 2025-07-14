@@ -131,10 +131,12 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         getPlayerSkills(userId),
         userDocRef.get().then(doc => doc.data()),
     ]);
-
+    
+    // 【核心修正】調整物件合併順序，確保 finalSaveData 中的最新時間戳不會被 finalPlayerProfile 的舊資料覆蓋。
+    // 將 finalSaveData 放在後面，這樣它的屬性（如 year, month, day, timeOfDay）會覆蓋掉 finalPlayerProfile 中可能存在的舊值。
     return {
-         ...finalSaveData, 
          ...finalPlayerProfile, 
+         ...finalSaveData, 
          skills: updatedSkills, 
          inventory: fullInventory, 
          bulkScore: calculateBulkScore(fullInventory)
