@@ -6,8 +6,8 @@ const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostComb
 
 const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require('./npcHelpers');
 const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState } = require('./playerStateHelpers'); // 引入 getRawInventory
-const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
-const { processReputationChangesAfterDeath } = require('./reputationManager');
+const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('../worldStateHelpers');
+const { processReputationChangesAfterDeath } = require('../reputationManager');
 
 const db = admin.firestore();
 
@@ -70,22 +70,15 @@ const initiateCombatHandler = async (req, res) => {
         
         const combatSetupResult = await getAICombatSetup(simulatedPlayerAction, lastSave);
 
-        // --- 【核心修改開始】 ---
-        
-        // 1. 同時獲取玩家所有技能和完整背包
         const [allPlayerSkills, playerInventory] = await Promise.all([
             getPlayerSkills(userId),
             getRawInventory(userId) 
         ]);
 
-        // 2. 判斷玩家當前裝備的武器類型
         const equippedWeapon = playerInventory.find(item => item.isEquipped && item.equipSlot && item.equipSlot.startsWith('weapon'));
         const currentWeaponType = equippedWeapon ? equippedWeapon.weaponType : null;
         
-        console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。可用技能數量: ${allPlayerSkills.length}/${allPlayerSkills.length}`);
-
-        // --- 【核心修改結束】 ---
-
+        console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。`);
 
         const userProfile = (await userDocRef.get()).data();
         const maxHp = (userProfile.externalPower || 5) * 10 + 50;
@@ -120,8 +113,8 @@ const initiateCombatHandler = async (req, res) => {
             turn: 1, 
             player: { 
                 username, 
-                skills: allPlayerSkills,          // 【修改】傳遞所有技能
-                currentWeaponType: currentWeaponType, // 【新增】傳遞當前武器類型
+                skills: allPlayerSkills,
+                currentWeaponType: currentWeaponType,
                 hp: maxHp, 
                 maxHp, 
                 mp: maxMp, 
