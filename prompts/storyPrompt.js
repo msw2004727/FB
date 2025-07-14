@@ -40,7 +40,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     // 【核心修改】新增創功資料連動鐵律
     const customSkillRule = `
 ## 【創功資料連動鐵律 (極高優先級)】
-當你的 \`story\` 敘述中明確描寫了玩家正在「自創」或「領悟」一門全新的武學時，你**必須**在回傳的 \`roundData.skillChanges\` 陣列中，為這門新武學添加一個對應的物件。此物件的 \`isNewlyAcquired\` 必須為 \`true\`，且初始等級 \`level\` 必須為 \`0\`。故事描述與數據生成必須同步，任何情況下都不能遺漏此數據。
+當你的 \`story\` 敘述中明確描寫了玩家正在「自創」或「領悟」或「習得」一門全新的武學時，你**必須**在回傳的 \`roundData.skillChanges\` 陣列中，為這門新武學添加一個對應的物件。此物件的 \`isNewlyAcquired\` 必須為 \`true\`，且初始等級 \`level\` 必須為 \`0\`。故事描述與數據生成必須同步，任何情況下都不能遺漏此數據。
 `;
 
     const specialEventInstruction = worldEventToWeave ? `
