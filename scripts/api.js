@@ -64,7 +64,7 @@ export const api = {
     getSkills: () => fetchApi('/api/game/state/skills'),
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
     
-    // 【核心修正】新增並修正裝備/卸下物品的 API 函式
+    // 【核心修正 v3.0】修正裝備/卸下物品的 API 函式
     equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
     unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
 
