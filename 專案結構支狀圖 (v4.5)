@@ -1,156 +1,155 @@
+好的，指揮官。
+
+這份是您遊戲專案的完整檔案結構圖。我已將每個檔案的主要用途和歸屬（前端、後端、資料庫互動）進行了中文標記，讓您能一目了然整個專案的架構。
+
+遊戲專案檔案結構圖
+這張圖表以樹狀結構呈現，從根目錄開始，詳細列出了每個檔案和資料夾。
+
 .
-├── 📁 api/                   # 後端: API 路由與核心商業邏輯
-│   ├── 📁 admin/             # 後端: 管理後台專用邏輯
-│   │   ├── adminAuth.js      # 後端: 管理後台的密碼驗證中間件
-│   │   ├── adminRoutes.js    # 後端: 管理後台所有API的總路由
-│   │   ├── balanceService.js # 後端: (模擬)獲取各AI服務餘額的服務
-│   │   └── logService.js       # 後端: 讀取與篩選後台日誌的服務
-│   ├── 📁 gameplay/         # 後端: 核心遊戲循環與玩家動作處理
-│   │   ├── actionHandler.js  # 後端: 處理玩家主要動作的核心函式
-│   │   ├── preActionChecks.js # 後端: 在執行主要動作前的預檢測 (如體力、特殊指令)
-│   │   ├── staminaManager.js # 後端: 管理玩家精力值的增減與耗盡懲罰
-│   │   └── stateUpdaters.js  # 後端: 更新遊戲狀態並寫入資料庫的核心函式
-│   ├── 📁 models/           # 後端: 定義資料庫文檔的結構與模型
-│   │   ├── inventoryModel.js # 後端: 處理物品裝備、卸下的資料庫邏輯
-│   │   └── userModel.js      # 後端: 定義新玩家的預設欄位與數值
-│   ├── 📁 routes/           # 後端: (已棄用) 舊版的路由，現已整合
-│   │   ├── npcChatRoutes.js   # 後端: (舊) 處理NPC聊天、贈禮、結束對話的路由
-│   │   ├── npcProfileRoutes.js# 後端: (舊) 處理獲取NPC公開資料的路由
-│   │   └── npcTradeRoutes.js  # 後端: (舊) 處理與NPC交易的路由
-│   ├── 📁 services/          # 後端: 專門處理特定服務的模組
-│   │   ├── beggarService.js     # 後端: 處理丐幫情報系統的專用邏輯
-│   │   └── npcCreationService.js # 後端: 專門負責從無到有創建新NPC的服務
-│   ├── aiConfig.js             # 後端: AI模型中控設定檔，可為不同任務指派不同模型
-│   ├── authRoutes.js           # 後端: 處理玩家註冊與登入的驗證路由
-│   ├── beggarRoutes.js         # 後端: 丐幫情報系統的總路由
-│   ├── bountyRoutes.js         # 後端: 處理懸賞任務獲取與領取的路由
-│   ├── cacheManager.js         # 後端: 伺服器啟動時，快取NPC名稱等不常變動的數據
-│   ├── combatRoutes.js         # 後端: 處理戰鬥發起、行動、投降、結算的路由
-│   ├── contextBuilder.js       # 後端: 為AI生成提示前，建構完整遊戲上下文的模組
-│   ├── dataIntegrityService.js # 後端: 登入時在背景執行的數據健康檢查與修復服務
-│   ├── economyManager.js       # 後端: 管理遊戲中的貨幣（銀兩）系統
-│   ├── epilogue.js             # 後端: 為死亡玩家生成結局故事的API
-│   ├── gameRoutes.js           # 後端: 遊戲核心互動的總路由
-│   ├── gameplayRoutes.js       # 後端: (舊) 遊戲玩法的路由分發
-│   ├── gmRoutes.js             # 後端: GM工具的API路由
-│   ├── identityManager.js      # 後端: (已棄用) 根據地點為新NPC決定身份的模組
-│   ├── interactionRoutes.js    # 後端: (新) 處理玩家非戰鬥互動的總路由
-│   ├── itemManager.js          # 後端: 處理物品增減的核心邏輯
-│   ├── libraryRoutes.js        # 後端: 處理江湖圖書館小說列表與內容的路由
-│   ├── locationManager.js      # 後端: 處理地點狀態更新的邏輯
-│   ├── mapRoutes.js            # 後端: 生成玩家個人化世界地圖的路由
-│   ├── npcHelpers.js           # 後端: 包含獲取NPC資料、更新友好度等輔助函式
-│   ├── npcRoutes.js            # 後端: NPC互動相關功能的總路由
-│   ├── playerStateHelpers.js   # 後端: 包含獲取玩家技能、物品等狀態的輔助函式
-│   ├── relationshipManager.js  # 後端: 處理NPC之間關係建立與擴散的邏輯
-│   ├── reputationManager.js    # 後端: 處理NPC死亡後聲譽連鎖變化的邏輯
-│   ├── stateRoutes.js          # 後端: 處理讀取遊戲狀態、庫存、重啟遊戲等的路由
-│   ├── templateManager.js      # 後端: (已棄用) 從模板池中復用NPC的邏輯
-│   ├── worldEngine.js          # 後端: 負責動態生成新地點與懸賞任務的引擎
-│   └── worldStateHelpers.js    # 後端: 包含時間推進、快取管理等世界狀態輔助函式
-│
-├── 📁 prompts/                 # 後端: 存放所有用於呼叫AI的提示(Prompt)模板
-│   ├── 📁 story_components/    # 後端: 將大型storyPrompt拆分的組件
-│   │   ├── interactionRule.js # 後端: storyPrompt中關於NPC互動與戰鬥的規則
-│   │   ├── itemLedgerRule.js # 後端: storyPrompt中關於新版物品帳本系統的規則
-│   │   ├── martialArtsRule.js # 後端: storyPrompt中關於武學系統的規則
-│   │   ├── npcRule.js        # 後端: storyPrompt中關於NPC資料結構的規則
-│   │   ├── outputStructureRule.js # 後端: storyPrompt中關於最終JSON輸出格式的規則
-│   │   ├── playerAttributeRule.js # 後端: storyPrompt中關於玩家屬性(時間、正邪)的規則
-│   │   ├── romanceRule.js    # 後端: storyPrompt中關於戀愛系統的規則
-│   │   └── systemInteractionRule.js # 後端: storyPrompt中關於與系統互動(地點更新)的規則
-│   ├── actionClassifierPrompt.js # 後端: AI行動分類器的提示
-│   ├── anachronismPrompt.js    # 後端: 處理時代錯置指令的提示
-│   ├── beggarInquiryPrompt.js # 後端: 丐幫情報問答的提示
-│   ├── bountyGeneratorPrompt.js # 後端: AI懸賞生成器的提示
-│   ├── chatMasterPrompt.js    # 後端: NPC密談AI的提示
-│   ├── chatSummaryPrompt.js   # 後端: 密談總結AI的提示
-│   ├── combatPrompt.js        # 後端: 戰鬥裁判AI的提示
-│   ├── combatSetupPrompt.js   # 後端: 戰鬥導演AI的提示
-│   ├── deathCausePrompt.js    # 後端: 玩家自殺時生成死因的提示
-│   ├── encyclopediaPrompt.js  # 後端: 江湖百科生成AI的提示
-│   ├── epiloguePrompt.js      # 後端: 角色結局生成AI的提示
-│   ├── giveItemPrompt.js      # 後端: 贈予NPC物品時AI反應的提示
-│   ├── itemGeneratorPrompt.js # 後端: 新物品模板生成AI的提示
-│   ├── locationGeneratorPrompt.js # 後端: 新地點模板生成AI的提示
-│   ├── narrativeForGivePrompt.js # 後端: 將贈予事件小說化的提示
-│   ├── narrativePrompt.js     # 後端: 將回合數據小說化的提示
-│   ├── npcCreatorPrompt.js    # 後端: 新NPC模板生成AI的提示
-│   ├── npcMemoryPrompt.js     # 後端: 更新NPC個人記憶AI的提示
-│   ├── postCombatPrompt.js    # 後端: 戰後結算AI的提示
-│   ├── prequelPrompt.js       # 後端: 前情提要生成AI的提示
-│   ├── proactiveChatPrompt.js # 後端: NPC主動對話AI的提示
-│   ├── randomEventPrompt.js   # 後端: 隨機事件生成AI的提示
-│   ├── relationGraphPrompt.js # 後端: 人物關係圖生成AI的提示
-│   ├── relationshipFixPrompt.js # 後端: 孤立NPC關係鏈修復AI的提示
-│   ├── rewardGeneratorPrompt.js # 後端: 懸賞獎勵生成AI的提示
-│   ├── skillGeneratorPrompt.js  # 後端: 新技能模板生成AI的提示
-│   ├── storyPrompt.js         # 後端: 主故事生成AI的核心提示
-│   ├── suggestionPrompt.js    # 後端: 書僮行動建議AI的提示
-│   ├── surrenderPrompt.js     # 後端: 戰鬥認輸裁決AI的提示
-│   └── tradeSummaryPrompt.js  # 後端: 交易事件總結AI的提示
-│
-├── 📁 public/                  # 前端: (未使用) 預留的靜態資源目錄
-│   └── 📁 js/
-│       └── inventoryManager.js # 前端: (已棄用) 舊版物品欄管理器
-│
-├── 📁 scripts/                 # 前端/工具: 主要的客戶端邏輯與一次性腳本
-│   ├── admin.js                # 前端: 管理後台頁面的主要邏輯
-│   ├── api.js                  # 前端: 統一管理所有對後端API請求的模組
-│   ├── bounties.js             # 前端: 懸賞告示板頁面的邏輯
-│   ├── config.js               # 前端: 存放前端的通用設定 (如後端URL)
-│   ├── dom.js                  # 前端: 集中存放所有DOM元素的引用
-│   ├── encyclopedia.js         # 前端: 江湖百科頁面的邏輯
-│   ├── gameLoop.js             # 前端: 遊戲主循環、載入與UI更新的核心邏輯
-│   ├── gameState.js            # 前端: 全域遊戲狀態管理物件
-│   ├── gmManager.js            # 前端: 處理GM面板的渲染與事件綁定
-│   ├── interactionHandlers.js  # 前端: 處理所有玩家與NPC、環境互動的事件
-│   ├── library.js              # 前端: 江湖圖書館頁面的邏輯
-│   ├── main.js                 # 前端: 遊戲主頁面(index.html)的總入口與初始化腳本
-│   ├── map.js                  # 前端: 世界地圖頁面的邏輯
-│   ├── modalManager.js         # 前端: 管理遊戲中所有彈出式視窗的顯示與邏輯
-│   ├── novel.js                # 前端: 我的江湖路(小說)頁面的邏輯
-│   ├── populateRulers.js       # 工具: (一次性)為地點填充統治者的腳本
-│   ├── relations.js            # 前端: 人物關係圖頁面的邏輯
-│   ├── tips.js                 # 前端: 存放遊戲載入時的提示文字
-│   ├── tradeManager.js         # 前端: 處理交易視窗UI與邏輯
-│   └── uiUpdater.js            # 前端: 專門負責更新所有儀表板與UI顯示的模組
-│
-├── 📁 styles/                  # 前端: CSS 樣式表
-│   ├── admin.css               # 前端: 管理後台頁面的樣式
-│   ├── auth.css                # 前端: 登入與註冊頁面的樣式
-│   ├── base.css                # 前端: 全域基礎樣式、字體與顏色變數
-│   ├── bounties.css            # 前端: 懸賞告示板頁面的樣式
-│   ├── components.css          # 前端: 遊戲儀表板中各組件的樣式
-│   ├── game.css                # 前端: 遊戲主介面的佈局樣式
-│   ├── gmPanel.css             # 前端: GM面板的樣式
-│   ├── library.css             # 前端: 江湖圖書館頁面的樣式
-│   ├── modals.css              # 前端: (已棄用) 舊版彈窗樣式
-│   ├── modals_feedback.css     # 前端: 反饋型彈窗(死亡、結局)的樣式
-│   ├── modals_info.css         # 前端: 資訊展示型彈窗(武學)的樣式
-│   ├── modals_interaction.css  # 前端: 互動型彈窗(戰鬥、聊天)的樣式
-│   ├── modals_location.css     # 前端: 地點詳情彈窗的樣式
-│   ├── novel.css               # 前端: 小說與百科閱讀頁面的樣式
-│   ├── skills.css              # 前端: 武學總覽彈窗的樣式
-│   └── trade.css               # 前端: 交易視窗的樣式
-│
-├── .env                        # 後端: 存放環境變數 (API金鑰、資料庫密鑰等)
-├── .gitignore                  # 工具: Git忽略清單
-├── admin.html                  # 前端: 管理後台的HTML頁面
-├── bounties.html               # 前端: 懸賞告示板的HTML頁面
-├── dataPurification.js         # 工具: (一次性)修復舊資料庫數據類型的腳本
-├── encyclopedia.html           # 前端: 江湖百科的HTML頁面
-├── index.html                  # 前端: 遊戲主頁面，玩家最主要的互動介面
-├── library.html                # 前端: 江湖圖書館的HTML頁面
-├── login.html                  # 前端: 玩家登入頁面
-├── login.js                    # 前端: 處理登入頁面邏輯的腳本
-├── map.html                    # 前端: 世界地圖的HTML頁面
-├── middleware/auth.js          # 後端: JWT令牌驗證的中間件
-├── novel.html                  # 前端: 我的江湖路(小說)頁面的HTML
-├── package-lock.json           # 工具: 鎖定專案依賴版本
-├── package.json                # 工具: 定義專案依賴與腳本
-├── register.html               # 前端: 新玩家註冊頁面
-├── register.js                 # 前端: 處理註冊頁面邏輯的腳本
-├── relations.html              # 前端: 人物關係圖的HTML頁面
-├── server.js                   # 後端: Express伺服器的啟動入口
-└── viewport.html               # 前端: 玩家操作手冊的HTML頁面
+├── 📂 api/
+│   ├── 📂 admin/
+│   │   ├── 📄 adminAuth.js          -> [後端] 後台管理員身份驗證中間件
+│   │   ├── 📄 adminRoutes.js        -> [後端] 後台管理功能的主路由
+│   │   ├── 📄 balanceService.js      -> [後端] (模擬)各家AI服務的餘額查詢
+│   │   └── 📄 logService.js          -> [後端] 系統日誌的讀取服務
+│   ├── 📂 gameplay/
+│   │   ├── 📄 actionHandler.js       -> [後端] 處理玩家核心互動（如移動、探索）的邏輯
+│   │   ├── 📄 preActionChecks.js     -> [後端] 在執行玩家動作前的預先檢查（如精力、特殊指令）
+│   │   ├── 📄 stateUpdaters.js       -> [後端] 更新遊戲核心狀態並寫入資料庫
+│   │   └── 📄 staminaManager.js      -> [後端] 管理玩家精力值的計算與事件
+│   ├── 📂 models/
+│   │   ├── 📄 inventoryModel.js      -> [後端/資料庫] 處理玩家物品裝備、卸下的複雜邏輯
+│   │   └── 📄 userModel.js           -> [後端/資料庫] 定義新玩家帳號的預設欄位資料結構
+│   ├── 📂 routes/
+│   │   ├── 📄 npcChatRoutes.js       -> [後端] 處理與NPC聊天、贈禮、結束對話的路由
+│   │   ├── 📄 npcProfileRoutes.js    -> [後端] 提供NPC公開資訊的路由
+│   │   └── 📄 npcTradeRoutes.js      -> [後端] 處理與NPC交易的路由
+│   ├── 📄 aiConfig.js              -> [後端] AI模型中控設定檔，為不同任務指派特定AI
+│   ├── 📄 authRoutes.js            -> [後端/資料庫] 處理玩家註冊與登入的路由
+│   ├── 📄 beggarRoutes.js          -> [後端] 處理丐幫情報系統的專用路由
+│   ├── 📄 bountyRoutes.js          -> [後端] 處理懸賞任務的讀取與領取的路由
+│   ├── 📄 cacheManager.js          -> [後端] 伺服器啟動時快取數據（如NPC姓名）的管理
+│   ├── 📄 combatRoutes.js          -> [後端] 處理戰鬥發起、行動、認輸、結算的路由
+│   ├── 📄 contextBuilder.js        -> [後端/資料庫] 建立遊戲當前回合完整上下文的核心服務
+│   ├── 📄 dataIntegrityService.js  -> [後端/資料庫] 數據健康度檢查與自動修復服務
+│   ├── 📄 economyManager.js        -> [後端/資料庫] 處理遊戲中的貨幣（銀兩）增減
+│   ├── 📄 epilogue.js              -> [後端] 為死亡玩家生成結局故事的路由
+│   ├── 📄 gameRoutes.js            -> [後端] 遊戲核心功能的主路由分發器
+│   ├── 📄 gameplayRoutes.js        -> [後端] 遊戲互動與戰鬥的路由分發器
+│   ├── 📄 gmRoutes.js              -> [後端] GM（遊戲管理員）工具的API路由
+│   ├── 📄 identityManager.js       -> [後端] 為新NPC決定其社會身份（如寨主、掌門）
+│   ├── 📄 interactionRoutes.js     -> [後端] 玩家互動指令的統一入口路由
+│   ├── 📄 itemManager.js           -> [後端/資料庫] 管理玩家與NPC物品交換的核心邏輯
+│   ├── 📄 libraryRoutes.js         -> [後端] 提供「江湖圖書館」小說列表與內容的路由
+│   ├── 📄 locationManager.js       -> [後端/資料庫] 處理地點狀態的更新
+│   ├── 📄 mapRoutes.js             -> [後端] 提供玩家個人化世界地圖的路由
+│   ├── 📄 npcHelpers.js            -> [後端/資料庫] NPC相關的輔助函式（如合併檔案、更新好感度）
+│   ├── 📄 npcRoutes.js             -> [後端] NPC相關路由的總分發器
+│   ├── 📄 playerStateHelpers.js    -> [後端/資料庫] 玩家狀態相關的輔助函式（如獲取背包、技能）
+│   ├── 📄 relationshipManager.js   -> [後端/資料庫] 處理NPC之間關係（如夫妻、父子）的同步
+│   ├── 📄 reputationManager.js     -> [後端/資料庫] NPC死亡後，處理相關人連鎖聲譽變化的引擎
+│   ├── 📄 stateRoutes.js           -> [後端] 遊戲狀態讀取（如最新進度、百科）的路由
+│   └── 📄 worldEngine.js           -> [後端] 動態生成新地點與懸賞任務的世界引擎
+├── 📂 middleware/
+│   └── 📄 auth.js                  -> [後端] JWT身份驗證中間件，保護需要登入的API
+├── 📂 prompts/
+│   ├── 📂 story_components/
+│   │   ├── 📄 interactionRule.js   -> [後端] AI規則：定義NPC互動與戰鬥觸發
+│   │   ├── 📄 itemLedgerRule.js      -> [後端] AI規則：定義物品變化的回傳格式
+│   │   ├── 📄 martialArtsRule.js   -> [後端] AI規則：定義武學學習與修練
+│   │   ├── 📄 npcRule.js           -> [後端] AI規則：定義NPC互動的資料結構
+│   │   ├── 📄 outputStructureRule.js -> [後端] AI規則：定義AI最終輸出的完整JSON結構
+│   │   ├── 📄 playerAttributeRule.js -> [後端] AI規則：定義時間、正邪、武功等核心屬性
+│   │   ├── 📄 romanceRule.js       -> [後端] AI規則：定義戀愛與心動值系統
+│   │   └── 📄 systemInteractionRule.js -> [後端] AI規則：定義世界動態演化（如地點更新）
+│   ├── 📄 actionClassifierPrompt.js -> [後端] AI腳本：玩家行動意圖分類
+│   ├── 📄 anachronismPrompt.js      -> [後端] AI腳本：處理時代錯置指令（如掏出手機）
+│   ├── 📄 beggarInquiryPrompt.js   -> [後端] AI腳本：生成丐幫弟子的情報回覆
+│   ├── 📄 bountyGeneratorPrompt.js -> [後端] AI腳本：生成新的懸賞任務
+│   ├── 📄 chatMasterPrompt.js      -> [後端] AI腳本：驅動NPC進行深度對話
+│   ├── 📄 chatSummaryPrompt.js     -> [後端] AI腳本：將長對話總結為故事
+│   ├── 📄 combatPrompt.js          -> [後端] AI腳本：裁決一回合的戰鬥過程與結果
+│   ├── 📄 combatSetupPrompt.js     -> [後端] AI腳本：佈置戰鬥開場的陣營與反應
+│   ├── 📄 deathCausePrompt.js      -> [後端] AI腳本：為玩家自盡生成一個合理的死因
+│   ├── 📄 encyclopediaPrompt.js    -> [後端] AI腳本：生成玩家的江湖百科
+│   ├── 📄 epiloguePrompt.js        -> [後端] AI腳本：為死亡玩家撰寫結局故事
+│   ├── 📄 giveItemPrompt.js        -> [後端] AI腳本：判斷NPC收到禮物後的反應
+│   ├── 📄 itemGeneratorPrompt.js   -> [後端] AI腳本：為新物品生成詳細設定
+│   ├── 📄 locationGeneratorPrompt.js-> [後端] AI腳本：為新地點生成詳細設定
+│   ├── 📄 narrativeForGivePrompt.js -> [後端] AI腳本：將贈予事件小說化
+│   ├── 📄 narrativePrompt.js       -> [後端] AI腳本：將結構化數據轉為小說旁白
+│   ├── 📄 npcCreatorPrompt.js      -> [後端] AI腳本：為新NPC生成完整人設
+│   ├── 📄 npcMemoryPrompt.js       -> [後端] AI腳本：以NPC視角更新其對玩家的記憶
+│   ├── 📄 postCombatPrompt.js      -> [後端] AI腳本：生成戰鬥結束後的實質結果與獎勵
+│   ├── 📄 prequelPrompt.js         -> [後端] AI腳本：生成「前情提要」
+│   ├── 📄 proactiveChatPrompt.js   -> [後端] AI腳本：驅動NPC主動與玩家對話
+│   ├── 📄 relationGraphPrompt.js   -> [後端] AI腳本：生成人物關係圖的Mermaid語法
+│   ├── 📄 relationshipFixPrompt.js -> [後端] AI腳本：為孤立的NPC創造與玩家的相遇故事
+│   ├── 📄 rewardGeneratorPrompt.js -> [後端] AI腳本：生成懸賞任務的獎勵
+│   ├── 📄 skillGeneratorPrompt.js  -> [後端] AI腳本：為新武學生成詳細設定
+│   ├── 📄 storyPrompt.js           -> [後端] AI腳本：遊戲最核心的主故事生成器
+│   ├── 📄 suggestionPrompt.js      -> [後端] AI腳本：生成書僮的行動建議
+│   └── 📄 surrenderPrompt.js       -> [後端] AI腳本：裁決戰鬥中認輸的結果
+├── 📂 public/
+│   └── 📂 js/
+│       └── 📄 inventoryManager.js    -> [前端] (未使用) 舊版的物品欄管理邏輯
+├── 📂 scripts/
+│   ├── 📄 admin.js                 -> [前端] 後台管理頁面的主要邏輯
+│   ├── 📄 api.js                   -> [前端] 統一管理所有對後端API請求的模組
+│   ├── 📄 bounties.js              -> [前端] 懸賞告示板頁面的邏輯
+│   ├── 📄 config.js                -> [前端] 前端設定檔（如後端網址）
+│   ├── 📄 dom.js                   -> [前端] 集中管理所有DOM元素的獲取
+│   ├── 📄 encyclopedia.js          -> [前端] 江湖百科頁面的邏輯
+│   ├── 📄 gameLoop.js              -> [前端] 遊戲主循環與核心邏輯（加載、處理玩家動作）
+│   ├── 📄 gameState.js             -> [前端] 定義並導出全域的遊戲狀態物件
+│   ├── 📄 gmManager.js             -> [前端] GM面板的功能邏輯
+│   ├── 📄 interactionHandlers.js   -> [前端] 處理玩家與介面互動（如點擊NPC、戰鬥操作）
+│   ├── 📄 library.js               -> [前端] 江湖圖書館頁面的邏輯
+│   ├── 📄 main.js                  -> [前端] 遊戲主頁面的入口，初始化所有事件監聽
+│   ├── 📄 map.js                   -> [前端] 世界地圖頁面的邏輯
+│   ├── 📄 modalManager.js          -> [前端] 管理遊戲中所有彈出視窗（對話、戰鬥、技能等）
+│   ├── 📄 novel.js                 -> [前端] 「我的江湖路」小說頁面的邏輯
+│   ├── 📄 populateRulers.js        -> [後端/資料庫] (一次性腳本) 為舊地點數據填充統治者
+│   ├── 📄 relations.js             -> [前端] 人物關係圖頁面的邏輯
+│   ├── 📄 tips.js                  -> [前端] 遊戲載入時的提示語句庫
+│   ├── 📄 tradeManager.js          -> [前端] 處理交易視窗的完整邏輯
+│   └── 📄 uiUpdater.js             -> [前端] 負責更新遊戲主介面所有UI元素的模組
+├── 📂 services/
+│   ├── 📄 aiService.js             -> [後端] AI服務的總調度中心，封裝對各家AI的呼叫
+│   ├── 📄 beggarService.js         -> [後端] 丐幫情報系統的後端服務邏輯
+│   └── 📄 npcCreationService.js    -> [後端] 負責從無到有創建一個完整NPC的核心服務
+├── 📂 styles/
+│   ├── 📄 admin.css                -> [前端] 後台管理頁面的樣式
+│   ├── 📄 auth.css                 -> [前端] 登入註冊頁面的樣式
+│   ├── 📄 base.css                 -> [前端] 基礎樣式與全域變數
+│   ├── 📄 bounties.css             -> [前端] 懸賞告示板頁面的樣式
+│   ├── 📄 components.css           -> [前端] 遊戲介面中各種小元件的樣式
+│   ├── 📄 game.css                 -> [前端] 遊戲主介面的佈局樣式
+│   ├── 📄 gmPanel.css              -> [前端] GM面板的樣式
+│   ├── 📄 library.css              -> [前端] 江湖圖書館頁面的樣式
+│   ├── 📄 modals.css               -> [前端] (已棄用) 舊版彈窗樣式
+│   ├── 📄 modals_feedback.css      -> [前端] 回饋型彈窗（如死亡、結局）的樣式
+│   ├── 📄 modals_info.css          -> [前端] 資訊展示型彈窗（如技能）的樣式
+│   ├── 📄 modals_interaction.css   -> [前端] 互動型彈窗（如戰鬥、對話）的樣式
+│   ├── 📄 modals_location.css      -> [前端] 地點詳情彈窗的樣式
+│   ├── 📄 novel.css                -> [前端] 小說/百科閱讀頁面的樣式
+│   ├── 📄 skills.css               -> [前端] 武學總覽彈窗的樣式
+│   └── 📄 trade.css                -> [前端] 交易視窗的樣式
+├── 📄 .env                         -> [後端] (未提供) 環境變數設定檔，儲存API金鑰等敏感資訊
+├── 📄 admin.html                   -> [前端] 後台管理系統頁面
+├── 📄 bounties.html                -> [前端] 懸賞告示板頁面
+├── 📄 dataPurification.js          -> [後端/資料庫] (一次性腳本) 用於淨化舊數據的腳本
+├── 📄 encyclopedia.html            -> [前端] 江湖百科頁面
+├── 📄 index.html                   -> [前端] 遊戲主介面
+├── 📄 library.html                 -> [前端] 江湖圖書館頁面
+├── 📄 login.html                   -> [前端] 登入頁面
+├── 📄 login.js                     -> [前端] 登入頁面的邏輯
+├── 📄 map.html                     -> [前端] 世界地圖頁面
+├── 📄 novel.html                   -> [前端] 我的江湖路（個人小說）頁面
+├── 📄 package-lock.json            -> [後端] 鎖定Node.js專案依賴版本
+├── 📄 package.json                 -> [後端] Node.js專案設定與依賴列表
+├── 📄 register.html                -> [前端] 註冊頁面
+├── 📄 register.js                  -> [前端] 註冊頁面的邏輯
+├── 📄 relations.html               -> [前端] 人物關係圖頁面
+├── 📄 server.js                    -> [後端] Express伺服器的入口檔案，初始化與啟動伺服器
+└── 📄 viewport.html                -> [前端] 玩家操作手冊頁面
