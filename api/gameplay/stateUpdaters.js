@@ -6,6 +6,7 @@ const { updateSkills, getRawInventory, calculateBulkScore, getPlayerSkills } = r
 const { TIME_SEQUENCE, advanceDate, invalidateNovelCache, updateLibraryNovel } = require('../worldStateHelpers');
 const { processLocationUpdates } = require('../locationManager');
 const { processItemChanges } = require('../itemManager');
+const { calculateNewStamina } = require('./staminaManager'); // 【核心修正】引入精力總管的計算函式
 
 const db = admin.firestore();
 
@@ -24,29 +25,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const summaryDocRef = userDocRef.collection('game_state').doc('summary');
 
     const safeRoundData = aiResponse.roundData;
-    const playerState = safeRoundData.playerState || 'alive';
-    const powerChange = safeRoundData.powerChange || { internal: 0, external: 0, lightness: 0 };
-    const moralityChange = safeRoundData.moralityChange || 0;
-    const moneyChange = safeRoundData.moneyChange || 0;
-    const itemChanges = safeRoundData.itemChanges || [];
-    const skillChanges = safeRoundData.skillChanges || [];
-    const romanceChanges = safeRoundData.romanceChanges || [];
-    const npcUpdates = safeRoundData.npcUpdates || [];
-    const locationUpdates = safeRoundData.locationUpdates || [];
-    const ATM = safeRoundData.ATM || [''];
-    const EVT = safeRoundData.EVT || '江湖軼事';
-    const LOC = safeRoundData.LOC || player.currentLocation || ['未知之地'];
-    const PSY = safeRoundData.PSY || '心如止水';
-    const PC = safeRoundData.PC || '安然無恙';
-    const NPC = safeRoundData.NPC || [];
-    const QST = safeRoundData.QST || '';
-    const WRD = safeRoundData.WRD || '晴朗';
-    const LOR = safeRoundData.LOR || '';
-    const CLS = safeRoundData.CLS || '';
-    const IMP = safeRoundData.IMP || '你的行動似乎沒有產生什麼特別的影響。';
-    const aiNextTimeOfDay = safeRoundData.timeOfDay;
-    const daysToAdvance = safeRoundData.daysToAdvance || 0;
-    const staminaChange = safeRoundData.staminaChange || 0; 
+    const { playerState = 'alive', powerChange = {}, moralityChange = 0, moneyChange = 0, itemChanges = [], skillChanges = [], romanceChanges = [], npcUpdates = [], locationUpdates = [], ATM = [''], EVT = '江湖軼事', LOC = player.currentLocation || ['未知之地'], PSY = '心如止水', PC = '安然無恙', NPC = [], QST = '', WRD = '晴朗', LOR = '', CLS = '', IMP = '你的行動似乎沒有產生什麼特別的影響。', timeOfDay: aiNextTimeOfDay, daysToAdvance = 0 } = safeRoundData;
 
     const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, skillChanges, player);
     if (customSkillCreationResult && !customSkillCreationResult.success) {
@@ -59,39 +38,11 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
     }
     
+    // 【核心修正】將精力計算全權交給精力總管
+    const newStamina = calculateNewStamina(player, playerAction, safeRoundData);
+
     const timeDidAdvance = (daysToAdvance > 0) || (aiNextTimeOfDay && aiNextTimeOfDay !== player.currentTimeOfDay);
-
-    // --- 【核心修正】三階遞進式調息心法 v2.0 (百分比恢復) ---
-    const recoveryKeywords = ['睡覺', '休息', '歇息', '打坐', '進食', '喝水', '療傷', '丹藥', '求救', '小歇', '歇會', '躺一下', '坐一下'];
-    const isRecoveryAction = recoveryKeywords.some(kw => playerAction.includes(kw));
-    
-    let newStamina = player.stamina ?? 100;
-
-    if (isRecoveryAction) {
-        let recoveryAmount = 0;
-        if (daysToAdvance > 0) {
-            // 規則 3: 跨日長眠，恢復現有精力的75%
-            recoveryAmount = Math.floor(newStamina * 0.75);
-            console.log(`[精力系統] 進行了跨日長眠，恢復 ${recoveryAmount} 點精力。`);
-        } else if (timeDidAdvance) {
-            // 規則 2: 時段小憩，恢復現有精力的25%
-            recoveryAmount = Math.floor(newStamina * 0.25);
-            console.log(`[精力系統] 進行了時段小憩，恢復 ${recoveryAmount} 點精力。`);
-        } else {
-            // 規則 1: 回合調息，恢復現有精力的10%
-            recoveryAmount = Math.floor(newStamina * 0.10);
-            console.log(`[精力系統] 進行了回合調息，恢復 ${recoveryAmount} 點精力。`);
-        }
-        newStamina += recoveryAmount;
-    } else {
-        // 非恢復性活動：應用AI的精力變化，並扣除基礎消耗
-        newStamina += (staminaChange || 0);
-        newStamina -= (Math.floor(Math.random() * 5) + 1); // 基礎消耗1-5點
-    }
-
-    newStamina = Math.max(0, Math.min(100, newStamina)); // 確保精力在 0-100 之間
-    // --- 核心修正結束 ---
-
+    const isRecoveryAction = ['睡覺', '休息', '歇息', '打坐', '進食', '喝水', '療傷', '丹藥', '求救', '小歇', '歇會', '躺一下', '坐一下'].some(kw => playerAction.includes(kw));
     let shortActionCounter = player.shortActionCounter || 0;
     if (!timeDidAdvance && !isRecoveryAction) shortActionCounter++; else shortActionCounter = 0;
     
@@ -155,7 +106,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     await batch.commit();
     console.log(`[數據同步] 玩家主檔案與長期記憶已同步至 R${newRoundNumber}。`);
 
-    // 背景任務
     if (NPC && Array.isArray(NPC)) {
         NPC.filter(npc => npc.status).forEach(npc => {
             const interactionContext = `事件：「${EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
@@ -165,7 +115,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     invalidateNovelCache(userId).catch(e => console.error("背景任務失敗: 無效化小說快取", e));
     updateLibraryNovel(userId, username).catch(e => console.error("背景任務失敗: 更新圖書館", e));
 
-    // 準備回傳給前端的最終數據
     const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
         getRawInventory(userId),
         getPlayerSkills(userId),
