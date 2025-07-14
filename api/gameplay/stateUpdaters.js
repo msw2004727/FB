@@ -12,7 +12,7 @@ const { addCurrency } = require('../economyManager');
 const db = admin.firestore();
 
 /**
- * 更新遊戲狀態並將所有更改寫入資料庫
+ * 【核心修正 v3.0】更新遊戲狀態並將所有更改寫入資料庫
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} player - 當前回合開始前的玩家數據
@@ -50,8 +50,15 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     let shortActionCounter = player.shortActionCounter || 0;
     if (!timeDidAdvance && !isRecoveryAction) shortActionCounter++; else shortActionCounter = 0;
     
-    let finalTimeOfDay = aiNextTimeOfDay || player.currentTimeOfDay;
-    let finalDate = { year: player.year, month: player.month, day: player.day, yearName: player.yearName };
+    // 【核心修正】明確地從 player 物件初始化日期，並提供預設值以防萬一
+    let finalTimeOfDay = aiNextTimeOfDay || player.currentTimeOfDay || '上午';
+    let finalDate = {
+        year: player.year || 1,
+        month: player.month || 1,
+        day: player.day || 1,
+        yearName: player.yearName || '元祐'
+    };
+    
     let daysToAdd = daysToAdvance;
     if (shortActionCounter >= 3) {
         const currentTimeIndex = TIME_SEQUENCE.indexOf(finalTimeOfDay);
@@ -62,9 +69,12 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     }
     for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
+    // 【核心修正】明確地將新日期寫入要存檔的數據
     const finalSaveData = { 
-        story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, ...finalDate, stamina: newStamina,
-        playerState, powerChange, moralityChange, moneyChange, itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
+        story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, 
+        year: finalDate.year, month: finalDate.month, day: finalDate.day, yearName: finalDate.yearName,
+        stamina: newStamina, playerState, powerChange, moralityChange, moneyChange, 
+        itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
         ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
     };
 
@@ -92,11 +102,15 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const newExternalPower = (player.externalPower || 0) + (powerChange?.external || 0);
     const newLightnessPower = (player.lightness || 0) + (powerChange?.lightness || 0);
 
+    // 【核心修正】明確地將新日期寫入要更新到玩家主檔案的數據
     const playerUpdatesForDb = {
         timeOfDay: finalTimeOfDay,
         stamina: newStamina,
         shortActionCounter,
-        ...finalDate,
+        year: finalDate.year,
+        month: finalDate.month,
+        day: finalDate.day,
+        yearName: finalDate.yearName,
         currentLocation: LOC,
         internalPower: newInternalPower,
         externalPower: newExternalPower,
@@ -131,21 +145,12 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         userDocRef.get().then(doc => doc.data()),
     ]);
     
-    // 【核心修正 v2.0】明確地建構回傳給前端的物件，確保最新的時間數據(finalDate, finalTimeOfDay)不會被覆蓋。
     const finalRoundDataForClient = {
-        // 先放入從DB讀取的最新玩家頂層數據(如總功力、立場等)
-        ...finalPlayerProfile,
-        // 再放入本回合存檔的所有數據(故事、地點、NPC狀態等)
-        ...finalSaveData,
-        // 最後再明確放入最新的、動態獲取的陣列型數據和時間，確保它們是最準確的
+        ...finalPlayerProfile, 
+        ...finalSaveData, 
         skills: updatedSkills, 
         inventory: fullInventory, 
-        bulkScore: calculateBulkScore(fullInventory),
-        year: finalDate.year,
-        month: finalDate.month,
-        day: finalDate.day,
-        yearName: finalDate.yearName,
-        timeOfDay: finalTimeOfDay,
+        bulkScore: calculateBulkScore(fullInventory)
     };
     
     return finalRoundDataForClient;
