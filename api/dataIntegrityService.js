@@ -4,10 +4,11 @@ const { DEFAULT_USER_FIELDS } = require('./models/userModel');
 const { generateNpcTemplateData } = require('../services/npcCreationService');
 const { getOrGenerateItemTemplate, getOrGenerateSkillTemplate } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
+const { addCurrency } = require('./economyManager');
 
 const db = admin.firestore();
 
-// 【核心新增】定義一個NPC狀態檔案應有的預設欄位和值
+// 定義一個NPC狀態檔案應有的預設欄位和值
 const DEFAULT_NPC_STATE_FIELDS = {
     interactionSummary: "你與此人的交往尚淺。",
     isDeceased: false,
@@ -18,9 +19,31 @@ const DEFAULT_NPC_STATE_FIELDS = {
     triggeredRomanceEvents: []
 };
 
+/**
+ * 將舊的 money 欄位轉移到銀兩物品，並刪除舊欄位
+ * @param {string} userId - 玩家ID
+ * @param {object} userData - 玩家的文檔數據
+ */
+async function migrateCurrency(userId, userData) {
+    // 檢查舊的 money 欄位是否存在且大於0
+    if (userData.money !== undefined && typeof userData.money === 'number' && userData.money > 0) {
+        console.log(`[健康檢查-貨幣] 發現玩家 ${userId} 存在舊貨幣 ${userData.money} 文錢，開始清算...`);
+        const batch = db.batch();
+        const userDocRef = db.collection('users').doc(userId);
+        
+        // 1. 將舊貨幣加到銀兩中
+        await addCurrency(userId, userData.money, batch);
+        
+        // 2. 刪除舊的 money 欄位
+        batch.update(userDocRef, { money: admin.firestore.FieldValue.delete() });
+        
+        await batch.commit();
+        console.log(`[健康檢查-貨幣] 清算完畢！已將 ${userData.money} 文錢兌換為銀兩，並移除舊欄位。`);
+    }
+}
 
 /**
- * 【核心新增】為指定玩家的所有舊NPC狀態檔案，補全缺失的欄位
+ * 為指定玩家的所有舊NPC狀態檔案，補全缺失的欄位
  * @param {string} userId - 玩家ID
  */
 async function backfillNpcStates(userId) {
@@ -44,7 +67,6 @@ async function backfillNpcStates(userId) {
             }
         }
         
-        // 特別處理 firstMet，因為它是一個物件
         if (npcData.firstMet === undefined) {
             updates.firstMet = { round: 0, time: '未知', location: '未知', event: '一次未被記錄的相遇' };
             needsUpdate = true;
@@ -67,42 +89,30 @@ async function backfillNpcStates(userId) {
 /**
  * 檢查並修補玩家資料中的預設欄位和資料類型
  * @param {string} userId - 玩家ID
+ * @param {object} userData - 從資料庫讀取的原始玩家數據
  */
-async function checkUserFields(userId) {
+async function checkUserFields(userId, userData) {
     const userDocRef = db.collection('users').doc(userId);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) return;
-
-    const userData = userDoc.data();
     const updates = {};
     let needsUpdate = false;
 
-    // 1. 補全缺失的欄位
     for (const [field, defaultValue] of Object.entries(DEFAULT_USER_FIELDS)) {
         if (userData[field] === undefined) {
             needsUpdate = true;
-            let value = defaultValue;
-            if (field === 'maxInternalPowerAchieved') value = userData.internalPower || defaultValue;
-            else if (field === 'maxExternalPowerAchieved') value = userData.externalPower || defaultValue;
-            else if (field === 'maxLightnessAchieved') value = userData.lightness || defaultValue;
-            updates[field] = value;
-            console.log(`[健康檢查-玩家] 補齊缺失欄位: ${field} ->`, value);
+            updates[field] = defaultValue;
         }
     }
     
-    // 2. 修正錯誤的資料類型
-    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'money', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day', 'maxInternalPowerAchieved', 'maxExternalPowerAchieved', 'maxLightnessAchieved'];
+    const fieldsToEnsureNumber = ['internalPower', 'externalPower', 'lightness', 'morality', 'stamina', 'bulkScore', 'R', 'shortActionCounter', 'year', 'month', 'day', 'maxInternalPowerAchieved', 'maxExternalPowerAchieved', 'maxLightnessAchieved'];
     for (const field of fieldsToEnsureNumber) {
         if (userData[field] !== undefined && typeof userData[field] !== 'number') {
             const parsedValue = Number(userData[field]);
             updates[field] = isNaN(parsedValue) ? (DEFAULT_USER_FIELDS[field] || 0) : parsedValue;
             needsUpdate = true;
-            console.log(`[健康檢查-玩家] 修正類型錯誤: ${field} 從 "${userData[field]}" (${typeof userData[field]}) 修復為 ${updates[field]} (number)。`);
         }
     }
-
-    // 3. 修正歷史巔峰值
-    const finalData = { ...userData, ...updates }; // 合併已修正的資料
+    
+    const finalData = { ...userData, ...updates };
     const powerTypes = ['Internal', 'External', 'Lightness'];
 
     powerTypes.forEach(type => {
@@ -125,7 +135,7 @@ async function checkUserFields(userId) {
 }
 
 /**
- * 【核心新增】修復內容不完整的NPC公用模板
+ * 修復內容不完整的NPC公用模板
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} playerProfile - 玩家的完整檔案
@@ -227,11 +237,18 @@ async function runDataHealthCheck(userId, username) {
         if (!playerDoc.exists) return;
         const playerProfile = playerDoc.data();
 
+        // 1. 優先處理貨幣轉移
+        await migrateCurrency(userId, playerProfile);
+
+        // 2. 在其他檢查前，先確保玩家檔案本身是健康的
+        await checkUserFields(userId, playerProfile);
+        
+        // 3. 獲取所有存檔，供後續檢查共用
         const allSavesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'asc').get();
         const allSavesData = allSavesSnapshot.docs.map(doc => doc.data());
-
+        
+        // 4. 並行執行剩餘的檢查
         await Promise.all([
-            checkUserFields(userId),
             repairMissingNpcTemplates(userId, username, playerProfile, allSavesData),
             repairIncompleteNpcTemplates(userId, username, playerProfile, allSavesData),
             backfillNpcStates(userId)
