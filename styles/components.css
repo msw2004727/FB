@@ -259,6 +259,11 @@ body.dark-theme .header-icon-btn:hover {
     border-color: var(--dark-accent);
 }
 
+.header-icon-btn .fas {
+    margin: 0;
+    line-height: 1; /* 【核心修正】確保圖示在按鈕內垂直居中 */
+}
+
 
 /* --- AI 模型選擇器 --- */
 .select-wrapper {
@@ -530,24 +535,21 @@ body.dark-theme .romance-event {
     color: #ffb3c1;
 }
 
-/* ======================================================= */
-/* 【核心修改】將儀表板頭部的樣式集中於此，並套用靠左對齊 */
-/* ======================================================= */
 .dashboard-header {
     display: flex;
-    justify-content: flex-start; /* 核心：將按鈕組靠左對齊 */
+    justify-content: flex-start;
     align-items: center;
-    padding: 1rem 1.5rem;       /* 核心：調整內邊距以適應左對齊 */
+    padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--light-border);
     flex-shrink: 0;
 }
 body.dark-theme .dashboard-header {
-    border-bottom: 1px solid var(--dark-border);
+    border-bottom-color: var(--dark-border);
 }
 .dashboard-header .header-buttons {
     display: flex;
     align-items: center;
-    gap: 0.5rem; /* 核心：縮小按鈕間距使其更緊湊 */
+    gap: 0.25rem; /* 【核心修正】再次縮小按鈕間距使其更緊湊 */
 }
 
 .header-action-group {
