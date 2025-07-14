@@ -5,9 +5,10 @@ const admin = require('firebase-admin');
 const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult, getAISummary, getAISuggestion } = require('../services/aiService');
 
 const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require('./npcHelpers');
-const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState } = require('./playerStateHelpers'); // 引入 getRawInventory
-const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('../worldStateHelpers');
-const { processReputationChangesAfterDeath } = require('../reputationManager');
+const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState } = require('./playerStateHelpers');
+// 【核心修正】將錯誤的相對路徑 ../worldStateHelpers 改為正確的 ./worldStateHelpers
+const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
+const { processReputationChangesAfterDeath } = require('./reputationManager');
 
 const db = admin.firestore();
 
