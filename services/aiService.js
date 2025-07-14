@@ -52,6 +52,8 @@ const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
+// 【核心新增】引入新建的閉關Prompt
+const { generateCultivationStory: getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 
 
 // 統一的AI調度中心
@@ -118,6 +120,21 @@ function parseJsonResponse(text) {
     const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanJsonText);
 }
+
+// 【核心新增】閉關故事生成函式
+async function getAICultivationResult(playerProfile, skillToPractice, days, outcome, storyHint) {
+    const prompt = getCultivationPrompt(playerProfile, skillToPractice, days, outcome, storyHint);
+    try {
+        const modelToUse = aiConfig.narrative || 'openai'; // 沿用敘事模型的設定
+        const story = await callAI(modelToUse, prompt, false);
+        return story;
+    } catch (error) {
+        console.error(`[AI 任務失敗] 為 ${playerProfile.name} 生成閉關故事時出錯:`, error);
+        // 提供一個降級的預設故事
+        return `經過 ${days} 天的閉關，你感覺到體內氣息流轉，似乎有所感悟，但具體進境如何，卻又難以言說。`;
+    }
+}
+
 
 // 【核心修改】更新NPC個人記憶的函式，現在接收通用的 interactionData
 async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, interactionData) {
@@ -463,7 +480,6 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
     }
 }
 
-
 module.exports = {
     callAI,
     aiConfig,
@@ -492,4 +508,6 @@ module.exports = {
     getAIAnachronismResponse,
     getAIPostCombatResult,
     getAIPerNpcSummary,
+    // 【核心新增】匯出閉關函式
+    getAICultivationResult,
 };
