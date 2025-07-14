@@ -5,8 +5,7 @@ const admin = require('firebase-admin');
 const { getAICombatSetup, getAICombatAction, getAISurrenderResult, getAIPostCombatResult, getAISummary, getAISuggestion } = require('../services/aiService');
 
 const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require('./npcHelpers');
-const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState } = require('./playerStateHelpers');
-// 【核心修正】將錯誤的相對路徑 ../worldStateHelpers 改為正確的 ./worldStateHelpers
+const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState, getOrGenerateSkillTemplate } = require('./playerStateHelpers');
 const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
 
@@ -141,10 +140,9 @@ const initiateCombatHandler = async (req, res) => {
     }
 };
 
-
 const combatActionRouteHandler = async (req, res) => {
     const userId = req.user.id;
-    const { strategy, skill, model: playerModelChoice } = req.body;
+    const { strategy, skill: selectedSkillName, model: playerModelChoice } = req.body;
 
     try {
         const userDocRef = db.collection('users').doc(userId);
@@ -156,6 +154,24 @@ const combatActionRouteHandler = async (req, res) => {
         }
 
         let combatState = combatDoc.data();
+        
+        // --- 【核心新增】後端安全驗證 ---
+        if (selectedSkillName) {
+            const skillTemplateResult = await getOrGenerateSkillTemplate(selectedSkillName);
+            if (!skillTemplateResult || !skillTemplateResult.template) {
+                return res.status(404).json({ message: `找不到武學「${selectedSkillName}」的資料。`});
+            }
+            const requiredWeaponType = skillTemplateResult.template.requiredWeaponType;
+            const currentWeaponType = combatState.player.currentWeaponType;
+
+            const isWeaponMatch = !requiredWeaponType || requiredWeaponType === '無' || requiredWeaponType === currentWeaponType;
+
+            if (!isWeaponMatch) {
+                console.warn(`[後端驗證失敗] 玩家 ${req.user.username} 試圖使用與武器不符的武學！武學: ${selectedSkillName}, 需求: ${requiredWeaponType}, 現有: ${currentWeaponType}`);
+                return res.status(403).json({ message: `你裝備的武器不對，無法施展「${selectedSkillName}」。` });
+            }
+        }
+        // --- 驗證結束 ---
         
         const [userDoc, skills] = await Promise.all([
             userDocRef.get(),
@@ -169,7 +185,7 @@ const combatActionRouteHandler = async (req, res) => {
         playerProfile.mp = combatState.player.mp;
         playerProfile.maxMp = combatState.player.maxMp;
 
-        const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, { strategy, skill });
+        const combatResult = await getAICombatAction(playerModelChoice, playerProfile, combatState, { strategy, skill: selectedSkillName });
 
         if (!combatResult) throw new Error("戰鬥裁判AI未能生成有效回應。");
 
