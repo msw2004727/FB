@@ -90,8 +90,10 @@ async function handleAction(req, res, player, newRoundNumber) {
             const cultivationResult = await handleCultivation(userId, username, context.player, cultivationCommand.days, cultivationCommand.skillName);
             
             if (!cultivationResult.success) {
-                // 如果條件不滿足，直接返回失敗訊息，不生成新回合
+                // 【核心修改】使用輔助函式包裝錯誤訊息
                 return res.status(400).json({ message: cultivationResult.message });
+                const tutorialMessage = appendTutorialHint(cultivationResult.message);
+                return res.status(400).json({ message: tutorialMessage });
             }
             
             // 條件滿足，使用閉關模組生成的數據來更新遊戲狀態
