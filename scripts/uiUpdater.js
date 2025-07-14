@@ -41,7 +41,6 @@ const slotConfig = {
     weapon_back: { icon: 'fa-archive' },
 };
 
-// 【核心修正】增加一個根據物品類型判斷通用圖示的對照表
 const itemTypeConfig = {
     '武器': { icon: 'fa-gavel' },
     '裝備': { icon: 'fa-user-shield' },
@@ -173,7 +172,7 @@ function updateDeathCountdownUI(countdownValue) {
     }
 }
 
-function updateBulkStatus(score) {
+export function updateBulkStatus(score) {
     if (!bulkStatus) return;
     let emoji = '🎒';
     let text = '輕裝上陣';
@@ -233,7 +232,7 @@ function highlightNpcNames(text, npcs) {
     return highlightedText;
 }
 
-function renderInventory(inventory) {
+export function renderInventory(inventory) {
     if (!itmContent) return;
     itmContent.innerHTML = '';
     
@@ -268,27 +267,15 @@ function createItemEntry(item) {
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
 
-    // --- 【全新修正】重寫圖示判斷邏輯 ---
-    let iconClass = 'fa-box'; // 預設圖示為小木盒
-
-    // 判斷是否為武器或裝備，如果是，則使用其專屬圖示
-    if (item.itemType === '武器') {
-        iconClass = 'fa-gavel';
-    } else if (item.itemType === '裝備') {
-        iconClass = 'fa-user-shield';
-    } else if (item.itemType === '財寶') {
-        iconClass = 'fa-coins';
+    let iconClass = 'fa-box';
+    if (item.itemType && itemTypeConfig[item.itemType]) {
+        iconClass = itemTypeConfig[item.itemType].icon;
     }
-    // 對於其他所有類型（秘笈、道具、材料等），都會維持預設的 'fa-box' 圖示。
-
-    // 如果物品「已裝備」，則使用更精確的「部位圖示」覆蓋前面的設定
     if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
         iconClass = slotConfig[item.equipSlot].icon;
     }
-    // --- 修正結束 ---
 
     let equipControls = '';
-    // 判斷物品類型是否為「武器」或「裝備」，只要是，就顯示開關
     if (item.itemType === '武器' || item.itemType === '裝備') {
         equipControls = `
             <div class="item-controls">
@@ -304,7 +291,7 @@ function createItemEntry(item) {
         <div class="item-info">
              <i class="item-icon fa-solid ${iconClass}"></i>
             <div>
-                 <span class="item-name">${item.itemName}</span>
+                 <a href="#" class="item-link" data-item-id="${item.instanceId}">${item.itemName}</a>
                  ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
             </div>
         </div>
