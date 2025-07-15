@@ -7,21 +7,13 @@ const { getAICultivationResult } = require('../../services/aiService');
 const { processItemChanges } = require('../itemManager');
 
 /**
- * 【輔助】從玩家指令中解析閉關天數
- * @param {string} playerAction - 玩家的原始指令
- * @returns {number} - 閉關天數，預設為1
+ * 【核心修正】移除舊的、有問題的文字解析函式
  */
+/*
 function parseCultivationDays(playerAction) {
-    const timeUnits = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
-    const dayKeyword = '日';
-
-    const dayMatch = playerAction.match(new RegExp(`([一二三四五六七八九十]+)${dayKeyword}`));
-    if (dayMatch && dayMatch[1] && timeUnits[dayMatch[1]]) {
-        return timeUnits[dayMatch[1]];
-    }
-    // 如果沒有指定天數，預設為閉關一天
-    return 1;
+    // ... old code removed ...
 }
+*/
 
 /**
  * 【輔助】從玩家指令和已學技能中，找出要修練的目標
@@ -33,51 +25,34 @@ function findSkillToPractice(playerAction, playerSkills) {
     const foundSkills = playerSkills.filter(skill => playerAction.includes(skill.skillName));
 
     if (foundSkills.length === 1) {
-        // 如果指令中明確提到了玩家已會的一門武學，就返回它
         return foundSkills[0];
     }
     if (foundSkills.length > 1) {
-        // 如果同時提到了多門武學，返回一個錯誤標記
         return { error: 'multiple_skills_mentioned', skills: foundSkills };
     }
-    // 如果沒有提到任何已會的武學，返回 null
     return null;
 }
 
 
 /**
- * 【核心】處理閉關修練請求的總控制器 v2.3
+ * 【核心】處理閉關修練請求的總控制器 v2.4
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} playerProfile - 當前的玩家完整檔案
- * @param {string} playerAction - 玩家的原始指令
+ * @param {string} skillToPracticeName - 要修練的武學名稱
+ * @param {number} days - 閉關天數
  * @returns {Promise<{success: boolean, message: string, data: object|null}>}
  */
-async function handleCultivation(userId, username, playerProfile, playerAction) {
-    const days = parseCultivationDays(playerAction);
-    console.log(`[閉關系統] 玩家 ${username} 請求閉關 ${days} 天，原始指令：「${playerAction}」。`);
+async function handleCultivation(userId, username, playerProfile, skillToPracticeName, days) {
+    console.log(`[閉關系統 v2.4] 玩家 ${username} 請求閉關修練「${skillToPracticeName}」，時長 ${days} 天。`);
 
-    // --- 1. 武學智慧判斷 2.0 ---
+    // --- 1. 武學有效性判斷 ---
     const playerSkills = await getPlayerSkills(userId);
-    let skillToPractice = findSkillToPractice(playerAction, playerSkills);
-
-    if (skillToPractice && skillToPractice.error) {
-        const skillList = skillToPractice.skills.map(s => `「${s.skillName}」`).join('、');
-        return { success: false, message: `你試圖同時修練 ${skillList}，真氣在體內亂竄，無法集中。請一次只專心修練一門武學。`, data: null };
-    }
+    const skillToPractice = playerSkills.find(skill => skill.skillName === skillToPracticeName);
 
     if (!skillToPractice) {
-        if (playerSkills.length === 0) {
-            return { success: false, message: "你身無長技，不知從何練起。", data: null };
-        }
-        if (playerSkills.length === 1) {
-            skillToPractice = playerSkills[0];
-            console.log(`[閉關系統] 玩家未指定武學，自動選擇其唯一的武學：「${skillToPractice.skillName}」。`);
-        } else {
-            const skillList = playerSkills.map(s => `「${s.skillName}」`).join('、');
-            const exampleCommand = `指令範例：「閉關修練${playerSkills[0].skillName}三日」`;
-            return { success: false, message: `你身負數門絕學 (${skillList})，請明確指定要修練哪一門。\n\n${exampleCommand}`, data: null };
-        }
+        console.error(`[閉關系統] 錯誤：玩家 ${username} 試圖修練一個他不會的武學「${skillToPracticeName}」。`);
+        return { success: false, message: `你尚未學會「${skillToPracticeName}」，無法進行閉關修練。`, data: null };
     }
 
     // --- 2. 前置條件檢查 ---
@@ -120,7 +95,6 @@ async function handleCultivation(userId, username, playerProfile, playerAction) 
     console.log(`[閉關系統] 預計算結果: ${outcome}, 經驗變化: ${expChange}, 功力變化:`, powerChange);
     
     // --- 5. AI生成故事 ---
-    // 【關鍵修正】將 username 傳遞給AI服務
     const cultivationStory = await getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint);
 
     // --- 6. 構造新回合數據 ---
