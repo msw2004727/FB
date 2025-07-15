@@ -12,7 +12,7 @@ const { addCurrency } = require('../economyManager');
 const db = admin.firestore();
 
 /**
- * 【核心修正 v3.0】更新遊戲狀態並將所有更改寫入資料庫
+ * 【核心修正 v3.1】更新遊戲狀態並將所有更改寫入資料庫
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} player - 當前回合開始前的玩家數據
@@ -24,23 +24,50 @@ const db = admin.firestore();
 async function updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber) {
     const userDocRef = db.collection('users').doc(userId);
     const summaryDocRef = userDocRef.collection('game_state').doc('summary');
+    
+    // 【關鍵修正】統一從 aiResponse.roundData 中獲取所有回合數據
+    const safeRoundData = aiResponse.roundData || {};
+    const { 
+        story = aiResponse.story || '時間悄然流逝...', // 兼容舊格式，但優先使用roundData中的story
+        playerState = 'alive', 
+        powerChange = {}, 
+        moralityChange = 0, 
+        moneyChange = 0, 
+        itemChanges = [], 
+        skillChanges = [], 
+        romanceChanges = [], 
+        npcUpdates = [], 
+        locationUpdates = [], 
+        ATM = [''], 
+        EVT = '江湖軼事', 
+        LOC = player.currentLocation || ['未知之地'], 
+        PSY = '心如止水', 
+        PC = '安然無恙', 
+        NPC = [], 
+        QST = '', 
+        WRD = '晴朗', 
+        LOR = '', 
+        CLS = '', 
+        IMP = '你的行動似乎沒有產生什麼特別的影響。', 
+        timeOfDay: aiNextTimeOfDay, 
+        daysToAdvance = 0 
+    } = safeRoundData;
 
-    if (aiResponse.story && (aiResponse.story.includes('黑影') || aiResponse.story.includes('影子'))) {
+
+    if (story && (story.includes('黑影') || story.includes('影子'))) {
         console.log(`[!!!] 系統警示：神秘黑影人已在玩家 [${username}] 的第 ${newRoundNumber} 回合劇情中出現！`);
     }
 
-    const safeRoundData = aiResponse.roundData;
-    const { playerState = 'alive', powerChange = {}, moralityChange = 0, moneyChange = 0, itemChanges = [], skillChanges = [], romanceChanges = [], npcUpdates = [], locationUpdates = [], ATM = [''], EVT = '江湖軼事', LOC = player.currentLocation || ['未知之地'], PSY = '心如止水', PC = '安然無恙', NPC = [], QST = '', WRD = '晴朗', LOR = '', CLS = '', IMP = '你的行動似乎沒有產生什麼特別的影響。', timeOfDay: aiNextTimeOfDay, daysToAdvance = 0 } = safeRoundData;
-
     const { levelUpEvents, customSkillCreationResult } = await updateSkills(userId, skillChanges, player);
+    let finalStory = story;
     if (customSkillCreationResult && !customSkillCreationResult.success) {
-        aiResponse.story = customSkillCreationResult.reason;
+        finalStory = customSkillCreationResult.reason;
         if(skillChanges.some(s => s.isNewlyAcquired)) {
              skillChanges.length = 0;
         }
     }
     if (levelUpEvents.length > 0) {
-        aiResponse.story += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
+        finalStory += `\n\n(你感覺到自己的${levelUpEvents.map(e => `「${e.skillName}」`).join('、')}境界似乎有所精進。)`;
     }
     
     const newStamina = calculateNewStamina(player, playerAction, safeRoundData);
@@ -50,7 +77,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     let shortActionCounter = player.shortActionCounter || 0;
     if (!timeDidAdvance && !isRecoveryAction) shortActionCounter++; else shortActionCounter = 0;
     
-    // 【核心修正】明確地從 player 物件初始化日期，並提供預設值以防萬一
     let finalTimeOfDay = aiNextTimeOfDay || player.currentTimeOfDay || '上午';
     let finalDate = {
         year: player.year || 1,
@@ -69,9 +95,8 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     }
     for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
-    // 【核心修正】明確地將新日期寫入要存檔的數據
     const finalSaveData = { 
-        story: aiResponse.story, R: newRoundNumber, timeOfDay: finalTimeOfDay, 
+        story: finalStory, R: newRoundNumber, timeOfDay: finalTimeOfDay, 
         year: finalDate.year, month: finalDate.month, day: finalDate.day, yearName: finalDate.yearName,
         stamina: newStamina, playerState, powerChange, moralityChange, moneyChange, 
         itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
@@ -102,7 +127,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const newExternalPower = (player.externalPower || 0) + (powerChange?.external || 0);
     const newLightnessPower = (player.lightness || 0) + (powerChange?.lightness || 0);
 
-    // 【核心修正】明確地將新日期寫入要更新到玩家主檔案的數據
     const playerUpdatesForDb = {
         timeOfDay: finalTimeOfDay,
         stamina: newStamina,
@@ -132,7 +156,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
 
     if (NPC && Array.isArray(NPC)) {
         NPC.filter(npc => npc.status).forEach(npc => {
-            const interactionContext = `事件：「${EVT}」。\n經過：${aiResponse.story}\n我在事件中的狀態是：「${npc.status}」。`;
+            const interactionContext = `事件：「${EVT}」。\n經過：${story}\n我在事件中的狀態是：「${npc.status}」。`;
             updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext).catch(err => console.error(`[背景任務] 更新NPC ${npc.name} 記憶時出錯:`, err));
         });
     }
