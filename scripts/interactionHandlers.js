@@ -275,12 +275,23 @@ function handleStrategySelection(strategy) {
                 const slider = skillControl.querySelector('.power-level-slider');
                 slider.addEventListener('input', () => {
                     const powerLevel = slider.value;
-                    skillControl.querySelector('.power-level-display').textContent = `${powerLevel} 成`;
-                    
                     const costSpan = skillControl.querySelector('.skill-cost');
                     const baseCost = parseInt(costSpan.dataset.baseCost, 10);
-                    costSpan.textContent = `內力 ${baseCost * powerLevel}`;
+                    const totalCost = baseCost * powerLevel;
+                    const currentMp = gameState.combat.state.player.mp;
 
+                    skillControl.querySelector('.power-level-display').textContent = `${powerLevel} 成`;
+                    costSpan.textContent = `內力 ${totalCost}`;
+
+                    if (totalCost > currentMp) {
+                        costSpan.style.color = '#dc3545'; // 紅色警示
+                        confirmBtn.disabled = true;
+                    } else {
+                        costSpan.style.color = ''; // 恢復預設顏色
+                        confirmBtn.disabled = false;
+                    }
+                    
+                    // 【核心修正】在這裡即時更新全域狀態
                     if (gameState.combat.selectedSkill === skill.skillName) {
                         gameState.combat.selectedPowerLevel = parseInt(powerLevel, 10);
                     }
