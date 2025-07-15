@@ -240,8 +240,12 @@ function handleStrategySelection(strategy) {
     if (relevantSkills.length > 0) {
         relevantSkills.forEach(skill => {
             const requiredWeapon = skill.requiredWeaponType;
-            // 【核心邏輯修正】'無' (Unarmed) 技能在 `currentWeaponType` 為 null 或 undefined 時也應可用
-            const isUsable = !requiredWeapon || requiredWeapon === '無' || requiredWeapon === currentWeaponType;
+            
+            // 【核心修正 v3.0】重寫UI驗證邏輯
+            const isUsable = 
+                (requiredWeapon && requiredWeapon !== '無' && requiredWeapon === currentWeaponType) ||
+                (requiredWeapon === '無' && currentWeaponType === null);
+
             const disabledClass = isUsable ? '' : 'disabled';
 
             let weaponStatusHtml = '';
@@ -291,7 +295,6 @@ function handleStrategySelection(strategy) {
                         confirmBtn.disabled = false;
                     }
                     
-                    // 【核心修正】在這裡即時更新全域狀態
                     if (gameState.combat.selectedSkill === skill.skillName) {
                         gameState.combat.selectedPowerLevel = parseInt(powerLevel, 10);
                     }
@@ -304,7 +307,6 @@ function handleStrategySelection(strategy) {
          skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
     }
     
-    // 【核心修正】即使沒有可用技能，也允許玩家點擊「確定」以執行普通攻擊
     if (confirmBtn) {
         confirmBtn.disabled = false;
     }
@@ -341,7 +343,6 @@ function handleSkillSelection(skillName) {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
-// 【核心修正】重構丐幫互動流程
 async function handleBeggarInquiry(npcName, npcProfile) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
@@ -419,27 +420,22 @@ export async function sendChatMessage() {
         let data;
 
         if (chatMode === 'inquiry') {
-            // 在提問前，先進行一次性的付費操作
             try {
                 const paymentResult = await api.startBeggarInquiry();
-                // 付款成功，更新本地的錢錢顯示
                 if (gameState.roundData) {
-                    // 這是一個簡化的更新，實際可能需要更全面的UI刷新
                     const moneyContent = document.getElementById('money-content');
                     if (moneyContent) moneyContent.textContent = `${paymentResult.newBalance} 兩銀子`;
                 }
             } catch (error) {
-                // 處理錢不夠的狀況
                 if(error.message.includes('銀兩不足')) {
                     modal.appendChatMessage('npc', '嘿嘿，客官，您的銀兩似乎不太夠啊...');
                     dom.chatActionBtn.disabled = true;
-                    return; // 中斷後續操作
+                    return; 
                 } else {
-                    throw error; // 拋出其他網路或伺服器錯誤
+                    throw error; 
                 }
             }
             
-            // 付費成功後，再進行提問
             data = await api.askBeggarQuestion({
                 beggarName: gameState.currentChatNpc,
                 userQuery: message,
