@@ -55,9 +55,9 @@ async function invalidateNovelCache(userId) {
     }
 }
 
-// 【核心修正 v2.0 - 圖書館存檔分片】
+// 【核心修正 v2.1 - 修復變數未定義錯誤】
 async function updateLibraryNovel(userId, username) {
-    console.log(`[圖書館系統 v2.0] 開始為 ${username} 更新分章節小說...`);
+    console.log(`[圖書館系統 v2.1] 開始為 ${username} 更新分章節小說...`);
     try {
         const userSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (userSavesSnapshot.empty) return;
@@ -68,7 +68,14 @@ async function updateLibraryNovel(userId, username) {
         // 使用批次寫入以提高效率
         const batch = db.batch();
 
-        const lastRoundData = userSavesSnapshot.docs[userSavesSnapshot.docs.length - 1].data();
+        // 【錯誤修復】從已獲取的快照中正確地取得最後一回合的數據
+        const lastSaveDoc = userSavesSnapshot.docs[userSavesSnapshot.docs.length - 1];
+        if (!lastSaveDoc) {
+             console.error(`[圖書館系統 v2.1] 錯誤：找不到玩家 ${username} 的最後存檔。`);
+             return;
+        }
+        const lastRoundData = lastSaveDoc.data();
+
         const isDeceased = lastRoundData.playerState === 'dead';
         const novelTitle = `${username}的江湖路`;
 
@@ -100,15 +107,10 @@ async function updateLibraryNovel(userId, username) {
         // 3. 提交所有批次操作
         await batch.commit();
 
-        console.log(`[圖書館系統 v2.0] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節。`);
+        console.log(`[圖書館系統 v2.1] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節。`);
 
     } catch (error) {
-        // 檢查是否是文檔大小超限錯誤，並給出更明確的日誌
-        if (error.details && error.details.includes('exceeds the maximum allowed size')) {
-            console.error(`[圖書館系統 v2.0] 即使在分章節後，仍有單個章節過大，這是一個罕見錯誤，需要檢查 R${lastRoundData.R} 的存檔內容。`, error);
-        } else {
-            console.error(`[圖書館系統 v2.0] 更新 ${username} 的小說時發生錯誤:`, error);
-        }
+        console.error(`[圖書館系統 v2.1] 更新 ${username} 的小說時發生錯誤:`, error);
     }
 }
 
