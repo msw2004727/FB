@@ -55,37 +55,63 @@ async function invalidateNovelCache(userId) {
     }
 }
 
+// 【核心修正 v2.0 - 圖書館存檔分片】
 async function updateLibraryNovel(userId, username) {
+    console.log(`[圖書館系統 v2.0] 開始為 ${username} 更新分章節小說...`);
     try {
-        const userSavesRef = db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
-        const snapshot = await userSavesRef;
-        if (snapshot.empty) return;
-        const storyChapters = snapshot.docs.map(doc => {
-            const roundData = doc.data();
-            const title = roundData.EVT || `第 ${roundData.R} 回`;
-            const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
-            return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
-        });
-        const fullStoryHTML = storyChapters.join('');
-        const lastRoundData = snapshot.docs[snapshot.docs.length - 1].data();
+        const userSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+        if (userSavesSnapshot.empty) return;
+
+        const libraryDocRef = db.collection('library_novels').doc(userId);
+        const chaptersRef = libraryDocRef.collection('chapters');
+
+        // 使用批次寫入以提高效率
+        const batch = db.batch();
+
+        const lastRoundData = userSavesSnapshot.docs[userSavesSnapshot.docs.length - 1].data();
         const isDeceased = lastRoundData.playerState === 'dead';
         const novelTitle = `${username}的江湖路`;
-        const libraryDocRef = db.collection('library_novels').doc(userId);
 
-        await libraryDocRef.set({
+        // 1. 更新主文檔，只包含元數據，不再包含巨大的 storyHTML
+        batch.set(libraryDocRef, {
             playerName: username,
             novelTitle: novelTitle,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-            storyHTML: fullStoryHTML,
             isDeceased,
             lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`,
             lastChapterData: lastRoundData
         }, { merge: true });
-        console.log(`[圖書館系統] 成功更新 ${username} 的小說至圖書館！`);
+        
+        // 2. 將每一回合的故事作為一個獨立的章節文件存儲
+        userSavesSnapshot.docs.forEach(doc => {
+            const roundData = doc.data();
+            const chapterId = `R${String(roundData.R).padStart(6, '0')}`; // 使用 R 作為文檔ID，並補零以確保順序
+            const chapterDocRef = chaptersRef.doc(chapterId);
+
+            const chapterContent = {
+                title: roundData.EVT || `第 ${roundData.R} 回`,
+                content: roundData.story || "這段往事，已淹沒在時間的長河中。",
+                round: roundData.R
+            };
+            
+            batch.set(chapterDocRef, chapterContent);
+        });
+        
+        // 3. 提交所有批次操作
+        await batch.commit();
+
+        console.log(`[圖書館系統 v2.0] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節。`);
+
     } catch (error) {
-        console.error(`[圖書館系統] 更新 ${username} 的小說時發生錯誤:`, error);
+        // 檢查是否是文檔大小超限錯誤，並給出更明確的日誌
+        if (error.details && error.details.includes('exceeds the maximum allowed size')) {
+            console.error(`[圖書館系統 v2.0] 即使在分章節後，仍有單個章節過大，這是一個罕見錯誤，需要檢查 R${lastRoundData.R} 的存檔內容。`, error);
+        } else {
+            console.error(`[圖書館系統 v2.0] 更新 ${username} 的小說時發生錯誤:`, error);
+        }
     }
 }
+
 
 async function getMergedLocationData(userId, locationHierarchyArray) {
     if (!Array.isArray(locationHierarchyArray) || locationHierarchyArray.length === 0) {
