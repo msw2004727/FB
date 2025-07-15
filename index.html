@@ -308,8 +308,8 @@
         <div id="skills-modal" class="skills-modal-overlay">
             <div class="skills-modal-content">
                 <div class="skills-modal-header">
-                    <button id="create-skill-btn" class="skills-header-btn" title="自創武學">
-                        <i class="fas fa-plus"></i>
+                    <button id="open-cultivation-btn" class="skills-header-btn" title="閉關修練">
+                        <i class="fas fa-door-closed"></i>
                     </button>
                     <h3>武學總覽</h3>
                     <button id="close-skills-btn" class="skills-modal-close"><i class="fas fa-times"></i></button>
@@ -453,6 +453,43 @@
                 <footer class="item-details-footer">
                     <button id="item-details-delete-btn"><i class="fas fa-trash-alt"></i> 丟棄</button>
                 </footer>
+            </div>
+        </div>
+
+        <div id="cultivation-modal" class="skills-modal-overlay">
+            <div class="skills-modal-content" style="max-width: 500px; height: auto;">
+                <div class="skills-modal-header">
+                    <h3 style="grid-column: 1 / span 3;">閉關修練</h3>
+                    <button id="close-cultivation-btn" class="skills-modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="skills-modal-body" id="cultivation-modal-body">
+                    <div class="cultivation-form-group">
+                        <label for="cultivation-skill-select">選擇武學</label>
+                        <select id="cultivation-skill-select" class="cultivation-select"></select>
+                    </div>
+                    <div class="cultivation-form-group">
+                        <label for="cultivation-days-input">閉關天數 (1-10日)</label>
+                        <div class="cultivation-days-selector">
+                            <button class="day-btn" data-days="1">1</button>
+                            <button class="day-btn" data-days="3">3</button>
+                            <button class="day-btn" data-days="5">5</button>
+                            <button class="day-btn" data-days="7">7</button>
+                            <button class="day-btn" data-days="10">10</button>
+                        </div>
+                        <input type="hidden" id="cultivation-days-input" value="1">
+                    </div>
+                    <div class="cultivation-requirements">
+                        <h4>閉關條件：</h4>
+                        <ul>
+                            <li id="req-location"><i class="fas fa-times-circle"></i> 需身處私密地點</li>
+                            <li id="req-stamina"><i class="fas fa-times-circle"></i> 精力需高於80%</li>
+                            <li id="req-food"><i class="fas fa-times-circle"></i> 需備足糧食飲水</li>
+                        </ul>
+                    </div>
+                    <button id="start-cultivation-btn" class="cultivation-start-btn" disabled>
+                        <i class="fas fa-bed"></i> 開始閉關
+                    </button>
+                </div>
             </div>
         </div>
 
