@@ -46,15 +46,14 @@ body.dark-theme .skills-modal-content {
     border-color: var(--dark-border);
 }
 
-/* 【核心修改】將 header 改為 grid 佈局以容納新按鈕 */
 .skills-modal-header {
     flex-shrink: 0;
-    display: grid; /* 改為 grid */
-    grid-template-columns: 1fr auto 1fr; /* 三欄佈局：左側空白、中間標題、右側按鈕 */
+    display: grid; 
+    grid-template-columns: 1fr auto 1fr; 
     align-items: center;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--light-border);
-    position: relative; /* 為關閉按鈕提供定位基準 */
+    position: relative; 
 }
 
 
@@ -67,18 +66,17 @@ body.dark-theme .skills-modal-header {
     font-family: var(--font-serif);
     font-size: 1.8rem;
     color: var(--light-accent);
-    text-align: center; /* 讓標題在中間一欄居中 */
-    grid-column: 2 / 3; /* 讓標題佔據中間的格子 */
+    text-align: center; 
+    grid-column: 2 / 3; 
 }
 
 body.dark-theme .skills-modal-header h3 {
     color: var(--dark-accent);
 }
 
-/* 【核心新增】為新按鈕預留的樣式 */
 .skills-header-btn {
-    grid-column: 1 / 2; /* 讓按鈕佔據左邊的格子 */
-    justify-self: start; /* 讓按鈕靠左對齊 */
+    grid-column: 1 / 2; 
+    justify-self: start; 
     width: 36px;
     height: 36px;
     background: transparent;
@@ -119,8 +117,8 @@ body.dark-theme .skills-header-btn:hover {
     cursor: pointer;
     padding: 0.5rem;
     line-height: 1;
-    grid-column: 3 / 4; /* 讓關閉按鈕佔據右邊的格子 */
-    justify-self: end; /* 讓關閉按鈕靠右對齊 */
+    grid-column: 3 / 4; 
+    justify-self: end; 
 }
 
 .skills-modal-close:hover {
@@ -296,4 +294,116 @@ body.dark-theme .exp-bar-fill {
     color: var(--light-text-secondary);
     min-width: 80px;
     text-align: right;
+}
+
+/* --- 【核心新增】閉關彈窗樣式 --- */
+.cultivation-form-group {
+    margin-bottom: 1.5rem;
+}
+.cultivation-form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: var(--light-text-secondary);
+}
+.cultivation-select {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--light-border);
+    background-color: var(--light-bg);
+    font-size: 1rem;
+}
+body.dark-theme .cultivation-select {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-primary);
+}
+
+.cultivation-days-selector {
+    display: flex;
+    gap: 0.5rem;
+}
+.day-btn {
+    flex-grow: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--light-border);
+    background-color: var(--light-bg);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+body.dark-theme .day-btn {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-primary);
+}
+.day-btn.selected {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+}
+body.dark-theme .day-btn.selected {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+    border-color: var(--dark-accent);
+}
+
+.cultivation-requirements {
+    margin-top: 2rem;
+    padding: 1rem;
+    background-color: var(--light-bg);
+    border: 1px dashed var(--light-border);
+    border-radius: 8px;
+}
+body.dark-theme .cultivation-requirements {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+}
+.cultivation-requirements h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.1rem;
+}
+.cultivation-requirements ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: var(--light-text-secondary);
+}
+body.dark-theme .cultivation-requirements ul {
+    color: var(--dark-text-secondary);
+}
+.cultivation-requirements li {
+    margin-bottom: 0.5rem;
+}
+.cultivation-requirements li .fas {
+    margin-right: 0.5rem;
+    width: 1.2em;
+}
+.cultivation-requirements .fa-times-circle {
+    color: #dc3545;
+}
+.cultivation-requirements .fa-check-circle {
+    color: #28a745;
+}
+
+.cultivation-start-btn {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    background-color: var(--light-accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    margin-top: 2rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.cultivation-start-btn:hover:not(:disabled) {
+    opacity: 0.85;
+}
+.cultivation-start-btn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
 }
