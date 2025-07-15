@@ -3,16 +3,16 @@ const { buildContext } = require('../contextBuilder');
 const { getAIStory, getAISuggestion } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
-const { handleCultivation } = require('./cultivationManager');
-// 【核心修改】移除 tutorialHelper 的引用，因為我們將在 gameLoop.js 控制提示
-// const { appendTutorialHint } = require('../utils/tutorialHelper'); 
+// 【核心修改】移除閉關管理器的引用
+// const { handleCultivation } = require('./cultivationManager'); 
 
-// 【核心修改】極度簡化指令判斷，只檢查關鍵字
+// 【核心修改】移除舊的閉關指令判斷函式
+/*
 function isCultivationAttempt(action) {
     const keywords = ['閉關', '靜修', '修行', '修練', '練習'];
     return keywords.some(kw => action.includes(kw));
 }
-
+*/
 
 const preprocessPlayerAction = (playerAction, locationContext) => {
     const facilityKeywords = {
@@ -54,28 +54,7 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         }
         
-        // --- 【核心修改】閉關指令攔截 ---
-        if (isCultivationAttempt(playerAction)) {
-            // 直接將最原始的玩家指令傳遞給管理器，讓管理器全權負責解析
-            const cultivationResult = await handleCultivation(userId, username, context.player, playerAction);
-            
-            if (!cultivationResult.success) {
-                return res.status(400).json({ message: cultivationResult.message });
-            }
-            
-            const finalRoundData = await updateGameState(userId, username, player, playerAction, { roundData: cultivationResult.data }, newRoundNumber);
-            const suggestion = await getAISuggestion(finalRoundData);
-            finalRoundData.suggestion = suggestion;
-            const finalLocationData = await getMergedLocationData(userId, finalRoundData.LOC);
-            
-            return res.json({
-                story: finalRoundData.story,
-                roundData: finalRoundData,
-                suggestion: suggestion,
-                locationData: finalLocationData
-            });
-        }
-        // --- 閉關邏輯結束 ---
+        // --- 【核心修改】舊的閉關指令攔截邏輯已完全移除 ---
         
         playerAction = preprocessPlayerAction(playerAction, context.locationContext);
         
