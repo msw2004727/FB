@@ -1,3 +1,4 @@
+// api/libraryRoutes.js
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
@@ -47,7 +48,7 @@ router.get('/novels', async (req, res) => {
 
 /**
  * @route   GET /api/library/novel/:userId
- * @desc    根據使用者ID獲取單本小說的完整內容
+ * @desc    根據使用者ID獲取單本小說的完整內容 (已修改為分片讀取)
  * @access  Public
  */
 router.get('/novel/:userId', async (req, res) => {
@@ -58,20 +59,40 @@ router.get('/novel/:userId', async (req, res) => {
         }
 
         const novelDocRef = db.collection('library_novels').doc(userId);
-        const doc = await novelDocRef.get();
+        const novelDoc = await novelDocRef.get();
 
-        if (!doc.exists) {
+        if (!novelDoc.exists) {
             return res.status(404).json({ message: '找不到這本江湖傳奇。' });
         }
-
-        const novelData = doc.data();
         
-        const title = novelData.lastChapterTitle || novelData.novelTitle || '未命名傳奇';
+        const novelData = novelDoc.data();
+
+        // 讀取 chapters 子集合
+        const chaptersSnapshot = await novelDocRef.collection('chapters').orderBy('round', 'asc').get();
+        
+        if (chaptersSnapshot.empty) {
+             return res.json({
+                playerName: novelData.playerName,
+                novelTitle: novelData.novelTitle || '未命名傳奇',
+                storyHTML: '<p>這本傳奇空無一字。</p>',
+                lastUpdated: novelData.lastUpdated.toDate(),
+                isDeceased: novelData.isDeceased
+            });
+        }
+
+        // 在伺服器端拼接所有章節的HTML
+        const storyChapters = chaptersSnapshot.docs.map(doc => {
+            const chapter = doc.data();
+            const title = chapter.title || `第 ${chapter.round} 回`;
+            const content = chapter.content || "這段往事，已淹沒在時間的長河中。";
+            return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
+        });
+        const fullStoryHTML = storyChapters.join('');
 
         res.json({
             playerName: novelData.playerName,
-            novelTitle: title,
-            storyHTML: novelData.storyHTML,
+            novelTitle: novelData.novelTitle || '未命名傳奇',
+            storyHTML: fullStoryHTML,
             lastUpdated: novelData.lastUpdated.toDate(),
             isDeceased: novelData.isDeceased
         });
