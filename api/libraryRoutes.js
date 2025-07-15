@@ -7,36 +7,52 @@ const db = admin.firestore();
 
 /**
  * @route   GET /api/library/novels
- * @desc    獲取所有已發布小說的列表
+ * @desc    獲取所有已發布小說的列表 (已修改為讀取最新章節回合數)
  * @access  Public
  */
 router.get('/novels', async (req, res) => {
     try {
         const novelsRef = db.collection('library_novels');
-        // 根據最後更新時間排序，最新的排在最前面
         const snapshot = await novelsRef.orderBy('lastUpdated', 'desc').get();
 
         if (snapshot.empty) {
             return res.json([]);
         }
 
-        const novelsList = snapshot.docs.map(doc => {
+        // 使用 Promise.all 來並行處理所有小說的最新章節查詢
+        const novelsListPromises = snapshot.docs.map(async (doc) => {
             const data = doc.data();
+            let finalRoundNumber = '未知';
+
+            // 【核心修正】為每本小說查詢其最新的章節
+            const lastChapterSnapshot = await db.collection('library_novels')
+                .doc(doc.id)
+                .collection('chapters')
+                .orderBy('round', 'desc')
+                .limit(1)
+                .get();
+
+            if (!lastChapterSnapshot.empty) {
+                finalRoundNumber = lastChapterSnapshot.docs[0].data().round;
+            } else {
+                // 如果章節不存在，作為備用方案，嘗試讀取主文件上的數字
+                finalRoundNumber = data.lastRoundNumber !== undefined ? data.lastRoundNumber : '未知';
+            }
             
-            // 從 lastChapterData 中提取更多資訊，並提供預設值以防出錯
-            const lastChapterData = data.lastChapterData || {};
-            const timeString = `${lastChapterData.yearName || '元祐'}${lastChapterData.year || 1}年${lastChapterData.month || 1}月${lastChapterData.day || 1}日`;
+            const timeString = `${data.lastYearName || '元祐'}${data.lastYear || 1}年${data.lastMonth || 1}月${data.lastDay || 1}日`;
 
             return {
-                id: doc.id, // 這就是作者的 userId
+                id: doc.id,
                 playerName: data.playerName || '無名氏',
-                novelTitle: data.lastChapterTitle || '開篇', // 直接將最新章節設為標題
+                novelTitle: data.lastChapterTitle || '開篇',
                 lastUpdated: data.lastUpdated.toDate(),
                 isDeceased: data.isDeceased || false,
-                time: timeString, // 新增：時間
-                round: lastChapterData.R !== undefined ? lastChapterData.R : '未知', // 新增：回合數
+                time: timeString,
+                round: finalRoundNumber,
             };
         });
+
+        const novelsList = await Promise.all(novelsListPromises);
 
         res.json(novelsList);
 
