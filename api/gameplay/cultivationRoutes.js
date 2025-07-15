@@ -22,10 +22,8 @@ router.post('/start', async (req, res) => {
         }
         const playerProfile = playerDoc.data();
         
-        // 構造一個模擬的玩家行動指令，以便 handleCultivation 函式能夠解析
-        const playerAction = `閉關修練${skillName}${days}日`;
-
-        const cultivationResult = await handleCultivation(userId, username, playerProfile, playerAction);
+        // 【核心修正】直接傳遞準確的 skillName 和 days，而不是一個拼接後的字串
+        const cultivationResult = await handleCultivation(userId, username, playerProfile, skillName, days);
 
         if (!cultivationResult.success) {
             // 如果前置條件不滿足，直接回傳錯誤訊息
@@ -36,6 +34,9 @@ router.post('/start', async (req, res) => {
         const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const currentRoundNumber = lastSaveSnapshot.empty ? 0 : (lastSaveSnapshot.docs[0].data().R || 0);
         const newRoundNumber = currentRoundNumber + 1;
+
+        // 為了日誌和記錄，我們在最後才構造一個 playerAction
+        const playerAction = `透過彈窗閉關修練「${skillName}」${days}日`;
 
         const finalRoundData = await updateGameState(userId, username, playerProfile, playerAction, { roundData: cultivationResult.data }, newRoundNumber);
         const suggestion = await getAISuggestion(finalRoundData);
