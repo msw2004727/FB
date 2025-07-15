@@ -76,7 +76,6 @@ const initiateCombatHandler = async (req, res) => {
         ]);
 
         const equippedWeapon = playerInventory.find(item => item.isEquipped && item.equipSlot && item.equipSlot.startsWith('weapon'));
-        // 【核心修正】在這裡加入最終防線，確保 weaponType 不會是 undefined
         const currentWeaponType = equippedWeapon ? (equippedWeapon.weaponType || null) : null;
         
         console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。`);
@@ -156,7 +155,7 @@ const combatActionRouteHandler = async (req, res) => {
 
         let combatState = combatDoc.data();
         
-        // --- 【核心新增】後端安全驗證 ---
+        // --- 【核心修正 v3.0】後端安全驗證 ---
         if (selectedSkillName) {
             const skillTemplateResult = await getOrGenerateSkillTemplate(selectedSkillName);
             if (!skillTemplateResult || !skillTemplateResult.template) {
@@ -165,11 +164,17 @@ const combatActionRouteHandler = async (req, res) => {
             const requiredWeaponType = skillTemplateResult.template.requiredWeaponType;
             const currentWeaponType = combatState.player.currentWeaponType;
 
-            const isWeaponMatch = !requiredWeaponType || requiredWeaponType === '無' || requiredWeaponType === currentWeaponType;
+            // 重寫驗證邏輯，使其更嚴謹
+            const isWeaponMatch = 
+                // 情況一：武學需要特定武器，且玩家裝備的武器與之相符
+                (requiredWeaponType && requiredWeaponType !== '無' && requiredWeaponType === currentWeaponType) ||
+                // 情況二：武學是空手武學，且玩家目前為空手狀態 (currentWeaponType 為 null)
+                (requiredWeaponType === '無' && currentWeaponType === null);
 
             if (!isWeaponMatch) {
-                console.warn(`[後端驗證失敗] 玩家 ${req.user.username} 試圖使用與武器不符的武學！武學: ${selectedSkillName}, 需求: ${requiredWeaponType}, 現有: ${currentWeaponType}`);
-                return res.status(403).json({ message: `你裝備的武器不對，無法施展「${selectedSkillName}」。` });
+                const weaponName = currentWeaponType ? `${currentWeaponType}類武器` : '空手';
+                console.warn(`[後端驗證失敗] 玩家 ${req.user.username} 試圖使用與武器不符的武學！武學: ${selectedSkillName}, 需求: ${requiredWeaponType}, 現有: ${weaponName}`);
+                return res.status(403).json({ message: `你目前的「${weaponName}」狀態，無法施展「${selectedSkillName}」。` });
             }
         }
         // --- 驗證結束 ---
