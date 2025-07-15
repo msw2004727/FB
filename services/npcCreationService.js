@@ -6,6 +6,43 @@ const { processNpcRelationships } = require('../api/relationshipManager');
 
 const db = admin.firestore();
 
+// 【核心新增】在創建新NPC前，先在資料庫中尋找潛在的親友
+async function findPotentialRelatives(npcName, location) {
+    if (!location) return {};
+
+    const npcsRef = db.collection('npcs');
+    const snapshot = await npcsRef.where('currentLocation', '==', location).get();
+    if (snapshot.empty) return {};
+
+    const potentialRelatives = {
+        father: [],
+        mother: [],
+        spouse: [],
+        sibling: []
+    };
+    
+    // 簡單的姓氏和地點匹配邏輯
+    const surname = npcName.charAt(0);
+
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        // 排除自己
+        if (data.name === npcName) return;
+
+        // 尋找潛在的父親 (同姓、男性、年齡大20-40歲)
+        if (data.name.startsWith(surname) && data.gender === '男' && data.age > 20) {
+            potentialRelatives.father.push({ name: data.name, age: data.age });
+        }
+        // 尋找潛在的母親 (女性、年齡大20-40歲)
+        if (data.gender === '女' && data.age > 20) {
+            potentialRelatives.mother.push({ name: data.name, age: data.age });
+        }
+    });
+
+    return potentialRelatives;
+}
+
+
 function getMoneyForNpc(npcProfile) {
     if (!npcProfile) return 10;
     const occupation = npcProfile.occupation || '';
@@ -31,7 +68,12 @@ async function generateNpcTemplateData(username, npcDataFromStory, roundData, pl
     const initialName = npcDataFromStory.name;
     try {
         console.log(`[NPC Creation Service] 為「${initialName}」啟動AI生成程序...`);
-        const prompt = getNpcCreatorPrompt(username, initialName, roundData, playerProfile);
+        
+        // 【核心新增】在調用AI前，先查找潛在關係
+        const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : null;
+        const potentialRelationships = await findPotentialRelatives(initialName, encounterLocation);
+
+        const prompt = getNpcCreatorPrompt(username, initialName, roundData, playerProfile, potentialRelationships);
         const npcJsonString = await callAI(aiConfig.npcProfile, prompt, true);
         const newTemplateData = JSON.parse(npcJsonString.replace(/^```json\s*|```\s*$/g, ''));
 
@@ -45,8 +87,7 @@ async function generateNpcTemplateData(username, npcDataFromStory, roundData, pl
         const rand = Math.random();
         newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
         
-        const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : '未知之地';
-        if (!newTemplateData.currentLocation) {
+        if (!newTemplateData.currentLocation && encounterLocation) {
              newTemplateData.currentLocation = encounterLocation;
         }
         
@@ -58,17 +99,6 @@ async function generateNpcTemplateData(username, npcDataFromStory, roundData, pl
     }
 }
 
-/**
- * 【核心創建函式 v2.0】
- * 此函式現在假定通用模板一定不存在，並總是執行創建流程。
- * @param {string} userId - 玩家ID
- * @param {string} username - 玩家名稱
- * @param {object} npcDataFromStory - 從故事AI得到的NPC基礎數據
- * @param {object} roundData - 當前回合數據
- * @param {object} playerProfile - 玩家的完整檔案
- * @param {admin.firestore.WriteBatch} batch - Firestore的批次寫入物件
- * @returns {Promise<string|null>} 成功時返回NPC的權威名稱，失敗時返回null
- */
 async function createNewNpc(userId, username, npcDataFromStory, roundData, playerProfile, batch) {
     const initialName = npcDataFromStory.name;
     console.log(`[NPC 創建服務 v2.0] 偵測到新NPC「${initialName}」，開始建檔流程...`);
@@ -112,7 +142,7 @@ async function createNewNpc(userId, username, npcDataFromStory, roundData, playe
         inventory: { '銀兩': initialMoney },
         equipment: npcTemplateData.initialEquipment || [], 
         romanceValue: 0,
-        friendlinessValue: npcDataFromStory.friendlinessChange || 0,
+        friendlinessValue: npcTemplateData.initialFriendlinessValue || npcDataFromStory.friendlinessChange || 0,
         triggeredRomanceEvents: []
     };
 
