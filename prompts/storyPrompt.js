@@ -8,6 +8,7 @@ const { getRomanceRule } = require('./story_components/romanceRule.js');
 const { getWorldviewAndProgressionRule } = require('./story_components/worldviewAndProgressionRule.js');
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
+const { getNarrativeStyleRule } = require('./story_components/narrativeStyleRule.js'); // 【核心新增】
 
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = [], blackShadowEvent = null) => {
     const protagonistDescription = userProfile.gender === 'female'
@@ -19,7 +20,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerGender = userProfile.gender || 'male';
     const playerStamina = userProfile.stamina === undefined ? 100 : userProfile.stamina;
 
-    // 【核心修正 v3.0】強化對AI的指示，在不觸發時明確禁止
+    // 【核心修改】從新模組獲取風格規則
+    const narrativeStyle = getNarrativeStyleRule('modern'); 
+
     const blackShadowRule = blackShadowEvent 
         ? `
 ## 【最高優先級特殊劇情指令：神秘黑影人】
@@ -169,7 +172,8 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
     // 整合所有規則...
     return `
-你是名為「江湖百曉生」的AI，也是這個世界的頂級故事大師。你的風格是基於架空的古代歷史小說，沉穩、寫實且富有邏輯。你的職責是根據玩家的行動，產生接下來發生的故事。
+你是一位頂尖的故事大師AI。你的職責是根據玩家的行動，產生接下來發生的故事。
+${narrativeStyle}
 
 ${blackShadowRule}
 ${specialEventInstruction}
