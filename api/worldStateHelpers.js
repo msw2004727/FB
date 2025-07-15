@@ -52,9 +52,9 @@ async function invalidateNovelCache(userId) {
     }
 }
 
-// 【核心修正 v2.2 - 圖書館存檔瘦身】
+// 【核心修正 v2.3 - 釜底抽薪，強制刪除舊欄位】
 async function updateLibraryNovel(userId, username) {
-    console.log(`[圖書館系統 v2.2] 開始為 ${username} 更新分章節小說...`);
+    console.log(`[圖書館系統 v2.3] 開始為 ${username} 更新分章節小說...`);
     try {
         const userSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (userSavesSnapshot.empty) return;
@@ -65,27 +65,30 @@ async function updateLibraryNovel(userId, username) {
 
         const lastSaveDoc = userSavesSnapshot.docs[userSavesSnapshot.docs.length - 1];
         if (!lastSaveDoc) {
-             console.error(`[圖書館系統 v2.2] 錯誤：找不到玩家 ${username} 的最後存檔。`);
+             console.error(`[圖書館系統 v2.3] 錯誤：找不到玩家 ${username} 的最後存檔。`);
              return;
         }
         const lastRoundData = lastSaveDoc.data();
         const isDeceased = lastRoundData.playerState === 'dead';
         const novelTitle = `${username}的江湖路`;
 
-        // 1. 【關鍵修改】只將必要的元數據寫入主文檔，移除龐大的 lastChapterData
-        batch.set(libraryDocRef, {
+        // 1. 【關鍵修改】使用 batch.update 並明確刪除舊的、龐大的欄位
+        const updatePayload = {
             playerName: username,
             novelTitle: novelTitle,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             isDeceased,
             lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`,
-            // 直接儲存必要的標量值，而不是整個物件
             lastRoundNumber: lastRoundData.R,
             lastYearName: lastRoundData.yearName || '元祐',
             lastYear: lastRoundData.year || 1,
             lastMonth: lastRoundData.month || 1,
             lastDay: lastRoundData.day || 1,
-        }, { merge: true });
+            // 【釜底抽薪】明確地刪除可能存在的、導致文件過大的舊欄位
+            lastChapterData: admin.firestore.FieldValue.delete(),
+            storyHTML: admin.firestore.FieldValue.delete()
+        };
+        batch.update(libraryDocRef, updatePayload);
         
         // 2. 將每一回合的故事作為一個獨立的章節文件存儲
         userSavesSnapshot.docs.forEach(doc => {
@@ -99,20 +102,51 @@ async function updateLibraryNovel(userId, username) {
                 round: roundData.R
             };
             
-            batch.set(chapterDocRef, chapterContent);
+            // 使用 set + merge:true 來創建或覆蓋章節文件
+            batch.set(chapterDocRef, chapterContent, { merge: true });
         });
         
         // 3. 提交所有批次操作
         await batch.commit();
 
-        console.log(`[圖書館系統 v2.2] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節。`);
+        console.log(`[圖書館系統 v2.3] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節，並清理了索引文件。`);
 
     } catch (error) {
-        if (error.details && error.details.includes('exceeds the maximum allowed size')) {
-            console.error(`[圖書館系統 v2.2] 批次寫入時發生文檔大小超限錯誤，這通常意味著單次回合存檔過大，需要檢查。`, error);
+        // 如果初次執行update失敗（因為文件不存在），則嘗試用set創建
+        if (error.code === 5) { // 5 = NOT_FOUND, 表示文件不存在
+            console.warn(`[圖書館系統 v2.3] 索引文件不存在，將嘗試創建...`);
+            // 重新執行一次，但這次使用 set 而不是 update
+            await createLibraryNovel(userId, username);
         } else {
-            console.error(`[圖書館系統 v2.2] 更新 ${username} 的小說時發生錯誤:`, error);
+            console.error(`[圖書館系統 v2.3] 更新 ${username} 的小說時發生錯誤:`, error);
         }
+    }
+}
+
+// 輔助函式：在文件不存在時，使用 set 進行創建
+async function createLibraryNovel(userId, username) {
+    try {
+        const userSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+        if (userSavesSnapshot.empty) return;
+        const libraryDocRef = db.collection('library_novels').doc(userId);
+        const lastSaveDoc = userSavesSnapshot.docs[userSavesSnapshot.docs.length - 1];
+        const lastRoundData = lastSaveDoc.data();
+        const createPayload = {
+            playerName: username,
+            novelTitle: `${username}的江湖路`,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            isDeceased: lastRoundData.playerState === 'dead',
+            lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`,
+            lastRoundNumber: lastRoundData.R,
+            lastYearName: lastRoundData.yearName || '元祐',
+            lastYear: lastRoundData.year || 1,
+            lastMonth: lastRoundData.month || 1,
+            lastDay: lastRoundData.day || 1,
+        };
+        await libraryDocRef.set(createPayload);
+        console.log(`[圖書館系統 v2.3] 成功為 ${username} 創建了新的圖書館索引文件。`);
+    } catch(e) {
+        console.error(`[圖書館系統 v2.3] 創建索引文件時失敗:`, e);
     }
 }
 
