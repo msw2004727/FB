@@ -22,18 +22,19 @@ function calculateNewStamina(player, playerAction, roundData) {
     let newStamina = player.stamina ?? 100;
 
     if (isRecoveryAction) {
+        // 【核心修正 v2.0】修改精力恢復的計算方式
         if (daysToAdvance > 0) {
-            // 規則 3: 跨日長眠，恢復現有精力的75%
-            newStamina += Math.floor(newStamina * 0.75);
-            console.log(`[精力系統] 進行了跨日長眠，恢復精力。`);
+            // 規則 3: 跨日長眠，精力完全恢復
+            newStamina = 100;
+            console.log(`[精力系統 v2.0] 進行了跨日長眠，精力完全恢復。`);
         } else if (timeDidAdvance) {
-            // 規則 2: 時段小憩，恢復現有精力的25%
-            newStamina += Math.floor(newStamina * 0.25);
-            console.log(`[精力系統] 進行了時辰小憩，恢復精力。`);
+            // 規則 2: 時段小憩，恢復 40 點精力
+            newStamina += 40;
+            console.log(`[精力系統 v2.0] 進行了時辰小憩，恢復40點精力。`);
         } else {
-            // 規則 1: 回合調息，恢復現有精力的10%
-            newStamina += Math.floor(newStamina * 0.10);
-            console.log(`[精力系統] 進行了回合調息，恢復精力。`);
+            // 規則 1: 回合調息，恢復 15 點精力
+            newStamina += 15;
+            console.log(`[精力系統 v2.0] 進行了回合調息，恢復15點精力。`);
         }
     } else {
         // 非恢復性活動：應用AI的精力變化，並扣除基礎消耗
