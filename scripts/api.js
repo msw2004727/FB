@@ -37,6 +37,9 @@ export const api = {
     // Gameplay Routes
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
 
+    // 【核心新增】為閉關功能預留的API接口
+    startCultivation: (body) => fetchApi('/api/game/cultivation/start', { method: 'POST', body: JSON.stringify(body) }),
+
     // Combat Routes
     initiateCombat: (body) => fetchApi('/api/game/combat/initiate', { method: 'POST', body: JSON.stringify(body) }),
     combatAction: (body) => fetchApi('/api/game/combat/action', { method: 'POST', body: JSON.stringify(body) }),
@@ -62,7 +65,6 @@ export const api = {
     getSkills: () => fetchApi('/api/game/state/skills'),
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
     
-    // 【核心修正 v4.0】修正並確認裝備/卸下物品的 API 函式
     equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
     unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
 
