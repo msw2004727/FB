@@ -17,7 +17,6 @@ function isLeapYear(year) {
 }
 
 /**
- * 【核心修正 v2.0 - 已加入閏年判斷】
  * 將日期推進一天
  * @param {object} currentDate - 當前日期物件 { year, month, day, yearName }
  * @returns {object} - 新的日期物件
@@ -27,7 +26,6 @@ function advanceDate(currentDate) {
     
     day++;
 
-    // 獲取當前月份的天數，考慮閏年
     let daysInCurrentMonth = DAYS_IN_MONTH[month];
     if (month === 2 && isLeapYear(year)) {
         daysInCurrentMonth = 29;
@@ -39,7 +37,6 @@ function advanceDate(currentDate) {
         if (month > 12) {
             month = 1;
             year++;
-            // 這裡可以加入更換年號的邏輯，如果需要的話
         }
     }
     return { year, month, day, yearName };
@@ -55,44 +52,45 @@ async function invalidateNovelCache(userId) {
     }
 }
 
-// 【核心修正 v2.1 - 修復變數未定義錯誤】
+// 【核心修正 v2.2 - 圖書館存檔瘦身】
 async function updateLibraryNovel(userId, username) {
-    console.log(`[圖書館系統 v2.1] 開始為 ${username} 更新分章節小說...`);
+    console.log(`[圖書館系統 v2.2] 開始為 ${username} 更新分章節小說...`);
     try {
         const userSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
         if (userSavesSnapshot.empty) return;
 
         const libraryDocRef = db.collection('library_novels').doc(userId);
         const chaptersRef = libraryDocRef.collection('chapters');
-
-        // 使用批次寫入以提高效率
         const batch = db.batch();
 
-        // 【錯誤修復】從已獲取的快照中正確地取得最後一回合的數據
         const lastSaveDoc = userSavesSnapshot.docs[userSavesSnapshot.docs.length - 1];
         if (!lastSaveDoc) {
-             console.error(`[圖書館系統 v2.1] 錯誤：找不到玩家 ${username} 的最後存檔。`);
+             console.error(`[圖書館系統 v2.2] 錯誤：找不到玩家 ${username} 的最後存檔。`);
              return;
         }
         const lastRoundData = lastSaveDoc.data();
-
         const isDeceased = lastRoundData.playerState === 'dead';
         const novelTitle = `${username}的江湖路`;
 
-        // 1. 更新主文檔，只包含元數據，不再包含巨大的 storyHTML
+        // 1. 【關鍵修改】只將必要的元數據寫入主文檔，移除龐大的 lastChapterData
         batch.set(libraryDocRef, {
             playerName: username,
             novelTitle: novelTitle,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             isDeceased,
             lastChapterTitle: lastRoundData.EVT || `第 ${lastRoundData.R} 回`,
-            lastChapterData: lastRoundData
+            // 直接儲存必要的標量值，而不是整個物件
+            lastRoundNumber: lastRoundData.R,
+            lastYearName: lastRoundData.yearName || '元祐',
+            lastYear: lastRoundData.year || 1,
+            lastMonth: lastRoundData.month || 1,
+            lastDay: lastRoundData.day || 1,
         }, { merge: true });
         
         // 2. 將每一回合的故事作為一個獨立的章節文件存儲
         userSavesSnapshot.docs.forEach(doc => {
             const roundData = doc.data();
-            const chapterId = `R${String(roundData.R).padStart(6, '0')}`; // 使用 R 作為文檔ID，並補零以確保順序
+            const chapterId = `R${String(roundData.R).padStart(6, '0')}`;
             const chapterDocRef = chaptersRef.doc(chapterId);
 
             const chapterContent = {
@@ -107,10 +105,14 @@ async function updateLibraryNovel(userId, username) {
         // 3. 提交所有批次操作
         await batch.commit();
 
-        console.log(`[圖書館系統 v2.1] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節。`);
+        console.log(`[圖書館系統 v2.2] 成功為 ${username} 的小說更新了 ${userSavesSnapshot.docs.length} 個章節。`);
 
     } catch (error) {
-        console.error(`[圖書館系統 v2.1] 更新 ${username} 的小說時發生錯誤:`, error);
+        if (error.details && error.details.includes('exceeds the maximum allowed size')) {
+            console.error(`[圖書館系統 v2.2] 批次寫入時發生文檔大小超限錯誤，這通常意味著單次回合存檔過大，需要檢查。`, error);
+        } else {
+            console.error(`[圖書館系統 v2.2] 更新 ${username} 的小說時發生錯誤:`, error);
+        }
     }
 }
 
