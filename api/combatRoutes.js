@@ -76,7 +76,8 @@ const initiateCombatHandler = async (req, res) => {
         ]);
 
         const equippedWeapon = playerInventory.find(item => item.isEquipped && item.equipSlot && item.equipSlot.startsWith('weapon'));
-        const currentWeaponType = equippedWeapon ? equippedWeapon.weaponType : null;
+        // 【核心修正】在這裡加入最終防線，確保 weaponType 不會是 undefined
+        const currentWeaponType = equippedWeapon ? (equippedWeapon.weaponType || null) : null;
         
         console.log(`[戰鬥準備] 玩家裝備武器: ${equippedWeapon?.itemName || '無'} (類型: ${currentWeaponType})。`);
 
