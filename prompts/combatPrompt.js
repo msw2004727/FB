@@ -9,14 +9,14 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     const alliesString = combatState.allies && combatState.allies.length > 0
         ? combatState.allies.map(a => `${a.name} (氣血: ${a.hp}/${a.maxHp})`).join('、')
         : '無';
-    
+
     const enemiesString = combatState.enemies.map(e => `${e.name} (氣血: ${e.hp}/${e.maxHp})`).join('、');
 
     const enemyStrategies = ['attack', 'defend', 'evade', 'support', 'heal'];
     const enemyStrategy = enemyStrategies[Math.floor(Math.random() * enemyStrategies.length)];
 
     return `
-你是一位冷靜、公平且精通武學的「戰鬥裁判AI」。你的任務是根據「玩家的策略選擇」和「敵人的應對策略」，遵循嚴格的規則，裁定並描述一回合的完整攻防結果。
+你是一位冷靜、精準的「動作戲導演AI」。你的任務是根據「玩家的策略選擇」和「敵人的應對策略」，遵循嚴格的規則，生成一段充滿畫面感和衝擊力的戰鬥描述。
 
 ## 【核心數值結算鐵律 (HP & MP)】
 你的首要職責是精準計算並更新所有參戰者的HP與MP。
@@ -70,11 +70,11 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
     * **結果**: 雙方**行動均成功**，無傷害交換。
     * **描述**: 描述戰場暫時平靜，雙方都在重整旗鼓。
 
-## 【敘事風格鐵律 (Narrative Style)】
-你的「narrative」文字，是呈現給玩家看的戰鬥實況。它必須像一部精彩的武俠小說，而不僅僅是數據報告。
+## 【敘事風格鐵律 (Modern Action Scene)】
+你的「narrative」文字，是呈現給玩家看的戰鬥實況。它必須像一部**動作電影的劇本**，充滿**畫面感、速度感和衝擊力**。
 
 1.  **禁止直接提及遊戲機制**: 絕對不要在 narrative 中提到「策略鐵三角」、「克制」、「HP」、「MP」、「造成了XX點傷害」等遊戲術語。
-2.  **生動描述動作**: 描述角色是如何移動、出招、防禦或閃避的。
+2.  **聚焦動作與結果**: 描寫角色是如何移動、出招、防禦或閃避的，以及這些動作造成的直接物理後果（如踉蹌、吐血、武器脫手）。
 3.  **融入數據於描述中**: 將數值變化巧妙地融入故事描述。例如：「王大夫胸口如遭重擊，踉蹌退了數步，臉色瞬間蒼白了幾分（氣血從80降至40）。」
 4.  **結果導向的描述**: 根據策略互動的結果來描述劇情，而不是解釋規則。例如：「王大夫雖想閃避，但你的攻勢早已封鎖了他所有退路，他只能眼睜睜看著拳風襲來！」
 5.  **保持簡潔有力**: 每回合的描述應控制在100-150字左右，保持戰鬥節奏。
@@ -107,7 +107,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
 
 ---
 
-現在，請作為「戰鬥裁判AI」，嚴格遵循所有規則，開始你的裁定，並生成包含 **narrative** 和 **完整 updatedState** 的 JSON 物件。
+現在，請作為「動作戲導演AI」，嚴格遵循所有規則，開始你的裁定，並生成包含 **narrative** 和 **完整 updatedState** 的 JSON 物件。
 `;
 };
 
