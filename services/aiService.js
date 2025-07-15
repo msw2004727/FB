@@ -52,8 +52,7 @@ const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
-// 【核心新增】引入新建的閉關Prompt
-const { generateCultivationStory: getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
+const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 
 
 // 統一的AI調度中心
@@ -121,11 +120,13 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// 【核心新增】閉關故事生成函式
+// 【核心修正】修正閉關故事的生成邏輯
 async function getAICultivationResult(playerProfile, skillToPractice, days, outcome, storyHint) {
+    // 1. 正確地調用 prompt 生成函式，獲取完整的AI指令
     const prompt = getCultivationPrompt(playerProfile, skillToPractice, days, outcome, storyHint);
     try {
         const modelToUse = aiConfig.narrative || 'openai'; // 沿用敘事模型的設定
+        // 2. 將完整的指令發送給 callAI
         const story = await callAI(modelToUse, prompt, false);
         return story;
     } catch (error) {
@@ -135,19 +136,16 @@ async function getAICultivationResult(playerProfile, skillToPractice, days, outc
     }
 }
 
-
-// 【核心修改】更新NPC個人記憶的函式，現在接收通用的 interactionData
 async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, interactionData) {
     const prompt = getNpcMemoryPrompt(npcName, oldSummary, interactionData);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcMemory || 'openai';
         const text = await callAI(modelToUse, prompt, true);
         const parsedJson = parseJsonResponse(text);
-        // 新增一個保護，確保即使AI回傳不正確的格式，也有預設值
         return parsedJson.newSummary || oldSummary; 
     } catch (error) {
         console.error(`[AI 任務失敗] 為 ${npcName} 更新個人記憶時出錯:`, error);
-        return oldSummary; // 出錯時返回舊摘要，避免資料遺失
+        return oldSummary;
     }
 }
 
@@ -287,7 +285,6 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
 }
 
 async function getAITradeSummary(playerModelChoice, username, npcName, tradeDetails, longTermSummary) {
-    // 【核心修復】增加一個防呆判斷，確保 tradeDetails 存在
     if (!tradeDetails) {
         console.error("[AI 任務失敗] 呼叫交易摘要師時缺少 tradeDetails。");
         return {
@@ -483,6 +480,9 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
 module.exports = {
     callAI,
     aiConfig,
+    getAICultivationResult,
+    getAIPerNpcSummary,
+    getAIAnachronismResponse,
     getNarrative,
     getAISummary,
     getAIStory,
@@ -505,9 +505,5 @@ module.exports = {
     getAIActionClassification,
     getAISurrenderResult,
     getAIProactiveChat,
-    getAIAnachronismResponse,
     getAIPostCombatResult,
-    getAIPerNpcSummary,
-    // 【核心新增】匯出閉關函式
-    getAICultivationResult,
 };
