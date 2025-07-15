@@ -46,14 +46,17 @@ body.dark-theme .skills-modal-content {
     border-color: var(--dark-border);
 }
 
+/* 【核心修改】將 header 改為 grid 佈局以容納新按鈕 */
 .skills-modal-header {
     flex-shrink: 0;
-    display: flex;
-    justify-content: space-between;
+    display: grid; /* 改為 grid */
+    grid-template-columns: 1fr auto 1fr; /* 三欄佈局：左側空白、中間標題、右側按鈕 */
     align-items: center;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--light-border);
+    position: relative; /* 為關閉按鈕提供定位基準 */
 }
+
 
 body.dark-theme .skills-modal-header {
     border-bottom-color: var(--dark-border);
@@ -64,10 +67,48 @@ body.dark-theme .skills-modal-header {
     font-family: var(--font-serif);
     font-size: 1.8rem;
     color: var(--light-accent);
+    text-align: center; /* 讓標題在中間一欄居中 */
+    grid-column: 2 / 3; /* 讓標題佔據中間的格子 */
 }
 
 body.dark-theme .skills-modal-header h3 {
     color: var(--dark-accent);
+}
+
+/* 【核心新增】為新按鈕預留的樣式 */
+.skills-header-btn {
+    grid-column: 1 / 2; /* 讓按鈕佔據左邊的格子 */
+    justify-self: start; /* 讓按鈕靠左對齊 */
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--light-border);
+    border-radius: 50%;
+    color: var(--light-text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.skills-header-btn:hover {
+    background-color: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+    transform: scale(1.1);
+}
+
+body.dark-theme .skills-header-btn {
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+body.dark-theme .skills-header-btn:hover {
+    background-color: var(--dark-accent);
+    color: var(--dark-bg);
+    border-color: var(--dark-accent);
 }
 
 .skills-modal-close {
@@ -78,6 +119,8 @@ body.dark-theme .skills-modal-header h3 {
     cursor: pointer;
     padding: 0.5rem;
     line-height: 1;
+    grid-column: 3 / 4; /* 讓關閉按鈕佔據右邊的格子 */
+    justify-self: end; /* 讓關閉按鈕靠右對齊 */
 }
 
 .skills-modal-close:hover {
@@ -161,7 +204,6 @@ body.dark-theme .skill-entry {
     margin-bottom: 0.75rem;
 }
 
-/* 【核心新增】用於將標題和自創標籤並排的容器 */
 .skill-title-group {
     display: flex;
     align-items: center;
@@ -179,7 +221,6 @@ body.dark-theme .skill-title-group h4 {
     color: var(--dark-text-primary);
 }
 
-/* 【核心新增】自創標籤的樣式 */
 .skill-custom-tag {
     background-color: #ffd700; /* 金色 */
     color: #4b3a00;
