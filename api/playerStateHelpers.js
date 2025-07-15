@@ -41,6 +41,12 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
                 templateData.hands = null;
                 needsUpdate = true;
             }
+            // 【核心修正】在這裡加入 weaponType 的校驗
+            if (templateData.itemType === '武器' && templateData.weaponType === undefined) {
+                console.warn(`[數據校驗] 物品「${itemName}」模板為武器，但缺少 weaponType，已自動修正為 null。`);
+                templateData.weaponType = null;
+                needsUpdate = true;
+            }
 
             if(needsUpdate) {
                 await templateRef.set(templateData, { merge: true });
@@ -66,6 +72,11 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
         if (newTemplateData.bulk === undefined) newTemplateData.bulk = '中';
         if (newTemplateData.equipSlot === undefined) newTemplateData.equipSlot = null;
         if (newTemplateData.hands === undefined) newTemplateData.hands = null;
+        // 【核心修正】對AI生成的新模板也進行校驗
+        if (newTemplateData.itemType === '武器' && newTemplateData.weaponType === undefined) {
+            console.warn(`[數據校驗] AI生成的武器「${itemName}」缺少 weaponType，已自動修正為 null。`);
+            newTemplateData.weaponType = null;
+        }
 
         newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
         await templateRef.set(newTemplateData);
