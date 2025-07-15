@@ -7,7 +7,6 @@ import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
-// 【核心修正】從 uiUpdater.js 中直接導入所有需要的函式
 import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory } from './uiUpdater.js';
 
 
@@ -36,6 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemDetailsDeleteBtn = document.getElementById('item-details-delete-btn');
     const closeItemDetailsBtn = document.getElementById('close-item-details-btn');
 
+    // 【核心新增】獲取閉關彈窗的所有元素
+    const cultivationModal = document.getElementById('cultivation-modal');
+    const openCultivationBtn = document.getElementById('open-cultivation-btn');
+    const closeCultivationBtn = document.getElementById('close-cultivation-btn');
+    const skillSelect = document.getElementById('cultivation-skill-select');
+    const daysSelector = document.querySelector('.cultivation-days-selector');
+    const daysInput = document.getElementById('cultivation-days-input');
+    const startCultivationBtn = document.getElementById('start-cultivation-btn');
+    const reqLocation = document.getElementById('req-location');
+    const reqStamina = document.getElementById('req-stamina');
+    const reqFood = document.getElementById('req-food');
+
     function setGameContainerHeight() {
         if (dom.gameContainer) {
             dom.gameContainer.style.height = `${window.innerHeight}px`;
@@ -47,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const item = gameState.roundData.inventory.find(i => i.instanceId === itemId);
         if (!item) {
-            // 【核心修正】這裡的錯誤提示現在會正常顯示
             appendMessageToStory(`在你的背包中找不到ID為 ${itemId} 的物品。`, 'system-message');
             console.error(`在遊戲狀態中找不到 ID 為 ${itemId} 的物品。`);
             return;
@@ -87,10 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const result = await api.dropItem({ itemId });
                 if (result.success) {
-                    // 更新全域狀態
                     gameState.roundData.inventory = result.inventory;
                     gameState.roundData.bulkScore = result.bulkScore;
-                    // 【核心修正】直接調用正確的函式顯示訊息與刷新UI
                     appendMessageToStory(result.message, 'system-message');
                     renderInventory(gameState.roundData.inventory);
                     updateBulkStatus(gameState.roundData.bulkScore);
@@ -98,13 +106,89 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(result.message);
                 }
             } catch (error) {
-                // 【核心修正】直接調用正確的函式
                 handleApiError(error);
             } finally {
                 gameLoop.setLoading(false);
             }
         }
     }
+
+    // --- 【核心新增】閉關系統相關函式 ---
+    function updateCultivationConditions() {
+        if (!gameState.roundData || !cultivationModal.classList.contains('visible')) return;
+
+        const { currentLocationData, roundData } = gameState;
+        const days = parseInt(daysInput.value, 10);
+
+        // 條件1: 私密地點
+        const isPrivate = currentLocationData?.isPrivate === true;
+        reqLocation.innerHTML = `<i class="fas ${isPrivate ? 'fa-check-circle' : 'fa-times-circle'}"></i> 需身處私密地點 (${isPrivate ? '達成' : '未達成'})`;
+
+        // 條件2: 精力
+        const staminaSufficient = roundData.stamina >= 80;
+        reqStamina.innerHTML = `<i class="fas ${staminaSufficient ? 'fa-check-circle' : 'fa-times-circle'}"></i> 精力需高於80% (${roundData.stamina}%)`;
+
+        // 條件3: 食物飲水
+        const foodItems = roundData.inventory.filter(item => item.category === '食物');
+        const drinkItems = roundData.inventory.filter(item => item.category === '飲品');
+        const totalFood = foodItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        const totalDrinks = drinkItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        const resourcesSufficient = totalFood >= days && totalDrinks >= days;
+        reqFood.innerHTML = `<i class="fas ${resourcesSufficient ? 'fa-check-circle' : 'fa-times-circle'}"></i> 需備足糧食飲水 (需${days}份, 備有${totalFood}糧/${totalDrinks}水)`;
+        
+        // 最終判斷
+        startCultivationBtn.disabled = !(isPrivate && staminaSufficient && resourcesSufficient);
+    }
+
+    async function openCultivationModal() {
+        modal.closeSkillsModal();
+        cultivationModal.classList.add('visible');
+        skillSelect.innerHTML = '<option>載入武學中...</option>';
+        startCultivationBtn.disabled = true;
+
+        try {
+            const skills = await api.getSkills();
+            if (skills && skills.length > 0) {
+                skillSelect.innerHTML = skills.map(s => `<option value="${s.skillName}">${s.skillName} (Lv.${s.level})</option>`).join('');
+            } else {
+                skillSelect.innerHTML = '<option value="">無任何可修練的武學</option>';
+            }
+        } catch (error) {
+            handleApiError(error);
+            skillSelect.innerHTML = '<option value="">讀取武學失敗</option>';
+        } finally {
+            updateCultivationConditions();
+        }
+    }
+    
+    async function handleStartCultivation() {
+        if (startCultivationBtn.disabled || gameState.isRequesting) return;
+
+        const skillName = skillSelect.value;
+        const days = parseInt(daysInput.value, 10);
+
+        if (!skillName) {
+            alert('請選擇一門要修練的武學。');
+            return;
+        }
+
+        cultivationModal.classList.remove('visible');
+        gameLoop.setLoading(true, `正在閉關修練 ${skillName}，預計耗時${days}日...`);
+        
+        try {
+            const result = await api.startCultivation({ skillName, days });
+            if (result.success) {
+                gameLoop.processNewRoundData(result);
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            gameLoop.setLoading(false);
+        }
+    }
+
 
     function initialize() {
         let currentTheme = localStorage.getItem('game_theme') || 'light';
@@ -127,8 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dom.menuToggle.addEventListener('click', () => dom.gameContainer.classList.toggle('sidebar-open'));
 
-        // 【核心新增】點擊主內容區域時，如果側邊欄是開啟的，則將其關閉
-        // 這讓使用者在窄視窗模式下可以方便地收回儀表板
         dom.mainContent.addEventListener('click', () => {
             if (window.innerWidth <= 1024 && dom.gameContainer.classList.contains('sidebar-open')) {
                 dom.gameContainer.classList.remove('sidebar-open');
@@ -180,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // 使用 document 進行事件委託，這是最穩定的方式
         document.addEventListener('click', (e) => {
             const locationBtn = e.target.closest('#view-location-details-btn');
             if (locationBtn) {
@@ -191,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 【核心修正】將物品點擊的監聽器也放在這裡，確保其穩定性
             const itemLink = e.target.closest('.item-link');
             if (itemLink) {
                 e.preventDefault();
@@ -260,6 +340,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+        
+        // --- 【核心新增】為閉關系統綁定事件 ---
+        if (openCultivationBtn) openCultivationBtn.addEventListener('click', openCultivationModal);
+        if (closeCultivationBtn) closeCultivationBtn.addEventListener('click', () => cultivationModal.classList.remove('visible'));
+        if (skillSelect) skillSelect.addEventListener('change', updateCultivationConditions);
+        if (daysSelector) {
+            daysSelector.addEventListener('click', (e) => {
+                if (e.target.classList.contains('day-btn')) {
+                    daysSelector.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
+                    e.target.classList.add('selected');
+                    daysInput.value = e.target.dataset.days;
+                    updateCultivationConditions();
+                }
+            });
+            // 預設選中第一天
+            daysSelector.querySelector('.day-btn[data-days="1"]').classList.add('selected');
+        }
+        if (startCultivationBtn) startCultivationBtn.addEventListener('click', handleStartCultivation);
 
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);
