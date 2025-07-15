@@ -179,17 +179,13 @@ router.get('/get-encyclopedia', async (req, res) => {
     }
 });
 
+// 【核心修正 v2.0 - 移除快取寫入，改為即時拼接】
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
-        const novelCacheRef = db.collection('users').doc(userId).collection('game_state').doc('novel_cache');
-        const novelCacheDoc = await novelCacheRef.get();
-
-        if (novelCacheDoc.exists && novelCacheDoc.data().storyHTML) {
-            return res.json({ novelHTML: novelCacheDoc.data().storyHTML });
-        }
-
+        // 不再讀取或寫入 novel_cache
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+        
         if (snapshot.empty) {
             return res.json({ novelHTML: "" });
         }
@@ -200,11 +196,18 @@ router.get('/get-novel', async (req, res) => {
             const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
             return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
         });
+        
         const fullStoryHTML = storyChapters.join('');
-        await novelCacheRef.set({ storyHTML: fullStoryHTML });
+        
+        // 直接將拼接好的HTML回傳，不再寫入任何快取文件
         res.json({ novelHTML: fullStoryHTML });
+
     } catch (error) {
         console.error(`[小說API] 替玩家 ${req.user.id} 生成小說時出錯:`, error);
+        // 檢查是否是文檔大小相關的錯誤，儘管理論上不應再發生
+        if (error.details && error.details.includes('longer than 1048487 bytes')) {
+             return res.status(500).json({ message: "拼接後的故事內容過於龐大，伺服器無法處理。" });
+        }
         res.status(500).json({ message: "生成小說時出錯。" });
     }
 });
