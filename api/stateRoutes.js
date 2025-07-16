@@ -3,19 +3,23 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause, getAIForgetSkillStory } = require('../services/aiService');
-const { getPlayerSkills, getRawInventory, calculateBulkScore, getInventoryState } = require('./playerStateHelpers');
+const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); // 【修正】移除不存在的 getInventoryState
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
-// --- 自廢武功的路由 ---
+// --- 自廢武功的路由 (修正版) ---
 router.post('/forget-skill', async (req, res) => {
     const { skillName, skillType } = req.body;
     const { id: userId, username } = req.user;
 
     if (!skillName) {
         return res.status(400).json({ success: false, message: '未提供要廢除的武功名稱。' });
+    }
+    // 【新增】防止玩家刪除唯一的初始技能
+    if (skillName === '現代搏擊') {
+        return res.status(403).json({ success: false, message: '這是你穿越時帶來的唯一印記，無法被遺忘。' });
     }
 
     try {
@@ -31,77 +35,70 @@ router.post('/forget-skill', async (req, res) => {
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         let playerProfile = playerProfileSnapshot.data();
 
-        // 【核心修改】組合一個完整的 profile 物件傳遞給 AI prompt
         const profileForPrompt = {
             ...playerProfile,
             username: username,
             currentLocation: lastRoundData.LOC,
-            NPC: lastRoundData.NPC || [] // 確保 NPC 列表存在
+            NPC: lastRoundData.NPC || []
         };
 
-        // 1. 產生廢功劇情
         const story = await getAIForgetSkillStory(playerProfile.preferredModel, profileForPrompt, skillName);
 
         const batch = db.batch();
 
-        // 2. 刪除玩家技能列表中的對應武學
         batch.delete(skillRef);
 
-        // 3. 如果是自創武學，則釋放對應的功體欄位
+        // 只有在 skillType 有效時才處理自創技能計數
         if (skillType && ['internal', 'external', 'lightness', 'none'].includes(skillType)) {
             const fieldToDecrement = `customSkillsCreated.${skillType}`;
-            batch.update(userRef, {
-                [fieldToDecrement]: admin.firestore.FieldValue.increment(-1)
-            });
+            // 確保欄位存在才進行操作
+            if (playerProfile.customSkillsCreated && typeof playerProfile.customSkillsCreated[skillType] === 'number') {
+                batch.update(userRef, {
+                    [fieldToDecrement]: admin.firestore.FieldValue.increment(-1)
+                });
+            }
         }
         
-        // 4. 提交資料庫變更
         await batch.commit();
 
-        // 5. 創建新回合
         const newRoundNumber = lastRoundData.R + 1;
-        const inventoryState = await getInventoryState(userId);
-
-        const newRoundData = {
-            ...lastRoundData,
-            ...inventoryState,
-            R: newRoundNumber,
-            story: story,
-            PC: `你廢除了「${skillName}」，感覺體內一陣空虛，但也為新的可能性騰出了空間。`,
-            EVT: `自廢武功「${skillName}」`
-        };
         
-        const suggestion = await getAISuggestion(newRoundData);
-        newRoundData.suggestion = suggestion;
-        
-        // 6. 儲存新回合
-        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
-        
-        // 7. 更新小說和快取
-        await invalidateNovelCache(userId);
-        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(自廢武功):", err));
-        
-        // 8. 準備回傳給前端的完整資料
+        // 【修正】使用正確的函式獲取最新的玩家狀態
         const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
             getRawInventory(userId),
             getPlayerSkills(userId),
             userRef.get().then(doc => doc.data()),
         ]);
-        const finalRoundDataForClient = {
-            ...newRoundData,
+        const bulkScore = calculateBulkScore(fullInventory);
+        
+        const newRoundData = {
+            ...lastRoundData,
+            R: newRoundNumber,
+            story: story,
+            PC: `你廢除了「${skillName}」，感覺體內一陣空虛，但也為新的可能性騰出了空間。`,
+            EVT: `自廢武功「${skillName}」`,
+            // 更新狀態
             ...finalPlayerProfile,
-            skills: updatedSkills,
             inventory: fullInventory,
-            bulkScore: calculateBulkScore(fullInventory),
+            skills: updatedSkills,
+            bulkScore: bulkScore,
         };
+        
+        const suggestion = await getAISuggestion(newRoundData);
+        newRoundData.suggestion = suggestion;
+        
+        await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
+        
+        await invalidateNovelCache(userId);
+        updateLibraryNovel(userId, username).catch(err => console.error("背景更新圖書館失敗(自廢武功):", err));
         
         res.json({
             success: true,
             message: `你已成功廢除「${skillName}」。`,
-            story: finalRoundDataForClient.story,
-            roundData: finalRoundDataForClient,
+            story: newRoundData.story,
+            roundData: newRoundData,
             suggestion: suggestion,
-            locationData: await getMergedLocationData(userId, finalRoundDataForClient.LOC)
+            locationData: await getMergedLocationData(userId, newRoundData.LOC)
         });
 
     } catch (error) {
@@ -110,7 +107,8 @@ router.post('/forget-skill', async (req, res) => {
     }
 });
 
-// ... (其餘路由保持不變) ...
+
+// (其餘路由保持不變) ...
 
 router.post('/drop-item', async (req, res) => {
     const { itemId } = req.body;
