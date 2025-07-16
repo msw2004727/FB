@@ -1,11 +1,19 @@
 // /api/gameplay/actionHandler.js
 const { buildContext } = require('../contextBuilder');
-const { getAIStory, getAISuggestion, getAIActionClassification } = require('../../services/aiService'); // 引入分類器
+const { getAIStory, getAISuggestion, getAIActionClassification, getAIAnachronismResponse } = require('../../services/aiService'); // 【核心新增】引入守序者AI
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
-const { initiateCombat } = require('./combatManager'); // 【核心新增】引入新的戰鬥管理器
+const { initiateCombat } = require('./combatManager'); 
+
+// 【核心新增】定義一個違禁/傳說物品清單
+const FORBIDDEN_ITEMS = [
+    '倚天劍', '屠龍刀', '聖火令', '九陽神功', '九陰真經', '乾坤大挪移',
+    '降龍十八掌', '六脈神劍', '北冥神功', '凌波微步', '手機', '電腦',
+    'AK-47', '手槍', '火箭筒', '汽車', '摩托車'
+];
 
 const preprocessPlayerAction = (playerAction, locationContext) => {
+    // ... (此函式內容不變)
     const facilityKeywords = {
         '鐵匠鋪': '鐵匠鋪', '打鐵鋪': '鐵匠鋪',
         '藥鋪': '藥鋪', '藥房': '藥鋪', '醫館': '藥鋪',
@@ -47,7 +55,42 @@ async function handleAction(req, res, player, newRoundNumber) {
         
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame, player: playerContext } = context;
 
-        // 【核心修改】先進行動作分類
+        // --- 【核心修改】加入「守門員」檢查機制 ---
+        const detectedItem = FORBIDDEN_ITEMS.find(item => playerAction.includes(item));
+        if (detectedItem) {
+            console.log(`[守門員系統] 偵測到違規物品「${detectedItem}」，啟動化解程序...`);
+            const story = await getAIAnachronismResponse(playerModelChoice, playerAction, detectedItem);
+            
+            // 構造一個無任何實際變化的回合資料
+            const anachronismRoundData = {
+                story: story,
+                roundData: {
+                    ...lastRoundData, // 繼承上一回合的狀態
+                    R: newRoundNumber,
+                    story: story,
+                    PC: "你的思緒有些混亂，但很快又恢復了平靜。",
+                    EVT: "一閃而過的幻想",
+                    // 所有變化都設為 0 或空
+                    powerChange: { internal: 0, external: 0, lightness: 0 },
+                    moralityChange: 0,
+                    itemChanges: [],
+                    skillChanges: [],
+                    romanceChanges: [],
+                }
+            };
+            const finalRoundData = await updateGameState(userId, username, player, playerAction, anachronismRoundData, newRoundNumber);
+            const suggestion = await getAISuggestion(finalRoundData);
+
+            return res.json({
+                story: finalRoundData.story,
+                roundData: finalRoundData,
+                suggestion: suggestion,
+                locationData: await getMergedLocationData(userId, finalRoundData.LOC)
+            });
+        }
+        // --- 守門員機制結束 ---
+
+
         const classificationContext = {
             location: locationContext?.locationName,
             npcs: Object.keys(npcContext),
@@ -56,7 +99,6 @@ async function handleAction(req, res, player, newRoundNumber) {
         const classification = await getAIActionClassification(playerModelChoice, playerAction, classificationContext);
         console.log(`[AI總導演] 玩家行動「${playerAction}」被分類為: ${classification.actionType}`);
         
-        // 【核心修改】如果分類為戰鬥，則直接啟動戰鬥流程
         if (classification.actionType === 'COMBAT_ATTACK' && classification.details.target) {
             try {
                 const initialState = await initiateCombat(userId, username, classification.details.target, classification.details.intention || '打死');
@@ -67,7 +109,6 @@ async function handleAction(req, res, player, newRoundNumber) {
                     }
                 });
             } catch(combatError) {
-                // 如果戰鬥發起失敗（例如目標不在場），則將錯誤轉化為故事
                 playerAction = `我本想攻擊${classification.details.target}，但發現${combatError.message}`;
                 console.log(`[戰鬥發起失敗] 自動將行動轉化為故事: ${playerAction}`);
             }
