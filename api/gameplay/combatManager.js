@@ -41,6 +41,9 @@ const getNpcTags = (skills = []) => {
  * @returns {Promise<object>} 返回戰鬥的初始狀態物件
  */
 async function initiateCombat(userId, username, targetNpcName, intention) {
+    // 【核心修改】在此處加入後端日誌記錄
+    console.log(`[戰鬥事件] 玩家 ${username} 對 ${targetNpcName} 發起戰鬥，意圖為「${intention}」。`);
+
     if (!targetNpcName) {
         throw new Error("未指定對決目標。");
     }
@@ -129,8 +132,6 @@ async function initiateCombat(userId, username, targetNpcName, intention) {
     };
 
     await userDocRef.collection('game_state').doc('current_combat').set(combatState);
-    
-    console.log(`[戰鬥系統] 由玩家 ${username} 主動對 ${targetNpcName} 發起戰鬥，意圖為「${intention}」。`);
     
     return combatState;
 }
