@@ -53,7 +53,7 @@ const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js'
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
 const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
-
+const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js'); // 【核心新增】
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt, isJsonExpected = false) {
@@ -120,7 +120,20 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// 【核心修正】修正閉關故事的生成邏輯
+// --- 【核心新增】獲取自廢武功故事的函式 ---
+async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName) {
+    const prompt = getForgetSkillPrompt(playerProfile, skillName);
+    try {
+        const modelToUse = playerModelChoice || aiConfig.narrative || 'openai';
+        const story = await callAI(modelToUse, prompt, false);
+        return story;
+    } catch (error) {
+        console.error(`[AI 任務失敗] 為 ${playerProfile.username} 生成自廢武功故事時出錯:`, error);
+        return `你下定決心，逆運內力。一時間，經脈中真氣如脫韁野馬般肆虐衝撞，你感到一陣撕心裂肺的劇痛，眼前一黑，險些暈厥過去。待你回過神來，體內關於「${skillName}」的感悟已蕩然無存，只剩下無盡的空虛。`;
+    }
+}
+
+
 async function getAICultivationResult(playerProfile, skillToPractice, days, outcome, storyHint) {
     // 1. 正確地調用 prompt 生成函式，獲取完整的AI指令
     const prompt = getCultivationPrompt(playerProfile, skillToPractice, days, outcome, storyHint);
@@ -480,6 +493,7 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
 module.exports = {
     callAI,
     aiConfig,
+    getAIForgetSkillStory, // 【核心新增】
     getAICultivationResult,
     getAIPerNpcSummary,
     getAIAnachronismResponse,
