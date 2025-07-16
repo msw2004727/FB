@@ -8,7 +8,9 @@ const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = requ
 
 const db = admin.firestore();
 
-// --- 自廢武功的路由 (修正版) ---
+// ... (所有其他路由保持不變) ...
+
+// ... (自廢武功、丟棄物品、獲取最新遊戲、庫存、技能、關係圖、百科等路由) ...
 router.post('/forget-skill', async (req, res) => {
     const { skillName, skillType } = req.body;
     const { id: userId, username } = req.user;
@@ -287,34 +289,47 @@ router.get('/get-encyclopedia', async (req, res) => {
     }
 });
 
+/**
+ * 【核心優化】獲取個人小說的路由
+ * 此路由現在將從 library_novels 集合讀取分章節數據，而不是掃描全部的 game_saves。
+ * 這將極大地提升讀取速度並降低資料庫讀取成本。
+ */
 router.get('/get-novel', async (req, res) => {
     const userId = req.user.id;
     try {
-        const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
-        
-        if (snapshot.empty) {
-            return res.json({ novelHTML: "" });
+        const novelDocRef = db.collection('library_novels').doc(userId);
+        const chaptersSnapshot = await novelDocRef.collection('chapters').orderBy('round', 'asc').get();
+
+        if (chaptersSnapshot.empty) {
+            // 如果在圖書館找不到，作為備用方案，可以嘗試從 game_saves 讀取一次（僅限此處）。
+            // 這確保了即使圖書館更新失敗，玩家依然能看到自己的故事。
+            const savesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
+            if (savesSnapshot.empty) {
+                return res.json({ novelHTML: "" });
+            }
+            const storyChapters = savesSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return `<div class="chapter"><h2>${data.EVT || `第 ${data.R} 回`}</h2><p>${(data.story || "").replace(/\n/g, '<br>')}</p></div>`;
+            });
+            return res.json({ novelHTML: storyChapters.join('') });
         }
 
-        const storyChapters = snapshot.docs.map(doc => {
-            const roundData = doc.data();
-            const title = roundData.EVT || `第 ${roundData.R} 回`;
-            const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
+        const storyChapters = chaptersSnapshot.docs.map(doc => {
+            const chapter = doc.data();
+            const title = chapter.title || `第 ${chapter.round} 回`;
+            const content = chapter.content || "這段往事，已淹沒在時間的長河中。";
             return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
         });
         
         const fullStoryHTML = storyChapters.join('');
-        
         res.json({ novelHTML: fullStoryHTML });
 
     } catch (error) {
-        console.error(`[小說API] 替玩家 ${req.user.id} 生成小說時出錯:`, error);
-        if (error.details && error.details.includes('longer than 1048487 bytes')) {
-             return res.status(500).json({ message: "拼接後的故事內容過於龐大，伺服器無法處理。" });
-        }
-        res.status(500).json({ message: "生成小說時出錯。" });
+        console.error(`[小說API v2.0] 替玩家 ${req.user.id} 生成小說時出錯:`, error);
+        res.status(500).json({ message: "生成個人小說時發生未知錯誤。" });
     }
 });
+
 
 router.post('/restart', async (req, res) => {
     const userId = req.user.id;
@@ -390,5 +405,6 @@ router.post('/force-suicide', async (req, res) => {
         res.status(500).json({ message: '了此殘生時發生未知錯誤...' });
     }
 });
+
 
 module.exports = router;
