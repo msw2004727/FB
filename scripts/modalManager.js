@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { initializeTrade, closeTradeUI } from './tradeManager.js';
 import { dom } from './dom.js';
 
-// --- 【核心新增】處理自廢武功的函式 ---
+// --- 處理自廢武功的函式 ---
 async function handleForgetSkill(skillName, skillType) {
     if (!skillName) return;
 
@@ -421,9 +421,9 @@ export function openSkillsModal(skillsData) {
             const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
 
-            // 【核心修改】為自創武學添加廢除按鈕
             const customTagHtml = skill.isCustom ? '<span class="skill-custom-tag">自創</span>' : '';
-            const forgetButtonHtml = skill.isCustom ? `<button class="skill-forget-btn" data-skill-name="${skill.skillName}" data-skill-type="${skill.power_type}"><i class="fas fa-trash-alt"></i> 自廢武功</button>` : '';
+            // 【核心修改】移除按鈕中的文字，並加上 title 屬性
+            const forgetButtonHtml = skill.isCustom ? `<button class="skill-forget-btn" title="自廢武功" data-skill-name="${skill.skillName}" data-skill-type="${skill.power_type}"><i class="fas fa-trash-alt"></i></button>` : '';
 
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
@@ -485,8 +485,6 @@ export function closeSkillsModal() {
 }
 
 // --- 地點詳情彈窗 ---
-
-// 【核心修正】新增一個 key-value 對照表，將英文欄位名翻譯成中文
 const keyMap = {
     類型: '類型',
     層級: '層級',
@@ -507,7 +505,6 @@ const keyMap = {
     buildings: '建築',
 };
 
-// 【核心修正】重寫 formatObjectForDisplay 函式以解決排版和翻譯問題
 function formatObjectForDisplay(obj, keysToExclude = []) {
     if (obj === null || typeof obj !== 'object') {
         return obj || '無';
@@ -517,14 +514,13 @@ function formatObjectForDisplay(obj, keysToExclude = []) {
     for (const [key, value] of Object.entries(obj)) {
         if (keysToExclude.includes(key) || value === undefined || value === null) continue;
 
-        const displayKey = keyMap[key] || key; // 使用翻譯後的中文 Key
+        const displayKey = keyMap[key] || key; 
         let displayValue;
 
         if (Array.isArray(value)) {
             if (value.length === 0) {
                 displayValue = '無';
             } else {
-                // 為陣列創建一個無樣式的 ul，使其垂直排列
                 displayValue = '<ul class="nested-list">';
                 value.forEach(item => {
                     if (typeof item === 'object' && item !== null) {
@@ -538,21 +534,17 @@ function formatObjectForDisplay(obj, keysToExclude = []) {
                 displayValue += '</ul>';
             }
         } else if (typeof value === 'object') {
-            displayValue = formatObjectForDisplay(value, keysToExclude); // 遞迴處理巢狀物件
+            displayValue = formatObjectForDisplay(value, keysToExclude); 
         } else {
-            // 對純文字值進行處理
             displayValue = value.toString().trim() !== '' ? value.toString().replace(/\n/g, '<br>') : '無';
         }
 
-        // 根據值的類型，決定 li 的結構
         if (typeof value === 'object' && value !== null) {
-            // 如果值是物件或陣列，使用 block 佈局，避免 flex 壓縮排版
             html += `<li class="nested-object">
                         <span class="key">${displayKey}:</span>
                         <div class="value">${displayValue}</div>
                      </li>`;
         } else {
-            // 普通的 key-value 使用 flex 佈局
             html += `<li>
                        <span class="key">${displayKey}:</span>
                        <span class="value">${displayValue}</span>
@@ -566,10 +558,9 @@ function formatObjectForDisplay(obj, keysToExclude = []) {
 export function openLocationDetailsModal(locationData) {
     if (!dom.locationDetailsModal || !locationData) return;
     dom.locationModalTitle.textContent = locationData.locationName || '地區情報';
-
+    
     let bodyHtml = '';
-
-    // 將數據分類，傳給格式化函式
+    
     const staticData = {
         類型: locationData.locationType,
         層級: locationData.address ? Object.values(locationData.address).join(' > ') : '未知',
@@ -578,7 +569,7 @@ export function openLocationDetailsModal(locationData) {
         特產: locationData.economy?.specialty?.join(', ') || '無',
         歷史: locationData.lore?.history,
     };
-
+    
     const dynamicData = {
         當前繁榮度: locationData.economy?.currentProsperity,
         統治: locationData.governance,
