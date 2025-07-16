@@ -3,11 +3,54 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause } = require('../services/aiService');
-const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); 
+const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers');
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
+
+// --- 【核心新增】自廢武功的路由 ---
+router.post('/forget-skill', async (req, res) => {
+    const { skillName, skillType } = req.body;
+    const userId = req.user.id;
+
+    if (!skillName) {
+        return res.status(400).json({ success: false, message: '未提供要廢除的武功名稱。' });
+    }
+
+    try {
+        const userRef = db.collection('users').doc(userId);
+        const skillRef = userRef.collection('skills').doc(skillName);
+
+        const batch = db.batch();
+
+        // 1. 刪除玩家技能列表中的對應武學
+        batch.delete(skillRef);
+        console.log(`[自廢武功] 已將玩家 ${userId} 的武學「${skillName}」加入刪除佇列。`);
+
+        // 2. 如果是自創武學，則釋放對應的功體欄位
+        if (skillType && ['internal', 'external', 'lightness', 'none'].includes(skillType)) {
+            const fieldToDecrement = `customSkillsCreated.${skillType}`;
+            batch.update(userRef, {
+                [fieldToDecrement]: admin.firestore.FieldValue.increment(-1)
+            });
+            console.log(`[自廢武功] 已將玩家 ${userId} 的「${fieldToDecrement}」欄位計數減一。`);
+        }
+
+        // 3. 提交事務
+        await batch.commit();
+
+        res.json({
+            success: true,
+            message: `你已成功廢除「${skillName}」，感覺心中一片空明，似乎可以容納新的感悟了。`
+        });
+
+    } catch (error) {
+        console.error(`[自廢武功API] 玩家 ${userId} 廢除武功 ${skillName} 時出錯:`, error);
+        res.status(500).json({ success: false, message: '散功時發生未知錯誤，你的內力產生了混亂。' });
+    }
+});
+
 
 // 【核心新增】新增的物品丟棄路由
 router.post('/drop-item', async (req, res) => {
@@ -25,10 +68,10 @@ router.post('/drop-item', async (req, res) => {
         if (!itemDoc.exists) {
             return res.status(404).json({ success: false, message: '在你的背包中找不到這個物品。' });
         }
-        
+
         // 刪除物品文件
         await itemRef.delete();
-        
+
         // 獲取更新後的完整背包數據並回傳
         const updatedInventory = await getRawInventory(userId);
         const newBulkScore = calculateBulkScore(updatedInventory);
@@ -57,28 +100,28 @@ router.get('/latest-game', async (req, res) => {
             const savesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get();
             return res.json({ gameState: 'deceased', roundData: savesSnapshot.empty ? null : savesSnapshot.docs[0].data() });
         }
-        
+
         const [snapshot, newBountiesSnapshot, fullInventory, skills] = await Promise.all([
             userDocRef.collection('game_saves').orderBy('R', 'desc').limit(1).get(),
             userDocRef.collection('bounties').where('isRead', '==', false).limit(1).get(),
             getRawInventory(userId),
             getPlayerSkills(userId)
         ]);
-        
+
         if (snapshot.empty) {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
         }
 
         let latestGameData = snapshot.docs[0].data();
-        
+
         const locationData = await getMergedLocationData(userId, latestGameData.LOC);
         const bulkScore = calculateBulkScore(fullInventory);
 
         const silverItem = fullInventory.find(item => item.templateId === '銀兩');
         const silverAmount = silverItem ? silverItem.quantity : 0;
-        
-        Object.assign(latestGameData, { 
-            ...userData, 
+
+        Object.assign(latestGameData, {
+            ...userData,
             skills: skills,
             inventory: fullInventory,
             bulkScore: bulkScore,
@@ -185,7 +228,7 @@ router.get('/get-novel', async (req, res) => {
     try {
         // 不再讀取或寫入 novel_cache
         const snapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get();
-        
+
         if (snapshot.empty) {
             return res.json({ novelHTML: "" });
         }
@@ -196,9 +239,9 @@ router.get('/get-novel', async (req, res) => {
             const content = roundData.story || "這段往事，已淹沒在時間的長河中。";
             return `<div class="chapter"><h2>${title}</h2><p>${content.replace(/\n/g, '<br>')}</p></div>`;
         });
-        
+
         const fullStoryHTML = storyChapters.join('');
-        
+
         // 直接將拼接好的HTML回傳，不再寫入任何快取文件
         res.json({ novelHTML: fullStoryHTML });
 
@@ -217,7 +260,7 @@ router.post('/restart', async (req, res) => {
     try {
         const userDocRef = db.collection('users').doc(userId);
         await updateLibraryNovel(userId, req.user.username);
-        
+
         const collections = ['game_saves', 'npc_states', 'game_state', 'skills', 'location_states', 'bounties', 'inventory_items'];
         for (const col of collections) {
             try {
@@ -231,11 +274,10 @@ router.post('/restart', async (req, res) => {
                 console.warn(`清除集合 ${col} 失敗，可能該集合尚不存在。`, e.message);
             }
         }
-        
+
         await userDocRef.set({
             internalPower: 5, externalPower: 5, lightness: 5, morality: 0,
-            timeOfDay: '上午', yearName: '元祐', year: 1, month: 1, day: 1,
-            bulkScore: 0 
+            bulkScore: 0
         }, { merge: true });
 
         await invalidateNovelCache(userId);
