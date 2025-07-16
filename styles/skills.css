@@ -230,6 +230,12 @@ body.dark-theme .skill-title-group h4 {
     border: 1px solid #cda400;
 }
 
+/* 【核心新增】武學標題右側的控制項容器 */
+.skill-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
 
 .skill-entry-header .skill-type {
     font-size: 0.85rem;
@@ -243,6 +249,38 @@ body.dark-theme .skill-entry-header .skill-type {
     color: var(--dark-text-secondary);
     background: var(--dark-border);
 }
+
+/* 【核心新增】自廢武功按鈕樣式 */
+.skill-forget-btn {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.skill-forget-btn:hover {
+    background: #dc3545;
+    color: #fff;
+    border-color: #dc3545;
+}
+body.dark-theme .skill-forget-btn {
+    background-color: #5d2b30;
+    color: #ff8787;
+    border-color: #8c4a51;
+}
+body.dark-theme .skill-forget-btn:hover {
+    background-color: #c92a2a;
+    color: #fff;
+    border-color: #c92a2a;
+}
+
 
 .skill-description {
     font-size: 0.95rem;
@@ -296,7 +334,7 @@ body.dark-theme .exp-bar-fill {
     text-align: right;
 }
 
-/* --- 【核心新增】閉關彈窗樣式 --- */
+/* --- 閉關彈窗樣式 --- */
 .cultivation-form-group {
     margin-bottom: 1.5rem;
 }
