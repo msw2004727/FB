@@ -7,7 +7,8 @@ const { getMergedNpcProfile, getFriendlinessLevel, processNpcUpdates } = require
 const { getPlayerSkills, getRawInventory, updateInventory, getInventoryState, getOrGenerateSkillTemplate } = require('./playerStateHelpers');
 const { updateLibraryNovel, invalidateNovelCache, getMergedLocationData } = require('./worldStateHelpers');
 const { processReputationChangesAfterDeath } = require('./reputationManager');
-const { initiateCombat } = require('../gameplay/combatManager'); // 【核心新增】
+// 【核心修正】將路徑從 '../gameplay/combatManager' 改為 './gameplay/combatManager'
+const { initiateCombat } = require('./gameplay/combatManager'); 
 
 const db = admin.firestore();
 
