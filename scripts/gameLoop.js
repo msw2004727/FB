@@ -2,12 +2,13 @@
 
 import { api } from './api.js';
 import { gameState } from './gameState.js';
-import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
+import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory, renderInventory, updateBulkStatus } from './uiUpdater.js';
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 import * as interaction from './interactionHandlers.js';
 import { dom } from './dom.js';
 
+// ... (setLoading, handlePlayerDeath, startProactiveChat 保持不變) ...
 const loadingDisclaimers = [
     "說書人掐指一算：此番推演約需二十至四十五息。若遇江湖新奇，則需額外十數息為其立傳建檔。",
     "天機運轉，世界演化...若初遇奇人、初探秘境，耗時或將近一分鐘，還望少俠耐心等候。",
@@ -151,30 +152,70 @@ async function startProactiveChat(proactiveData) {
     }
 }
 
-export function processNewRoundData(data) {
-    if(!data.roundData) return;
 
-    data.roundData.suggestion = data.suggestion;
+/**
+ * 【核心重構 v2.0 - 前端水合】
+ * 處理從後端傳來的精簡數據包，並更新本地的 `gameState`
+ * @param {object} data - 後端回傳的精簡數據包
+ */
+export async function processNewRoundData(data) {
+    if (!data.roundData) {
+        console.error("收到了無效的回合數據！", data);
+        return;
+    }
+    
+    // 將新回合的建議儲存起來，準備在UI更新後顯示
+    const newSuggestion = data.suggestion || "江湖之大，何處不可去得？";
+    data.roundData.suggestion = newSuggestion;
+
+    // 將新回合的標題加入故事面板
     addRoundTitleToStory(data.roundData.EVT || `第 ${data.roundData.R} 回`);
 
+    // --- 本地 gameState 水合開始 ---
+    // 1. 更新核心數值
+    if (data.roundData.powerChange) {
+        gameState.roundData.internalPower += data.roundData.powerChange.internal || 0;
+        gameState.roundData.externalPower += data.roundData.powerChange.external || 0;
+        gameState.roundData.lightness += data.roundData.powerChange.lightness || 0;
+    }
+    if (data.roundData.moralityChange) {
+        gameState.roundData.morality += data.roundData.moralityChange;
+    }
+    gameState.roundData.stamina = data.roundData.stamina;
+
+    // 2. 更新物品 (這部分比較複雜，暫時先完全替換)
+    if(data.inventory) {
+        gameState.roundData.inventory = data.inventory;
+    }
+
+    // 3. 【優化】只更新變動的NPC，而不是替換整個列表
     if (data.roundData.NPC && Array.isArray(data.roundData.NPC)) {
-        data.roundData.NPC.forEach(npc => {
-            if (npc.isDeceased && !gameState.deceasedNpcs.includes(npc.name)) {
-                gameState.deceasedNpcs.push(npc.name);
-                console.log(`【生死簿】已記錄死亡NPC: ${npc.name}`);
+        data.roundData.NPC.forEach(updatedNpc => {
+            const existingNpcIndex = gameState.roundData.NPC.findIndex(npc => npc.name === updatedNpc.name);
+            if (existingNpcIndex > -1) {
+                // 如果NPC已存在，則更新
+                Object.assign(gameState.roundData.NPC[existingNpcIndex], updatedNpc);
+            } else {
+                // 如果是新NPC，則新增
+                gameState.roundData.NPC.push(updatedNpc);
             }
         });
+        // 過濾掉已死亡的NPC
+        gameState.roundData.NPC = gameState.roundData.NPC.filter(npc => !npc.isDeceased);
     }
+    
+    // 4. 將其他資訊直接覆蓋到本地gameState
+    Object.assign(gameState.roundData, data.roundData);
+    gameState.currentRound = data.roundData.R;
 
+    // 5. 如果有地點數據，則更新
     if (data.locationData) {
         gameState.currentLocationData = data.locationData;
-        console.log('【遊戲狀態】已更新當前地區的詳細情报:', gameState.currentLocationData);
     }
-
-    updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
-
-    gameState.currentRound = data.roundData.R;
-    gameState.roundData = data.roundData;
+    // --- 本地 gameState 水合結束 ---
+    
+    // 使用水合後的、最新的 gameState.roundData 來更新UI
+    updateUI(data.story, gameState.roundData, data.randomEvent, gameState.currentLocationData);
 
     updateBountyButton(data.hasNewBounties);
 
@@ -188,6 +229,7 @@ export function processNewRoundData(data) {
         startProactiveChat(data.proactiveChat);
     }
 }
+
 
 export async function handlePlayerAction() {
     interaction.hideNpcInteractionMenu();
@@ -216,8 +258,13 @@ export async function handlePlayerAction() {
             round: gameState.currentRound,
             model: dom.aiModelSelector.value
         });
-
+        
+        // 【核心修改】收到後端數據後，交給新的處理函式
         if (data && data.roundData) {
+            // 在處理新回合數據前，先獲取一次完整的背包狀態並更新
+            // 這是因為後端可能只回傳了變化，前端需要一個完整的基準來應用這些變化
+            const fullInventory = await api.getInventory();
+            data.inventory = fullInventory;
             processNewRoundData(data);
         } else {
             throw new Error("從伺服器收到的回應格式不正確。");
@@ -229,20 +276,14 @@ export async function handlePlayerAction() {
 
     } catch (error) {
         console.error('API 錯誤或通訊中斷:', error);
-
         const errorMessage = error.message.replace(/\n/g, '<br>');
-
         const cultivationErrorKeywords = ["閉關", "靜修", "修行", "糧食飲水不足", "身心俱疲", "尚未習得", "身無長技", "身負數門絕學", "人多嘴雜"];
         const isCultivationError = cultivationErrorKeywords.some(keyword => errorMessage.includes(keyword));
-
         if (isCultivationError) {
-            // 對於閉關錯誤，使用特殊的CSS class來渲染
             appendMessageToStory(`<div class="cultivation-error">${errorMessage}</div>`, 'system-message');
         } else {
-            // 對於其他錯誤，使用通用的系統訊息樣式
             appendMessageToStory(`【系統提示】<br>${errorMessage}`, 'system-message');
         }
-
     } finally {
         if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
              setLoading(false);
@@ -250,14 +291,13 @@ export async function handlePlayerAction() {
     }
 }
 
+
+// 初始載入遊戲的邏輯保持不變
 export async function loadInitialGame() {
     setLoading(true, '正在連接你的世界，讀取記憶中...');
-
     try {
         const data = await api.getLatestGame();
-
         dom.storyTextContainer.innerHTML = '';
-
         if (data.gameState === 'deceased') {
             if(data.roundData) {
                 if (data.locationData) gameState.currentLocationData = data.locationData;
@@ -271,7 +311,13 @@ export async function loadInitialGame() {
                 prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
                 dom.storyTextContainer.appendChild(prequelDiv);
             }
-            processNewRoundData(data);
+            // 【核心修改】將完整的初始數據賦予給本地 gameState
+            gameState.roundData = data.roundData;
+            gameState.currentLocationData = data.locationData;
+            gameState.currentRound = data.roundData.R;
+            // 使用初始數據更新UI
+            updateUI(data.story, data.roundData, null, data.locationData);
+            updateBountyButton(data.hasNewBounties);
         }
     } catch (error) {
         if (error.message.includes('找不到存檔')) {
