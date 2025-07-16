@@ -15,7 +15,7 @@ async function fetchApi(endpoint, options = {}) {
         ...options,
         headers,
     });
-    
+
     const responseBody = await response.text();
     let data;
     try {
@@ -64,7 +64,8 @@ export const api = {
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
-    
+    forgetSkill: (body) => fetchApi('/api/game/state/forget-skill', { method: 'POST', body: JSON.stringify(body) }), // 【核心新增】
+
     equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
     unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
 
@@ -76,7 +77,7 @@ export const api = {
 
     // Map Route
     getMap: () => fetchApi('/api/map/world-map'),
-    
+
     // Beggar (丐幫) Routes
     summonBeggar: (body) => fetchApi('/api/beggar/summon', { method: 'POST', body: JSON.stringify(body) }),
     startBeggarInquiry: (body) => fetchApi('/api/beggar/start-inquiry', { method: 'POST', body: JSON.stringify(body) }),
