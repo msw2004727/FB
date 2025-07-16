@@ -1,7 +1,38 @@
 // scripts/modalManager.js
 import { api } from './api.js';
-import { initializeTrade, closeTradeUI } from './tradeManager.js'; 
-import { dom } from './dom.js'; 
+import { initializeTrade, closeTradeUI } from './tradeManager.js';
+import { dom } from './dom.js';
+
+// --- 【核心新增】處理自廢武功的函式 ---
+async function handleForgetSkill(skillName, skillType) {
+    if (!skillName) return;
+
+    const confirmationText = `你確定要廢除「${skillName}」這門武學嗎？\n此過程不可逆，所有修練成果將會煙消雲散！`;
+    if (!confirm(confirmationText)) {
+        return;
+    }
+
+    // 顯示載入中...
+    const skillsModalBody = document.getElementById('skills-body-container');
+    if (skillsModalBody) {
+        skillsModalBody.innerHTML = '<p class="system-message">正在散去功力，請稍候...</p>';
+    }
+
+    try {
+        const result = await api.forgetSkill({ skillName: skillName, skillType: skillType });
+        alert(result.message); // 顯示成功訊息
+        closeSkillsModal(); // 關閉彈窗
+        // 你可以選擇在這裡觸發一個遊戲狀態的重新整理
+        // 例如：location.reload();
+    } catch (error) {
+        console.error('自廢武功失敗:', error);
+        alert(`操作失敗：${error.message}`);
+        // 失敗後重新打開技能列表
+        const skills = await api.getSkills();
+        openSkillsModal(skills);
+    }
+}
+
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
@@ -15,7 +46,7 @@ export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallbac
         return;
     }
     initializeTrade(tradeData, npcName, onTradeComplete, closeCallback);
-    tradeModalEl.classList.add('visible'); 
+    tradeModalEl.classList.add('visible');
 }
 
 export function closeTradeModal() {
@@ -30,10 +61,10 @@ export function closeTradeModal() {
 function displayRomanceValue(value) {
     const chatNpcInfo = document.getElementById('chat-npc-info');
     if (!chatNpcInfo) return;
-    
+
     const existingHearts = chatNpcInfo.querySelector('.romance-hearts');
     if (existingHearts) existingHearts.remove();
-    
+
     if (!value || value <= 0) return;
 
     let level = 0;
@@ -51,7 +82,7 @@ function displayRomanceValue(value) {
         heartSpan.className = i < level ? 'fas fa-heart' : 'far fa-heart';
         heartsContainer.appendChild(heartSpan);
     }
-    
+
     chatNpcInfo.prepend(heartsContainer);
 }
 
@@ -61,7 +92,7 @@ function displayFriendlinessBar(value) {
 
     const existingBar = chatNpcInfo.querySelector('.friendliness-bar-container');
     if (existingBar) existingBar.remove();
-    
+
     const percentage = ((value || 0) + 100) / 200 * 100;
     const barContainer = document.createElement('div');
     barContainer.className = 'friendliness-bar-container';
@@ -153,7 +184,7 @@ export function closeEpilogueModal() {
 export function openCombatModal(initialState, onCombatCancel) {
     const combatModal = document.getElementById('combat-modal');
     if (!combatModal) return;
-    
+
     const alliesRoster = document.getElementById('allies-roster');
     const enemiesRoster = document.getElementById('enemies-roster');
     const combatLog = document.getElementById('combat-log');
@@ -164,14 +195,14 @@ export function openCombatModal(initialState, onCombatCancel) {
 
     alliesRoster.innerHTML = '<h4><i class="fas fa-users"></i> 我方陣營</h4>';
     enemiesRoster.innerHTML = '<h4><i class="fas fa-skull-crossbones"></i> 敵方陣營</h4>';
-    
+
     if (initialState.player) alliesRoster.appendChild(createCharacterCard(initialState.player));
     if (initialState.allies) initialState.allies.forEach(ally => alliesRoster.appendChild(createCharacterCard(ally)));
     if (initialState.enemies) initialState.enemies.forEach(enemy => enemiesRoster.appendChild(createCharacterCard(enemy)));
 
     combatLog.innerHTML = `<p>${initialState.log?.[0] || '戰鬥開始！'}</p>`;
     combatTurnCounter.textContent = `第 ${initialState.turn || 1} 回合`;
-    
+
     strategyButtonsContainer.innerHTML = `
         <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
         <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
@@ -179,13 +210,13 @@ export function openCombatModal(initialState, onCombatCancel) {
         <button class="strategy-btn" data-strategy="support"><i class="fas fa-hands-helping"></i> 輔助</button>
         <button class="strategy-btn" data-strategy="heal"><i class="fas fa-briefcase-medical"></i> 治癒</button>
     `;
-    
+
     skillSelectionContainer.innerHTML = '<div class="system-message">請先選擇一個策略</div>';
     confirmActionContainer.innerHTML = `
         <button id="combat-confirm-btn" class="confirm-btn" disabled>確定</button>
         <button id="combat-surrender-btn" class="surrender-btn">認輸</button>
     `;
-    
+
     const closeCombatBtn = document.getElementById('close-combat-btn');
     if (closeCombatBtn) {
         closeCombatBtn.onclick = () => {
@@ -200,7 +231,7 @@ export function openCombatModal(initialState, onCombatCancel) {
 export function updateCombatUI(updatedState) {
     const combatModal = document.getElementById('combat-modal');
     if (!combatModal) return;
-    
+
     const allCombatants = [ updatedState.player, ...(updatedState.allies || []), ...(updatedState.enemies || []) ];
     allCombatants.forEach(character => {
         if (!character) return;
@@ -213,7 +244,7 @@ export function updateCombatUI(updatedState) {
                 hpBar.style.width = `${(character.hp / character.maxHp) * 100}%`;
                 hpValueText.textContent = character.hp;
             }
-            
+
             const mpBar = card.querySelector('.mp-bar-fill');
             const mpValueText = card.querySelector('.mp-bar-container .bar-value-text');
             if (mpBar && mpValueText && character.mp !== undefined) {
@@ -239,13 +270,13 @@ export function setTurnCounter(turn) {
     if(combatTurnCounter) combatTurnCounter.textContent = `第 ${turn} 回合`;
 }
 
-export function closeCombatModal() { 
+export function closeCombatModal() {
     const combatModal = document.getElementById('combat-modal');
-    if(combatModal) combatModal.classList.remove('visible'); 
+    if(combatModal) combatModal.classList.remove('visible');
 }
-export function setCombatLoading(isLoading) { 
+export function setCombatLoading(isLoading) {
     const combatLoader = document.getElementById('combat-loader');
-    if (combatLoader) combatLoader.classList.toggle('visible', isLoading); 
+    if (combatLoader) combatLoader.classList.toggle('visible', isLoading);
 }
 
 
@@ -260,7 +291,7 @@ export function openChatModalUI(profile, mode = 'chat') {
     const chatActionBtn = document.getElementById('chat-action-btn');
 
     if (!chatModal || !chatNpcName || !chatNpcInfo || !chatLog || !giveItemBtn || !chatFooter) return;
-    
+
     if (mode === 'inquiry') {
         chatNpcName.textContent = `向 ${profile.name} 探聽秘聞`;
         chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 花費100銀兩</span>`;
@@ -270,20 +301,20 @@ export function openChatModalUI(profile, mode = 'chat') {
         displayRomanceValue(profile.romanceValue);
         displayFriendlinessBar(profile.friendlinessValue);
     }
-    
+
     giveItemBtn.style.display = mode === 'inquiry' ? 'none' : 'inline-flex';
     chatFooter.style.display = mode === 'inquiry' ? 'none' : 'block';
     chatLog.innerHTML = `<p class="system-message">你開始與${profile.name}交談...</p>`;
-    
+
     if (chatActionBtn) chatActionBtn.disabled = false;
 
     chatModal.classList.add('visible');
     chatModal.dataset.mode = mode;
 }
 
-export function closeChatModal() { 
+export function closeChatModal() {
     const chatModal = document.getElementById('chat-modal');
-    if(chatModal) chatModal.classList.remove('visible'); 
+    if(chatModal) chatModal.classList.remove('visible');
 }
 export function appendChatMessage(speaker, message) {
     const chatLog = document.getElementById('chat-log');
@@ -294,7 +325,7 @@ export function appendChatMessage(speaker, message) {
     chatLog.appendChild(messageDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
 }
-export function setChatLoading(isLoading) { 
+export function setChatLoading(isLoading) {
     const chatLoader = document.getElementById('chat-loader');
     if (chatLoader) chatLoader.classList.toggle('visible', isLoading);
 }
@@ -308,9 +339,9 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
     giveInventoryList.innerHTML = '<p class="system-message">正在翻檢你的行囊...</p>';
     giveItemModal.classList.add('visible');
     try {
-        const inventory = await api.getInventory(); 
+        const inventory = await api.getInventory();
         giveInventoryList.innerHTML = '';
-        
+
         if (inventory && inventory.length > 0) {
             inventory.forEach(itemData => {
                 if (itemData.quantity > 0) {
@@ -318,7 +349,7 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'give-item';
                     itemDiv.innerHTML = `<i class="fas ${itemName === '銀兩' ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (數量: ${itemData.quantity})`
-                    
+
                     itemDiv.addEventListener('click', () => {
                         if (itemName === '銀兩') {
                             const amount = prompt(`你要給予多少銀兩？ (最多 ${itemData.quantity})`, itemData.quantity);
@@ -343,9 +374,9 @@ export async function openGiveItemModal(currentNpcName, giveItemCallback) {
         giveInventoryList.innerHTML = `<p class="system-message">翻檢行囊時出錯: ${error.message}</p>`;
     }
 }
-export function closeGiveItemModal() { 
+export function closeGiveItemModal() {
     const giveItemModal = document.getElementById('give-item-modal');
-    if(giveItemModal) giveItemModal.classList.remove('visible'); 
+    if(giveItemModal) giveItemModal.classList.remove('visible');
 }
 
 
@@ -380,7 +411,7 @@ export function openSkillsModal(skillsData) {
         tabButton.className = 'skill-tab';
         tabButton.textContent = type;
         tabButton.dataset.tab = type;
-        
+
         const tabContent = document.createElement('div');
         tabContent.className = 'skill-tab-content';
         tabContent.id = `tab-${type}`;
@@ -389,8 +420,10 @@ export function openSkillsModal(skillsData) {
             const expToNextLevel = (skill.level + 1) * 100;
             const expPercentage = expToNextLevel > 0 ? (skill.exp / expToNextLevel) * 100 : 0;
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
-            
+
+            // 【核心修改】為自創武學添加廢除按鈕
             const customTagHtml = skill.isCustom ? '<span class="skill-custom-tag">自創</span>' : '';
+            const forgetButtonHtml = skill.isCustom ? `<button class="skill-forget-btn" data-skill-name="${skill.skillName}" data-skill-type="${skill.power_type}"><i class="fas fa-trash-alt"></i> 自廢武功</button>` : '';
 
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
@@ -400,7 +433,10 @@ export function openSkillsModal(skillsData) {
                         <h4>${skill.skillName}</h4>
                         ${customTagHtml}
                     </div>
-                    <span class="skill-type">${translatedPowerType}</span>
+                    <div class="skill-header-controls">
+                        <span class="skill-type">${translatedPowerType}</span>
+                        ${forgetButtonHtml}
+                    </div>
                 </div>
                 <p class="skill-description">${skill.base_description || '暫無描述。'}</p>
                 <div class="skill-progress-container">
@@ -410,7 +446,7 @@ export function openSkillsModal(skillsData) {
                 </div>`;
             tabContent.appendChild(skillEntry);
         });
-        
+
         skillsTabsContainer.appendChild(tabButton);
         skillsBodyContainer.appendChild(tabContent);
 
@@ -429,9 +465,19 @@ export function openSkillsModal(skillsData) {
             document.getElementById(`tab-${tabName}`).classList.add('active');
         }
     };
+    
+    // 【核心新增】為所有自廢武功按鈕綁定事件
+    skillsBodyContainer.querySelectorAll('.skill-forget-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const skillName = e.currentTarget.dataset.skillName;
+            const skillType = e.currentTarget.dataset.skillType;
+            handleForgetSkill(skillName, skillType);
+        });
+    });
 
     skillsModal.classList.add('visible');
 }
+
 
 export function closeSkillsModal() {
     const skillsModal = document.getElementById('skills-modal');
@@ -520,9 +566,9 @@ function formatObjectForDisplay(obj, keysToExclude = []) {
 export function openLocationDetailsModal(locationData) {
     if (!dom.locationDetailsModal || !locationData) return;
     dom.locationModalTitle.textContent = locationData.locationName || '地區情報';
-    
+
     let bodyHtml = '';
-    
+
     // 將數據分類，傳給格式化函式
     const staticData = {
         類型: locationData.locationType,
@@ -532,7 +578,7 @@ export function openLocationDetailsModal(locationData) {
         特產: locationData.economy?.specialty?.join(', ') || '無',
         歷史: locationData.lore?.history,
     };
-    
+
     const dynamicData = {
         當前繁榮度: locationData.economy?.currentProsperity,
         統治: locationData.governance,
