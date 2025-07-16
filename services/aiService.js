@@ -53,7 +53,8 @@ const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js'
 const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
 const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
 const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
-const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js'); // 【核心新增】
+const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
+
 
 // 統一的AI調度中心
 async function callAI(modelName, prompt, isJsonExpected = false) {
@@ -120,7 +121,7 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// --- 【核心新增】獲取自廢武功故事的函式 ---
+// 【核心新增】獲取自廢武功故事的函式
 async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName) {
     const prompt = getForgetSkillPrompt(playerProfile, skillName);
     try {
@@ -135,16 +136,13 @@ async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName
 
 
 async function getAICultivationResult(playerProfile, skillToPractice, days, outcome, storyHint) {
-    // 1. 正確地調用 prompt 生成函式，獲取完整的AI指令
     const prompt = getCultivationPrompt(playerProfile, skillToPractice, days, outcome, storyHint);
     try {
-        const modelToUse = aiConfig.narrative || 'openai'; // 沿用敘事模型的設定
-        // 2. 將完整的指令發送給 callAI
+        const modelToUse = aiConfig.narrative || 'openai';
         const story = await callAI(modelToUse, prompt, false);
         return story;
     } catch (error) {
         console.error(`[AI 任務失敗] 為 ${playerProfile.name} 生成閉關故事時出錯:`, error);
-        // 提供一個降級的預設故事
         return `經過 ${days} 天的閉關，你感覺到體內氣息流轉，似乎有所感悟，但具體進境如何，卻又難以言說。`;
     }
 }
@@ -155,7 +153,7 @@ async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, intera
         const modelToUse = playerModelChoice || aiConfig.npcMemory || 'openai';
         const text = await callAI(modelToUse, prompt, true);
         const parsedJson = parseJsonResponse(text);
-        return parsedJson.newSummary || oldSummary; 
+        return parsedJson.newSummary || oldSummary;
     } catch (error) {
         console.error(`[AI 任務失敗] 為 ${npcName} 更新個人記憶時出錯:`, error);
         return oldSummary;
@@ -286,8 +284,8 @@ async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHi
     const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory, longTermSummary);
     try {
         const modelToUse = playerModelChoice || aiConfig.npcChatSummary;
-        const text = await callAI(modelToUse, prompt, true); 
-        return parseJsonResponse(text); 
+        const text = await callAI(modelToUse, prompt, true);
+        return parseJsonResponse(text);
     } catch (error) {
         console.error("[AI 任務失敗] 摘要師任務:", error);
         return {
@@ -493,10 +491,10 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
 module.exports = {
     callAI,
     aiConfig,
-    getAIForgetSkillStory, // 【核心新增】
+    getAIAnachronismResponse,
+    getAIForgetSkillStory,
     getAICultivationResult,
     getAIPerNpcSummary,
-    getAIAnachronismResponse,
     getNarrative,
     getAISummary,
     getAIStory,
