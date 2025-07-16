@@ -2,7 +2,6 @@
 import { api } from './api.js';
 import { initializeTrade, closeTradeUI } from './tradeManager.js';
 import { dom } from './dom.js';
-// 【核心新增】從主循環中引入處理新回合資料的函式
 import { processNewRoundData } from './gameLoop.js';
 
 // --- 處理自廢武功的函式 ---
@@ -14,14 +13,13 @@ async function handleForgetSkill(skillName, skillType) {
         return;
     }
 
-    closeSkillsModal(); // 先關閉彈窗
-    const gameLoop = await import('./gameLoop.js'); // 動態引入以避免循環依賴
+    closeSkillsModal(); 
+    const gameLoop = await import('./gameLoop.js'); 
     gameLoop.setLoading(true, '正在散去功力，重塑經脈...');
 
     try {
         const result = await api.forgetSkill({ skillName: skillName, skillType: skillType });
         
-        // 【核心修改】檢查回傳結果，並調用主循環的函式來處理新回合
         if (result.success && result.roundData) {
             processNewRoundData(result);
         } else {
@@ -33,14 +31,12 @@ async function handleForgetSkill(skillName, skillType) {
         alert(`操作失敗：${error.message}`);
     } finally {
         const gameLoop = await import('./gameLoop.js');
-        // 確保在任何情況下都能關閉載入動畫
         if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
             gameLoop.setLoading(false);
         }
     }
 }
 
-// ... (其餘程式碼保持不變) ...
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
@@ -430,7 +426,10 @@ export function openSkillsModal(skillsData) {
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
 
             const customTagHtml = skill.isCustom ? '<span class="skill-custom-tag">自創</span>' : '';
-            const forgetButtonHtml = skill.isCustom ? `<button class="skill-forget-btn" title="自廢武功" data-skill-name="${skill.skillName}" data-skill-type="${skill.power_type}"><i class="fas fa-trash-alt"></i></button>` : '';
+            // 【核心修改】為所有非「現代搏擊」的武學添加廢除按鈕
+            const forgetButtonHtml = skill.skillName !== '現代搏擊' 
+                ? `<button class="skill-forget-btn" title="自廢武功" data-skill-name="${skill.skillName}" data-skill-type="${skill.power_type}"><i class="fas fa-trash-alt"></i></button>` 
+                : '';
 
             const skillEntry = document.createElement('div');
             skillEntry.className = 'skill-entry';
