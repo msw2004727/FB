@@ -1,6 +1,6 @@
 // services/aiService.js
 
-// --- AI SDK 初始化 ---
+// --- AI SDK 初始化 (保持不變) ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 
@@ -26,7 +26,7 @@ const grok = new OpenAI({
 
 const { aiConfig } = require('../api/aiConfig.js');
 
-// --- 從 prompts 資料夾導入腳本 ---
+// --- 從 prompts 資料夾導入腳本 (保持不變) ---
 const { getStoryPrompt } = require('../prompts/storyPrompt.js');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt.js');
 const { getSummaryPrompt } = require('../prompts/summaryPrompt.js');
@@ -56,7 +56,7 @@ const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
-// 統一的AI調度中心
+// 統一的AI調度中心 (保持不變)
 async function callAI(modelName, prompt, isJsonExpected = false) {
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
@@ -115,13 +115,38 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
     }
 }
 
-// 清理並解析JSON的輔助函式
+// 清理並解析JSON的輔助函式 (保持不變)
 function parseJsonResponse(text) {
     const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanJsonText);
 }
 
-// 【核心新增】獲取自廢武功故事的函式
+/**
+ * 【核心修正】修正了 getAICultivationResult 的函式簽名和內部邏輯
+ * @param {string} username - 玩家名稱
+ * @param {object} playerProfile - 玩家的完整檔案
+ * @param {object} skillToPractice - 要修練的武學
+ * @param {number} days - 閉關天數
+ * @param {string} outcome - 後端計算的閉關結果
+ * @param {string} storyHint - 給AI的故事基調提示
+ * @returns {Promise<string>}
+ */
+async function getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint) {
+    // 確保傳遞給 prompt 的 playerProfile 物件中一定有 username
+    const profileForPrompt = { ...playerProfile, username: username };
+    const prompt = getCultivationPrompt(profileForPrompt, skillToPractice, days, outcome, storyHint);
+    try {
+        const modelToUse = aiConfig.narrative || 'openai';
+        const story = await callAI(modelToUse, prompt, false);
+        return story;
+    } catch (error) {
+        console.error(`[AI 任務失敗] 為 ${username} 生成閉關故事時出錯:`, error);
+        return `經過 ${days} 天的閉關，你感覺到體內氣息流轉，似乎有所感悟，但具體進境如何，卻又難以言說。`;
+    }
+}
+
+
+// ... (其餘所有 getAI... 函式保持不變) ...
 async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName) {
     const prompt = getForgetSkillPrompt(playerProfile, skillName);
     try {
@@ -131,19 +156,6 @@ async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName
     } catch (error) {
         console.error(`[AI 任務失敗] 為 ${playerProfile.username} 生成自廢武功故事時出錯:`, error);
         return `你下定決心，逆運內力。一時間，經脈中真氣如脫韁野馬般肆虐衝撞，你感到一陣撕心裂肺的劇痛，眼前一黑，險些暈厥過去。待你回過神來，體內關於「${skillName}」的感悟已蕩然無存，只剩下無盡的空虛。`;
-    }
-}
-
-
-async function getAICultivationResult(playerProfile, skillToPractice, days, outcome, storyHint) {
-    const prompt = getCultivationPrompt(playerProfile, skillToPractice, days, outcome, storyHint);
-    try {
-        const modelToUse = aiConfig.narrative || 'openai';
-        const story = await callAI(modelToUse, prompt, false);
-        return story;
-    } catch (error) {
-        console.error(`[AI 任務失敗] 為 ${playerProfile.name} 生成閉關故事時出錯:`, error);
-        return `經過 ${days} 天的閉關，你感覺到體內氣息流轉，似乎有所感悟，但具體進境如何，卻又難以言說。`;
     }
 }
 
