@@ -35,13 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemDetailsDeleteBtn = document.getElementById('item-details-delete-btn');
     const closeItemDetailsBtn = document.getElementById('close-item-details-btn');
 
-    // 【核心新增】獲取閉關彈窗的所有元素
+    // 【核心修改】重新獲取閉關彈窗的所有元素
     const cultivationModal = document.getElementById('cultivation-modal');
     const openCultivationBtn = document.getElementById('open-cultivation-btn');
     const closeCultivationBtn = document.getElementById('close-cultivation-btn');
     const skillSelect = document.getElementById('cultivation-skill-select');
-    const daysSelector = document.querySelector('.cultivation-days-selector');
-    const daysInput = document.getElementById('cultivation-days-input');
+    const daysInput = document.getElementById('cultivation-days-input'); // 現在是 range slider
+    const daysDisplay = document.getElementById('cultivation-days-display'); // 新增的天數顯示標籤
     const startCultivationBtn = document.getElementById('start-cultivation-btn');
     const reqLocation = document.getElementById('req-location');
     const reqStamina = document.getElementById('req-stamina');
@@ -113,12 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 【核心新增】閉關系統相關函式 ---
+    // --- 【核心修改 v2.0】閉關系統相關函式 ---
     function updateCultivationConditions() {
         if (!gameState.roundData || !cultivationModal.classList.contains('visible')) return;
 
         const { currentLocationData, roundData } = gameState;
         const days = parseInt(daysInput.value, 10);
+
+        // 更新天數顯示
+        if(daysDisplay) daysDisplay.textContent = `${days} 天`;
 
         // 條件1: 私密地點
         const isPrivate = currentLocationData?.isPrivate === true;
@@ -157,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
             handleApiError(error);
             skillSelect.innerHTML = '<option value="">讀取武學失敗</option>';
         } finally {
+            daysInput.value = 1; // 每次打開時重置為1天
             updateCultivationConditions();
         }
     }
@@ -169,6 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!skillName) {
             alert('請選擇一門要修練的武學。');
+            return;
+        }
+        if (!days || days <= 0) {
+            alert('請選擇有效的閉關天數。');
             return;
         }
 
@@ -191,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function initialize() {
+        // ... (initialize 函式中的其他事件綁定保持不變) ...
         let currentTheme = localStorage.getItem('game_theme') || 'light';
         const themeIcon = dom.themeSwitcher.querySelector('i');
         document.body.className = `${currentTheme}-theme`;
@@ -341,21 +350,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // --- 【核心新增】為閉關系統綁定事件 ---
+        // --- 【核心修改 v2.0】為閉關系統綁定事件 ---
         if (openCultivationBtn) openCultivationBtn.addEventListener('click', openCultivationModal);
         if (closeCultivationBtn) closeCultivationBtn.addEventListener('click', () => cultivationModal.classList.remove('visible'));
         if (skillSelect) skillSelect.addEventListener('change', updateCultivationConditions);
-        if (daysSelector) {
-            daysSelector.addEventListener('click', (e) => {
-                if (e.target.classList.contains('day-btn')) {
-                    daysSelector.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
-                    e.target.classList.add('selected');
-                    daysInput.value = e.target.dataset.days;
-                    updateCultivationConditions();
-                }
-            });
-            // 預設選中第一天
-            daysSelector.querySelector('.day-btn[data-days="1"]').classList.add('selected');
+        if (daysInput) { // 現在監聽 slider 的 input 事件
+            daysInput.addEventListener('input', updateCultivationConditions);
         }
         if (startCultivationBtn) startCultivationBtn.addEventListener('click', handleStartCultivation);
 
