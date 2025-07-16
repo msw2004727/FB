@@ -53,7 +53,7 @@ async function handleAction(req, res, player, newRoundNumber) {
         
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame, player: playerContext } = context;
 
-        // 【核心修正】在這裡定義 lastRoundData，確保後續邏輯能取用
+        // 【核心修改】在此處定義 lastRoundData，確保後續邏輯能取用
         const lastRoundData = recentHistory && recentHistory.length > 0 ? recentHistory[recentHistory.length - 1] : {};
 
         // --- 「守門員」檢查機制 ---
@@ -95,23 +95,36 @@ async function handleAction(req, res, player, newRoundNumber) {
             skills: playerContext.skills.map(s => s.skillName)
         };
         const classification = await getAIActionClassification(playerModelChoice, playerAction, classificationContext);
-        console.log(`[AI總導演] 玩家行動「${playerAction}」被分類為: ${classification.actionType}`);
+        console.log(`[AI總導演 v2.0] 玩家行動「${playerAction}」被分類為: ${classification.actionType}`);
         
-        if (classification.actionType === 'COMBAT_ATTACK' && classification.details.target) {
-            try {
-                const initialState = await initiateCombat(userId, username, classification.details.target, classification.details.intention || '打死');
-                return res.json({
-                    combatInfo: {
-                        status: 'COMBAT_START',
-                        initialState: initialState,
-                    }
-                });
-            } catch(combatError) {
-                playerAction = `我本想攻擊${classification.details.target}，但發現${combatError.message}`;
-                console.log(`[戰鬥發起失敗] 自動將行動轉化為故事: ${playerAction}`);
-            }
+        // --- 【核心修改 v2.0】更精細的行動分類處理 ---
+        switch (classification.actionType) {
+            case 'COMBAT_ATTACK':
+            case 'COMBAT_NON_LETHAL':
+                try {
+                    const intent = classification.actionType === 'COMBAT_ATTACK' ? '打死' : '教訓';
+                    const initialState = await initiateCombat(userId, username, classification.details.target, intent);
+                    return res.json({
+                        combatInfo: {
+                            status: 'COMBAT_START',
+                            initialState: initialState,
+                        }
+                    });
+                } catch(combatError) {
+                    playerAction = `我本想攻擊${classification.details.target}，但發現${combatError.message}`;
+                    console.log(`[戰鬥發起失敗] 自動將行動轉化為故事: ${playerAction}`);
+                }
+                break;
+            // 未來可在此處為 INTERACTION_GIVE, INTERACTION_STEAL 等添加專門的處理邏輯
+            // case 'INTERACTION_STEAL':
+            //     // 呼叫偷竊系統
+            //     break;
+            default:
+                // 對於其他所有類型，暫時都交給主故事AI處理
+                console.log(`[行動處理器] 行動類型 ${classification.actionType} 暫無專門處理器，交由主故事AI生成。`);
+                break;
         }
-        
+
         playerAction = preprocessPlayerAction(playerAction, locationContext);
         
         if (isNewGame) {
