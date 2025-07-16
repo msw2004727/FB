@@ -9,9 +9,9 @@
 
 // 1. 閉關結果的基礎機率 (保持不變)
 const CULTIVATION_CHANCES = {
-    GREAT_SUCCESS: 0.15, // 15% 機率大功告成
-    SUCCESS: 0.60,       // 60% 機率略有小成
-    NO_PROGRESS: 0.20,   // 20% 機率毫無進展
+    GREAT_SUCCESS: 0.50, // 15% 機率大功告成
+    SUCCESS: 0.35,       // 60% 機率略有小成
+    NO_PROGRESS: 0.10,   // 20% 機率毫無進展
     DISASTER: 0.05       // 5% 機率走火入魔
 };
 
