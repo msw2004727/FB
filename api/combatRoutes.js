@@ -155,20 +155,29 @@ const combatActionRouteHandler = async (req, res) => {
 
         let combatState = combatDoc.data();
         
-        // --- 【核心修正 v3.0】後端安全驗證 ---
+        // --- 【核心修正 v3.1】後端安全驗證 ---
         if (selectedSkillName) {
+            // 從 combatState 中獲取玩家技能列表
+            const playerSkills = combatState.player?.skills || [];
+            const skillExists = playerSkills.some(s => s.skillName === selectedSkillName);
+
+            // 驗證玩家是否真的學會了此武學
+            if (!skillExists) {
+                console.warn(`[後端驗證失敗] 玩家 ${req.user.username} 試圖使用一個他不會的武學！武學: ${selectedSkillName}`);
+                // 返回一個友善的錯誤訊息，並中止後續操作
+                return res.status(403).json({ message: `你氣沉丹田，試圖運轉「${selectedSkillName}」的內力，卻發現腦中一片空白，原來你根本不會這門功夫。` });
+            }
+
+            // 如果武學存在，繼續驗證武器類型
             const skillTemplateResult = await getOrGenerateSkillTemplate(selectedSkillName);
             if (!skillTemplateResult || !skillTemplateResult.template) {
                 return res.status(404).json({ message: `找不到武學「${selectedSkillName}」的資料。`});
             }
             const requiredWeaponType = skillTemplateResult.template.requiredWeaponType;
             const currentWeaponType = combatState.player.currentWeaponType;
-
-            // 重寫驗證邏輯，使其更嚴謹
+            
             const isWeaponMatch = 
-                // 情況一：武學需要特定武器，且玩家裝備的武器與之相符
                 (requiredWeaponType && requiredWeaponType !== '無' && requiredWeaponType === currentWeaponType) ||
-                // 情況二：武學是空手武學，且玩家目前為空手狀態 (currentWeaponType 為 null)
                 (requiredWeaponType === '無' && currentWeaponType === null);
 
             if (!isWeaponMatch) {
