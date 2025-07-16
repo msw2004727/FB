@@ -2,13 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause, getAIForgetSkillStory } = require('../services/aiService'); // 【核心新增】 引入新服務
+const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause, getAIForgetSkillStory } = require('../services/aiService');
 const { getPlayerSkills, getRawInventory, calculateBulkScore, getInventoryState } = require('./playerStateHelpers');
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
+const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
-// --- 【核心重構】自廢武功的路由 ---
+// --- 自廢武功的路由 ---
 router.post('/forget-skill', async (req, res) => {
     const { skillName, skillType } = req.body;
     const { id: userId, username } = req.user;
@@ -30,8 +31,16 @@ router.post('/forget-skill', async (req, res) => {
         let lastRoundData = lastSaveSnapshot.docs[0].data();
         let playerProfile = playerProfileSnapshot.data();
 
+        // 【核心修改】組合一個完整的 profile 物件傳遞給 AI prompt
+        const profileForPrompt = {
+            ...playerProfile,
+            username: username,
+            currentLocation: lastRoundData.LOC,
+            NPC: lastRoundData.NPC || [] // 確保 NPC 列表存在
+        };
+
         // 1. 產生廢功劇情
-        const story = await getAIForgetSkillStory(playerProfile.preferredModel, { username, ...playerProfile }, skillName);
+        const story = await getAIForgetSkillStory(playerProfile.preferredModel, profileForPrompt, skillName);
 
         const batch = db.batch();
 
@@ -51,7 +60,7 @@ router.post('/forget-skill', async (req, res) => {
 
         // 5. 創建新回合
         const newRoundNumber = lastRoundData.R + 1;
-        const inventoryState = await getInventoryState(userId); // 獲取最新的物品狀態
+        const inventoryState = await getInventoryState(userId);
 
         const newRoundData = {
             ...lastRoundData,
