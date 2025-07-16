@@ -468,15 +468,11 @@
                         <select id="cultivation-skill-select" class="cultivation-select"></select>
                     </div>
                     <div class="cultivation-form-group">
-                        <label for="cultivation-days-input">閉關天數 (1-10日)</label>
-                        <div class="cultivation-days-selector">
-                            <button class="day-btn" data-days="1">1</button>
-                            <button class="day-btn" data-days="3">3</button>
-                            <button class="day-btn" data-days="5">5</button>
-                            <button class="day-btn" data-days="7">7</button>
-                            <button class="day-btn" data-days="10">10</button>
+                        <div class="day-selector-header">
+                            <label for="cultivation-days-input">閉關天數</label>
+                            <span id="cultivation-days-display" class="day-display">1 天</span>
                         </div>
-                        <input type="hidden" id="cultivation-days-input" value="1">
+                        <input type="range" id="cultivation-days-input" class="day-slider" min="1" max="60" value="1">
                     </div>
                     <div class="cultivation-requirements">
                         <h4>閉關條件：</h4>
