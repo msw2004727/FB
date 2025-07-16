@@ -11,8 +11,9 @@
  */
 const getCultivationPrompt = (playerProfile, skillToPractice, days, backendOutcome, storyHint) => {
     
+    // 【核心修正】將 playerProfile.name 改為 playerProfile.username
     return `
-你是一位頂尖的小說家，擅長用現代、洗鍊、充滿內心戲的文筆來描寫一個架空的古代故事。你的任務是根據以下提供的「閉關結果」和「故事基調」，為玩家「${playerProfile.name}」生成一段精彩的閉關過程描述。
+你是一位頂尖的小說家，擅長用現代、洗鍊、充滿內心戲的文筆來描寫一個架空的古代故事。你的任務是根據以下提供的「閉關結果」和「故事基調」，為玩家「${playerProfile.username}」生成一段精彩的閉關過程描述。
 
 ## 核心寫作鐵律：
 
@@ -21,12 +22,12 @@ const getCultivationPrompt = (playerProfile, skillToPractice, days, backendOutco
 3.  **融入角色與環境**: 故事中必須巧妙地融入玩家的姓名、當前地點、以及正在修練的武學。
 4.  **描寫心路歷程**: 你的描寫重點應是主角在閉關期間的心理活動、對自身力量的感知、遇到的瓶頸與心魔，而非華麗的招式或意象。
 5.  **禁止數據外洩**: 故事描述中，絕對禁止出現任何具體的數值，例如「經驗值增加了500點」或「功力提升了5點」。你只能用文學性的語言來側面描寫這些變化。
-6.  **格式要求**: 直接回傳純文字的故事內容，不要包含任何額外的標題或標籤。
+6.  **格式要求**: 直接回傳純文字的故事內容，不要包含任何額外的標題、標籤或JSON格式。
 
 ---
 
 ## 【本次閉關情境】
-* **閉關者**: ${playerProfile.name}
+* **閉關者**: ${playerProfile.username}
 * **閉關地點**: ${playerProfile.currentLocation || '一處靜室'}
 * **修練武學**: ${skillToPractice.skillName || '一門高深武學'}
 * **閉關時長**: ${days} 天
