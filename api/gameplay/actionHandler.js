@@ -1,11 +1,10 @@
 // /api/gameplay/actionHandler.js
 const { buildContext } = require('../contextBuilder');
-const { getAIStory, getAISuggestion, getAIActionClassification, getAIAnachronismResponse } = require('../../services/aiService'); // 【核心新增】引入守序者AI
+const { getAIStory, getAISuggestion, getAIActionClassification, getAIAnachronismResponse } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
 const { initiateCombat } = require('./combatManager'); 
 
-// 【核心新增】定義一個違禁/傳說物品清單
 const FORBIDDEN_ITEMS = [
     '倚天劍', '屠龍刀', '聖火令', '九陽神功', '九陰真經', '乾坤大挪移',
     '降龍十八掌', '六脈神劍', '北冥神功', '凌波微步', '手機', '電腦',
@@ -13,7 +12,6 @@ const FORBIDDEN_ITEMS = [
 ];
 
 const preprocessPlayerAction = (playerAction, locationContext) => {
-    // ... (此函式內容不變)
     const facilityKeywords = {
         '鐵匠鋪': '鐵匠鋪', '打鐵鋪': '鐵匠鋪',
         '藥鋪': '藥鋪', '藥房': '藥鋪', '醫館': '藥鋪',
@@ -55,22 +53,23 @@ async function handleAction(req, res, player, newRoundNumber) {
         
         const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame, player: playerContext } = context;
 
-        // --- 【核心修改】加入「守門員」檢查機制 ---
+        // 【核心修正】在這裡定義 lastRoundData，確保後續邏輯能取用
+        const lastRoundData = recentHistory && recentHistory.length > 0 ? recentHistory[recentHistory.length - 1] : {};
+
+        // --- 「守門員」檢查機制 ---
         const detectedItem = FORBIDDEN_ITEMS.find(item => playerAction.includes(item));
         if (detectedItem) {
             console.log(`[守門員系統] 偵測到違規物品「${detectedItem}」，啟動化解程序...`);
             const story = await getAIAnachronismResponse(playerModelChoice, playerAction, detectedItem);
             
-            // 構造一個無任何實際變化的回合資料
             const anachronismRoundData = {
                 story: story,
                 roundData: {
-                    ...lastRoundData, // 繼承上一回合的狀態
+                    ...lastRoundData, 
                     R: newRoundNumber,
                     story: story,
                     PC: "你的思緒有些混亂，但很快又恢復了平靜。",
                     EVT: "一閃而過的幻想",
-                    // 所有變化都設為 0 或空
                     powerChange: { internal: 0, external: 0, lightness: 0 },
                     moralityChange: 0,
                     itemChanges: [],
@@ -89,7 +88,6 @@ async function handleAction(req, res, player, newRoundNumber) {
             });
         }
         // --- 守門員機制結束 ---
-
 
         const classificationContext = {
             location: locationContext?.locationName,
