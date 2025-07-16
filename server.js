@@ -93,8 +93,8 @@ const { runEquipmentMigration } = require('./api/migrations/equipmentMigration')
 app.listen(PORT, async () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
     
-    // 初始化快取
-    cacheManager.initializeNpcNameCache();
+    // 【核心修改】初始化所有快取
+    cacheManager.initializeCaches();
     
     // 執行數據遷移腳本
     try {
