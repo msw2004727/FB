@@ -1,6 +1,7 @@
 // /api/gameplay/stateUpdaters.js
 const admin = require('firebase-admin');
-const { getAISummary } = require('../../services/aiService');
+// 【核心新增】從 aiService 中引入 getAIRandomEvent
+const { getAISummary, getAIRandomEvent } = require('../../services/aiService'); 
 const { updateFriendlinessValues, updateRomanceValues, processNpcUpdates, updateNpcMemoryAfterInteraction } = require('../npcHelpers');
 const { updateSkills, getRawInventory, calculateBulkScore, getPlayerSkills } = require('../playerStateHelpers');
 const { TIME_SEQUENCE, advanceDate, invalidateNovelCache, updateLibraryNovel } = require('../worldStateHelpers');
@@ -12,7 +13,7 @@ const { addCurrency } = require('../economyManager');
 const db = admin.firestore();
 
 /**
- * 【核心修正 v3.1】更新遊戲狀態並將所有更改寫入資料庫
+ * 【核心修正 v3.2】更新遊戲狀態並將所有更改寫入資料庫
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} player - 當前回合開始前的玩家數據
@@ -25,10 +26,9 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     const userDocRef = db.collection('users').doc(userId);
     const summaryDocRef = userDocRef.collection('game_state').doc('summary');
     
-    // 【關鍵修正】統一從 aiResponse.roundData 中獲取所有回合數據
     const safeRoundData = aiResponse.roundData || {};
     const { 
-        story = aiResponse.story || '時間悄然流逝...', // 兼容舊格式，但優先使用roundData中的story
+        story = aiResponse.story || '時間悄然流逝...',
         playerState = 'alive', 
         powerChange = {}, 
         moralityChange = 0, 
@@ -52,6 +52,33 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         timeOfDay: aiNextTimeOfDay, 
         daysToAdvance = 0 
     } = safeRoundData;
+
+    // --- 【核心新增】隨機事件觸發引擎 ---
+    let randomEvent = null;
+    let eventEffects = {};
+    // 設置一個 15% 的基礎觸發機率
+    if (Math.random() < 0.15) { 
+        console.log(`[隨機事件系統] 觸發隨機事件！`);
+        // 隨機決定事件是正面還是負面
+        const eventType = Math.random() < 0.6 ? '一個小小的正面事件' : '一個小小的負面事件';
+        const eventResult = await getAIRandomEvent(eventType, {
+            username: username,
+            location: LOC[0],
+            playerState: PC,
+            morality: player.morality || 0
+        });
+
+        if (eventResult && eventResult.description) {
+            randomEvent = eventResult;
+            eventEffects = eventResult.effects || {};
+            console.log(`[隨機事件系統] 已成功生成事件: ${eventResult.description}`);
+            // 將事件的物品變化合併到主流程中
+            if (eventEffects.itemChanges) {
+                itemChanges.push(...eventEffects.itemChanges);
+            }
+        }
+    }
+    // --- 隨機事件結束 ---
 
 
     if (story && (story.includes('黑影') || story.includes('影子'))) {
@@ -95,12 +122,21 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     }
     for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
 
+    // 【核心新增】整合隨機事件的影響
+    const finalPC = randomEvent ? `${PC} ${eventEffects.PC || ''}`.trim() : PC;
+    const finalPowerChange = {
+        internal: (powerChange.internal || 0) + (eventEffects.powerChange?.internal || 0),
+        external: (powerChange.external || 0) + (eventEffects.powerChange?.external || 0),
+        lightness: (powerChange.lightness || 0) + (eventEffects.powerChange?.lightness || 0),
+    };
+    const finalMoralityChange = (moralityChange || 0) + (eventEffects.moralityChange || 0);
+
     const finalSaveData = { 
         story: finalStory, R: newRoundNumber, timeOfDay: finalTimeOfDay, 
         year: finalDate.year, month: finalDate.month, day: finalDate.day, yearName: finalDate.yearName,
-        stamina: newStamina, playerState, powerChange, moralityChange, moneyChange, 
+        stamina: newStamina, playerState, powerChange: finalPowerChange, moralityChange: finalMoralityChange, moneyChange, 
         itemChanges, skillChanges, romanceChanges, npcUpdates, locationUpdates,
-        ATM, EVT, LOC, PSY, PC, NPC, QST, WRD, LOR, CLS, IMP
+        ATM, EVT, LOC, PSY, PC: finalPC, NPC, QST, WRD, LOR, CLS, IMP
     };
 
     const newSaveRef = userDocRef.collection('game_saves').doc(`R${newRoundNumber}`);
@@ -123,9 +159,9 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         await processLocationUpdates(userId, finalSaveData.LOC[0], locationUpdates);
     }
 
-    const newInternalPower = (player.internalPower || 0) + (powerChange?.internal || 0);
-    const newExternalPower = (player.externalPower || 0) + (powerChange?.external || 0);
-    const newLightnessPower = (player.lightness || 0) + (powerChange?.lightness || 0);
+    const newInternalPower = (player.internalPower || 0) + (finalPowerChange?.internal || 0);
+    const newExternalPower = (player.externalPower || 0) + (finalPowerChange?.external || 0);
+    const newLightnessPower = (player.lightness || 0) + (finalPowerChange?.lightness || 0);
 
     const playerUpdatesForDb = {
         timeOfDay: finalTimeOfDay,
@@ -142,7 +178,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         maxInternalPowerAchieved: Math.max(player.maxInternalPowerAchieved || 0, newInternalPower),
         maxExternalPowerAchieved: Math.max(player.maxExternalPowerAchieved || 0, newExternalPower),
         maxLightnessAchieved: Math.max(player.maxLightnessAchieved || 0, newLightnessPower),
-        morality: admin.firestore.FieldValue.increment(Number(moralityChange || 0)),
+        morality: admin.firestore.FieldValue.increment(Number(finalMoralityChange || 0)),
         R: newRoundNumber
     };
     batch.update(userDocRef, playerUpdatesForDb);
@@ -174,7 +210,8 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         ...finalSaveData, 
         skills: updatedSkills, 
         inventory: fullInventory, 
-        bulkScore: calculateBulkScore(fullInventory)
+        bulkScore: calculateBulkScore(fullInventory),
+        randomEvent: randomEvent // 【核心新增】將生成的隨機事件一起回傳給前端
     };
     
     return finalRoundDataForClient;
