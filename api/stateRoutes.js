@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause, getAIForgetSkillStory } = require('../services/aiService');
-const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); // 【修正】移除不存在的 getInventoryState
+const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); 
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
 const inventoryModel = require('./models/inventoryModel');
 
@@ -17,12 +17,14 @@ router.post('/forget-skill', async (req, res) => {
     if (!skillName) {
         return res.status(400).json({ success: false, message: '未提供要廢除的武功名稱。' });
     }
-    // 【新增】防止玩家刪除唯一的初始技能
     if (skillName === '現代搏擊') {
         return res.status(403).json({ success: false, message: '這是你穿越時帶來的唯一印記，無法被遺忘。' });
     }
 
     try {
+        // 【核心修改】在此處加入後端日誌記錄
+        console.log(`[玩家操作日誌] 玩家 ${username} (ID: ${userId}) 開始自廢武功: 「${skillName}」。`);
+
         const userRef = db.collection('users').doc(userId);
         const skillRef = userRef.collection('skills').doc(skillName);
         const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
@@ -39,7 +41,7 @@ router.post('/forget-skill', async (req, res) => {
             ...playerProfile,
             username: username,
             currentLocation: lastRoundData.LOC,
-            NPC: lastRoundData.NPC || []
+            NPC: lastRoundData.NPC || [] 
         };
 
         const story = await getAIForgetSkillStory(playerProfile.preferredModel, profileForPrompt, skillName);
@@ -48,10 +50,8 @@ router.post('/forget-skill', async (req, res) => {
 
         batch.delete(skillRef);
 
-        // 只有在 skillType 有效時才處理自創技能計數
         if (skillType && ['internal', 'external', 'lightness', 'none'].includes(skillType)) {
             const fieldToDecrement = `customSkillsCreated.${skillType}`;
-            // 確保欄位存在才進行操作
             if (playerProfile.customSkillsCreated && typeof playerProfile.customSkillsCreated[skillType] === 'number') {
                 batch.update(userRef, {
                     [fieldToDecrement]: admin.firestore.FieldValue.increment(-1)
@@ -63,7 +63,6 @@ router.post('/forget-skill', async (req, res) => {
 
         const newRoundNumber = lastRoundData.R + 1;
         
-        // 【修正】使用正確的函式獲取最新的玩家狀態
         const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
             getRawInventory(userId),
             getPlayerSkills(userId),
@@ -77,7 +76,6 @@ router.post('/forget-skill', async (req, res) => {
             story: story,
             PC: `你廢除了「${skillName}」，感覺體內一陣空虛，但也為新的可能性騰出了空間。`,
             EVT: `自廢武功「${skillName}」`,
-            // 更新狀態
             ...finalPlayerProfile,
             inventory: fullInventory,
             skills: updatedSkills,
