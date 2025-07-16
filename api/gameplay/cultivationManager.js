@@ -7,15 +7,6 @@ const { getAICultivationResult } = require('../../services/aiService');
 const { processItemChanges } = require('../itemManager');
 
 /**
- * 【核心修正】移除舊的、有問題的文字解析函式
- */
-/*
-function parseCultivationDays(playerAction) {
-    // ... old code removed ...
-}
-*/
-
-/**
  * 【輔助】從玩家指令和已學技能中，找出要修練的目標
  * @param {string} playerAction - 玩家的原始指令
  * @param {Array<object>} playerSkills - 玩家已學會的技能列表
@@ -35,7 +26,7 @@ function findSkillToPractice(playerAction, playerSkills) {
 
 
 /**
- * 【核心】處理閉關修練請求的總控制器 v2.4
+ * 【核心】處理閉關修練請求的總控制器 v2.5
  * @param {string} userId - 玩家ID
  * @param {string} username - 玩家名稱
  * @param {object} playerProfile - 當前的玩家完整檔案
@@ -44,7 +35,7 @@ function findSkillToPractice(playerAction, playerSkills) {
  * @returns {Promise<{success: boolean, message: string, data: object|null}>}
  */
 async function handleCultivation(userId, username, playerProfile, skillToPracticeName, days) {
-    console.log(`[閉關系統 v2.4] 玩家 ${username} 請求閉關修練「${skillToPracticeName}」，時長 ${days} 天。`);
+    console.log(`[閉關系統 v2.5] 玩家 ${username} 請求閉關修練「${skillToPracticeName}」，時長 ${days} 天。`);
 
     // --- 1. 武學有效性判斷 ---
     const playerSkills = await getPlayerSkills(userId);
@@ -94,7 +85,7 @@ async function handleCultivation(userId, username, playerProfile, skillToPractic
     const { outcome, expChange, powerChange, storyHint } = calculateCultivationOutcome(days, playerProfile, skillToPractice);
     console.log(`[閉關系統] 預計算結果: ${outcome}, 經驗變化: ${expChange}, 功力變化:`, powerChange);
     
-    // --- 5. AI生成故事 ---
+    // --- 5. 【核心修正】修正AI呼叫的參數順序 ---
     const cultivationStory = await getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint);
 
     // --- 6. 構造新回合數據 ---
