@@ -5,7 +5,6 @@ const admin = require('firebase-admin');
 const { getAIEncyclopedia, getRelationGraph, getAIPrequel, getAISuggestion, getAIDeathCause, getAIForgetSkillStory } = require('../services/aiService');
 const { getPlayerSkills, getRawInventory, calculateBulkScore } = require('./playerStateHelpers'); 
 const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = require('./worldStateHelpers');
-const inventoryModel = require('./models/inventoryModel');
 
 const db = admin.firestore();
 
@@ -22,11 +21,17 @@ router.post('/forget-skill', async (req, res) => {
     }
 
     try {
-        // 【核心修改】在此處加入後端日誌記錄
-        console.log(`[玩家操作日誌] 玩家 ${username} (ID: ${userId}) 開始自廢武功: 「${skillName}」。`);
+        console.log(`[自廢武功] 玩家 ${username} (ID: ${userId}) 請求廢除武功: 「${skillName}」。`);
 
         const userRef = db.collection('users').doc(userId);
         const skillRef = userRef.collection('skills').doc(skillName);
+        const skillDoc = await skillRef.get();
+
+        if (!skillDoc.exists) {
+            console.warn(`[自廢武功] 警告：玩家 ${username} 試圖廢除一個不存在的武學「${skillName}」。`);
+            return res.status(404).json({ success: false, message: `你並未學會「${skillName}」。` });
+        }
+        
         const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
         const playerProfileSnapshot = await userRef.get();
 
@@ -48,18 +53,25 @@ router.post('/forget-skill', async (req, res) => {
 
         const batch = db.batch();
 
+        // 【核心修正】只刪除單一武學文件
         batch.delete(skillRef);
+        console.log(`[自廢武功] 已將玩家 ${username} 的單一武學「${skillName}」加入刪除佇列。`);
 
+
+        // 只有在 skillType 有效時才處理自創技能計數
         if (skillType && ['internal', 'external', 'lightness', 'none'].includes(skillType)) {
             const fieldToDecrement = `customSkillsCreated.${skillType}`;
-            if (playerProfile.customSkillsCreated && typeof playerProfile.customSkillsCreated[skillType] === 'number') {
+            if (playerProfile.customSkillsCreated && typeof playerProfile.customSkillsCreated[skillType] === 'number' && playerProfile.customSkillsCreated[skillType] > 0) {
                 batch.update(userRef, {
                     [fieldToDecrement]: admin.firestore.FieldValue.increment(-1)
                 });
+                console.log(`[自廢武功] 已將玩家 ${username} 的「${fieldToDecrement}」欄位計數減一。`);
             }
         }
         
         await batch.commit();
+        console.log(`[自廢武功] 玩家 ${username} 的武學「${skillName}」已成功從資料庫中刪除。`);
+
 
         const newRoundNumber = lastRoundData.R + 1;
         
