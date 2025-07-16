@@ -2,6 +2,8 @@
 import { api } from './api.js';
 import { initializeTrade, closeTradeUI } from './tradeManager.js';
 import { dom } from './dom.js';
+// 【核心新增】從主循環中引入處理新回合資料的函式
+import { processNewRoundData } from './gameLoop.js';
 
 // --- 處理自廢武功的函式 ---
 async function handleForgetSkill(skillName, skillType) {
@@ -12,27 +14,33 @@ async function handleForgetSkill(skillName, skillType) {
         return;
     }
 
-    // 顯示載入中...
-    const skillsModalBody = document.getElementById('skills-body-container');
-    if (skillsModalBody) {
-        skillsModalBody.innerHTML = '<p class="system-message">正在散去功力，請稍候...</p>';
-    }
+    closeSkillsModal(); // 先關閉彈窗
+    const gameLoop = await import('./gameLoop.js'); // 動態引入以避免循環依賴
+    gameLoop.setLoading(true, '正在散去功力，重塑經脈...');
 
     try {
         const result = await api.forgetSkill({ skillName: skillName, skillType: skillType });
-        alert(result.message); // 顯示成功訊息
-        closeSkillsModal(); // 關閉彈窗
-        // 你可以選擇在這裡觸發一個遊戲狀態的重新整理
-        // 例如：location.reload();
+        
+        // 【核心修改】檢查回傳結果，並調用主循環的函式來處理新回合
+        if (result.success && result.roundData) {
+            processNewRoundData(result);
+        } else {
+            throw new Error(result.message || '廢功失敗，但未收到明確原因。');
+        }
+
     } catch (error) {
         console.error('自廢武功失敗:', error);
         alert(`操作失敗：${error.message}`);
-        // 失敗後重新打開技能列表
-        const skills = await api.getSkills();
-        openSkillsModal(skills);
+    } finally {
+        const gameLoop = await import('./gameLoop.js');
+        // 確保在任何情況下都能關閉載入動畫
+        if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
+            gameLoop.setLoading(false);
+        }
     }
 }
 
+// ... (其餘程式碼保持不變) ...
 
 // --- 交易系統函式 ---
 export function openTradeModal(tradeData, npcName, onTradeComplete, closeCallback) {
@@ -422,7 +430,6 @@ export function openSkillsModal(skillsData) {
             const translatedPowerType = powerTypeMap[skill.power_type] || '無';
 
             const customTagHtml = skill.isCustom ? '<span class="skill-custom-tag">自創</span>' : '';
-            // 【核心修改】移除按鈕中的文字，並加上 title 屬性
             const forgetButtonHtml = skill.isCustom ? `<button class="skill-forget-btn" title="自廢武功" data-skill-name="${skill.skillName}" data-skill-type="${skill.power_type}"><i class="fas fa-trash-alt"></i></button>` : '';
 
             const skillEntry = document.createElement('div');
@@ -466,7 +473,6 @@ export function openSkillsModal(skillsData) {
         }
     };
     
-    // 【核心新增】為所有自廢武功按鈕綁定事件
     skillsBodyContainer.querySelectorAll('.skill-forget-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             const skillName = e.currentTarget.dataset.skillName;
