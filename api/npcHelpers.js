@@ -2,15 +2,12 @@
 const admin = require('firebase-admin');
 const { getAIPerNpcSummary, getRomanceEventPrompt, callAI, aiConfig } = require('../services/aiService');
 const { createNewNpc } = require('../services/npcCreationService');
+// 【核心修改】引入快取管理器
+const { getKnownNpcTemplate } = require('./cacheManager');
 
 const db = admin.firestore();
 
-/**
- * 更新指定NPC的個人記憶摘要
- * @param {string} userId - 玩家ID
- * @param {string} npcName - 要更新記憶的NPC名稱
- * @param {string} interactionData - 本次互動的文字摘要
- */
+// ... (getFriendlinessLevel 和 updateNpcMemoryAfterInteraction 保持不變) ...
 async function updateNpcMemoryAfterInteraction(userId, npcName, interactionData) {
     if (!userId || !npcName || !interactionData) {
         console.warn(`[NPC記憶系統] 因缺少必要參數，跳過為 ${npcName} 的記憶更新。`);
@@ -48,10 +45,10 @@ function getFriendlinessLevel(value) {
     return 'neutral';
 }
 
+
 /**
- * 【核心修正 v3.0 - 最終版】
- * 獲取NPC的合併檔案。此函式現在嚴格遵守「只讀」原則。
- * 當通用模板不存在時，直接返回 null，將創建的責任完全交給 createNewNpc。
+ * 【核心優化 v4.0 - 快取優先】
+ * 獲取NPC的合併檔案。此函式現在優先從快取讀取通用模板，大幅減少資料庫讀取。
  * @param {string} userId - 玩家ID
  * @param {string} npcName - NPC姓名
  * @returns {Promise<object|null>} - 返回合併後的NPC檔案，或在找不到模板時返回null
@@ -63,27 +60,25 @@ async function getMergedNpcProfile(userId, npcName) {
     }
 
     try {
-        const npcTemplateRef = db.collection('npcs').doc(npcName);
-        const npcTemplateDoc = await npcTemplateRef.get();
+        // 1. 【優化】直接從快取中獲取通用模板
+        const baseProfile = getKnownNpcTemplate(npcName);
 
-        // 如果通用模板不存在，直接返回 null，不執行任何寫入操作。
-        if (!npcTemplateDoc.exists) {
-            console.log(`[NPC助手] 偵測到NPC「${npcName}」的通用模板不存在，將等待主流程創建。`);
+        if (!baseProfile) {
+            console.log(`[NPC助手-快取未命中] NPC「${npcName}」的通用模板不在快取中，將等待主流程創建。`);
+            // 這裡可以選擇是返回null讓主流程處理，還是觸發一次資料庫回查。為了效能，我們先返回null。
             return null;
         }
         
-        const baseProfile = npcTemplateDoc.data();
-
-        // 繼續獲取玩家專屬狀態
+        // 2. 只需讀取玩家專屬的狀態
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
         const npcStateDoc = await npcStateRef.get();
 
         if (npcStateDoc.exists) {
             const userSpecificState = npcStateDoc.data();
-            // 合併檔案，並確保 name 欄位來自通用模板
+            // 合併模板與玩家狀態
             return { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
         } else {
-            // 玩家雖然還沒有與他互動的紀錄，但通用模板存在，直接返回通用模板
+            // 玩家還沒有與他互動的紀錄，但通用模板存在，直接返回通用模板
             return { ...baseProfile, name: baseProfile.name || npcName };
         }
 
@@ -94,6 +89,7 @@ async function getMergedNpcProfile(userId, npcName) {
 }
 
 
+// ... (其餘函式 updateFriendlinessValues, updateRomanceValues, checkAndTriggerRomanceEvent, processNpcUpdates 保持不變) ...
 async function updateFriendlinessValues(userId, username, npcChanges, roundData, playerProfile, batch) {
     if (!npcChanges || npcChanges.length === 0) return;
 
@@ -222,6 +218,7 @@ async function processNpcUpdates(userId, updates) {
         console.error(`[NPC檔案更新] 為玩家 ${userId} 更新NPC檔案時發生錯誤:`, error);
     }
 }
+
 
 module.exports = {
     getFriendlinessLevel,
