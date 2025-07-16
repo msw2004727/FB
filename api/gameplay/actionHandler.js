@@ -1,18 +1,9 @@
 // /api/gameplay/actionHandler.js
 const { buildContext } = require('../contextBuilder');
-const { getAIStory, getAISuggestion } = require('../../services/aiService');
+const { getAIStory, getAISuggestion, getAIActionClassification } = require('../../services/aiService'); // 引入分類器
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
-// 【核心修改】移除閉關管理器的引用
-// const { handleCultivation } = require('./cultivationManager'); 
-
-// 【核心修改】移除舊的閉關指令判斷函式
-/*
-function isCultivationAttempt(action) {
-    const keywords = ['閉關', '靜修', '修行', '修練', '練習'];
-    return keywords.some(kw => action.includes(kw));
-}
-*/
+const { initiateCombat } = require('./combatManager'); // 【核心新增】引入新的戰鬥管理器
 
 const preprocessPlayerAction = (playerAction, locationContext) => {
     const facilityKeywords = {
@@ -54,11 +45,35 @@ async function handleAction(req, res, player, newRoundNumber) {
             throw new Error("無法建立當前的遊戲狀態，請稍後再試。");
         }
         
-        // --- 【核心修改】舊的閉關指令攔截邏輯已完全移除 ---
+        const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame, player: playerContext } = context;
+
+        // 【核心修改】先進行動作分類
+        const classificationContext = {
+            location: locationContext?.locationName,
+            npcs: Object.keys(npcContext),
+            skills: playerContext.skills.map(s => s.skillName)
+        };
+        const classification = await getAIActionClassification(playerModelChoice, playerAction, classificationContext);
+        console.log(`[AI總導演] 玩家行動「${playerAction}」被分類為: ${classification.actionType}`);
         
-        playerAction = preprocessPlayerAction(playerAction, context.locationContext);
+        // 【核心修改】如果分類為戰鬥，則直接啟動戰鬥流程
+        if (classification.actionType === 'COMBAT_ATTACK' && classification.details.target) {
+            try {
+                const initialState = await initiateCombat(userId, username, classification.details.target, classification.details.intention || '打死');
+                return res.json({
+                    combatInfo: {
+                        status: 'COMBAT_START',
+                        initialState: initialState,
+                    }
+                });
+            } catch(combatError) {
+                // 如果戰鬥發起失敗（例如目標不在場），則將錯誤轉化為故事
+                playerAction = `我本想攻擊${classification.details.target}，但發現${combatError.message}`;
+                console.log(`[戰鬥發起失敗] 自動將行動轉化為故事: ${playerAction}`);
+            }
+        }
         
-        const { longTermSummary, recentHistory, locationContext, npcContext, bulkScore, isNewGame } = context;
+        playerAction = preprocessPlayerAction(playerAction, locationContext);
         
         if (isNewGame) {
             return res.status(404).json({ message: '找不到存檔紀錄。' });
