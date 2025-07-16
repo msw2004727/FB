@@ -49,6 +49,31 @@ export function setLoading(isLoading, text = '') {
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
+            // 【核心修改】優先顯示上一回合的內心獨白
+            if (gameState.roundData && gameState.roundData.PSY) {
+                if (loaderDisclaimerElement) {
+                    // 使用 <pre> 標籤保留可能的格式，並用<em>使其更突出
+                    loaderDisclaimerElement.innerHTML = `【前情回憶】<em>「${gameState.roundData.PSY}」</em>`;
+                }
+                // 如果顯示了PSY，則不啟動隨機提示的計時器
+                if (disclaimerInterval) {
+                    clearInterval(disclaimerInterval);
+                    disclaimerInterval = null;
+                }
+            } else {
+                // 如果沒有PSY，則退回原來的隨機提示邏輯
+                const rotateDisclaimer = () => {
+                    if (loadingDisclaimers.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
+                        if(loaderDisclaimerElement) {
+                            loaderDisclaimerElement.innerHTML = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
+                        }
+                    }
+                };
+                rotateDisclaimer();
+                disclaimerInterval = setInterval(rotateDisclaimer, 10000);
+            }
+
             const rotateTip = () => {
                 if (gameTips.length > 0) {
                     const randomIndex = Math.floor(Math.random() * gameTips.length);
@@ -60,20 +85,12 @@ export function setLoading(isLoading, text = '') {
             rotateTip();
             tipInterval = setInterval(rotateTip, 10000);
 
-            const rotateDisclaimer = () => {
-                if (loadingDisclaimers.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
-                    if(loaderDisclaimerElement) {
-                        loaderDisclaimerElement.innerHTML = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
-                    }
-                }
-            };
-            rotateDisclaimer();
-            disclaimerInterval = setInterval(rotateDisclaimer, 10000);
-
         } else {
             clearInterval(tipInterval);
-            clearInterval(disclaimerInterval);
+            if(disclaimerInterval) {
+                 clearInterval(disclaimerInterval);
+                 disclaimerInterval = null;
+            }
         }
         dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }
@@ -151,7 +168,7 @@ export function processNewRoundData(data) {
 
     if (data.locationData) {
         gameState.currentLocationData = data.locationData;
-        console.log('【遊戲狀態】已更新當前地區的詳細情報:', gameState.currentLocationData);
+        console.log('【遊戲狀態】已更新當前地區的詳細情报:', gameState.currentLocationData);
     }
 
     updateUI(data.story, data.roundData, data.randomEvent, data.locationData);
