@@ -187,14 +187,17 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     await batch.commit();
     console.log(`[數據同步] 玩家主檔案與長期記憶已同步至 R${newRoundNumber}。`);
 
+    // --- 【核心修改】將背景任務改為前景任務，並傳遞當前回合數據 ---
     if (NPC && Array.isArray(NPC)) {
         NPC.filter(npc => npc.status).forEach(npc => {
             const interactionContext = `事件：「${EVT}」。\n經過：${story}\n我在事件中的狀態是：「${npc.status}」。`;
             updateNpcMemoryAfterInteraction(userId, npc.name, interactionContext).catch(err => console.error(`[背景任務] 更新NPC ${npc.name} 記憶時出錯:`, err));
         });
     }
-    invalidateNovelCache(userId).catch(e => console.error("背景任務失敗: 無效化小說快取", e));
-    updateLibraryNovel(userId, username).catch(e => console.error("背景任務失敗: 更新圖書館", e));
+    await invalidateNovelCache(userId);
+    // 直接將新生成的回合數據傳遞給圖書館更新函式，避免重複讀取
+    await updateLibraryNovel(userId, username, finalSaveData);
+    // --- 修改結束 ---
 
     const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
         getRawInventory(userId),
