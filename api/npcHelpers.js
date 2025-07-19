@@ -60,12 +60,11 @@ async function getMergedNpcProfile(userId, npcName) {
     }
 
     try {
-        // 1. 【優化】直接從快取中獲取通用模板
-        const baseProfile = getKnownNpcTemplate(npcName);
+        // 1. 【核心修改】從同步改為異步獲取，加上 await
+        const baseProfile = await getKnownNpcTemplate(npcName);
 
         if (!baseProfile) {
             console.log(`[NPC助手-快取未命中] NPC「${npcName}」的通用模板不在快取中，將等待主流程創建。`);
-            // 這裡可以選擇是返回null讓主流程處理，還是觸發一次資料庫回查。為了效能，我們先返回null。
             return null;
         }
         
