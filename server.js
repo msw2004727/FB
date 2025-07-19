@@ -3,9 +3,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
-const cacheManager = require('./api/cacheManager');
 
-// --- Firebase 初始化 ---
+// --- 【核心修正】Firebase 初始化區塊提前 ---
+// 確保在載入任何其他使用Firebase的自訂模組前，Firebase App已被初始化
 try {
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!serviceAccountString) {
@@ -24,6 +24,20 @@ try {
     console.error("Firebase 初始化失敗:", error.message);
     process.exit(1);
 }
+
+// --- 現在可以安全地載入其他模組 ---
+const cacheManager = require('./api/cacheManager');
+const authMiddleware = require('./middleware/auth');
+const authRoutes = require('./api/authRoutes');
+const gameRoutes = require('./api/gameRoutes');
+const libraryRoutes = require('./api/libraryRoutes');
+const epilogueRoutes = require('./api/epilogue.js');
+const bountyRoutes = require('./api/bountyRoutes');
+const gmRoutes = require('./api/gmRoutes');
+const mapRoutes = require('./api/mapRoutes');
+const adminRoutes = require('./api/admin/adminRoutes');
+const beggarRoutes = require('./api/beggarRoutes');
+const inventoryRoutes = require('./api/inventoryRoutes');
 
 // Express App 設定
 const app = express();
@@ -54,20 +68,6 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
-// --- 載入 API 路由 ---
-const authMiddleware = require('./middleware/auth');
-const authRoutes = require('./api/authRoutes');
-const gameRoutes = require('./api/gameRoutes');
-const libraryRoutes = require('./api/libraryRoutes');
-const epilogueRoutes = require('./api/epilogue.js');
-const bountyRoutes = require('./api/bountyRoutes');
-const gmRoutes = require('./api/gmRoutes');
-const mapRoutes = require('./api/mapRoutes');
-const adminRoutes = require('./api/admin/adminRoutes');
-const beggarRoutes = require('./api/beggarRoutes');
-// 【核心修正】引入我們新的背包路由
-const inventoryRoutes = require('./api/inventoryRoutes');
-
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
 app.use('/api/game', gameRoutes);
@@ -78,7 +78,6 @@ app.use('/api/gm', gmRoutes);
 app.use('/api/map', authMiddleware, mapRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/beggar', beggarRoutes);
-// 【核心修正】掛載背包路由
 app.use('/api/inventory', inventoryRoutes);
 
 // 根目錄健康檢查
