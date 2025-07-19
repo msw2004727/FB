@@ -164,81 +164,106 @@ router.post('/repair-relationships', async (req, res) => {
 });
 
 
-// --- 黑戶與汙染模板一鍵回填功能 ---
-const isNpcTainted = (data) => { if (!data) return true; const markers = ["生成中", "不詳"]; return markers.some(m => (data.appearance || '').includes(m) || (data.background || '').includes(m) || (Array.isArray(data.personality) && data.personality.some(p => (p || '').includes(m)))); };
-const rebuildBlackHouseholds = (playerSubCollection, rootCollection, createTemplateFunc, isTaintedFunc = () => false) => async (req, res) => {
-    res.status(202).json({ message: `任務已接收！${rootCollection} 的全局模板回填任務正在後台執行中。請查看Render後台日誌以獲取詳細進度。` });
+// --- 【核心修改】將黑戶修復功能從自動改為手動，並加入存檔回寫邏輯 ---
+const repairPlayerBlackHouseholds = (playerSubCollection, rootCollection, createTemplateFunc, isTaintedFunc = () => false) => async (req, res) => {
+    const { playerId } = req.body;
+    if (!playerId) {
+        return res.status(400).json({ message: '必須提供玩家ID。' });
+    }
+    
+    res.status(202).json({ message: `任務已接收！正在為玩家 ${playerId.substring(0,8)}... 在後台修復 ${rootCollection} 的黑戶與汙染模板。請查看Render後台日誌以獲取詳細進度。` });
+    
     (async () => {
-        console.log(`[模板回填系統 v3.0] 開始執行 ${rootCollection} 的全局模板回填任務...`);
+        console.log(`[模板修復系統 v4.0] 開始為玩家 ${playerId} 執行 ${rootCollection} 的修復任務...`);
         try {
-            const usersSnapshot = await db.collection('users').get();
-            const allMentionedIds = new Set();
-            const allPlayerSubDocs = [];
-            for (const userDoc of usersSnapshot.docs) {
-                const subSnapshot = await userDoc.ref.collection(playerSubCollection).get();
-                subSnapshot.forEach(subDoc => {
-                    const id = rootCollection === 'items' ? subDoc.data().templateId : subDoc.id;
-                    if(id) {
-                        allMentionedIds.add(id);
-                        allPlayerSubDocs.push({ userId: userDoc.id, username: userDoc.data().username, playerData: userDoc.data(), docId: id });
+            const userDocRef = db.collection('users').doc(playerId);
+            const userDoc = await userDocRef.get();
+            if (!userDoc.exists) {
+                console.error(`[模板修復系統 v4.0] 錯誤：找不到玩家 ${playerId}。`);
+                return;
+            }
+            const userData = userDoc.data();
+            const username = userData.username;
+
+            const allSavesSnapshot = await userDocRef.collection('game_saves').orderBy('R', 'asc').get();
+            const allSavesDocs = allSavesSnapshot.docs;
+
+            const mentionedIds = new Set();
+            allSavesDocs.forEach(doc => {
+                const roundData = doc.data();
+                if (roundData.NPC && Array.isArray(roundData.NPC)) {
+                    roundData.NPC.forEach(npc => { if (npc.name) mentionedIds.add(npc.name); });
+                }
+            });
+
+            const householdsToRebuild = new Map(); // 使用Map來儲存黑戶名和初見回合
+            for (const id of mentionedIds) {
+                const templateDoc = await db.collection(rootCollection).doc(id).get();
+                if (!templateDoc.exists || isTaintedFunc(templateDoc.data())) {
+                    const firstMentionRound = allSavesDocs.map(d=>d.data()).find(round => round.NPC?.some(npc => npc.name === id));
+                    if (firstMentionRound) {
+                        householdsToRebuild.set(id, firstMentionRound);
                     }
-                });
-            }
-            const householdsToRebuild = new Set();
-            const mentionedIdsArray = Array.from(allMentionedIds);
-            const rootDocs = new Map();
-            for (let i = 0; i < mentionedIdsArray.length; i += 30) {
-                const chunk = mentionedIdsArray.slice(i, i + 30);
-                if (chunk.length > 0) {
-                    const rootSnapshot = await db.collection(rootCollection).where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-                    rootSnapshot.forEach(doc => rootDocs.set(doc.id, doc.data()));
                 }
             }
-            for (const id of allMentionedIds) {
-                const templateData = rootDocs.get(id);
-                if (!templateData || isTaintedFunc(templateData)) {
-                    householdsToRebuild.add(id);
-                }
-            }
-            if (householdsToRebuild.size === 0) { console.log(`[模板回填系統 v3.0] 數據庫健康，未發現任何 ${rootCollection} 黑戶或汙染模板。`); return; }
-            console.log(`[模板回填系統 v3.0] 發現 ${householdsToRebuild.size} 個黑戶或汙染 ${rootCollection} 模板，開始重建...`);
+
+            if (householdsToRebuild.size === 0) { console.log(`[模板修復系統 v4.0] 玩家 ${username} 的數據健康，未發現任何 ${rootCollection} 黑戶或汙染模板。`); return; }
+            
+            console.log(`[模板修復系統 v4.0] 發現 ${householdsToRebuild.size} 個黑戶或汙染 ${rootCollection} 模板，開始重建與回寫...`);
+            
             let successCount = 0, failCount = 0;
-            for (const id of householdsToRebuild) {
+            const batch = db.batch();
+
+            for (const [genericName, firstMentionRound] of householdsToRebuild.entries()) {
                 try {
-                    const contextInfo = allPlayerSubDocs.find(p => p.docId === id);
-                    if (contextInfo) {
-                        await createTemplateFunc(contextInfo);
+                    const generationResult = await generateNpcTemplateData(username, { name: genericName }, firstMentionRound, userData);
+                    if (generationResult && generationResult.canonicalName && generationResult.templateData) {
+                        const { canonicalName, templateData } = generationResult;
+                        
+                        // 1. 創建新的、帶有唯一姓名的模板
+                        await db.collection(rootCollection).doc(canonicalName).set(templateData, { merge: true });
+
+                        // 2. 【關鍵】遍歷所有存檔，將舊的通用名替換為新的正式名
+                        allSavesDocs.forEach(doc => {
+                            const roundData = doc.data();
+                            let updated = false;
+                            if (roundData.NPC && Array.isArray(roundData.NPC)) {
+                                roundData.NPC.forEach(npc => {
+                                    if (npc.name === genericName) {
+                                        npc.name = canonicalName;
+                                        updated = true;
+                                    }
+                                });
+                            }
+                            if (updated) {
+                                batch.update(doc.ref, { NPC: roundData.NPC });
+                            }
+                        });
+
                         successCount++;
-                         console.log(`[模板回填系統 v3.0] 成功重建 ${rootCollection} 模板: ${id}`);
-                    } else {
-                        if (['items', 'skills'].includes(rootCollection)) {
-                            await createTemplateFunc({ docId: id });
-                            successCount++;
-                            console.log(`[模板回填系統 v3.0] 成功重建 ${rootCollection} 模板 (無上下文): ${id}`);
-                        } else {
-                            failCount++;
-                            console.warn(`[模板回填系統 v3.0] 找不到 ${id} 的玩家上下文，跳過重建。`);
-                        }
-                    }
+                        console.log(`[模板修復系統 v4.0] 成功將「${genericName}」修復為「${canonicalName}」，並準備回寫存檔。`);
+                    } else { throw new Error('AI生成NPC失敗'); }
                 } catch (error) {
-                    console.error(`[模板回填系統 v3.0] 重建 ${rootCollection} 模板 "${id}" 時失敗:`, error.message);
+                    console.error(`[模板修復系統 v4.0] 重建模板 "${genericName}" 時失敗:`, error.message);
                     failCount++;
                 }
             }
-            console.log(`[模板回填系統 v3.0] 任務完成！共發現 ${householdsToRebuild.size} 個待辦模板。成功重建 ${successCount} 個，失敗 ${failCount} 個。`);
-        } catch (error) {
-            console.error(`[模板回填系統 v3.0] 執行 ${rootCollection} 全局回填任務時發生嚴重錯誤:`, error);
-        }
-    })().catch(err => console.error(`[模板回填系統 v3.0] 背景任務執行失敗:`, err));
-};
-const createNpcTemplate = async ({ userId, username, playerData, docId }) => { const allSavesSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'asc').get(); const firstMentionRound = allSavesSnapshot.docs.map(d=>d.data()).find(round => round.NPC?.some(npc => npc.name === docId)); if (firstMentionRound) { const generationResult = await generateNpcTemplateData(username, { name: docId }, firstMentionRound, playerData); if (generationResult && generationResult.templateData) { await db.collection('npcs').doc(generationResult.canonicalName).set(generationResult.templateData, { merge: true }); } else { throw new Error('AI生成NPC失敗'); } } else { throw new Error('找不到NPC初見情境'); } };
-const createItemTemplate = async ({ docId }) => { await getOrGenerateItemTemplate(docId, {}); };
-const createSkillTemplate = async ({ docId }) => { await getOrGenerateSkillTemplate(docId); };
-const createLocationTemplate = async ({ userId, docId }) => { const summaryDoc = await db.collection('users').doc(userId).collection('game_state').doc('summary').get(); const worldSummary = summaryDoc.exists ? summaryDoc.data().text : '江湖軼事無可考。'; await generateAndCacheLocation(userId, docId, '未知', worldSummary); };
+            
+            await batch.commit();
+            console.log(`[模板修復系統 v4.0] 任務完成！共發現 ${householdsToRebuild.size} 個待辦模板。成功重建 ${successCount} 個，失敗 ${failCount} 個。所有相關存檔已更新。`);
 
-router.post('/rebuild-npc-templates', rebuildBlackHouseholds('npc_states', 'npcs', createNpcTemplate, isNpcTainted));
-router.post('/rebuild-item-templates', rebuildBlackHouseholds('inventory_items', 'items', createItemTemplate));
-router.post('/rebuild-skill-templates', rebuildBlackHouseholds('skills', 'skills', createSkillTemplate));
-router.post('/rebuild-location-templates', rebuildBlackHouseholds('location_states', 'locations', createLocationTemplate));
+        } catch (error) {
+            console.error(`[模板修復系統 v4.0] 執行 ${rootCollection} 修復任務時發生嚴重錯誤:`, error);
+        }
+    })().catch(err => console.error(`[模板修復系統 v4.0] 背景任務執行失敗:`, err));
+};
+
+// --- 【新】手動修復路由 ---
+router.post('/rebuild-player-npcs', repairPlayerBlackHouseholds('npc_states', 'npcs', null, (data) => {
+    if (!data) return true;
+    const markers = ["生成中", "不詳"];
+    return markers.some(m => (data.appearance || '').includes(m) || (data.background || '').includes(m));
+}));
+
 
 module.exports = router;
