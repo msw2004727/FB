@@ -139,9 +139,10 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: '姓名或密碼錯誤。' });
         }
         
-        runDataHealthCheck(userId, username).catch(err => {
-            console.error(`[背景健康檢查] 為玩家 ${username} 執行時發生錯誤:`, err);
-        });
+        // 【核心修改】註解掉此行，取消登入時的健康檢查
+        // runDataHealthCheck(userId, username).catch(err => {
+        //     console.error(`[背景健康檢查] 為玩家 ${username} 執行時發生錯誤:`, err);
+        // });
         
         const token = jwt.sign(
             { userId: userId, username: userData.username },
