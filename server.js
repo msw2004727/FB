@@ -22,7 +22,7 @@ try {
     console.log("Firebase 初始化成功！");
 } catch (error) {
     console.error("Firebase 初始化失敗:", error.message);
-    process.exit(1); 
+    process.exit(1);
 }
 
 // Express App 設定
@@ -31,9 +31,9 @@ const PORT = process.env.PORT || 3001;
 
 // --- CORS 配置 ---
 const allowedOrigins = [
-    'https://msw2004727.github.io', 
-    'http://localhost:5500', 
-    'http://127.0.0.1:5500'  
+    'https://msw2004727.github.io',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500'
 ];
 
 const corsOptions = {
@@ -44,8 +44,8 @@ const corsOptions = {
       callback(new Error('此來源不被CORS策略允許'));
     }
   },
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE", 
-  credentials: true, 
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
   optionsSuccessStatus: 204
 };
 
@@ -66,7 +66,7 @@ const mapRoutes = require('./api/mapRoutes');
 const adminRoutes = require('./api/admin/adminRoutes');
 const beggarRoutes = require('./api/beggarRoutes');
 // 【核心修正】引入我們新的背包路由
-const inventoryRoutes = require('./api/inventoryRoutes'); 
+const inventoryRoutes = require('./api/inventoryRoutes');
 
 // --- 使用路由 ---
 app.use('/api/auth', authRoutes);
@@ -92,10 +92,10 @@ const { runEquipmentMigration } = require('./api/migrations/equipmentMigration')
 // 啟動伺服器
 app.listen(PORT, async () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
-    
-    // 【核心修改】初始化所有快取
-    cacheManager.initializeCaches();
-    
+
+    // 【核心修改】註解掉此行，不再於啟動時預載所有快取
+    // cacheManager.initializeCaches();
+
     // 執行數據遷移腳本
     try {
         await runEquipmentMigration();
