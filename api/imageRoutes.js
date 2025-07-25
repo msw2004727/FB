@@ -49,10 +49,10 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        // --- 【核心修正】採用您指定的全新藝術風格指令 ---
-        const imagePrompt = `A soft-toned anime-inspired illustration that blends traditional East Asian aesthetics with modern Japanese animation. The artwork features clean linework, pastel and muted colors, and a light, almost watercolor-like background. The character design is expressive yet simple, with a dynamic pose and flowing garments that emphasize motion. The overall mood is bright, airy, and elegant, reminiscent of historical anime or Japanese animation set in ancient times. Character description: ${npcProfile.appearance}`;
+        // --- 【核心修正】採用您指定的全新水彩動漫藝術風格指令 ---
+        const imagePrompt = `A soft watercolor-inspired anime illustration with an ancient East Asian martial arts theme. The scene features a heroic young swordsman (or graceful young woman) dressed in traditional hanfu-style garments with flowing sleeves and a tied sash. The character design is expressive yet simple, with clean linework and dynamic poses that emphasize motion. The color palette is composed of pastel and muted tones, resembling watercolor washes, giving the artwork a light and airy mood. The background is painted in the style of traditional Chinese ink wash landscapes (shanshui), with misty mountains, pine trees, and a poetic atmosphere. Character description: ${npcProfile.appearance}`;
         
-        console.log(`[圖片系統 v5.0] 正在為「${canonicalNpcName}」使用全新動漫藝術風格生成頭像...`);
+        console.log(`[圖片系統 v6.0] 正在為「${canonicalNpcName}」使用全新水彩動漫風格生成頭像...`);
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
@@ -64,7 +64,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             avatarUrl: imageUrl
         }, { merge: true });
 
-        console.log(`[圖片系統 v5.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
+        console.log(`[圖片系統 v6.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
         res.json({
             success: true,
             message: `已成功為 ${canonicalNpcName} 繪製新的肖像。`,
@@ -72,7 +72,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[圖片系統 v5.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
+        console.error(`[圖片系統 v6.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
