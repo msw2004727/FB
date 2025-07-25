@@ -60,7 +60,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         // --- 【核心修正】採用全新、更強力、更穩定的風格提示詞 ---
-        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}`;
+        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Allegiance: ${npcProfile.allegiance || 'Unaffiliated'}, Appearance: ${npcProfile.appearance}`;
         const imagePrompt = `(Masterpiece, best quality, ultra-detailed). Style: Polished Japanese game CG, anime key visual, otome game character art, cel-shaded, vibrant colors, cinematic lighting. NOT a photo, NOT 3D. Content: A 3/4 view close-up portrait of a single character against a minimal, softly blurred background with hints of Chinese ink wash mountains. Character Details to incorporate: ${characterDetails}`;
         
         console.log(`[圖片系統 v9.0] 正在為「${canonicalNpcName}」使用強化的遊戲CG風格生成頭像...`);
