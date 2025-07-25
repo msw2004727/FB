@@ -10,7 +10,6 @@ let gameLoop = {};
 
 // --- Helper Functions (Internal to this module) ---
 
-// 【核心修改】重構 showNpcInteractionMenu 函式以顯示頭像
 function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     const disabledAttr = isDeceased ? 'disabled' : '';
     const npcName = npcProfile.name;
@@ -19,17 +18,17 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     if (npcProfile.avatarUrl) {
         avatarHtml = `<div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div>`;
     } else {
-        // 如果沒有頭像，顯示名字的第一個字作為預設圖
         const placeholder = npcName.charAt(0);
         avatarHtml = `<div class="npc-interaction-avatar"><span class="npc-interaction-avatar-placeholder">${placeholder}</span></div>`;
     }
 
+    // 【核心修改】將按鈕改回 圖案+文字 的設計
     dom.npcInteractionMenu.innerHTML = `
         ${avatarHtml}
         <div class="npc-interaction-buttons">
-            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr} title="交易"><i class="fas fa-exchange-alt"></i></button>
-            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr} title="聊天"><i class="fas fa-comments"></i></button>
-            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr} title="動手"><i class="fas fa-khanda"></i></button>
+            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> 交易</button>
+            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> 聊天</button>
+            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> 動手</button>
         </div>
     `;
     
@@ -67,7 +66,6 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
 function showAttackIntention(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
-    // 【核心修改】攻擊選單現在只替換按鈕部分
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
         buttonContainer.innerHTML = `
@@ -88,6 +86,7 @@ function showFinalConfirmation(event) {
     
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
+        // 確認/取消按鈕維持 icon-only 的簡潔設計
         buttonContainer.innerHTML = `
             <span class="confirm-prompt-text">確定要「${intention}」？</span>
             <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="取消"><i class="fas fa-times"></i></button>
@@ -96,7 +95,6 @@ function showFinalConfirmation(event) {
 
         buttonContainer.querySelector('.cancel-attack').addEventListener('click', async (e) => {
             e.stopPropagation();
-            // 【核心修改】重新獲取 profile 來顯示主選單
             try {
                 const profile = await api.getNpcProfile(npcName);
                 const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
@@ -421,7 +419,6 @@ export async function handleNpcClick(event) {
             try {
                 targetIsNpc.style.cursor = 'wait';
                 hideNpcInteractionMenu();
-                // 【核心修改】將獲取到的完整 profile 傳遞給 showNpcInteractionMenu
                 const profile = await api.getNpcProfile(npcName);
                 targetIsNpc.style.cursor = 'pointer';
 
