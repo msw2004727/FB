@@ -702,15 +702,16 @@ input:checked + .slider:before {
 /* --- 【核心修改】NPC互動選單全新樣式 --- */
 .npc-interaction-menu {
     position: absolute;
+    width: 220px; /* 【核心修改】給予一個固定的寬度 */
     background-color: var(--light-surface-bg);
     border: 1px solid var(--light-border);
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    padding: 0.75rem;
+    padding: 0.5rem; /* 【核心修改】調整內邊距 */
     display: flex;
-    flex-direction: column; /* 垂直佈局 */
-    gap: 0.75rem; /* 頭像和按鈕之間的間距 */
-    align-items: center;
+    flex-direction: column; 
+    gap: 0.5rem; /* 【核心修改】縮小間距 */
+    align-items: stretch; /* 【核心修改】讓子元素充滿寬度 */
     z-index: 50;
     opacity: 0;
     visibility: hidden;
@@ -728,6 +729,20 @@ body.dark-theme .npc-interaction-menu {
     background-color: #31313a;
     border-color: var(--dark-border);
     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* 【核心新增】頭像外層容器樣式 */
+.npc-interaction-avatar-container {
+    width: 100%;
+    padding: 0.5rem 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--light-bg);
+    border-radius: 4px;
+}
+body.dark-theme .npc-interaction-avatar-container {
+    background-color: var(--dark-bg);
 }
 
 .npc-interaction-avatar {
@@ -763,16 +778,17 @@ body.dark-theme .npc-interaction-avatar-placeholder {
 .npc-interaction-buttons {
     display: flex;
     gap: 0.5rem;
-    align-items: center; /* 確保確認提示文字和按鈕對齊 */
+    align-items: center; 
 }
 
 .npc-interaction-btn {
+    flex-grow: 1; /* 【核心修改】讓按鈕平分寬度 */
     background: none;
     border: 1px solid var(--light-border);
     border-radius: 6px;
-    padding: 0.6rem 1rem; /* 【核心修改】恢復內邊距 */
+    padding: 0.6rem 1rem; 
     font-family: var(--font-sans);
-    font-size: 0.9rem; /* 【核心修改】恢復字體大小 */
+    font-size: 0.9rem; 
     font-weight: bold;
     cursor: pointer;
     display: flex;
@@ -829,9 +845,11 @@ body.dark-theme .confirm-prompt-text {
 }
 
 .npc-interaction-btn.confirm-attack, .npc-interaction-btn.cancel-attack {
-    width: 44px; /* 確認/取消按鈕維持較小的 icon-only 尺寸 */
+    flex-grow: 0; /* 確認/取消按鈕不拉伸 */
+    width: 44px; 
     height: 40px;
     font-size: 1rem;
+    padding: 0.6rem;
 }
 
 .npc-interaction-btn.confirm-attack {
