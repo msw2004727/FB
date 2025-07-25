@@ -34,12 +34,11 @@ router.get('/profile/:npcName', async (req, res) => {
 
         const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
         
-        // 如果請求的是玩家自己的名字，直接回傳玩家資訊
         if (playerProfile && playerProfile.username === npcName) {
             return res.json({
                 name: playerProfile.username,
                 status_title: '玩家',
-                avatarUrl: null // 玩家目前沒有頭像系統
+                avatarUrl: null
             });
         }
 
@@ -47,19 +46,21 @@ router.get('/profile/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        // --- 【核心修正】更新位置判斷邏輯，使其能正確處理陣列 ---
+        // --- 【核心修正 v3.0】採用最穩健的比較方式 ---
         const playerLocationHierarchy = roundData.LOC || [];
         const npcLocationHierarchy = npcProfile.currentLocation;
 
-        // 確保兩者都是有效的陣列且至少有一個元素
-        const isPlayerLocationValid = Array.isArray(playerLocationHierarchy) && playerLocationHierarchy.length > 0;
-        const isNpcLocationValid = Array.isArray(npcLocationHierarchy) && npcLocationHierarchy.length > 0;
-
-        if (!isPlayerLocationValid || !isNpcLocationValid || playerLocationHierarchy[0] !== npcLocationHierarchy[0]) {
-            const playerArea = isPlayerLocationValid ? playerLocationHierarchy[0] : '未知';
-            const npcArea = isNpcLocationValid ? npcLocationHierarchy[0] : (npcLocationHierarchy || '未知');
+        const playerArea = (Array.isArray(playerLocationHierarchy) && playerLocationHierarchy.length > 0) 
+            ? playerLocationHierarchy[0].trim() 
+            : null;
             
-            console.log(`[密談檢查] 玩家 (${playerArea}) 與 NPC (${npcArea}) 不在同一個區域，拒絕密談。`);
+        const npcArea = (Array.isArray(npcLocationHierarchy) && npcLocationHierarchy.length > 0)
+            ? npcLocationHierarchy[0].trim()
+            : (typeof npcLocationHierarchy === 'string' ? npcLocationHierarchy.trim() : null);
+
+        if (!playerArea || !npcArea || playerArea !== npcArea) {
+            // 使用升級後的日誌，方便未來除錯
+            console.log(`[密談檢查 v3.0] 玩家 ("${playerArea}") 與 NPC ("${npcArea}") 不在同一個區域，拒絕密談。`);
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
         }
         // --- 修正結束 ---
