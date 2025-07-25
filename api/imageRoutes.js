@@ -23,8 +23,24 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
     const { npcName } = req.params;
 
     try {
-        const npcProfile = await getMergedNpcProfile(userId, npcName);
+        // --- 【核心修改】在呼叫 getMergedNpcProfile 之前，先獲取必要的上下文 ---
+        // 雖然這個路由不直接使用 roundData 和 playerProfile，但 getMergedNpcProfile 可能需要它們
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: '找不到玩家檔案。' });
+        }
+        const playerProfile = userDoc.data();
+
+        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        if (lastSaveSnapshot.empty) {
+            return res.status(404).json({ message: '找不到玩家存檔。' });
+        }
+        const roundData = lastSaveSnapshot.docs[0].data();
+        // --- 修改結束 ---
+
+        const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
         if (!npcProfile) {
+            // 這個錯誤現在只會在資料庫確實沒有該 NPC 模板時觸發
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
 
@@ -48,7 +64,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             avatarUrl: imageUrl
         });
 
-    } catch (error) { // 【核心修正】在這裡加上了遺漏的 { }
+    } catch (error) {
         console.error(`[圖片系統] /generate/npc/:npcName 錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
