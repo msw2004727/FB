@@ -6,9 +6,7 @@ const { getKnownNpcTemplate } = require('./cacheManager');
 
 const db = admin.firestore();
 
-// 【核心修改】為 updateNpcMemoryAfterInteraction 函式添加更嚴格的入口守衛
 async function updateNpcMemoryAfterInteraction(userId, npcName, interactionData) {
-    // 如果缺少任何一個必要參數，就直接警告並返回，不再繼續執行
     if (!userId || !npcName || !interactionData) {
         console.warn(`[NPC記憶系統] 因缺少必要參數，跳過為 ${npcName || '未知NPC'} 的記憶更新。`);
         return;
@@ -46,6 +44,7 @@ function getFriendlinessLevel(value) {
 }
 
 
+// 【核心修改】移除函式中的即時創建邏輯，讓其職責單一化
 async function getMergedNpcProfile(userId, npcName) {
     if (!userId || !npcName) {
         console.error('[NPC助手] getMergedNpcProfile缺少userId或npcName參數');
@@ -56,7 +55,7 @@ async function getMergedNpcProfile(userId, npcName) {
         const baseProfile = await getKnownNpcTemplate(npcName);
 
         if (!baseProfile) {
-            console.log(`[NPC助手-快取未命中] NPC「${npcName}」的通用模板不在快取中，將等待主流程創建。`);
+            console.log(`[NPC助手] 找不到NPC「${npcName}」的通用模板。`);
             return null;
         }
         
@@ -67,6 +66,7 @@ async function getMergedNpcProfile(userId, npcName) {
             const userSpecificState = npcStateDoc.data();
             return { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
         } else {
+            // 即使玩家還沒有與該NPC的個人互動紀錄，只要通用模板存在，就回傳基礎資料
             return { ...baseProfile, name: baseProfile.name || npcName };
         }
 
