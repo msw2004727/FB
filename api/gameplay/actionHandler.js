@@ -96,13 +96,7 @@ async function handleAction(req, res, player, newRoundNumber) {
         const classification = await getAIActionClassification(playerModelChoice, playerAction, classificationContext);
         console.log(`[AI總導演 v4.0] 玩家行動「${playerAction}」被分類為: ${classification.actionType}`);
         
-        // --- 【核心修改 v4.0】移除戰鬥分類處理 ---
-        // 所有行動都進入預設流程，交由主故事AI判斷
         switch (classification.actionType) {
-            // 未來若有特定非戰鬥指令需要單獨處理（如偷竊），可在此添加 case
-            // case 'INTERACTION_STEAL':
-            //     // 呼叫偷竊系統
-            //     break;
             default:
                 console.log(`[行動處理器] 行動類型 ${classification.actionType} 交由主故事AI生成。`);
                 break;
@@ -117,11 +111,14 @@ async function handleAction(req, res, player, newRoundNumber) {
             return res.status(403).json({ message: '逝者已矣，無法再有任何動作。' });
         }
 
+        // --- 【核心修改】神秘黑影人事件開關 ---
         let blackShadowEvent = null;
-        if (Math.random() < 0.10) { 
+        // 讀取指令牌，如果是 'true' 且滿足隨機條件，才觸發事件
+        if (process.env.ENABLE_BLACK_SHADOW_EVENT === 'true' && Math.random() < 0.10) { 
             blackShadowEvent = { trigger: true };
-            console.log(`[隨機系統] 觸發神秘黑影人事件！`);
+            console.log(`[隨機系統] 神秘黑影人事件已啟用並觸發！`);
         }
+        // --- 修改結束 ---
 
         const aiResponse = await getAIStory(
             playerModelChoice, 
