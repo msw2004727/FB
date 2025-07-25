@@ -45,7 +45,6 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             throw new Error(`系統無法找到或創建名為「${npcName}」的人物檔案。`);
         }
         
-        // --- 【核心修正】在生成圖片前，先檢查 avatarUrl 是否已存在 ---
         if (npcProfile.avatarUrl) {
             console.log(`[圖片系統 v7.0] NPC「${npcProfile.name}」的肖像已存在，無需重複生成。直接回傳現有URL。`);
             return res.json({
@@ -54,16 +53,17 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
                 avatarUrl: npcProfile.avatarUrl
             });
         }
-        // --- 修正結束 ---
 
         const canonicalNpcName = npcProfile.name;
         if (!canonicalNpcName || typeof canonicalNpcName !== 'string' || canonicalNpcName.trim() === '') {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        const imagePrompt = `A single-character close-up (3/4 view) portrait, dynamic and lively expression, subtle foreshortening, in a soft watercolor-inspired anime style. Clean, thin linework; pastel, muted colors with gentle watercolor washes. Add volumetric / rim lighting and nuanced shading to create a three-dimensional feel. Shallow depth of field and a softly blurred traditional Chinese ink-wash (shanshui) background. The character wears flowing hanfu-style garments with a tied sash, fabrics rendered with delicate brush textures. Elegant, airy, poetic mood. Character description: ${npcProfile.appearance}`;
+        // --- 【核心修正】將年齡、性別、身份地位納入提示詞 ---
+        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}`;
+        const imagePrompt = `A single-character close-up (3/4 view) portrait, dynamic and lively expression, subtle foreshortening, in a soft watercolor-inspired anime style. Clean, thin linework; pastel, muted colors with gentle watercolor washes. Add volumetric / rim lighting and nuanced shading to create a three-dimensional feel. Shallow depth of field and a softly blurred traditional Chinese ink-wash (shanshui) background. The character wears flowing hanfu-style garments with a tied sash, fabrics rendered with delicate brush textures. Elegant, airy, poetic mood. Character details: ${characterDetails}`;
         
-        console.log(`[圖片系統 v7.0] 正在為「${canonicalNpcName}」使用全新水彩動漫風格生成頭像...`);
+        console.log(`[圖片系統 v8.0] 正在為「${canonicalNpcName}」使用包含詳細人設的提示生成頭像...`);
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
@@ -78,10 +78,10 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         const updatedNpcTemplate = (await npcTemplateRef.get()).data();
         if (updatedNpcTemplate) {
             setTemplateInCache('npc', canonicalNpcName, updatedNpcTemplate);
-            console.log(`[圖片系統 v7.0] 已將「${canonicalNpcName}」的最新資料（包含頭像）同步至伺服器快取。`);
+            console.log(`[圖片系統 v8.0] 已將「${canonicalNpcName}」的最新資料（包含頭像）同步至伺服器快取。`);
         }
 
-        console.log(`[圖片系統 v7.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
+        console.log(`[圖片系統 v8.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
         res.json({
             success: true,
             message: `已成功為 ${canonicalNpcName} 繪製新的肖像。`,
@@ -89,7 +89,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[圖片系統 v7.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
+        console.error(`[圖片系統 v8.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
