@@ -28,20 +28,14 @@ router.get('/profile/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到玩家位置資訊。' });
         }
         
-        // --- 【核心修改】放寬密談條件 ---
         const playerLocationHierarchy = lastSaveSnapshot.docs[0].data().LOC;
-        // 玩家的 "大區域" 通常是地點陣列的第一個元素 (例如: "無名村")
         const playerArea = playerLocationHierarchy[0];
-
-        // NPC 的 "大區域" 從其地址中獲取，優先順序為 鎮 > 區 > 城。如果沒有地址，則使用其當前位置作為備用。
         const npcArea = npcProfile.address?.town || npcProfile.address?.district || npcProfile.address?.city || npcProfile.currentLocation;
 
-        // 只要兩者的大區域相同，就允許密談
         if (playerArea !== npcArea) {
             console.log(`[密談檢查] 玩家 (${playerArea}) 與 NPC (${npcArea}) 不在同一個區域，拒絕密談。`);
             return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
         }
-        // --- 修改結束 ---
 
         const publicProfile = {
             name: npcProfile.name,
@@ -49,7 +43,8 @@ router.get('/profile/:npcName', async (req, res) => {
             friendliness: getFriendlinessLevel(npcProfile.friendlinessValue || 0),
             romanceValue: npcProfile.romanceValue || 0,
             friendlinessValue: npcProfile.friendlinessValue || 0,
-            status_title: npcProfile.status_title || '身份不明' 
+            status_title: npcProfile.status_title || '身份不明',
+            avatarUrl: npcProfile.avatarUrl || null // 【核心新增】將頭像網址加入回傳資料中
         };
 
         res.json(publicProfile);
