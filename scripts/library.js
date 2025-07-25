@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalTitle = document.getElementById('modal-novel-title');
     const modalAuthorInfo = document.getElementById('modal-author-info');
     const modalStoryContent = document.getElementById('modal-story-content');
+    const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn'); // 【核心新增】
 
     const API_BASE_URL = `${backendBaseUrl}/api/library`;
 
@@ -42,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusText = novel.isDeceased ? '已完結' : '連載中';
                 const statusClass = novel.isDeceased ? 'status-deceased' : 'status-ongoing';
 
-                // 【核心修正】採用您指定的最終格式
                 novelCard.innerHTML = `
                     <div class="card-header">
                         <h3 class="card-title">${novel.novelTitle}</h3>
@@ -119,4 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal();
         }
     });
+
+    // 【核心新增】為新按鈕綁定點擊事件
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.addEventListener('click', () => {
+            if (modalStoryContent) {
+                modalStoryContent.scrollTo({
+                    top: modalStoryContent.scrollHeight,
+                    behavior: 'smooth' // 使用平滑滾動效果
+                });
+            }
+        });
+    }
 });
