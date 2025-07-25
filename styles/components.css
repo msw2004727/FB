@@ -702,16 +702,16 @@ input:checked + .slider:before {
 /* --- 【核心修改】NPC互動選單全新樣式 --- */
 .npc-interaction-menu {
     position: absolute;
-    width: 220px; /* 【核心修改】給予一個固定的寬度 */
+    width: 220px;
     background-color: var(--light-surface-bg);
     border: 1px solid var(--light-border);
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    padding: 0.5rem; /* 【核心修改】調整內邊距 */
+    padding: 0.5rem;
     display: flex;
-    flex-direction: column; 
-    gap: 0.5rem; /* 【核心修改】縮小間距 */
-    align-items: stretch; /* 【核心修改】讓子元素充滿寬度 */
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
     z-index: 50;
     opacity: 0;
     visibility: hidden;
@@ -731,7 +731,7 @@ body.dark-theme .npc-interaction-menu {
     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
-/* 【核心新增】頭像外層容器樣式 */
+/* 【核心修改】頭像外層容器樣式 - 使用虛線標示圖片範圍 */
 .npc-interaction-avatar-container {
     width: 100%;
     padding: 0.5rem 0;
@@ -740,9 +740,11 @@ body.dark-theme .npc-interaction-menu {
     align-items: center;
     background-color: var(--light-bg);
     border-radius: 4px;
+    border: 2px dashed var(--light-border); /* 【核心修改】使用虛線邊框 */
 }
 body.dark-theme .npc-interaction-avatar-container {
     background-color: var(--dark-bg);
+    border-color: var(--dark-border);
 }
 
 .npc-interaction-avatar {
@@ -778,17 +780,17 @@ body.dark-theme .npc-interaction-avatar-placeholder {
 .npc-interaction-buttons {
     display: flex;
     gap: 0.5rem;
-    align-items: center; 
+    align-items: center;
 }
 
 .npc-interaction-btn {
-    flex-grow: 1; /* 【核心修改】讓按鈕平分寬度 */
+    flex-grow: 1;
     background: none;
     border: 1px solid var(--light-border);
     border-radius: 6px;
-    padding: 0.6rem 1rem; 
+    padding: 0.6rem 0.8rem; /* 【核心修改】調整左右內邊距，減少跑圖可能性 */
     font-family: var(--font-sans);
-    font-size: 0.9rem; 
+    font-size: 0.9rem;
     font-weight: bold;
     cursor: pointer;
     display: flex;
@@ -796,11 +798,20 @@ body.dark-theme .npc-interaction-avatar-placeholder {
     justify-content: center;
     gap: 0.5rem;
     transition: background-color 0.2s, color 0.2s;
+    flex-direction: row; /* 【核心修改】確保文字橫向排列 */
 }
 
 body.dark-theme .npc-interaction-btn {
     border-color: var(--dark-border);
     color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn i {
+    font-size: 1rem; /* 【核心修改】調整圖示大小 */
+}
+
+.npc-interaction-btn span {
+    white-space: nowrap; /* 確保文字不換行 */
 }
 
 .npc-interaction-btn:hover {
@@ -845,8 +856,8 @@ body.dark-theme .confirm-prompt-text {
 }
 
 .npc-interaction-btn.confirm-attack, .npc-interaction-btn.cancel-attack {
-    flex-grow: 0; /* 確認/取消按鈕不拉伸 */
-    width: 44px; 
+    flex-grow: 0;
+    width: 44px;
     height: 40px;
     font-size: 1rem;
     padding: 0.6rem;
