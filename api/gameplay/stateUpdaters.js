@@ -1,6 +1,6 @@
 // /api/gameplay/stateUpdaters.js
 const admin = require('firebase-admin');
-const { getAISummary, getAIRandomEvent } = require('../../services/aiService'); 
+const { getAISummary } = require('../../services/aiService'); 
 const { updateFriendlinessValues, updateRomanceValues, processNpcUpdates, updateNpcMemoryAfterInteraction } = require('../npcHelpers');
 const { updateSkills, getRawInventory, calculateBulkScore, getPlayerSkills } = require('../playerStateHelpers');
 const { TIME_SEQUENCE, advanceDate, invalidateNovelCache, updateLibraryNovel } = require('../worldStateHelpers');
@@ -52,27 +52,30 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         daysToAdvance = 0 
     } = safeRoundData;
 
-    let randomEvent = null;
-    let eventEffects = {};
-    if (Math.random() < 0.15) { 
-        console.log(`[隨機事件系統] 觸發隨機事件！`);
-        const eventType = Math.random() < 0.6 ? '一個小小的正面事件' : '一個小小的負面事件';
-        const eventResult = await getAIRandomEvent(eventType, {
-            username: username,
-            location: LOC[0],
-            playerState: PC,
-            morality: player.morality || 0
-        });
+    // --- 【核心修改】移除隨機事件系統 ---
+    // let randomEvent = null;
+    // let eventEffects = {};
+    // if (Math.random() < 0.15) { 
+    //     console.log(`[隨機事件系統] 觸發隨機事件！`);
+    //     const eventType = Math.random() < 0.6 ? '一個小小的正面事件' : '一個小小的負面事件';
+    //     const eventResult = await getAIRandomEvent(eventType, {
+    //         username: username,
+    //         location: LOC[0],
+    //         playerState: PC,
+    //         morality: player.morality || 0
+    //     });
 
-        if (eventResult && eventResult.description) {
-            randomEvent = eventResult;
-            eventEffects = eventResult.effects || {};
-            console.log(`[隨機事件系統] 已成功生成事件: ${eventResult.description}`);
-            if (eventEffects.itemChanges) {
-                itemChanges.push(...eventEffects.itemChanges);
-            }
-        }
-    }
+    //     if (eventResult && eventResult.description) {
+    //         randomEvent = eventResult;
+    //         eventEffects = eventResult.effects || {};
+    //         console.log(`[隨機事件系統] 已成功生成事件: ${eventResult.description}`);
+    //         if (eventEffects.itemChanges) {
+    //             itemChanges.push(...eventEffects.itemChanges);
+    //         }
+    //     }
+    // }
+    // --- 修改結束 ---
+
 
     if (story && (story.includes('黑影') || story.includes('影子'))) {
         console.log(`[!!!] 系統警示：神秘黑影人已在玩家 [${username}] 的第 ${newRoundNumber} 回合劇情中出現！`);
@@ -87,11 +90,8 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         }
     }
     
-    // 【核心修正 v3.3】修正升級提示重複的問題
     if (levelUpEvents.length > 0) {
-        // 1. 先用 Set 過濾出所有不重複的武學名稱
         const uniqueSkillNames = [...new Set(levelUpEvents.map(e => e.skillName))];
-        // 2. 再用過濾後的名稱列表來生成提示
         finalStory += `\n\n(你感覺到自己的${uniqueSkillNames.map(name => `「${name}」`).join('、')}境界似乎有所精進。)`;
     }
     
@@ -119,14 +119,12 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         shortActionCounter = 0;
     }
     for (let i = 0; i < daysToAdd; i++) finalDate = advanceDate(finalDate);
-
-    const finalPC = randomEvent ? `${PC} ${eventEffects.PC || ''}`.trim() : PC;
-    const finalPowerChange = {
-        internal: (powerChange.internal || 0) + (eventEffects.powerChange?.internal || 0),
-        external: (powerChange.external || 0) + (eventEffects.powerChange?.external || 0),
-        lightness: (powerChange.lightness || 0) + (eventEffects.powerChange?.lightness || 0),
-    };
-    const finalMoralityChange = (moralityChange || 0) + (eventEffects.moralityChange || 0);
+    
+    // --- 【核心修改】移除隨機事件對數據的影響 ---
+    const finalPC = PC;
+    const finalPowerChange = powerChange;
+    const finalMoralityChange = moralityChange;
+    // --- 修改結束 ---
 
     const finalSaveData = { 
         story: finalStory, R: newRoundNumber, timeOfDay: finalTimeOfDay, 
@@ -187,7 +185,6 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     await batch.commit();
     console.log(`[數據同步] 玩家主檔案與長期記憶已同步至 R${newRoundNumber}。`);
 
-    // --- 【核心修改】將背景任務改為前景任務，並傳遞當前回合數據 ---
     if (NPC && Array.isArray(NPC)) {
         NPC.filter(npc => npc.status).forEach(npc => {
             const interactionContext = `事件：「${EVT}」。\n經過：${story}\n我在事件中的狀態是：「${npc.status}」。`;
@@ -195,10 +192,8 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         });
     }
     await invalidateNovelCache(userId);
-    // 直接將新生成的回合數據傳遞給圖書館更新函式，避免重複讀取
     await updateLibraryNovel(userId, username, finalSaveData);
-    // --- 修改結束 ---
-
+    
     const [fullInventory, updatedSkills, finalPlayerProfile] = await Promise.all([
         getRawInventory(userId),
         getPlayerSkills(userId),
@@ -211,7 +206,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         skills: updatedSkills, 
         inventory: fullInventory, 
         bulkScore: calculateBulkScore(fullInventory),
-        randomEvent: randomEvent
+        randomEvent: null // 【核心修改】確保不回傳 randomEvent
     };
     
     return finalRoundDataForClient;
