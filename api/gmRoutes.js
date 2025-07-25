@@ -7,13 +7,11 @@ const { getFriendlinessLevel, createNpcProfileInBackground } = require('./npcHel
 const { updateInventory, getInventoryState, getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { v4: uuidv4 } = require('uuid');
+const { setTemplateInCache } = require('./cacheManager'); // 【核心新增】引入快取更新工具
 
 const db = admin.firestore();
 
-// 所有GM路由都需要經過身份驗證
-router.use(authMiddleware);
-
-// --- 【核心新增】創建物品模板的API ---
+// --- 創建物品模板的API ---
 router.post('/create-item-template', async (req, res) => {
     const { itemName } = req.body;
     if (!itemName) {
@@ -32,7 +30,7 @@ router.post('/create-item-template', async (req, res) => {
     }
 });
 
-// --- 【核心新增】創建NPC模板的API ---
+// --- 創建NPC模板的API ---
 router.post('/create-npc-template', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -47,7 +45,6 @@ router.post('/create-npc-template', async (req, res) => {
             return res.status(409).json({ message: `NPC「${npcName}」的檔案已存在，無法重複創建。` });
         }
 
-        // 為GM創建一個通用的上下文
         const gmRoundData = {
             LOC: ['京城'],
             WRD: '晴朗',
@@ -58,12 +55,16 @@ router.post('/create-npc-template', async (req, res) => {
         };
         const gmPlayerProfile = { gender: 'male' };
 
-        // 使用 createNpcProfileInBackground (它現在只生成數據，不寫入)
         const newTemplateData = await createNpcProfileInBackground(username, { name: npcName }, gmRoundData, gmPlayerProfile);
         
         if (newTemplateData) {
             newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             await npcTemplateRef.set(newTemplateData);
+            
+            // 【核心修改】在創建成功後，立刻更新伺服器的短期記憶
+            setTemplateInCache('npc', npcName, newTemplateData);
+            console.log(`[GM工具] 已將新創建的NPC「${npcName}」即時寫入伺服器快取。`);
+
             res.json({ message: `NPC「${npcName}」的角色檔案已由AI成功創建！` });
         } else {
             throw new Error('AI未能生成有效的NPC數據。');
@@ -115,15 +116,19 @@ router.get('/npcs', async (req, res) => {
             const data = doc.data();
             const npcName = doc.id;
             let displayName = npcName;
+            let avatarUrl = null;
 
             const npcTemplateDoc = await db.collection('npcs').doc(npcName).get();
             if (npcTemplateDoc.exists) {
-                displayName = npcTemplateDoc.data().name || npcName;
+                const templateData = npcTemplateDoc.data();
+                displayName = templateData.name || npcName;
+                avatarUrl = templateData.avatarUrl || null;
             }
             
             existingNpcs.set(npcName, {
                 id: npcName,
                 name: displayName,
+                avatarUrl: avatarUrl,
                 friendlinessValue: data.friendlinessValue || 0,
                 romanceValue: data.romanceValue || 0,
                 relationships: data.relationships || {},
@@ -235,7 +240,7 @@ router.post('/rebuild-npc', async (req, res) => {
         
         if (newTemplateData) {
              const npcTemplateRef = db.collection('npcs').doc(npcName);
-             await npcTemplateRef.set(newTemplateData, { merge: true }); // 使用 merge 避免覆蓋現有關係
+             await npcTemplateRef.set(newTemplateData, { merge: true });
              res.json({ message: `已成功為「${npcName}」重建檔案。` });
         } else {
              throw new Error('AI未能生成有效的NPC數據來重建檔案。');
