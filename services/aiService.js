@@ -3,7 +3,6 @@
 // --- AI SDK 初始化 (保持不變) ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
-// 【核心新增】引入 Anthropic (Claude) 的 SDK
 const Anthropic = require("@anthropic-ai/sdk");
 
 // 1. Google Gemini
@@ -26,7 +25,7 @@ const grok = new OpenAI({
     timeout: 30 * 1000,
 });
 
-// 5. 【核心新增】 Anthropic Claude
+// 5. Anthropic Claude
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -64,7 +63,7 @@ const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
-// 統一的AI調度中心 (保持不變)
+// 統一的AI調度中心
 async function callAI(modelName, prompt, isJsonExpected = false) {
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
@@ -107,16 +106,13 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
                 break;
-            // 【核心新增】處理 Claude 模型的邏輯
             case 'claude':
                 const claudeOptions = {
-                    // 【核心修改】已為您升級至最新的 Sonnet 4 模型 (推測代號)
-                    // 如果此代號無效，請從您的 API 文件中找到正確的 Model ID 並替換此處
-                    model: "claude-4-sonnet", 
+                    // 【核心修正】已為您更換為官方最新的、確認可用的 Sonnet 3.5 模型代號
+                    model: "claude-3-5-sonnet-20240620", 
                     max_tokens: 4096,
                     messages: [{ role: "user", content: prompt }],
                 };
-                // 如果期望JSON，我們透過系統提示詞來引導Claude
                 if (isJsonExpected) {
                     claudeOptions.system = "Your response must be a single, valid JSON object and nothing else. Do not include any explanatory text or markdown formatting like ```json.";
                 }
@@ -139,6 +135,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
     }
 }
 
+// ... (檔案餘下部分保持不變，無需複製) ...
 // 清理並解析JSON的輔助函式 (保持不變)
 function parseJsonResponse(text) {
     const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
@@ -443,7 +440,7 @@ async function getAIEpilogue(playerData) {
         return story;
     } catch (error) {
         console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
-        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
+        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘𝑓後，偶爾談說。`;
     }
 }
 
