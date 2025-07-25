@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalTitle = document.getElementById('modal-novel-title');
     const modalAuthorInfo = document.getElementById('modal-author-info');
     const modalStoryContent = document.getElementById('modal-story-content');
-    const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn'); // 【核心新增】
+    const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
 
     const API_BASE_URL = `${backendBaseUrl}/api/library`;
 
@@ -120,14 +120,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 【核心新增】為新按鈕綁定點擊事件
+    // 【核心修改】將滾動方法改為更直接可靠的方式
     if (scrollToBottomBtn) {
         scrollToBottomBtn.addEventListener('click', () => {
             if (modalStoryContent) {
-                modalStoryContent.scrollTo({
-                    top: modalStoryContent.scrollHeight,
-                    behavior: 'smooth' // 使用平滑滾動效果
-                });
+                // 直接將滾動位置設定為最大高度，實現瞬時跳轉
+                modalStoryContent.scrollTop = modalStoryContent.scrollHeight;
             }
         });
     }
