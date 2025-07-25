@@ -59,11 +59,11 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        // --- 【核心修正】將年齡、性別、身份地位、以及歸屬陣營都納入提示詞 ---
-        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Allegiance: ${npcProfile.allegiance || 'Unaffiliated'}, Appearance: ${npcProfile.appearance}`;
-        const imagePrompt = `A soft watercolor-inspired anime illustration with an ancient East Asian martial arts theme. The scene features a heroic young swordsman (or graceful young woman) dressed in traditional hanfu-style garments with flowing sleeves and a tied sash. The character design is expressive yet simple, with clean linework and dynamic poses that emphasize motion. The color palette is composed of pastel and muted tones, resembling watercolor washes, giving the artwork a light and airy mood. The background is painted in the style of traditional Chinese ink wash landscapes (shanshui), with misty mountains, pine trees, and a poetic atmosphere. Character details: ${characterDetails}`;
+        // --- 【核心修正】採用全新、更強力、更穩定的風格提示詞 ---
+        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}`;
+        const imagePrompt = `(Masterpiece, best quality, ultra-detailed). Style: Polished Japanese game CG, anime key visual, otome game character art, cel-shaded, vibrant colors, cinematic lighting. NOT a photo, NOT 3D. Content: A 3/4 view close-up portrait of a single character against a minimal, softly blurred background with hints of Chinese ink wash mountains. Character Details to incorporate: ${characterDetails}`;
         
-        console.log(`[圖片系統 v9.0] 正在為「${canonicalNpcName}」使用包含詳細人設的提示生成頭像...`);
+        console.log(`[圖片系統 v9.0] 正在為「${canonicalNpcName}」使用強化的遊戲CG風格生成頭像...`);
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
