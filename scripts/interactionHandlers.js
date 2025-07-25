@@ -10,17 +10,26 @@ let gameLoop = {};
 
 // --- Helper Functions (Internal to this module) ---
 
+// 【核心修改】重構 showNpcInteractionMenu 函式以顯示頭像或生成按鈕
 function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     const disabledAttr = isDeceased ? 'disabled' : '';
     const npcName = npcProfile.name;
 
-    // 【核心修改】在頭像外層新增一個滿版的容器 (avatar-container)
     let avatarHtml = '';
+    // 檢查 NPC 是否已有頭像 URL
     if (npcProfile.avatarUrl) {
-        avatarHtml = `<div class="npc-interaction-avatar-container"><div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div></div>`;
+        // 如果有，就顯示圖片
+        avatarHtml = `<div class="npc-interaction-avatar-container">
+                        <div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div>
+                      </div>`;
     } else {
-        const placeholder = npcName.charAt(0);
-        avatarHtml = `<div class="npc-interaction-avatar-container"><div class="npc-interaction-avatar"><span class="npc-interaction-avatar-placeholder">${placeholder}</span></div></div>`;
+        // 如果沒有，就顯示 "查看照片" 按鈕
+        avatarHtml = `<div class="npc-interaction-avatar-container">
+                        <button class="npc-generate-avatar-btn" data-npc-name="${npcName}" ${disabledAttr}>
+                            <i class="fas fa-camera-retro"></i>
+                            <span>查看照片</span>
+                        </button>
+                      </div>`;
     }
 
     dom.npcInteractionMenu.innerHTML = `
@@ -32,12 +41,19 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
         </div>
     `;
     
+    // 為所有按鈕綁定事件
     if (!isDeceased) {
+        // 為 "查看照片" 按鈕綁定生成事件
+        const generateBtn = dom.npcInteractionMenu.querySelector('.npc-generate-avatar-btn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', handleGenerateAvatarClick);
+        }
         dom.npcInteractionMenu.querySelector('.trade').addEventListener('click', handleTradeButtonClick);
         dom.npcInteractionMenu.querySelector('.chat').addEventListener('click', handleChatButtonClick);
         dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
     }
 
+    // --- (後續的選單定位程式碼保持不變) ---
     const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
     const targetRect = targetElement.getBoundingClientRect();
     const panelRect = dom.storyPanel.getBoundingClientRect();
@@ -60,6 +76,34 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     dom.npcInteractionMenu.style.top = `${top}px`;
     dom.npcInteractionMenu.style.left = `${left}px`;
     dom.npcInteractionMenu.classList.add('visible');
+}
+
+// 【核心新增】處理 "查看照片" 按鈕點擊事件的函式
+async function handleGenerateAvatarClick(event) {
+    event.stopPropagation();
+    const npcName = event.currentTarget.dataset.npcName;
+    if (!npcName || gameState.isRequesting) return;
+
+    const btn = event.currentTarget;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>生成中...</span>`;
+    btn.disabled = true;
+    
+    try {
+        const result = await api.generateNpcAvatar(npcName);
+        if (result.success && result.avatarUrl) {
+            // 成功後，替換按鈕為圖片
+            const avatarContainer = btn.parentElement;
+            avatarContainer.innerHTML = `<div class="npc-interaction-avatar" style="background-image: url('${result.avatarUrl}')"></div>`;
+            appendMessageToStory(`【系統】AI 畫師為 ${npcName} 繪製了一張新的肖像。`, 'system-message');
+        } else {
+            throw new Error(result.message || '生成失敗但未回傳原因。');
+        }
+    } catch (error) {
+        handleApiError(error);
+        // 失敗後恢復按鈕
+        btn.innerHTML = `<i class="fas fa-camera-retro"></i><span>查看照片</span>`;
+        btn.disabled = false;
+    }
 }
 
 
