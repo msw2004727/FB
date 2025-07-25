@@ -770,11 +770,10 @@ body.dark-theme .npc-interaction-avatar-placeholder {
     background: none;
     border: 1px solid var(--light-border);
     border-radius: 6px;
-    padding: 0.6rem;
-    width: 44px; /* 固定寬度 */
-    height: 40px; /* 固定高度 */
+    padding: 0.6rem 1rem; /* 【核心修改】恢復內邊距 */
     font-family: var(--font-sans);
-    font-size: 1rem; /* 放大圖示 */
+    font-size: 0.9rem; /* 【核心修改】恢復字體大小 */
+    font-weight: bold;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -797,17 +796,10 @@ body.dark-theme .npc-interaction-btn:hover {
 }
 
 .npc-interaction-btn.chat {
-    color: #0d6efd; /* 藍色 */
+    color: var(--light-text-primary);
 }
 body.dark-theme .npc-interaction-btn.chat {
-    color: #4dabf7;
-}
-
-.npc-interaction-btn.trade {
-    color: #198754; /* 綠色 */
-}
-body.dark-theme .npc-interaction-btn.trade {
-    color: #28a745;
+    color: var(--dark-text-primary);
 }
 
 .npc-interaction-btn.attack {
@@ -834,6 +826,12 @@ body.dark-theme .npc-interaction-btn.attack:hover {
 }
 body.dark-theme .confirm-prompt-text {
     color: var(--dark-text-secondary);
+}
+
+.npc-interaction-btn.confirm-attack, .npc-interaction-btn.cancel-attack {
+    width: 44px; /* 確認/取消按鈕維持較小的 icon-only 尺寸 */
+    height: 40px;
+    font-size: 1rem;
 }
 
 .npc-interaction-btn.confirm-attack {
