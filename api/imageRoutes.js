@@ -61,7 +61,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
 
         // --- 【核心修正】將年齡、性別、身份地位納入提示詞 ---
         const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}`;
-        const imagePrompt = `A single-character close-up (3/4 view) portrait, dynamic and lively expression, subtle foreshortening, in a soft watercolor-inspired anime style. Clean, thin linework; pastel, muted colors with gentle watercolor washes. Add volumetric / rim lighting and nuanced shading to create a three-dimensional feel. Shallow depth of field and a softly blurred traditional Chinese ink-wash (shanshui) background. The character wears flowing hanfu-style garments with a tied sash, fabrics rendered with delicate brush textures. Elegant, airy, poetic mood. Character details: ${characterDetails}`;
+        const imagePrompt = `A single character 3/4 view close-up portrait, high-quality Japanese anime CG illustration, with sharp and clean linework, vibrant yet soft color tones, smooth gradient shading, and subtle lighting effects. The character is wearing elegant hanfu or traditional East Asian robes, with detailed folds and natural fabric flow. Focus on a vivid and expressive face, lively eyes, and dynamic hair strands, with soft rim lighting and cinematic depth to create a polished game-style CG look. The background is minimal, softly blurred, with hints of ink wash mountains or Japanese-style scenery. Character details: ${characterDetails}`;
         
         console.log(`[圖片系統 v8.0] 正在為「${canonicalNpcName}」使用包含詳細人設的提示生成頭像...`);
 
