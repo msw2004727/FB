@@ -1,3 +1,4 @@
+// scripts/relations.js
 import { api } from './api.js'; // 引入我們統一的api管理模組
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -23,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         relationsTitle.textContent = `${username}的人物關係圖`;
     }
 
-    // --- 【核心新增】定義點擊後觸發的函式，並掛載到 window 物件上 ---
+    // --- 【核心修正】將函式明確掛載到 window 物件上，使其成為全域函式 ---
     window.showNpcPortrait = async (npcName) => {
         if (!portraitModal) return;
 
@@ -34,6 +35,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         portraitImage.innerHTML = '<i class="fas fa-spinner fa-spin fa-2x"></i>';
 
         try {
+            // 【除錯】檢查玩家本身的情況
+            if (npcName === username) {
+                portraitName.textContent = username;
+                portraitTitle.textContent = '玩家';
+                portraitImage.innerHTML = '<span><i class="fas fa-user-circle"></i> 這是你自己</span>';
+                return;
+            }
+
             // 2. 向後端請求 NPC 的詳細資料
             const profile = await api.getNpcProfile(npcName);
 
@@ -54,7 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // --- 【核心新增】為彈窗增加關閉事件 ---
+    // --- 為彈窗增加關閉事件 ---
     if (portraitModal) {
         portraitModal.addEventListener('click', (event) => {
             // 點擊背景遮罩時關閉彈窗
