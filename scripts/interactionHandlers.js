@@ -10,7 +10,6 @@ let gameLoop = {};
 
 // --- Helper Functions (Internal to this module) ---
 
-// 【核心修改】重構 showNpcInteractionMenu 函式以顯示頭像或生成按鈕
 function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     const disabledAttr = isDeceased ? 'disabled' : '';
     const npcName = npcProfile.name;
@@ -78,14 +77,12 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
-// 【核心新增】處理 "查看照片" 按鈕點擊事件的函式
 async function handleGenerateAvatarClick(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
     if (!npcName || gameState.isRequesting) return;
 
     const btn = event.currentTarget;
-    // 【核心修正】更新按鈕文字並顯示系統提示
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>繪圖中...</span>`;
     btn.disabled = true;
     appendMessageToStory(`【系統】畫師繪圖至少1分鐘，若不想等可先推進劇情。`, 'system-message');
@@ -96,7 +93,8 @@ async function handleGenerateAvatarClick(event) {
             // 成功後，替換按鈕為圖片
             const avatarContainer = btn.parentElement;
             avatarContainer.innerHTML = `<div class="npc-interaction-avatar" style="background-image: url('${result.avatarUrl}')"></div>`;
-            appendMessageToStory(`【系統】AI 畫師為 ${npcName} 繪製了一張新的肖像。`, 'system-message');
+            // 【核心修正】更新提示文字
+            appendMessageToStory(`靈魂畫師為 ${npcName} 繪製了一張新的肖像。`, 'system-message');
         } else {
             throw new Error(result.message || '生成失敗但未回傳原因。');
         }
