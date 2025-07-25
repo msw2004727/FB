@@ -46,10 +46,16 @@ function getFriendlinessLevel(value) {
 
 // 【核心修改】為函式簽名加入 roundData 和 playerProfile 參數，並強化其內部邏輯
 async function getMergedNpcProfile(userId, npcName, roundData = {}, playerProfile = {}) {
-    if (!userId || !npcName) {
-        console.error('[NPC助手] getMergedNpcProfile缺少userId或npcName參數');
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+        console.error('[NPC助手] getMergedNpcProfile 收到無效的 userId:', userId);
         return null;
     }
+    if (!npcName || typeof npcName !== 'string' || npcName.trim() === '') {
+        console.error('[NPC助手] getMergedNpcProfile 收到無效的 npcName:', npcName);
+        return null;
+    }
+
+    console.log(`[NPC助手] 正在為玩家 ${userId} 獲取「${npcName}」的合併檔案...`);
 
     try {
         let baseProfile = await getKnownNpcTemplate(npcName);
@@ -65,7 +71,11 @@ async function getMergedNpcProfile(userId, npcName, roundData = {}, playerProfil
             await batch.commit();
 
             if (newNpcName) {
+                console.log(`[NPC助手] 新NPC「${newNpcName}」創建成功，正在重新獲取其模板...`);
                 baseProfile = await getKnownNpcTemplate(newNpcName); // 重新獲取剛創建的模板
+            } else {
+                 console.error(`[NPC助手] createNewNpc 流程未能成功為「${npcName}」創建檔案並返回有效名稱。`);
+                 return null; // Explicitly return null if creation fails
             }
         }
         
@@ -79,10 +89,14 @@ async function getMergedNpcProfile(userId, npcName, roundData = {}, playerProfil
 
         if (npcStateDoc.exists) {
             const userSpecificState = npcStateDoc.data();
-            return { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
+            const mergedProfile = { ...baseProfile, ...userSpecificState, name: baseProfile.name || npcName };
+            console.log(`[NPC助手] 成功合併「${npcName}」的通用模板與玩家個人狀態。`);
+            return mergedProfile;
         } else {
             // 即使玩家還沒有與該NPC的個人互動紀錄，只要通用模板存在，就回傳基礎資料
-            return { ...baseProfile, name: baseProfile.name || npcName };
+            const baseProfileWithCorrectName = { ...baseProfile, name: baseProfile.name || npcName };
+            console.log(`[NPC助手] 玩家與「${npcName}」尚無個人狀態檔案，僅返回通用模板。`);
+            return baseProfileWithCorrectName;
         }
 
     } catch (error) {
