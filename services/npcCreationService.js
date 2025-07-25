@@ -69,7 +69,6 @@ async function generateNpcTemplateData(username, npcDataFromStory, roundData, pl
     try {
         console.log(`[NPC Creation Service] 為「${initialName}」啟動AI生成程序...`);
         
-        // 【核心新增】在調用AI前，先查找潛在關係
         const encounterLocation = roundData.LOC && roundData.LOC.length > 0 ? roundData.LOC[0] : null;
         const potentialRelationships = await findPotentialRelatives(initialName, encounterLocation);
 
@@ -83,6 +82,10 @@ async function generateNpcTemplateData(username, npcDataFromStory, roundData, pl
         }
         
         newTemplateData.name = canonicalName; 
+        
+        // --- 【核心修改】為新創建的NPC預留頭像欄位 ---
+        newTemplateData.avatarUrl = null; 
+        // --- 修改結束 ---
         
         const rand = Math.random();
         newTemplateData.romanceOrientation = rand < 0.7 ? "異性戀" : rand < 0.85 ? "雙性戀" : rand < 0.95 ? "同性戀" : "無性戀";
