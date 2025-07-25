@@ -36,8 +36,6 @@ async function fetchApi(endpoint, options = {}) {
 export const api = {
     // Gameplay Routes
     interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
-
-    // 【核心新增】為閉關功能預留的API接口
     startCultivation: (body) => fetchApi('/api/game/cultivation/start', { method: 'POST', body: JSON.stringify(body) }),
 
     // Combat Routes
@@ -64,8 +62,9 @@ export const api = {
     getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
     getSkills: () => fetchApi('/api/game/state/skills'),
     dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
-    forgetSkill: (body) => fetchApi('/api/game/state/forget-skill', { method: 'POST', body: JSON.stringify(body) }), // 【核心新增】
+    forgetSkill: (body) => fetchApi('/api/game/state/forget-skill', { method: 'POST', body: JSON.stringify(body) }),
 
+    // Inventory Routes
     equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
     unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
 
@@ -82,6 +81,9 @@ export const api = {
     summonBeggar: (body) => fetchApi('/api/beggar/summon', { method: 'POST', body: JSON.stringify(body) }),
     startBeggarInquiry: (body) => fetchApi('/api/beggar/start-inquiry', { method: 'POST', body: JSON.stringify(body) }),
     askBeggarQuestion: (body) => fetchApi('/api/beggar/ask', { method: 'POST', body: JSON.stringify(body) }),
+
+    // 【核心新增】圖片生成路由
+    generateNpcAvatar: (npcName) => fetchApi(`/api/image/generate/npc/${npcName}`, { method: 'POST' }),
 
     // GM Panel Routes
     getNpcsForGM: () => fetchApi('/api/gm/npcs'),
