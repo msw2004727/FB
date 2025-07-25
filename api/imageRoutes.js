@@ -49,10 +49,10 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        // --- 【核心修正】更新圖片生成提示詞 ---
-        const imagePrompt = `A full-body sketch of a solitary martial arts hero (wuxia) from ancient China's Northern Song Dynasty. The style should be a clean, traditional ink wash sketch (su-miao). Emphasize the character's form and posture. The background should be stark white or very minimalistic, focusing solely on the single figure. Character description: ${npcProfile.appearance}`;
+        // --- 【核心修正】採用您指定的全新藝術風格指令 ---
+        const imagePrompt = `A soft-toned anime-inspired illustration that blends traditional East Asian aesthetics with modern Japanese animation. The artwork features clean linework, pastel and muted colors, and a light, almost watercolor-like background. The character design is expressive yet simple, with a dynamic pose and flowing garments that emphasize motion. The overall mood is bright, airy, and elegant, reminiscent of historical anime or Japanese animation set in ancient times. Character description: ${npcProfile.appearance}`;
         
-        console.log(`[圖片系統 v4.0] 正在為「${canonicalNpcName}」使用新提示生成頭像...`);
+        console.log(`[圖片系統 v5.0] 正在為「${canonicalNpcName}」使用全新動漫藝術風格生成頭像...`);
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
@@ -64,7 +64,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             avatarUrl: imageUrl
         }, { merge: true });
 
-        console.log(`[圖片系統 v4.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
+        console.log(`[圖片系統 v5.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
         res.json({
             success: true,
             message: `已成功為 ${canonicalNpcName} 繪製新的肖像。`,
@@ -72,7 +72,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[圖片系統 v4.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
+        console.error(`[圖片系統 v5.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
