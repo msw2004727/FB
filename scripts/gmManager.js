@@ -188,9 +188,18 @@ async function loadNpcManagementData(page) {
             if (npc.isGhost) {
                 cardBody = `<div class="gm-card-header"><h4>${npc.name}</h4><span class="gm-status-tag ghost"><i class="fa-solid fa-ghost"></i> 黑戶檔案</span></div><div class="gm-card-body"><p class="gm-note">此NPC存在於存檔中，但沒有詳細檔案。</p><button class="gm-button rebuild" data-npc-name="${npc.name}"><i class="fa-solid fa-user-check"></i> 重建檔案</button></div>`;
             } else {
-                const relationships = npc.relationships || {};
+                let avatarHtml = '';
+                if (npc.avatarUrl) {
+                    avatarHtml = `<img src="${npc.avatarUrl}" alt="${npc.name}" class="gm-npc-avatar">`;
+                } else {
+                    avatarHtml = `<div class="gm-npc-avatar-placeholder">${npc.name.charAt(0)}</div>`;
+                }
+
                 cardBody = `
-                    <div class="gm-card-header"><h4>${npc.name}</h4></div>
+                    <div class="gm-card-header">
+                        ${avatarHtml}
+                        <h4>${npc.name}</h4>
+                    </div>
                     <div class="gm-card-body">
                         <div class="gm-control-group"><label><span>友好度</span><span class="value-display" id="friend-val-${npc.id}">${npc.friendlinessValue}</span></label><input type="range" class="gm-slider" id="friend-slider-${npc.id}" min="-100" max="100" value="${npc.friendlinessValue}"></div>
                         <div class="gm-control-group"><label><span>心動值</span><span class="value-display" id="romance-val-${npc.id}">${npc.romanceValue}</span></label><input type="range" class="gm-slider" id="romance-slider-${npc.id}" min="0" max="100" value="${npc.romanceValue}"></div>
@@ -213,7 +222,10 @@ async function loadNpcManagementData(page) {
                             </div>
                         </div>
                     </div>
-                    <button class="gm-button save" data-npc-id="${npc.id}"><i class="fa-solid fa-floppy-disk"></i> 儲存所有變更</button>
+                    <div class="gm-button-group">
+                        <button class="gm-button save" data-npc-id="${npc.id}"><i class="fa-solid fa-floppy-disk"></i> 儲存變更</button>
+                        <button class="gm-button generate-avatar" data-npc-name="${npc.id}"><i class="fa-solid fa-palette"></i> 繪製肖像</button>
+                    </div>
                 `;
             }
             card.innerHTML = cardBody;
@@ -247,6 +259,25 @@ async function loadNpcManagementData(page) {
 
 
 // --- 事件處理函式 ---
+
+async function gmHandleGenerateAvatar(e) {
+    const button = e.target.closest('button');
+    const npcName = button.dataset.npcName;
+    if (!npcName) return;
+
+    button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 繪製中...`;
+    button.disabled = true;
+
+    try {
+        const result = await api.generateNpcAvatar(npcName);
+        alert(result.message);
+        loadPageContent('npc-management');
+    } catch (error) {
+        alert(`繪製失敗: ${error.message}`);
+        button.innerHTML = `<i class="fa-solid fa-palette"></i> 繪製肖像`;
+        button.disabled = false;
+    }
+}
 
 async function gmSavePlayerStats(e) {
     const button = e.target.closest('button');
@@ -413,9 +444,12 @@ function bindGmCardEvents(container) {
             }
         });
     });
+    
+    container.querySelectorAll('.gm-button.generate-avatar').forEach(button => {
+        button.addEventListener('click', gmHandleGenerateAvatar);
+    });
 }
 
-// --- 【新增】物品/NPC生成事件處理函式 ---
 async function gmHandleCreateItem(e) {
     const button = e.target.closest('button');
     const itemName = document.getElementById('gm-new-item-name').value.trim();
@@ -498,7 +532,7 @@ export function initializeGmPanel(gmPanel, gmCloseBtn, gmMenu, gmContent) {
 
         const targetPageId = link.getAttribute('href').substring(1);
         
-        gmContent.querySelectorAll('.page-content').forEach(page => page.style.display = 'none');
+        gmContent.querySelectorAll('.gm-page').forEach(page => page.style.display = 'none');
         
         const targetPage = document.getElementById(`page-${targetPageId}`);
         if (targetPage) {
