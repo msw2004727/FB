@@ -42,6 +42,81 @@
             max-width: 100%;
             height: auto;
         }
+
+        /* --- 【核心新增】NPC 肖像彈窗樣式 --- */
+        .portrait-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1050;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        .portrait-modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .portrait-modal-content {
+            background-color: var(--light-surface-bg);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 380px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            overflow: hidden;
+        }
+        .portrait-modal-overlay.visible .portrait-modal-content {
+            transform: scale(1);
+        }
+        body.dark-theme .portrait-modal-content {
+            background-color: var(--dark-surface-bg);
+            border: 1px solid var(--dark-border);
+        }
+        .portrait-image-container {
+            width: 100%;
+            height: 420px;
+            background-color: var(--light-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--light-text-secondary);
+        }
+        body.dark-theme .portrait-image-container {
+             background-color: var(--dark-bg);
+             color: var(--dark-text-secondary);
+        }
+        .portrait-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .portrait-info {
+            padding: 1.5rem;
+            text-align: center;
+        }
+        .portrait-info h3 {
+            margin: 0 0 0.5rem 0;
+            font-family: var(--font-serif);
+            font-size: 1.8rem;
+            color: var(--light-accent);
+        }
+        body.dark-theme .portrait-info h3 {
+             color: var(--dark-accent);
+        }
+        .portrait-info p {
+            margin: 0;
+            color: var(--light-text-secondary);
+            font-style: italic;
+        }
     </style>
 </head>
 <body class="light-theme">
@@ -61,6 +136,18 @@
                 正在梳理人物脈絡，繪製關係圖中...
             </p>
         </main>
+    </div>
+
+    <div id="portrait-modal" class="portrait-modal-overlay">
+        <div class="portrait-modal-content">
+            <div id="portrait-image" class="portrait-image-container">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+            </div>
+            <div class="portrait-info">
+                <h3 id="portrait-name">讀取中...</h3>
+                <p id="portrait-title">身份稱號</p>
+            </div>
+        </div>
     </div>
 
     <script type="module">
