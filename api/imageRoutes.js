@@ -23,7 +23,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
     const { npcName } = req.params;
 
     try {
-        // --- 【核心修正】在呼叫 getMergedNpcProfile 之前，先獲取必要的上下文 ---
+        // --- 獲取生成圖片所需的所有上下文 ---
         const userDoc = await db.collection('users').doc(userId).get();
         if (!userDoc.exists) {
             return res.status(404).json({ message: '找不到玩家檔案。' });
@@ -35,14 +35,22 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             return res.status(404).json({ message: '找不到玩家存檔。' });
         }
         const roundData = lastSaveSnapshot.docs[0].data();
-        // --- 修正結束 ---
-
-        // 將完整的上下文資訊傳遞給 getMergedNpcProfile
+        
+        // 呼叫 getMergedNpcProfile，它可能會在背景創建新的NPC
         const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
+
         if (!npcProfile) {
-            // 這個錯誤現在只會在資料庫確實沒有該 NPC 模板時觸發
-            return res.status(404).json({ message: '找不到該人物的檔案。' });
+            // 如果創建失敗或找不到，npcProfile 會是 null
+            return res.status(404).json({ message: `找不到或無法創建名為「${npcName}」的人物檔案。` });
         }
+
+        // 【核心修正】從回傳的 npcProfile 中獲取最權威的名稱
+        const canonicalNpcName = npcProfile.name;
+        if (!canonicalNpcName) {
+            throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
+        }
+        
+        console.log(`[圖片系統] 正在為「${canonicalNpcName}」 (原始請求: ${npcName}) 生成頭像...`);
 
         const imagePrompt = `A beautiful manga-style portrait of a character from the Northern Song Dynasty of ancient China. ${npcProfile.appearance}. Wuxia (martial arts hero) theme, elegant and aesthetic.`;
 
@@ -51,21 +59,22 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             throw new Error('AI 畫師創作失敗，請稍後再試。');
         }
 
-        const npcTemplateRef = db.collection('npcs').doc(npcName);
+        // 【核心修正】使用最權威的 canonicalNpcName 來儲存頭像
+        const npcTemplateRef = db.collection('npcs').doc(canonicalNpcName);
         await npcTemplateRef.set({
             avatarUrl: imageUrl
         }, { merge: true });
 
-        console.log(`[圖片系統] 已成功為 NPC「${npcName}」生成並儲存頭像。`);
+        console.log(`[圖片系統] 已成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
 
         res.json({
             success: true,
-            message: `已成功為 ${npcName} 繪製新的肖像。`,
+            message: `已成功為 ${canonicalNpcName} 繪製新的肖像。`,
             avatarUrl: imageUrl
         });
 
     } catch (error) {
-        console.error(`[圖片系統] /generate/npc/:npcName 錯誤:`, error);
+        console.error(`[圖片系統] /generate/npc/${npcName} 錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
