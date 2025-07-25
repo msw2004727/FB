@@ -4,8 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// --- 【核心修正】Firebase 初始化區塊提前 ---
-// 確保在載入任何其他使用Firebase的自訂模組前，Firebase App已被初始化
+// --- Firebase 初始化區塊 ---
 try {
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!serviceAccountString) {
@@ -25,7 +24,7 @@ try {
     process.exit(1);
 }
 
-// --- 現在可以安全地載入其他模組 ---
+// --- 載入模組 ---
 const authMiddleware = require('./middleware/auth');
 const authRoutes = require('./api/authRoutes');
 const gameRoutes = require('./api/gameRoutes');
@@ -37,7 +36,7 @@ const mapRoutes = require('./api/mapRoutes');
 const adminRoutes = require('./api/admin/adminRoutes');
 const beggarRoutes = require('./api/beggarRoutes');
 const inventoryRoutes = require('./api/inventoryRoutes');
-const imageRoutes = require('./api/imageRoutes'); // 【核心新增】引入圖片路由
+const imageRoutes = require('./api/imageRoutes');
 
 // Express App 設定
 const app = express();
@@ -79,7 +78,7 @@ app.use('/api/map', authMiddleware, mapRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/beggar', beggarRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/image', imageRoutes); // 【核心新增】掛載圖片路由
+app.use('/api/image', imageRoutes);
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
@@ -92,6 +91,15 @@ const { runEquipmentMigration } = require('./api/migrations/equipmentMigration')
 // 啟動伺服器
 app.listen(PORT, async () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
+
+    // --- 【核心新增】讀取並顯示所有功能開關的狀態 ---
+    console.log('--- 功能開關狀態 ---');
+    console.log(`[神秘黑影人事件]: ${process.env.ENABLE_BLACK_SHADOW_EVENT === 'true' ? '✅ 開啟' : '❌ 關閉'}`);
+    console.log(`[AI 畫師功能]: ${process.env.ENABLE_IMAGE_GENERATION === 'true' ? '✅ 開啟' : '❌ 關閉'}`);
+    console.log(`[未來系統]: ${process.env.ENABLE_FUTURE_SYSTEM === 'true' ? '✅ 開啟' : '❌ 關閉'}`);
+    console.log('--------------------');
+    // --- 修改結束 ---
+
     try {
         await runEquipmentMigration();
     } catch (error) {
