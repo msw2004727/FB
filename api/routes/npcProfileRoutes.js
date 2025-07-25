@@ -13,39 +13,50 @@ const db = admin.firestore();
  */
 router.get('/profile/:npcName', async (req, res) => {
     const userId = req.user.id;
+    const username = req.user.username;
     const { npcName } = req.params;
+
     try {
-        const [npcProfile, lastSaveSnapshot, userDoc] = await Promise.all([
-            getMergedNpcProfile(userId, npcName),
-            db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get(),
-            db.collection('users').doc(userId).get() // 新增：獲取玩家資料以比對姓名
+        // --- 【核心修正】步驟一：先獲取完整的上下文資料 ---
+        const [userDoc, lastSaveSnapshot] = await Promise.all([
+            db.collection('users').doc(userId).get(),
+            db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get()
         ]);
 
-        // 【核心新增】如果請求的是玩家自己的名字，直接回傳玩家資訊
-        const userData = userDoc.data();
-        if (userData && userData.username === npcName) {
-            return res.json({
-                name: userData.username,
-                status_title: '玩家',
-                avatarUrl: null // 玩家目前沒有頭像系統
-            });
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: '找不到玩家檔案。' });
+        }
+        if (lastSaveSnapshot.empty) {
+            return res.status(404).json({ message: '找不到玩家存檔紀錄。' });
         }
         
+        const playerProfile = { ...userDoc.data(), username: username };
+        const roundData = lastSaveSnapshot.docs[0].data();
+
+        // --- 步驟二：將完整的上下文傳遞給核心處理函式 ---
+        const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
+        
+        // --- 步驟三：處理回傳資料 ---
+        if (npcProfile && npcProfile.isPlayer) {
+             return res.json({
+                name: npcProfile.name,
+                status_title: '這就是你',
+                avatarUrl: null
+            });
+        }
+
         if (!npcProfile) {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        // 移除地點檢查，因為關係圖上的人物不一定在當前場景
-        // if (lastSaveSnapshot.empty) {
-        //     return res.status(404).json({ message: '找不到玩家位置資訊。' });
-        // }
-        // const playerLocationHierarchy = lastSaveSnapshot.docs[0].data().LOC;
-        // const playerArea = playerLocationHierarchy[0];
-        // const npcArea = npcProfile.address?.town || npcProfile.address?.district || npcProfile.address?.city || npcProfile.currentLocation;
-        // if (playerArea !== npcArea) {
-        //     console.log(`[密談檢查] 玩家 (${playerArea}) 與 NPC (${npcArea}) 不在同一個區域，拒絕密談。`);
-        //     return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
-        // }
+        const playerLocationHierarchy = lastSaveSnapshot.docs[0].data().LOC;
+        const playerArea = playerLocationHierarchy[0];
+        const npcArea = npcProfile.address?.town || npcProfile.address?.district || npcProfile.address?.city || npcProfile.currentLocation;
+
+        if (playerArea !== npcArea) {
+            console.log(`[密談檢查] 玩家 (${playerArea}) 與 NPC (${npcArea}) 不在同一個區域，拒絕密談。`);
+            return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
+        }
 
         const publicProfile = {
             name: npcProfile.name,
