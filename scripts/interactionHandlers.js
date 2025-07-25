@@ -85,8 +85,10 @@ async function handleGenerateAvatarClick(event) {
     if (!npcName || gameState.isRequesting) return;
 
     const btn = event.currentTarget;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>生成中...</span>`;
+    // 【核心修正】更新按鈕文字並顯示系統提示
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>繪圖中...</span>`;
     btn.disabled = true;
+    appendMessageToStory(`【系統】畫師繪圖至少1分鐘，若不想等可先推進劇情。`, 'system-message');
     
     try {
         const result = await api.generateNpcAvatar(npcName);
