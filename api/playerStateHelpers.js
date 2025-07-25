@@ -41,7 +41,6 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
                 templateData.hands = null;
                 needsUpdate = true;
             }
-            // 【核心修正】在這裡加入 weaponType 的校驗
             if (templateData.itemType === '武器' && templateData.weaponType === undefined) {
                 console.warn(`[數據校驗] 物品「${itemName}」模板為武器，但缺少 weaponType，已自動修正為 null。`);
                 templateData.weaponType = null;
@@ -72,7 +71,6 @@ async function getOrGenerateItemTemplate(itemName, roundData = {}) {
         if (newTemplateData.bulk === undefined) newTemplateData.bulk = '中';
         if (newTemplateData.equipSlot === undefined) newTemplateData.equipSlot = null;
         if (newTemplateData.hands === undefined) newTemplateData.hands = null;
-        // 【核心修正】對AI生成的新模板也進行校驗
         if (newTemplateData.itemType === '武器' && newTemplateData.weaponType === undefined) {
             console.warn(`[數據校驗] AI生成的武器「${itemName}」缺少 weaponType，已自動修正為 null。`);
             newTemplateData.weaponType = null;
@@ -273,13 +271,41 @@ async function updateSkills(userId, skillChanges, playerProfile) {
     const userDocRef = db.collection('users').doc(userId);
     const levelUpEvents = [];
     let customSkillCreationResult = null;
+    
     for (const skillChange of skillChanges) {
         const playerSkillDocRef = playerSkillsRef.doc(skillChange.skillName);
         try {
             await db.runTransaction(async (transaction) => {
-                const latestPlayerProfile = (await transaction.get(userDocRef)).data();
+                const [playerSkillDoc, latestPlayerProfileDoc] = await transaction.getAll(playerSkillDocRef, userDocRef);
+                const latestPlayerProfile = latestPlayerProfileDoc.data();
+                
+                // 【核心修正】將 isNewlyAcquired 和 expChange 的邏輯分開並加固
+                
+                // 情況一：處理經驗值變化 (無論 isNewlyAcquired 是真是假)
+                if (typeof skillChange.expChange === 'number' && skillChange.expChange > 0) {
+                    if (!playerSkillDoc.exists) return; // 如果武學不存在，無法增加經驗
+                    
+                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
+                    if (!templateResult?.template) return;
+                    
+                    let { level = 0, exp = 0 } = playerSkillDoc.data();
+                    const { max_level = 10 } = templateResult.template;
 
-                if (skillChange.isNewlyAcquired) {
+                    // 【核心修正】即使達到滿級，也允許經驗值繼續增加，只是不再升級
+                    exp += skillChange.expChange;
+                    let requiredExp = level * 100 + 100;
+
+                    while (exp >= requiredExp && level < max_level) {
+                        level++;
+                        exp -= requiredExp;
+                        levelUpEvents.push({ skillName: skillChange.skillName, levelUpTo: level });
+                        requiredExp = level * 100 + 100;
+                    }
+                    transaction.update(playerSkillDocRef, { level, exp, lastPractice: admin.firestore.FieldValue.serverTimestamp() });
+                }
+                
+                // 情況二：處理新學武學 (只有當武學真的不存在時才執行)
+                else if (skillChange.isNewlyAcquired && !playerSkillDoc.exists) {
                     const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
                     if (!templateResult || !templateResult.template) return;
 
@@ -287,19 +313,11 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         const powerType = templateResult.template.power_type || 'none';
                         let maxPowerAchieved = 0;
                         
-                        // 【核心修正】使用明確的 switch 語句代替動態字串組合，杜絕錯誤
                         switch(powerType) {
-                            case 'internal':
-                                maxPowerAchieved = latestPlayerProfile.maxInternalPowerAchieved || 0;
-                                break;
-                            case 'external':
-                                maxPowerAchieved = latestPlayerProfile.maxExternalPowerAchieved || 0;
-                                break;
-                            case 'lightness':
-                                maxPowerAchieved = latestPlayerProfile.maxLightnessAchieved || 0;
-                                break;
-                            default:
-                                maxPowerAchieved = 0;
+                            case 'internal': maxPowerAchieved = latestPlayerProfile.maxInternalPowerAchieved || 0; break;
+                            case 'external': maxPowerAchieved = latestPlayerProfile.maxExternalPowerAchieved || 0; break;
+                            case 'lightness': maxPowerAchieved = latestPlayerProfile.maxLightnessAchieved || 0; break;
+                            default: maxPowerAchieved = 0;
                         }
 
                         const createdSkillsCount = latestPlayerProfile.customSkillsCreated?.[powerType] || 0;
@@ -307,12 +325,7 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         const availableSlots = Math.floor(maxPowerAchieved / 100);
 
                         console.log(`[創功資格審查] 正在為「${skillChange.skillName}」進行判定...`);
-                        console.log(`  - 功體 (power_type): ${powerType}`);
-                        console.log(`  - 功體歷史最高成就 (maxPowerAchieved): ${maxPowerAchieved}`);
-                        console.log(`  - 計算出的資格槽位 (availableSlots): ${availableSlots}`);
-                        console.log(`  - 已創的同類武學數量 (createdSkillsCount): ${createdSkillsCount}`);
-                        console.log(`  - 總自創武學數量 (totalCreatedSkills): ${totalCreatedSkills}`);
-                        console.log(`  - 判定條件: (${createdSkillsCount} >= ${availableSlots})`);
+                        console.log(`  - 功體 (power_type): ${powerType}, 歷史最高成就: ${maxPowerAchieved}, 資格槽位: ${availableSlots}, 已創數量: ${createdSkillsCount}`);
 
                         if (totalCreatedSkills >= 10) {
                             customSkillCreationResult = { success: false, reason: '你感覺腦中思緒壅塞，似乎再也無法容納更多的奇思妙想，此次自創武學失敗了。' };
@@ -320,7 +333,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         }
 
                         if (createdSkillsCount >= availableSlots) {
-                            // 【核心修正】錯誤訊息也使用明確判斷，顯示正確的功體名稱
                              let powerTypeName = '基礎';
                              if (powerType === 'internal') powerTypeName = '內功';
                              if (powerType === 'external') powerTypeName = '外功';
@@ -337,29 +349,6 @@ async function updateSkills(userId, skillChanges, playerProfile) {
                         const playerSkillData = { level: skillChange.level || 0, exp: skillChange.exp || 0, lastPractice: admin.firestore.FieldValue.serverTimestamp() };
                         transaction.set(playerSkillDocRef, playerSkillData);
                     }
-
-                } else if (skillChange.expChange > 0) {
-                    const playerSkillDoc = await transaction.get(playerSkillDocRef);
-                    if (!playerSkillDoc.exists) return;
-                    
-                    const templateResult = await getOrGenerateSkillTemplate(skillChange.skillName);
-                    if (!templateResult?.template) return;
-                    
-                    let { level = 0, exp = 0 } = playerSkillDoc.data();
-                    const { max_level = 10 } = templateResult.template;
-
-                    if (level >= max_level) return;
-
-                    exp += skillChange.expChange;
-                    let requiredExp = level * 100 + 100;
-
-                    while (exp >= requiredExp && level < max_level) {
-                        level++;
-                        exp -= requiredExp;
-                        levelUpEvents.push({ skillName: skillChange.skillName, levelUpTo: level });
-                        requiredExp = level * 100 + 100;
-                    }
-                    transaction.update(playerSkillDocRef, { level, exp });
                 }
             });
         } catch (error) {
