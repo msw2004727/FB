@@ -702,7 +702,7 @@ input:checked + .slider:before {
 /* --- 【核心修改】NPC互動選單全新樣式 --- */
 .npc-interaction-menu {
     position: absolute;
-    width: 280px; /* 【核心修改】將寬度從 240px 大幅增加到 280px */
+    width: 260px; /* 【核心修改】將寬度從 240px 增加到 260px */
     background-color: var(--light-surface-bg);
     border: 1px solid var(--light-border);
     border-radius: 8px;
@@ -733,7 +733,7 @@ body.dark-theme .npc-interaction-menu {
 
 .npc-interaction-avatar-container {
     width: 100%;
-    padding: 0.5rem 0;
+    height: 120px; /* 【核心新增】給予一個固定的高度 */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -776,6 +776,34 @@ body.dark-theme .npc-interaction-avatar-placeholder {
     color: var(--dark-text-secondary);
 }
 
+/* 【核心新增】生成頭像按鈕樣式 */
+.npc-generate-avatar-btn {
+    background: none;
+    border: none;
+    color: var(--light-text-secondary);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 100%;
+    transition: color 0.3s, background-color 0.3s;
+}
+.npc-generate-avatar-btn:hover {
+    background-color: rgba(0,0,0,0.02);
+    color: var(--light-accent);
+}
+.npc-generate-avatar-btn i {
+    font-size: 1.5rem;
+}
+
+
 .npc-interaction-buttons {
     display: flex;
     gap: 0.5rem;
@@ -787,7 +815,7 @@ body.dark-theme .npc-interaction-avatar-placeholder {
     background: none;
     border: 1px solid var(--light-border);
     border-radius: 6px;
-    padding: 0.6rem 0.5rem; /* 微調內邊距 */
+    padding: 0.6rem 0.5rem;
     font-family: var(--font-sans);
     font-size: 0.9rem; 
     font-weight: bold;
