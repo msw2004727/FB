@@ -14,15 +14,15 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     const disabledAttr = isDeceased ? 'disabled' : '';
     const npcName = npcProfile.name;
 
+    // 【核心修改】在頭像外層新增一個滿版的容器 (avatar-container)
     let avatarHtml = '';
     if (npcProfile.avatarUrl) {
-        avatarHtml = `<div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div>`;
+        avatarHtml = `<div class="npc-interaction-avatar-container"><div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div></div>`;
     } else {
         const placeholder = npcName.charAt(0);
-        avatarHtml = `<div class="npc-interaction-avatar"><span class="npc-interaction-avatar-placeholder">${placeholder}</span></div>`;
+        avatarHtml = `<div class="npc-interaction-avatar-container"><div class="npc-interaction-avatar"><span class="npc-interaction-avatar-placeholder">${placeholder}</span></div></div>`;
     }
 
-    // 【核心修改】將按鈕改回 圖案+文字 的設計
     dom.npcInteractionMenu.innerHTML = `
         ${avatarHtml}
         <div class="npc-interaction-buttons">
@@ -86,7 +86,6 @@ function showFinalConfirmation(event) {
     
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
-        // 確認/取消按鈕維持 icon-only 的簡潔設計
         buttonContainer.innerHTML = `
             <span class="confirm-prompt-text">確定要「${intention}」？</span>
             <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="取消"><i class="fas fa-times"></i></button>
