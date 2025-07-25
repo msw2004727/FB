@@ -3,6 +3,7 @@
 // --- AI SDK 初始化 (保持不變) ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
+// 【核心新增】引入 Anthropic (Claude) 的 SDK
 const Anthropic = require("@anthropic-ai/sdk");
 
 // 1. Google Gemini
@@ -25,7 +26,7 @@ const grok = new OpenAI({
     timeout: 30 * 1000,
 });
 
-// 5. Anthropic Claude
+// 5. 【核心新增】 Anthropic Claude
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -40,7 +41,7 @@ const { getSummaryPrompt } = require('../prompts/summaryPrompt.js');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt.js');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt.js');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
-const { getRandomEventPrompt } = require('../prompts/randomEventPrompt.js');
+// const { getRandomEventPrompt } = require('../prompts/randomEventPrompt.js'); // 【核心修改】移除引用
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
@@ -63,7 +64,7 @@ const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
-// 統一的AI調度中心
+// 統一的AI調度中心 (保持不變)
 async function callAI(modelName, prompt, isJsonExpected = false) {
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
@@ -108,7 +109,6 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 break;
             case 'claude':
                 const claudeOptions = {
-                    // 【核心修正】已為您更換為官方最新的、確認可用的 Sonnet 3.5 模型代號
                     model: "claude-3-5-sonnet-20240620", 
                     max_tokens: 4096,
                     messages: [{ role: "user", content: prompt }],
@@ -135,7 +135,6 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
     }
 }
 
-// ... (檔案餘下部分保持不變，無需複製) ...
 // 清理並解析JSON的輔助函式 (保持不變)
 function parseJsonResponse(text) {
     const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
@@ -274,16 +273,8 @@ async function getAIEncyclopedia(longTermSummary, username, npcDetails) {
     }
 }
 
-async function getAIRandomEvent(eventType, playerProfile) {
-    const prompt = getRandomEventPrompt(eventType, playerProfile);
-    try {
-        const text = await callAI(aiConfig.randomEvent, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 司命星君任務:", error);
-        return null;
-    }
-}
+// 【核心修改】移除 getAIRandomEvent 函式
+// async function getAIRandomEvent(eventType, playerProfile) { ... }
 
 async function getAINpcProfile(username, npcName, roundData, playerProfile) {
     const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
@@ -440,7 +431,7 @@ async function getAIEpilogue(playerData) {
         return story;
     } catch (error) {
         console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
-        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘𝑓後，偶爾談說。`;
+        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
     }
 }
 
@@ -534,7 +525,7 @@ module.exports = {
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
-    getAIRandomEvent,
+    // getAIRandomEvent, // 【核心修改】移除導出
     getAINpcProfile,
     getAICombatAction,
     getAICombatSetup,
