@@ -44,19 +44,34 @@ function getFriendlinessLevel(value) {
 }
 
 
-// 【核心修改】移除函式中的即時創建邏輯，讓其職責單一化
-async function getMergedNpcProfile(userId, npcName) {
+// 【核心修改】為函式簽名加入 roundData 和 playerProfile 參數，並強化其內部邏輯
+async function getMergedNpcProfile(userId, npcName, roundData = {}, playerProfile = {}) {
     if (!userId || !npcName) {
         console.error('[NPC助手] getMergedNpcProfile缺少userId或npcName參數');
         return null;
     }
 
     try {
-        const baseProfile = await getKnownNpcTemplate(npcName);
+        let baseProfile = await getKnownNpcTemplate(npcName);
 
+        // 如果快取和資料庫都沒有，代表這是個全新的NPC，需要即時創建
         if (!baseProfile) {
-            console.log(`[NPC助手] 找不到NPC「${npcName}」的通用模板。`);
-            return null;
+            console.log(`[NPC助手] 找不到NPC「${npcName}」的通用模板，啟動即時創建流程...`);
+            const batch = db.batch();
+            // 確保 playerProfile 中有 username
+            const username = playerProfile.username || (await db.collection('users').doc(userId).get()).data().username || '玩家';
+            
+            const newNpcName = await createNewNpc(userId, username, { name: npcName, isNew: true }, roundData, playerProfile, batch);
+            await batch.commit();
+
+            if (newNpcName) {
+                baseProfile = await getKnownNpcTemplate(newNpcName); // 重新獲取剛創建的模板
+            }
+        }
+        
+        if (!baseProfile) {
+             console.error(`[NPC助手] 即使在嘗試創建後，依然無法獲取「${npcName}」的模板。`);
+             return null;
         }
         
         const npcStateRef = db.collection('users').doc(userId).collection('npc_states').doc(npcName);
