@@ -43,7 +43,7 @@
             height: auto;
         }
 
-        /* --- 【核心新增】NPC 肖像彈窗樣式 --- */
+        /* --- NPC 肖像彈窗樣式 --- */
         .portrait-modal-overlay {
             position: fixed;
             top: 0;
@@ -152,7 +152,11 @@
 
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ startOnLoad: false });
+        // --- 【核心修正】加入 securityLevel: 'loose' 來解鎖點擊事件 ---
+        mermaid.initialize({ 
+            startOnLoad: false,
+            securityLevel: 'loose' 
+        });
         window.mermaid = mermaid; // 將mermaid掛載到window上，方便我們的腳本呼叫
     </script>
     
