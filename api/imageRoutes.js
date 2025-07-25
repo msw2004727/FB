@@ -60,7 +60,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         console.log(`[圖片系統 v3.0] 步驟 3: 為「${canonicalNpcName}」準備圖片生成提示...`);
-        const imagePrompt = `A beautiful manga-style portrait of a character from the Northern Song Dynasty of ancient China. ${npcProfile.appearance}. Wuxia (martial arts hero) theme, elegant and aesthetic.`;
+        const imagePrompt = `A soft-toned anime-inspired illustration that blends traditional East Asian aesthetics with modern Japanese animation. The artwork features clean linework, pastel and muted colors, and a light, almost watercolor-like background. The character design is expressive yet simple, with a dynamic pose and flowing garments that emphasize motion. The overall mood is bright, airy, and elegant, reminiscent of historical anime or Japanese animation set in ancient times. ${npcProfile.appearance}. Wuxia (martial arts hero) theme, elegant and aesthetic.`;
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
