@@ -61,7 +61,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        const imagePrompt = `A soft watercolor-inspired anime illustration with an ancient East Asian martial arts theme. The scene features a heroic young swordsman (or graceful young woman) dressed in traditional hanfu-style garments with flowing sleeves and a tied sash. The character design is expressive yet simple, with clean linework and dynamic poses that emphasize motion. The color palette is composed of pastel and muted tones, resembling watercolor washes, giving the artwork a light and airy mood. The background is painted in the style of traditional Chinese ink wash landscapes (shanshui), with misty mountains, pine trees, and a poetic atmosphere. Character description: ${npcProfile.appearance}`;
+        const imagePrompt = `A single-character close-up (3/4 view) portrait, dynamic and lively expression, subtle foreshortening, in a soft watercolor-inspired anime style. Clean, thin linework; pastel, muted colors with gentle watercolor washes. Add volumetric / rim lighting and nuanced shading to create a three-dimensional feel. Shallow depth of field and a softly blurred traditional Chinese ink-wash (shanshui) background. The character wears flowing hanfu-style garments with a tied sash, fabrics rendered with delicate brush textures. Elegant, airy, poetic mood. Character description: ${npcProfile.appearance}`;
         
         console.log(`[圖片系統 v7.0] 正在為「${canonicalNpcName}」使用全新水彩動漫風格生成頭像...`);
 
