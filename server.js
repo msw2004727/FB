@@ -26,7 +26,6 @@ try {
 }
 
 // --- 現在可以安全地載入其他模組 ---
-const cacheManager = require('./api/cacheManager');
 const authMiddleware = require('./middleware/auth');
 const authRoutes = require('./api/authRoutes');
 const gameRoutes = require('./api/gameRoutes');
@@ -38,6 +37,7 @@ const mapRoutes = require('./api/mapRoutes');
 const adminRoutes = require('./api/admin/adminRoutes');
 const beggarRoutes = require('./api/beggarRoutes');
 const inventoryRoutes = require('./api/inventoryRoutes');
+const imageRoutes = require('./api/imageRoutes'); // 【核心新增】引入圖片路由
 
 // Express App 設定
 const app = express();
@@ -79,6 +79,7 @@ app.use('/api/map', authMiddleware, mapRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/beggar', beggarRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/image', imageRoutes); // 【核心新增】掛載圖片路由
 
 // 根目錄健康檢查
 app.get('/', (req, res) => {
@@ -91,11 +92,6 @@ const { runEquipmentMigration } = require('./api/migrations/equipmentMigration')
 // 啟動伺服器
 app.listen(PORT, async () => {
     console.log(`伺服器正在 http://localhost:${PORT} 上運行`);
-
-    // 【核心修改】註解掉此行，不再於啟動時預載所有快取
-    // cacheManager.initializeCaches();
-
-    // 執行數據遷移腳本
     try {
         await runEquipmentMigration();
     } catch (error) {
