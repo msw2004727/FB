@@ -85,7 +85,6 @@ async function handleGenerateAvatarClick(event) {
     const btn = event.currentTarget;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>畫師繪圖至少1分鐘，可先推進劇情..</span>`;
     btn.disabled = true;
-    appendMessageToStory(`【系統】畫師繪圖至少1分鐘，若不想等可先推進劇情。`, 'system-message');
     
     try {
         const result = await api.generateNpcAvatar(npcName);
