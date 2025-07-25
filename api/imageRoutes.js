@@ -57,7 +57,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Allegiance: ${npcProfile.allegiance || 'Unaffiliated'}, Appearance: ${npcProfile.appearance}`;
-        const imagePrompt = `A soft watercolor-inspired anime illustration... Character details: ${characterDetails}`;
+        const imagePrompt = `(Masterpiece, best quality, ultra-detailed). Style: Polished Japanese game CG, anime key visual, otome game character art, cel-shaded, vibrant colors, cinematic lighting. NOT a photo, NOT 3D. Content: A 3/4 view close-up portrait of a single character against a minimal, softly blurred background with hints of Chinese ink wash mountains. Character details: ${characterDetails}`;
         
         console.log(`[圖片系統 v10.0] 步驟 1: 為「${canonicalNpcName}」請求臨時圖片 URL...`);
         const tempImageUrl = await getAIGeneratedImage(imagePrompt);
