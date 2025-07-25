@@ -59,11 +59,11 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        // --- 【核心修正】將年齡、性別、身份地位納入提示詞 ---
+        // --- 【核心修正】採用全新、更強力、更穩定的風格提示詞 ---
         const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}`;
-        const imagePrompt = `A single character 3/4 view close-up portrait, high-quality Japanese anime CG illustration, with sharp and clean linework, vibrant yet soft color tones, smooth gradient shading, and subtle lighting effects. The character is wearing elegant hanfu or traditional East Asian robes, with detailed folds and natural fabric flow. Focus on a vivid and expressive face, lively eyes, and dynamic hair strands, with soft rim lighting and cinematic depth to create a polished game-style CG look. The background is minimal, softly blurred, with hints of ink wash mountains or Japanese-style scenery. Character details: ${characterDetails}`;
+        const imagePrompt = `(Masterpiece, best quality, ultra-detailed). Style: Polished Japanese game CG, anime key visual, otome game character art, cel-shaded, vibrant colors, cinematic lighting. NOT a photo, NOT 3D. Content: A 3/4 view close-up portrait of a single character against a minimal, softly blurred background with hints of Chinese ink wash mountains. Character Details to incorporate: ${characterDetails}`;
         
-        console.log(`[圖片系統 v8.0] 正在為「${canonicalNpcName}」使用包含詳細人設的提示生成頭像...`);
+        console.log(`[圖片系統 v9.0] 正在為「${canonicalNpcName}」使用強化的遊戲CG風格生成頭像...`);
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
@@ -78,10 +78,10 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         const updatedNpcTemplate = (await npcTemplateRef.get()).data();
         if (updatedNpcTemplate) {
             setTemplateInCache('npc', canonicalNpcName, updatedNpcTemplate);
-            console.log(`[圖片系統 v8.0] 已將「${canonicalNpcName}」的最新資料（包含頭像）同步至伺服器快取。`);
+            console.log(`[圖片系統 v9.0] 已將「${canonicalNpcName}」的最新資料（包含頭像）同步至伺服器快取。`);
         }
 
-        console.log(`[圖片系統 v8.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
+        console.log(`[圖片系統 v9.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
         res.json({
             success: true,
             message: `已成功為 ${canonicalNpcName} 繪製新的肖像。`,
@@ -89,7 +89,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[圖片系統 v8.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
+        console.error(`[圖片系統 v9.0] /generate/npc/${npcName} 處理過程中發生嚴重錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
