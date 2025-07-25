@@ -11,26 +11,43 @@ const getRelationGraphPrompt = (longTermSummary, username, npcDetails) => {
 ## Mermaid 語法核心準則：
 
 1.  **圖表方向**：你必須使用 \`graph TD;\` 作為開頭。
-2.  **節點定義**：每個人物都是一個節點。
-3.  **【核心修改規則】**: 在定義節點時，你必須根據我提供的「人物詳細情報」，在NPC姓名後加上代表「心動值」的愛心符號。
-    -   **只有在** NPC的 \`romanceValue\` **大於等於 10** 的情況下，才需要加上愛心。如果小於10，則**不要**加任何符號。
-    -   心動值與愛心對應規則 (總共5顆心)：
+2.  **節點定義與點擊事件 (核心修改)**:
+    * 在定義每一個人物節點時，你**必須**為其加上一個 \`click\` 事件，呼叫一個名為 \`showNpcPortrait\` 的全域 JavaScript 函式。
+    * 函式呼叫的參數必須是該 NPC 的**準確姓名**，並用**英文引號**包裹。
+    * **範例**: \`A["${username}"]:::playerClass\`, \`click A call showNpcPortrait("${username}")\`
+3.  **心動值顯示**: 你必須根據我提供的「人物詳細情報」，在NPC姓名後加上代表「心動值」的愛心符號。
+    * **只有在** NPC的 \`romanceValue\` **大於等於 10** 的情況下，才需要加上愛心。如果小於10，則**不要**加任何符號。
+    * 心動值與愛心對應規則 (總共5顆心)：
         -   10-29 (微動): ♥
         -   30-49 (好感): ♥♥
         -   50-69 (情愫): ♥♥♥
         -   70-89 (傾心): ♥♥♥♥
         -   90+ (情深): ♥♥♥♥♥
 4.  **關係連接**：使用 \`-- 關係描述 --- \` 的格式來連接兩個節點。
-5.  **優先順序**：優先繪製與玩家'${username}'直接相關的關係。
+5.  **樣式類別**: 為玩家節點加上 \`:::playerClass\` 以突顯。
 
 ### 語法範例：
 
 \`\`\`mermaid
 graph TD;
-    A[${username}] -- 師徒 --- B[師父];
-    A -- 朋友 --- C[小花 ♥♥];
-    B -- 夫妻 --- D[師娘];
-    C -- 父女 --- E[村長];
+    A["${username}"]:::playerClass;
+    B["師父"];
+    C["小花 ♥♥"];
+    D["師娘"];
+    E["村長"];
+
+    A -- 師徒 --- B;
+    A -- 朋友 --- C;
+    B -- 夫妻 --- D;
+    C -- 父女 --- E;
+
+    click A call showNpcPortrait("${username}");
+    click B call showNpcPortrait("師父");
+    click C call showNpcPortrait("小花");
+    click D call showNpcPortrait("師娘");
+    click E call showNpcPortrait("村長");
+    
+    classDef playerClass fill:#8c6f54,stroke:#3a2d21,stroke-width:4px,color:#fff;
 \`\`\`
 
 ---
