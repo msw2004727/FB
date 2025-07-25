@@ -5,6 +5,8 @@ const admin = require('firebase-admin');
 const { getAIGeneratedImage } = require('../services/aiService');
 const { getMergedNpcProfile } = require('./npcHelpers');
 const authMiddleware = require('../middleware/auth');
+// 【核心新增】引入快取更新工具
+const { setTemplateInCache } = require('./cacheManager');
 
 const db = admin.firestore();
 
@@ -49,7 +51,6 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        // --- 【核心修正】採用您指定的全新水彩動漫藝術風格指令 ---
         const imagePrompt = `A single-character close-up (3/4 view) portrait, dynamic and lively expression, subtle foreshortening, in a soft watercolor-inspired anime style. Clean, thin linework; pastel, muted colors with gentle watercolor washes. Add volumetric / rim lighting and nuanced shading to create a three-dimensional feel. Shallow depth of field and a softly blurred traditional Chinese ink-wash (shanshui) background. The character wears flowing hanfu-style garments with a tied sash, fabrics rendered with delicate brush textures. Elegant, airy, poetic mood. Character description: ${npcProfile.appearance}`;
         
         console.log(`[圖片系統 v6.0] 正在為「${canonicalNpcName}」使用全新水彩動漫風格生成頭像...`);
@@ -63,6 +64,14 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         await npcTemplateRef.set({
             avatarUrl: imageUrl
         }, { merge: true });
+
+        // --- 【核心修正】在更新資料庫後，立刻手動更新伺服器快取 ---
+        const updatedNpcTemplate = (await npcTemplateRef.get()).data();
+        if (updatedNpcTemplate) {
+            setTemplateInCache('npc', canonicalNpcName, updatedNpcTemplate);
+            console.log(`[圖片系統 v6.0] 已將「${canonicalNpcName}」的最新資料（包含頭像）同步至伺服器快取。`);
+        }
+        // --- 修正結束 ---
 
         console.log(`[圖片系統 v6.0] 成功為 NPC「${canonicalNpcName}」生成並儲存頭像。`);
         res.json({
