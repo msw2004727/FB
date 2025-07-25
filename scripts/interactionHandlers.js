@@ -10,12 +10,27 @@ let gameLoop = {};
 
 // --- Helper Functions (Internal to this module) ---
 
-function showNpcInteractionMenu(targetElement, npcName, isDeceased = false) {
+// 【核心修改】重構 showNpcInteractionMenu 函式以顯示頭像
+function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     const disabledAttr = isDeceased ? 'disabled' : '';
+    const npcName = npcProfile.name;
+
+    let avatarHtml = '';
+    if (npcProfile.avatarUrl) {
+        avatarHtml = `<div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div>`;
+    } else {
+        // 如果沒有頭像，顯示名字的第一個字作為預設圖
+        const placeholder = npcName.charAt(0);
+        avatarHtml = `<div class="npc-interaction-avatar"><span class="npc-interaction-avatar-placeholder">${placeholder}</span></div>`;
+    }
+
     dom.npcInteractionMenu.innerHTML = `
-        <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> 交易</button>
-        <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> 聊天</button>
-        <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> 動手</button>
+        ${avatarHtml}
+        <div class="npc-interaction-buttons">
+            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr} title="交易"><i class="fas fa-exchange-alt"></i></button>
+            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr} title="聊天"><i class="fas fa-comments"></i></button>
+            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr} title="動手"><i class="fas fa-khanda"></i></button>
+        </div>
     `;
     
     if (!isDeceased) {
@@ -48,17 +63,22 @@ function showNpcInteractionMenu(targetElement, npcName, isDeceased = false) {
     dom.npcInteractionMenu.classList.add('visible');
 }
 
+
 function showAttackIntention(event) {
     event.stopPropagation();
     const npcName = event.currentTarget.dataset.npcName;
-    dom.npcInteractionMenu.innerHTML = `
-        <button class="npc-interaction-btn intention" data-intention="切磋" data-npc-name="${npcName}">切磋</button>
-        <button class="npc-interaction-btn intention" data-intention="教訓" data-npc-name="${npcName}">教訓</button>
-        <button class="npc-interaction-btn intention attack" data-intention="打死" data-npc-name="${npcName}">打死</button>
-    `;
-    dom.npcInteractionMenu.querySelectorAll('.intention').forEach(btn => {
-        btn.addEventListener('click', showFinalConfirmation);
-    });
+    // 【核心修改】攻擊選單現在只替換按鈕部分
+    const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
+    if (buttonContainer) {
+        buttonContainer.innerHTML = `
+            <button class="npc-interaction-btn intention" data-intention="切磋" data-npc-name="${npcName}">切磋</button>
+            <button class="npc-interaction-btn intention" data-intention="教訓" data-npc-name="${npcName}">教訓</button>
+            <button class="npc-interaction-btn intention attack" data-intention="打死" data-npc-name="${npcName}">打死</button>
+        `;
+        buttonContainer.querySelectorAll('.intention').forEach(btn => {
+            btn.addEventListener('click', showFinalConfirmation);
+        });
+    }
 }
 
 function showFinalConfirmation(event) {
@@ -66,23 +86,33 @@ function showFinalConfirmation(event) {
     const npcName = event.currentTarget.dataset.npcName;
     const intention = event.currentTarget.dataset.intention;
     
-    dom.npcInteractionMenu.innerHTML = `
-        <span class="confirm-prompt-text">確定要「${intention}」？</span>
-        <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}"><i class="fas fa-times"></i></button>
-        <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}"><i class="fas fa-check"></i></button>
-    `;
+    const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
+    if (buttonContainer) {
+        buttonContainer.innerHTML = `
+            <span class="confirm-prompt-text">確定要「${intention}」？</span>
+            <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="取消"><i class="fas fa-times"></i></button>
+            <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}" title="確認"><i class="fas fa-check"></i></button>
+        `;
 
-    dom.npcInteractionMenu.querySelector('.cancel-attack').addEventListener('click', (e) => {
-        e.stopPropagation();
-        const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
-        if (originalTarget) {
-            const isDeceased = originalTarget.dataset.isDeceased === 'true';
-            showNpcInteractionMenu(originalTarget, npcName, isDeceased);
-        } else {
-            hideNpcInteractionMenu();
-        }
-    });
-    dom.npcInteractionMenu.querySelector('.confirm-attack').addEventListener('click', confirmAndInitiateAttack);
+        buttonContainer.querySelector('.cancel-attack').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            // 【核心修改】重新獲取 profile 來顯示主選單
+            try {
+                const profile = await api.getNpcProfile(npcName);
+                const originalTarget = document.querySelector(`.npc-name[data-npc-name="${npcName}"]`);
+                if (originalTarget && profile) {
+                    const isDeceased = originalTarget.dataset.isDeceased === 'true';
+                    showNpcInteractionMenu(originalTarget, profile, isDeceased);
+                } else {
+                    hideNpcInteractionMenu();
+                }
+            } catch (error) {
+                handleApiError(error);
+                hideNpcInteractionMenu();
+            }
+        });
+        buttonContainer.querySelector('.confirm-attack').addEventListener('click', confirmAndInitiateAttack);
+    }
 }
 
 
@@ -241,7 +271,6 @@ function handleStrategySelection(strategy) {
         relevantSkills.forEach(skill => {
             const requiredWeapon = skill.requiredWeaponType;
             
-            // 【核心修正 v3.0】重寫UI驗證邏輯
             const isUsable = 
                 (requiredWeapon && requiredWeapon !== '無' && requiredWeapon === currentWeaponType) ||
                 (requiredWeapon === '無' && currentWeaponType === null);
@@ -288,10 +317,10 @@ function handleStrategySelection(strategy) {
                     costSpan.textContent = `內力 ${totalCost}`;
 
                     if (totalCost > currentMp) {
-                        costSpan.style.color = '#dc3545'; // 紅色警示
+                        costSpan.style.color = '#dc3545'; 
                         confirmBtn.disabled = true;
                     } else {
-                        costSpan.style.color = ''; // 恢復預設顏色
+                        costSpan.style.color = ''; 
                         confirmBtn.disabled = false;
                     }
                     
@@ -392,13 +421,14 @@ export async function handleNpcClick(event) {
             try {
                 targetIsNpc.style.cursor = 'wait';
                 hideNpcInteractionMenu();
+                // 【核心修改】將獲取到的完整 profile 傳遞給 showNpcInteractionMenu
                 const profile = await api.getNpcProfile(npcName);
                 targetIsNpc.style.cursor = 'pointer';
 
                 if (profile.status_title === '丐幫弟子') {
                     await handleBeggarInquiry(npcName, profile);
                 } else {
-                    showNpcInteractionMenu(targetIsNpc, npcName, isDeceased);
+                    showNpcInteractionMenu(targetIsNpc, profile, isDeceased);
                 }
             } catch (error) {
                 targetIsNpc.style.cursor = 'pointer';
