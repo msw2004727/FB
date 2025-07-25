@@ -1,9 +1,8 @@
 // services/aiService.js
 
-// --- AI SDK 初始化 (保持不變) ---
+// --- AI SDK 初始化 ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
-// 【核心新增】引入 Anthropic (Claude) 的 SDK
 const Anthropic = require("@anthropic-ai/sdk");
 
 // 1. Google Gemini
@@ -26,7 +25,7 @@ const grok = new OpenAI({
     timeout: 30 * 1000,
 });
 
-// 5. 【核心新增】 Anthropic Claude
+// 5. Anthropic Claude
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -34,14 +33,13 @@ const anthropic = new Anthropic({
 
 const { aiConfig } = require('../api/aiConfig.js');
 
-// --- 從 prompts 資料夾導入腳本 (保持不變) ---
+// --- 從 prompts 資料夾導入腳本 ---
 const { getStoryPrompt } = require('../prompts/storyPrompt.js');
 const { getNarrativePrompt } = require('../prompts/narrativePrompt.js');
 const { getSummaryPrompt } = require('../prompts/summaryPrompt.js');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt.js');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt.js');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
-// const { getRandomEventPrompt } = require('../prompts/randomEventPrompt.js'); // 【核心修改】移除引用
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
 const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
 const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
@@ -64,7 +62,7 @@ const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
-// 統一的AI調度中心 (保持不變)
+// 統一的AI調度中心
 async function callAI(modelName, prompt, isJsonExpected = false) {
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
@@ -135,24 +133,40 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
     }
 }
 
-// 清理並解析JSON的輔助函式 (保持不變)
+/**
+ * 使用 DALL-E 3 生成圖片
+ * @param {string} prompt - 描述圖片內容的提示詞
+ * @returns {Promise<string|null>} - 成功時返回圖片的 URL，失敗時返回 null
+ */
+async function getAIGeneratedImage(prompt) {
+    console.log(`[AI 畫師] 收到圖片生成請求，描述: "${prompt}"`);
+    try {
+        const response = await openai.images.generate({
+            model: "dall-e-3",
+            prompt: prompt,
+            n: 1,
+            size: "1024x1024",
+            quality: "standard",
+        });
+
+        const imageUrl = response.data[0].url;
+        console.log(`[AI 畫師] 圖片生成成功，URL: ${imageUrl}`);
+        return imageUrl;
+
+    } catch (error) {
+        console.error(`[AI 畫師] DALL-E 3 圖片生成失敗:`, error);
+        return null;
+    }
+}
+
+// 清理並解析JSON的輔助函式
 function parseJsonResponse(text) {
     const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanJsonText);
 }
 
-/**
- * 【核心修正】修正了 getAICultivationResult 的函式簽名和內部邏輯
- * @param {string} username - 玩家名稱
- * @param {object} playerProfile - 玩家的完整檔案
- * @param {object} skillToPractice - 要修練的武學
- * @param {number} days - 閉關天數
- * @param {string} outcome - 後端計算的閉關結果
- * @param {string} storyHint - 給AI的故事基調提示
- * @returns {Promise<string>}
- */
+// ... (此處省略所有 getAI... 函式的重複程式碼，它們與您提供的檔案內容完全相同) ...
 async function getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint) {
-    // 確保傳遞給 prompt 的 playerProfile 物件中一定有 username
     const profileForPrompt = { ...playerProfile, username: username };
     const prompt = getCultivationPrompt(profileForPrompt, skillToPractice, days, outcome, storyHint);
     try {
@@ -165,8 +179,6 @@ async function getAICultivationResult(username, playerProfile, skillToPractice, 
     }
 }
 
-
-// ... (其餘所有 getAI... 函式保持不變) ...
 async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName) {
     const prompt = getForgetSkillPrompt(playerProfile, skillName);
     try {
@@ -272,9 +284,6 @@ async function getAIEncyclopedia(longTermSummary, username, npcDetails) {
         return `<div class="chapter"><h2 class="chapter-title">錯誤</h2><p class="entry-content">史官在翻閱你的記憶時遇到了困難，暫時無法完成編撰。</p></div>`;
     }
 }
-
-// 【核心修改】移除 getAIRandomEvent 函式
-// async function getAIRandomEvent(eventType, playerProfile) { ... }
 
 async function getAINpcProfile(username, npcName, roundData, playerProfile) {
     const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
@@ -515,6 +524,7 @@ async function getAIPostCombatResult(playerModelChoice, playerProfile, finalComb
 module.exports = {
     callAI,
     aiConfig,
+    getAIGeneratedImage,
     getAIAnachronismResponse,
     getAIForgetSkillStory,
     getAICultivationResult,
@@ -525,7 +535,6 @@ module.exports = {
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
-    // getAIRandomEvent, // 【核心修改】移除導出
     getAINpcProfile,
     getAICombatAction,
     getAICombatSetup,
