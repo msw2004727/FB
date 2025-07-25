@@ -7,7 +7,10 @@ const { getFriendlinessLevel, createNpcProfileInBackground } = require('./npcHel
 const { updateInventory, getInventoryState, getOrGenerateItemTemplate } = require('./playerStateHelpers');
 const { generateAndCacheLocation } = require('./worldEngine');
 const { v4: uuidv4 } = require('uuid');
-const { setTemplateInCache } = require('./cacheManager'); // 【核心新增】引入快取更新工具
+const { setTemplateInCache } = require('./cacheManager');
+
+// --- 【核心修正】為所有 GM 路由啟用身份驗證中介軟體 ---
+router.use(authMiddleware);
 
 const db = admin.firestore();
 
@@ -61,7 +64,6 @@ router.post('/create-npc-template', async (req, res) => {
             newTemplateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             await npcTemplateRef.set(newTemplateData);
             
-            // 【核心修改】在創建成功後，立刻更新伺服器的短期記憶
             setTemplateInCache('npc', npcName, newTemplateData);
             console.log(`[GM工具] 已將新創建的NPC「${npcName}」即時寫入伺服器快取。`);
 
