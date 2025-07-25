@@ -23,8 +23,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
     const { npcName } = req.params;
 
     try {
-        // --- 【核心修改】在呼叫 getMergedNpcProfile 之前，先獲取必要的上下文 ---
-        // 雖然這個路由不直接使用 roundData 和 playerProfile，但 getMergedNpcProfile 可能需要它們
+        // --- 【核心修正】在呼叫 getMergedNpcProfile 之前，先獲取必要的上下文 ---
         const userDoc = await db.collection('users').doc(userId).get();
         if (!userDoc.exists) {
             return res.status(404).json({ message: '找不到玩家檔案。' });
@@ -36,8 +35,9 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             return res.status(404).json({ message: '找不到玩家存檔。' });
         }
         const roundData = lastSaveSnapshot.docs[0].data();
-        // --- 修改結束 ---
+        // --- 修正結束 ---
 
+        // 將完整的上下文資訊傳遞給 getMergedNpcProfile
         const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
         if (!npcProfile) {
             // 這個錯誤現在只會在資料庫確實沒有該 NPC 模板時觸發
