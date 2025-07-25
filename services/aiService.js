@@ -3,6 +3,8 @@
 // --- AI SDK 初始化 (保持不變) ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
+// 【核心新增】引入 Anthropic (Claude) 的 SDK
+const Anthropic = require("@anthropic-ai/sdk");
 
 // 1. Google Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -23,6 +25,12 @@ const grok = new OpenAI({
     baseURL: "https://api.x.ai/v1",
     timeout: 30 * 1000,
 });
+
+// 5. 【核心新增】 Anthropic Claude
+const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
 
 const { aiConfig } = require('../api/aiConfig.js');
 
@@ -98,6 +106,20 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 }
                 const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
+                break;
+            // 【核心新增】處理 Claude 模型的邏輯
+            case 'claude':
+                const claudeOptions = {
+                    model: "claude-3-haiku-20240307", // 您可以根據需求更換為 Sonnet 或 Opus
+                    max_tokens: 4096,
+                    messages: [{ role: "user", content: prompt }],
+                };
+                // 如果期望JSON，我們透過系統提示詞來引導Claude
+                if (isJsonExpected) {
+                    claudeOptions.system = "Your response must be a single, valid JSON object and nothing else. Do not include any explanatory text or markdown formatting like ```json.";
+                }
+                const claudeResult = await anthropic.messages.create(claudeOptions);
+                textResponse = claudeResult.content[0].text;
                 break;
             default:
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
