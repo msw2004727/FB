@@ -110,7 +110,9 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
             // 【核心新增】處理 Claude 模型的邏輯
             case 'claude':
                 const claudeOptions = {
-                    model: "claude-3-haiku-20240307", // 您可以根據需求更換為 Sonnet 或 Opus
+                    // 【核心修改】已為您升級至最新的 Sonnet 4 模型 (推測代號)
+                    // 如果此代號無效，請從您的 API 文件中找到正確的 Model ID 並替換此處
+                    model: "claude-4-sonnet", 
                     max_tokens: 4096,
                     messages: [{ role: "user", content: prompt }],
                 };
