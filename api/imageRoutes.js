@@ -28,9 +28,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
 
-        // --- 【核心修改】將您的風格指令融入繪圖提示中 ---
         const imagePrompt = `A beautiful manga-style portrait of a character from the Northern Song Dynasty of ancient China. ${npcProfile.appearance}. Wuxia (martial arts hero) theme, elegant and aesthetic.`;
-        // --- 修改結束 ---
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
@@ -50,7 +48,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             avatarUrl: imageUrl
         });
 
-    } catch (error)
+    } catch (error) { // 【核心修正】在這裡加上了遺漏的 { }
         console.error(`[圖片系統] /generate/npc/:npcName 錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
