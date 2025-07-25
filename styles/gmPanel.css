@@ -179,10 +179,32 @@
 
 .gm-card-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 1rem;
     margin-bottom: 1.5rem;
 }
+
+.gm-npc-avatar, .gm-npc-avatar-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: #4a4a6a;
+    border: 2px solid #626288;
+}
+.gm-npc-avatar {
+    background-size: cover;
+    background-position: center;
+}
+.gm-npc-avatar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    color: #e0e0e0;
+}
+
 
 .gm-card-header h4 {
     font-size: 1.2rem;
@@ -196,6 +218,7 @@
     padding: 0.2rem 0.6rem;
     border-radius: 10px;
     color: #fff;
+    margin-left: auto; /* 讓標籤靠右 */
 }
 .gm-status-tag.ghost {
     background-color: #e03131; /* 紅色 */
@@ -275,13 +298,18 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    flex-grow: 1; /* 讓按鈕在 button-group 內平分寬度 */
 }
 .gm-button.save {
     background: #845ef7;
 }
 .gm-button.rebuild {
-    background: #22b8cf; /* 青色 */
+    background: #22b8cf;
 }
+.gm-button.generate-avatar {
+    background: #e67700;
+}
+
 .gm-button:hover {
     opacity: 0.85;
 }
@@ -289,6 +317,13 @@
     background: #626288;
     cursor: not-allowed;
 }
+
+.gm-button-group {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
 
 /* 玩家屬性編輯頁面專屬樣式 */
 .gm-form-section {
@@ -335,9 +370,4 @@
 .gm-input[type="number"] {
     width: 120px;
     flex-grow: 0;
-}
-
-.gm-button-group {
-    display: flex;
-    gap: 1rem;
 }
