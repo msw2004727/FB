@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const { getAIGeneratedImage } = require('../services/aiService');
-const { getKnownNpcTemplate } = require('./cacheManager'); // 【核心修改】改用更直接的快取/資料庫查詢工具
+const { getMergedNpcProfile } = require('./npcHelpers');
 const authMiddleware = require('../middleware/auth');
 
 const db = admin.firestore();
@@ -19,18 +19,32 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         return res.status(503).json({ success: false, message: 'AI 畫師目前正在休息，暫不提供服務。' });
     }
 
+    const { userId, username } = req.user;
     const { npcName } = req.params;
 
     try {
-        // --- 【核心修改】直接從快取或資料庫獲取最基礎的 NPC 模板 ---
-        const npcTemplate = await getKnownNpcTemplate(npcName);
-        if (!npcTemplate || !npcTemplate.appearance) {
-            // 這個錯誤現在只會在資料庫確實沒有該 NPC 模板，或模板不完整時觸發
-            return res.status(404).json({ message: '找不到該人物的檔案或其外觀描述。' });
+        // --- 【核心修正】在呼叫 getMergedNpcProfile 之前，先獲取必要的上下文 ---
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: '找不到玩家檔案。' });
         }
-        // --- 修改結束 ---
+        const playerProfile = { ...userDoc.data(), username: username };
 
-        const imagePrompt = `A beautiful manga-style portrait of a character from the Northern Song Dynasty of ancient China. ${npcTemplate.appearance}. Wuxia (martial arts hero) theme, elegant and aesthetic.`;
+        const lastSaveSnapshot = await db.collection('users').doc(userId).collection('game_saves').orderBy('R', 'desc').limit(1).get();
+        if (lastSaveSnapshot.empty) {
+            return res.status(404).json({ message: '找不到玩家存檔。' });
+        }
+        const roundData = lastSaveSnapshot.docs[0].data();
+        // --- 修正結束 ---
+
+        // 將完整的上下文資訊傳遞給 getMergedNpcProfile
+        const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
+        if (!npcProfile) {
+            // 這個錯誤現在只會在資料庫確實沒有該 NPC 模板時觸發
+            return res.status(404).json({ message: '找不到該人物的檔案。' });
+        }
+
+        const imagePrompt = `A beautiful manga-style portrait of a character from the Northern Song Dynasty of ancient China. ${npcProfile.appearance}. Wuxia (martial arts hero) theme, elegant and aesthetic.`;
 
         const imageUrl = await getAIGeneratedImage(imagePrompt);
         if (!imageUrl) {
