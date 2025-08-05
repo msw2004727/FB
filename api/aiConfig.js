@@ -28,7 +28,7 @@ const aiConfig = {
     // --- 遊戲邏輯與數據處理 ---
     summary: 'openai',        // 將回合數據總結為長期記憶
     actionClassifier: 'openai',// 玩家行動意圖分類器
-    suggestion: 'grok',   // 書僮的行動建議
+    suggestion: 'deepseek',   // 書僮的行動建議
     
     // --- 戰鬥相關 ---
     combat: 'openai',       // 戰鬥過程裁決
@@ -38,7 +38,7 @@ const aiConfig = {
     npcProfile: 'openai',   // 新NPC的詳細人設生成
     npcChat: 'openai',        // NPC密談時的回應
     npcChatSummary: 'openai', // 總結密談內容
-    giveItem: 'grok',       // 贈予NPC物品時的反應
+    giveItem: 'deepseek',       // 贈予NPC物品時的反應
     giveNarrative: 'openai',  // 贈予事件的小說化描述
     proactiveChat: 'openai',// NPC主動發起對話的內容
 
