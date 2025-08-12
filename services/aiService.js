@@ -270,7 +270,8 @@ async function getAISuggestion(roundData) {
         return text.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 機靈書僮任務:", error);
-        return null;
+        // 【核心修正】在AI出錯時，返回一個預設的建議，而不是null
+        return "江湖之大，何處不可去得？";
     }
 }
 
