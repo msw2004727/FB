@@ -29,7 +29,7 @@ const aiConfig = {
     // --- 遊戲邏輯與數據處理 ---
     summary: 'openai',        // 將回合數據總結為長期記憶
     actionClassifier: 'openai',// 玩家行動意圖分類器
-    suggestion: 'openai',     // 【核心修正】書僮的行動建議 (從 'grok' 更換為 'openai' 確保穩定性)
+    suggestion: 'grok',     // 書僮的行動建議
     
     // --- 戰鬥相關 ---
     combat: 'openai',       // 戰鬥過程裁決
