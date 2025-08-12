@@ -5,11 +5,23 @@ const getSuggestionPrompt = (roundData) => {
     const aliveNpcs = (roundData.NPC || []).filter(npc => !npc.isDeceased);
     const aliveNpcNames = aliveNpcs.map(npc => npc.name).join('、') || '無';
 
+    // 【核心修正 v2.0】改為從 inventory 陣列讀取物品，並生成易讀的字串
+    let itemsString = '身無長物';
+    if (roundData.inventory && Array.isArray(roundData.inventory) && roundData.inventory.length > 0) {
+        const playerItems = roundData.inventory
+            .filter(item => item.itemName !== '銀兩') // 過濾掉銀兩，專注於可互動的物品
+            .map(item => `${item.itemName}${item.quantity > 1 ? `(x${item.quantity})` : ''}`);
+        
+        if (playerItems.length > 0) {
+            itemsString = playerItems.join('、');
+        }
+    }
+
     // 將當前回合的數據轉換為易讀的摘要
     const context = `
 - 玩家狀態: ${roundData.PC}
 - 人物見聞: ${aliveNpcNames}
-- 隨身物品: ${roundData.ITM || '無'}
+- 隨身物品: ${itemsString}
 - 任務日誌: ${roundData.QST || '無'}
 - 關鍵線索: ${roundData.CLS || '無'}
 - 內心獨白: ${roundData.PSY}
