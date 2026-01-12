@@ -74,7 +74,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                options.model = "gpt-4.2-mini";
+                options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -119,7 +119,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 break;
             default:
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
-                options.model = "gpt-4.2-mini";
+                options.model = "gpt-4.1-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
