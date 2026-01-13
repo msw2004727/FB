@@ -183,9 +183,11 @@ export async function processNewRoundData(data) {
     }
     gameState.roundData.stamina = data.roundData.stamina;
 
-    // 2. 更新物品 (這部分比較複雜，暫時先完全替換)
+    // 2. 更新物品 (【優化】現在這個 data.inventory 來自後端的一次性回傳)
     if(data.inventory) {
         gameState.roundData.inventory = data.inventory;
+    } else {
+        console.warn("[優化警告] 後端未回傳背包數據，背包顯示可能不同步。");
     }
 
     // 3. 【優化】只更新變動的NPC，而不是替換整個列表
@@ -261,10 +263,8 @@ export async function handlePlayerAction() {
         
         // 【核心修改】收到後端數據後，交給新的處理函式
         if (data && data.roundData) {
-            // 在處理新回合數據前，先獲取一次完整的背包狀態並更新
-            // 這是因為後端可能只回傳了變化，前端需要一個完整的基準來應用這些變化
-            const fullInventory = await api.getInventory();
-            data.inventory = fullInventory;
+            // 【效能優化】移除此處的 await api.getInventory(); 二次請求
+            // 直接將後端傳回的資料交給 processNewRoundData
             processNewRoundData(data);
         } else {
             throw new Error("從伺服器收到的回應格式不正確。");
