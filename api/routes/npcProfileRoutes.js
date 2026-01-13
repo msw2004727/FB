@@ -34,6 +34,7 @@ router.get('/profile/:npcName', async (req, res) => {
 
         const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
         
+        // 1. 如果是玩家自己
         if (playerProfile && playerProfile.username === npcName) {
             return res.json({
                 name: playerProfile.username,
@@ -46,7 +47,8 @@ router.get('/profile/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        // --- 【核心修正 v3.0】採用最穩健的比較方式 ---
+        // --- 【核心修正 v3.5】位置與隊友檢查邏輯 ---
+        
         const playerLocationHierarchy = roundData.LOC || [];
         const npcLocationHierarchy = npcProfile.currentLocation;
 
@@ -58,11 +60,18 @@ router.get('/profile/:npcName', async (req, res) => {
             ? npcLocationHierarchy[0].trim()
             : (typeof npcLocationHierarchy === 'string' ? npcLocationHierarchy.trim() : null);
 
-        if (!playerArea || !npcArea || playerArea !== npcArea) {
-            // 使用升級後的日誌，方便未來除錯
-            console.log(`[密談檢查 v3.0] 玩家 ("${playerArea}") 與 NPC ("${npcArea}") 不在同一個區域，拒絕密談。`);
-            return res.status(403).json({ message: `你環顧四周，並未見到 ${npcName} 的身影。` });
+        // [關鍵修復] 檢查該 NPC 是否為玩家的同行隊友 (Companions)
+        // 假設存檔結構中有 companions 陣列，若無則預設為空
+        const companions = roundData.companions || [];
+        const isCompanion = Array.isArray(companions) && companions.includes(npcName);
+
+        // [判定邏輯]
+        // 如果 (地點不同) 且 (不是隊友)，才拒絕存取
+        if ((!playerArea || !npcArea || playerArea !== npcArea) && !isCompanion) {
+            console.log(`[互動檢查] 玩家位於 "${playerArea}"，NPC "${npcName}" 位於 "${npcArea}"。地點不符且非隊友，系統拒絕連接。`);
+            return res.status(403).json({ message: `[系統] 連接失敗... (你環顧四周，並未見到 ${npcName} 的身影。)` });
         }
+        
         // --- 修正結束 ---
 
         const publicProfile = {
