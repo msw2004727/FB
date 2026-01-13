@@ -57,7 +57,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Allegiance: ${npcProfile.allegiance || 'Unaffiliated'}, Appearance: ${npcProfile.appearance}`;
-        const imagePrompt = `(Masterpiece, best quality, ultra-detailed). 單一角色的3/4視角特寫肖像，高品質日系CG插畫風格，線條乾淨俐落，顏色柔和但飽滿，使用平滑的漸層陰影，光影細膩柔和。角色身穿東方古風的寬袖長袍或漢服，布料細節自然且有褶皺。重點強調生動且有神的眼睛、自然流暢的髮絲、清晰的五官輪廓與立體感。背景簡約並稍微模糊，帶有水墨山水或淡淡的古典東方氛圍，整體畫面乾淨、優雅並富有詩意，特寫獨照. Character details: ${characterDetails}`;
+        const imagePrompt = `(Masterpiece, best quality, ultra-detailed). 單一角色的3/4視角特寫肖像，高品質日系CG插畫風格，線條乾淨俐落，顏色柔和但飽滿，使用平滑的漸層陰影，光影細膩柔和。角色身穿東方古風的寬袖長袍或漢服，布料細節自然且有褶皺。重點強調生動且有神的眼睛、自然流暢的髮絲、清晰的五官輪廓與立體感。背景簡約並稍微模糊，帶有水墨山水或淡淡的古典東方氛圍，整體畫面乾淨、優雅並富有詩意，特寫獨照，手繪風格. Character details: ${characterDetails}`;
         
         console.log(`[圖片系統 v10.0] 步驟 1: 為「${canonicalNpcName}」請求臨時圖片 URL...`);
         const tempImageUrl = await getAIGeneratedImage(imagePrompt);
