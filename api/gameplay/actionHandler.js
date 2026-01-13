@@ -1,9 +1,12 @@
 // /api/gameplay/actionHandler.js
 const { buildContext } = require('../contextBuilder');
-const { getAIStory, getAISuggestion, getAIActionClassification, getAIAnachronismResponse } = require('../../services/aiService');
+// 【優化】移除 getAIActionClassification 引用
+const { getAIStory, getAISuggestion, getAIAnachronismResponse } = require('../../services/aiService');
 const { updateGameState } = require('./stateUpdaters');
 const { getMergedLocationData } = require('../worldStateHelpers');
 const { initiateCombat } = require('./combatManager'); 
+// 【優化】新增背包查詢工具
+const { getRawInventory } = require('../playerStateHelpers');
 
 const FORBIDDEN_ITEMS = [
     '倚天劍', '屠龍刀', '聖火令', '九陽神功', '九陰真經', '乾坤大挪移',
@@ -88,20 +91,10 @@ async function handleAction(req, res, player, newRoundNumber) {
         }
         // --- 守門員機制結束 ---
 
-        const classificationContext = {
-            location: locationContext?.locationName,
-            npcs: Object.keys(npcContext),
-            skills: playerContext.skills.map(s => s.skillName)
-        };
-        const classification = await getAIActionClassification(playerModelChoice, playerAction, classificationContext);
-        console.log(`[AI總導演 v4.0] 玩家行動「${playerAction}」被分類為: ${classification.actionType}`);
+        /* * 【效能優化】已移除 getAIActionClassification 分類器
+         * 原因：該分類器在後續邏輯中僅使用 default，造成無謂的 API 等待時間。
+         */
         
-        switch (classification.actionType) {
-            default:
-                console.log(`[行動處理器] 行動類型 ${classification.actionType} 交由主故事AI生成。`);
-                break;
-        }
-
         playerAction = preprocessPlayerAction(playerAction, locationContext);
         
         if (isNewGame) {
@@ -149,13 +142,18 @@ async function handleAction(req, res, player, newRoundNumber) {
         const suggestion = await getAISuggestion(finalRoundData);
         finalRoundData.suggestion = suggestion;
         
-        const finalLocationData = await getMergedLocationData(userId, finalRoundData.LOC);
+        // 【效能優化】使用 Promise.all 並行撈取地點資訊與背包資訊
+        const [finalLocationData, userInventory] = await Promise.all([
+            getMergedLocationData(userId, finalRoundData.LOC),
+            getRawInventory(userId)
+        ]);
 
         res.json({
             story: finalRoundData.story,
             roundData: finalRoundData,
             suggestion: suggestion,
-            locationData: finalLocationData
+            locationData: finalLocationData,
+            inventory: userInventory // 【優化】直接回傳背包數據，前端不需再查詢
         });
 
     } catch (error) {
