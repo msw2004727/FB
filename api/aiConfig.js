@@ -8,7 +8,7 @@
  * 指定要使用的AI模型。
  *
  * 可用模型名稱:
- * - 'openai'   : GPT-4.1-mini，綜合能力最強，穩定，但成本較高。
+ * - 'openai'   : GPT-5-Nano (原 GPT-4.1-mini)，速度極快且成本低。
  * - 'deepseek' : DeepSeek-Chat，創造力和遵循複雜指令的能力很強，文筆奇幻。
  * - 'grok'     : Grok-3-Fast，速度快，反應不按常理出牌，風格獨特。
  * - 'gemini'   : Gemini-1.5-Flash，目前服務不穩，暫不建議使用。
