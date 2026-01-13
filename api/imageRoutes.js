@@ -73,12 +73,14 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             [Background]: PURE WHITE BACKGROUND (#FFFFFF), Empty, No Environment, No Text, No Watermarks.
         `;
 
-        // B. 資料解析 (Data Parsing)
-        const gender = npcProfile.gender || 'Unknown';
-        const age = npcProfile.age || 'Unknown';
-        const role = npcProfile.occupation || npcProfile.identity || 'Wanderer'; // 職業/身分
-        const appearanceBase = npcProfile.appearance || 'Distinct eastern features';
-        const personality = (npcProfile.personality || '').toLowerCase();
+        // B. 資料解析 (Data Parsing) - 【關鍵修復】加入 String() 強制轉型，防止崩潰
+        const gender = String(npcProfile.gender || 'Unknown');
+        const age = String(npcProfile.age || 'Unknown');
+        const role = String(npcProfile.occupation || npcProfile.identity || 'Wanderer'); // 職業/身分
+        const appearanceBase = String(npcProfile.appearance || 'Distinct eastern features');
+        
+        // 這裡就是報錯的源頭，加上 String() 確保它一定是字串
+        const personality = String(npcProfile.personality || '').toLowerCase(); 
 
         // C. 動態特徵映射 - 根據個性決定表情 (Expression Mapping)
         let facialExpression = "Calm and neutral expression";
@@ -100,7 +102,9 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
 
         // D. 動態特徵映射 - 根據身分決定服裝材質 (Outfit Mapping)
         let outfitTexture = "Standard Eastern Fantasy fabric";
-        const roleLower = role.toLowerCase();
+        
+        // 同樣加上 String() 保護
+        const roleLower = String(role).toLowerCase();
 
         if (roleLower.includes('beggar') || roleLower.includes('丐')) {
             outfitTexture = "Tattered, patched rough linen, dirty texture, worn-out edges";
