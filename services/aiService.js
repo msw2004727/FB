@@ -74,8 +74,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                // 【核心修改】已升級為 GPT-5-Nano (速度極快)
-                options.model = "gpt-5-nano"; 
+                // 【核心修改】已升級為 gpt-4o-mini (速度極快)
+                options.model = "gpt-4o-mini"; 
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -120,7 +120,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 break;
             default:
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
-                options.model = "gpt-5-nano";
+                options.model = "gpt-4o-mini";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
