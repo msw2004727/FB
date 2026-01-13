@@ -6,10 +6,10 @@ const { getAIGeneratedImage } = require('../services/aiService');
 const { getMergedNpcProfile } = require('./npcHelpers');
 const authMiddleware = require('../middleware/auth');
 const { setTemplateInCache } = require('./cacheManager');
-const gaxios = require('gaxios'); // 【核心新增】引入 HTTP 客戶端以下載圖片
+const gaxios = require('gaxios'); 
 
 const db = admin.firestore();
-const storage = admin.storage(); // 【核心新增】初始化 Firebase Storage
+const storage = admin.storage(); 
 
 router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
     if (process.env.ENABLE_IMAGE_GENERATION !== 'true') {
@@ -56,10 +56,37 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Allegiance: ${npcProfile.allegiance || 'Unaffiliated'}, Appearance: ${npcProfile.appearance}`;
-        const imagePrompt = `(Masterpiece, best quality, ultra-detailed). 單一角色的3/4視角特寫肖像，高品質日系CG插畫風格，線條乾淨俐落，顏色柔和但飽滿，使用平滑的漸層陰影，光影細膩柔和。角色身穿東方古風的寬袖長袍或漢服，布料細節自然且有褶皺。重點強調生動且有神的眼睛、自然流暢的髮絲、清晰的五官輪廓與立體感。背景簡約並稍微模糊，帶有水墨山水或淡淡的古典東方氛圍，整體畫面乾淨、優雅並富有詩意，特寫獨照，手繪風格. Character details: ${characterDetails}`;
+        // --- 【核心修改】Prompt 風格優化區塊 ---
+        const gender = npcProfile.gender ? npcProfile.gender.toLowerCase() : 'unknown';
+        let styleSpecifics = "";
+        
+        // 根據性別決定描述
+        if (gender.includes('female') || gender.includes('女')) {
+            // 女性：穿著偏裸露、性感、迷人
+            styleSpecifics = "Female character, wearing a bold and somewhat revealing Eastern fantasy outfit (穿著大膽且略為裸露的東方服飾), showing skin elegantly. Alluring pose, sensual vibe, beautiful face, expressive eyes.";
+        } else if (gender.includes('male') || gender.includes('男')) {
+            // 男性：帥氣、酷、英俊
+            styleSpecifics = "Male character, extremely handsome and cool (英俊帥氣), sharp facial features, heroic and dashing appearance. Wearing stylish Eastern martial arts clothing.";
+        } else {
+            // 其他
+            styleSpecifics = "Character with distinct personality features, wearing Eastern fantasy clothing.";
+        }
+
+        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}, Personality: ${npcProfile.personality || 'Distinct'}`;
+        
+        // 組合最終 Prompt
+        // 強調：日式手繪 (Hand-drawn)、白底 (White Background)、個性鮮明
+        const imagePrompt = `(Masterpiece, best quality). 
+        Japanese Hand-drawn Anime Style (日式手繪插畫風格), mixed with watercolor texture and distinct ink lines (水彩與墨線質感).
+        Solo character portrait, clear white background (純白背景), no background elements.
+        ${styleSpecifics}
+        The character design should strongly reflect their personality. 
+        Detailed hair and eyes, distinct facial expression.
+        Character details: ${characterDetails}`;
+        // --- 修改結束 ---
         
         console.log(`[圖片系統 v10.0] 步驟 1: 為「${canonicalNpcName}」請求臨時圖片 URL...`);
+        // 注意：這裡依賴 services/aiService.js 中的設定 (建議確認那邊有開啟 HD + Vivid 以獲得最佳手繪效果)
         const tempImageUrl = await getAIGeneratedImage(imagePrompt);
         if (!tempImageUrl) {
             throw new Error('AI 畫師創作失敗，請稍後再試。');
@@ -73,21 +100,18 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         const imageBuffer = Buffer.from(response.data);
 
         console.log(`[圖片系統 v10.0] 步驟 3: 將圖片上傳至 Firebase Storage...`);
-        const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET); // 從環境變數獲取 bucket 名稱
+        const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
         const fileName = `npc-avatars/${canonicalNpcName}_${Date.now()}.png`;
         const file = bucket.file(fileName);
 
         await file.save(imageBuffer, {
             metadata: {
                 contentType: 'image/png',
-                cacheControl: 'public, max-age=31536000', // 快取一年
+                cacheControl: 'public, max-age=31536000',
             },
         });
         
-        // 讓檔案公開可讀
         await file.makePublic();
-        
-        // 獲取永久的公開URL
         const permanentUrl = file.publicUrl();
         console.log(`[圖片系統 v10.0] 步驟 4: 獲取永久 URL 並存入資料庫: ${permanentUrl}`);
 
