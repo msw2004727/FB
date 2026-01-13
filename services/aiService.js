@@ -74,7 +74,8 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                options.model = "gpt-5-nano";
+                // 【核心修改】已升級為 GPT-5-Nano (速度極快)
+                options.model = "gpt-5-nano"; 
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -134,19 +135,20 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 }
 
 /**
- * 使用 DALL-E 3 生成圖片
+ * 使用 DALL-E 3 生成圖片 (已升級為 HD 畫質)
  * @param {string} prompt - 描述圖片內容的提示詞
  * @returns {Promise<string|null>} - 成功時返回圖片的 URL，失敗時返回 null
  */
 async function getAIGeneratedImage(prompt) {
-    console.log(`[AI 畫師] 收到圖片生成請求，描述: "${prompt}"`);
+    console.log(`[AI 畫師] 收到圖片生成請求 (HD模式)，描述: "${prompt}"`);
     try {
         const response = await openai.images.generate({
-            model: "dall-e-3",
+            model: "dall-e-3", // 保持 DALL-E 3，它是目前最穩定的圖像接口
             prompt: prompt,
             n: 1,
             size: "1024x1024",
-            quality: "standard",
+            quality: "hd",    // 【核心升級】開啟 HD 畫質，細節更豐富
+            style: "vivid",   // 【核心升級】使用鮮明風格，適合遊戲立繪
         });
 
         const imageUrl = response.data[0].url;
@@ -165,7 +167,6 @@ function parseJsonResponse(text) {
     return JSON.parse(cleanJsonText);
 }
 
-// ... (此處省略所有 getAI... 函式的重複程式碼，它們與您提供的檔案內容完全相同) ...
 async function getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint) {
     const profileForPrompt = { ...playerProfile, username: username };
     const prompt = getCultivationPrompt(profileForPrompt, skillToPractice, days, outcome, storyHint);
@@ -270,7 +271,6 @@ async function getAISuggestion(roundData) {
         return text.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 機靈書僮任務:", error);
-        // 【核心修正】在AI出錯時，返回一個預設的建議，而不是null
         return "江湖之大，何處不可去得？";
     }
 }
