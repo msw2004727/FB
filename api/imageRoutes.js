@@ -56,37 +56,47 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
              throw new Error(`為 ${npcName} 獲取的資料中缺少有效的姓名。`);
         }
 
-        // --- 【核心修改】Prompt 風格優化區塊 ---
+        // --- 【核心修改】畫風統一邏輯 ---
+        
+        // 1. 定義一個「絕對統一」的基礎風格模板
+        // 使用 "Official Character Design Sheet" 和 "Flat Cel Shading" 來強制統一
+        const UNIFIED_STYLE_BASE = `
+            Type: Official Anime Character Design Sheet (官方動畫角色設定圖).
+            Art Style: High-quality 2D Anime Illustration (高品質2D動畫插畫).
+            Technique: Flat Cel Shading (賽璐珞平塗), Clean Vector Lines (乾淨的向量線條), No messy sketch lines.
+            Lighting: Uniform Soft Studio Lighting (統一柔和棚光), No dramatic shadows, No lens flare.
+            Background: Pure White Background (純白背景), isolated character.
+            Vibe: Professional Game Asset (專業遊戲素材).
+        `;
+
         const gender = npcProfile.gender ? npcProfile.gender.toLowerCase() : 'unknown';
         let styleSpecifics = "";
         
-        // 根據性別決定描述
+        // 2. 根據性別微調，但保持在上述框架內
         if (gender.includes('female') || gender.includes('女')) {
-            // 女性：穿著偏裸露、性感、迷人
-            styleSpecifics = "Female character, wearing a bold and somewhat revealing Eastern fantasy outfit (穿著大膽且略為裸露的東方服飾), showing skin elegantly. Alluring pose, sensual vibe, beautiful face, expressive eyes.";
+            // 女性：強調曲線與魅力，但畫風要乾淨
+            styleSpecifics = "Subject: Female character. Outfit: Bold and revealing Eastern fantasy robes, showing skin aesthetically. Features: Beautiful face, alluring expression, intricate hair ornaments.";
         } else if (gender.includes('male') || gender.includes('男')) {
-            // 男性：帥氣、酷、英俊
-            styleSpecifics = "Male character, extremely handsome and cool (英俊帥氣), sharp facial features, heroic and dashing appearance. Wearing stylish Eastern martial arts clothing.";
+            // 男性：強調挺拔與英氣，線條可稍硬朗
+            styleSpecifics = "Subject: Male character. Outfit: Stylish Eastern martial artist attire. Features: Handsome, cool, sharp facial definition, confident stance.";
         } else {
-            // 其他
-            styleSpecifics = "Character with distinct personality features, wearing Eastern fantasy clothing.";
+            styleSpecifics = "Subject: Character with distinct features. Outfit: Eastern fantasy clothing.";
         }
 
-        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Gender: ${npcProfile.gender || 'Unknown'}, Title: ${npcProfile.status_title || 'Commoner'}, Appearance: ${npcProfile.appearance}, Personality: ${npcProfile.personality || 'Distinct'}`;
+        const characterDetails = `Age: ${npcProfile.age || 'Unknown'}, Appearance Details: ${npcProfile.appearance}, Personality: ${npcProfile.personality || 'Distinct'}`;
         
-        // 組合最終 Prompt
-        // 強調：日式手繪 (Hand-drawn)、白底 (White Background)、個性鮮明
-        const imagePrompt = `(Masterpiece, best quality). 
-        Japanese Hand-drawn Anime Style (日式手繪插畫風格), mixed with watercolor texture and distinct ink lines (水彩與墨線質感).
-        Solo character portrait, clear white background (純白背景), no background elements.
-        ${styleSpecifics}
-        The character design should strongly reflect their personality. 
-        Detailed hair and eyes, distinct facial expression.
-        Character details: ${characterDetails}`;
+        // 3. 組合 Prompt：基礎風格 + 角色特徵 + 再次強調乾淨
+        const imagePrompt = `
+            ${UNIFIED_STYLE_BASE}
+            ${styleSpecifics}
+            Character Details: ${characterDetails}
+            (Masterpiece, best quality, ultra-detailed face, 8k resolution).
+            Ensure the image is a solo portrait with no background objects.
+        `.replace(/\s+/g, ' ').trim(); // 移除多餘空白
         // --- 修改結束 ---
         
         console.log(`[圖片系統 v10.0] 步驟 1: 為「${canonicalNpcName}」請求臨時圖片 URL...`);
-        // 注意：這裡依賴 services/aiService.js 中的設定 (建議確認那邊有開啟 HD + Vivid 以獲得最佳手繪效果)
+        // 使用 services/aiService.js 發送請求
         const tempImageUrl = await getAIGeneratedImage(imagePrompt);
         if (!tempImageUrl) {
             throw new Error('AI 畫師創作失敗，請稍後再試。');
