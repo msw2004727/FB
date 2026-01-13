@@ -46,7 +46,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             throw new Error(`系統無法找到或創建名為「${npcName}」的人物檔案。`);
         }
         
-        // 3. 檢查是否已有頭像，避免重複生成浪費資源
+        // 3. 檢查是否已有頭像
         if (npcProfile.avatarUrl) {
             console.log(`[圖片系統] NPC「${npcProfile.name}」的肖像已存在，無需重複生成。`);
             return res.json({
@@ -62,10 +62,12 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         // ==========================================
-        //       【核心修改】 Prompt 建構邏輯
+        //       【核心修改】 Prompt 建構邏輯 (防護升級)
         // ==========================================
 
-        // A. 畫風鎖定 (Style Anchor) - 強制統一為日式賽璐璐手繪立繪
+        console.log(`[圖片系統] 正在處理 NPC: ${canonicalNpcName}, 原始個性資料:`, npcProfile.personality);
+
+        // A. 畫風鎖定 (Style Anchor)
         const STYLE_ANCHOR = `
             [Art Style]: Japanese 2D Anime Style (日式動畫風格), High-Quality Hand-drawn Illustration.
             [Technique]: Flat Cel Shading (賽璐珞平塗), Clean Vector Lines (G-pen ink style), Hard-edge shadows.
@@ -73,14 +75,30 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             [Background]: PURE WHITE BACKGROUND (#FFFFFF), Empty, No Environment, No Text, No Watermarks.
         `;
 
-        // B. 資料解析 (Data Parsing) - 【關鍵修復】加入 String() 強制轉型，防止崩潰
-        const gender = String(npcProfile.gender || 'Unknown');
-        const age = String(npcProfile.age || 'Unknown');
-        const role = String(npcProfile.occupation || npcProfile.identity || 'Wanderer'); // 職業/身分
-        const appearanceBase = String(npcProfile.appearance || 'Distinct eastern features');
-        
-        // 這裡就是報錯的源頭，加上 String() 確保它一定是字串
-        const personality = String(npcProfile.personality || '').toLowerCase(); 
+        // B. 資料解析 (Data Parsing) - 全面加上 String() 強制轉型
+        // 使用 try-catch 確保變數解析絕對不會導致 Server Crash
+        let personality = "";
+        let roleLower = "";
+        let gender = "";
+        let age = "";
+        let appearanceBase = "";
+        let role = "";
+
+        try {
+            // 強制轉型為 String，即使是 undefined, null, Array, Object 都不會報錯
+            gender = String(npcProfile.gender || 'Unknown');
+            age = String(npcProfile.age || 'Unknown');
+            role = String(npcProfile.occupation || npcProfile.identity || 'Wanderer');
+            appearanceBase = String(npcProfile.appearance || 'Distinct eastern features');
+            
+            // 這是最常出錯的地方，我們用 String() 包起來，並確保轉小寫
+            personality = String(npcProfile.personality || '').toLowerCase(); 
+            roleLower = String(role).toLowerCase();
+        } catch (parseError) {
+            console.error(`[圖片系統] 資料解析異常 (已自動修復):`, parseError);
+            personality = "neutral"; // 發生錯誤時的預設值
+            roleLower = "wanderer";
+        }
 
         // C. 動態特徵映射 - 根據個性決定表情 (Expression Mapping)
         let facialExpression = "Calm and neutral expression";
@@ -102,9 +120,6 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
 
         // D. 動態特徵映射 - 根據身分決定服裝材質 (Outfit Mapping)
         let outfitTexture = "Standard Eastern Fantasy fabric";
-        
-        // 同樣加上 String() 保護
-        const roleLower = String(role).toLowerCase();
 
         if (roleLower.includes('beggar') || roleLower.includes('丐')) {
             outfitTexture = "Tattered, patched rough linen, dirty texture, worn-out edges";
@@ -117,7 +132,6 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         // E. 最終 Prompt 組合
-        // 結構：[風格] + [核心定義] + [視覺細節] + [負面約束]
         const imagePrompt = `
             ${STYLE_ANCHOR}
             
@@ -138,13 +152,9 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             - NO background objects, NO trees, NO buildings, NO magic effects floating around.
             - NO text, NO speech bubbles, NO signature, NO character sheet layout grid.
             - The image must look like a professional Visual Novel game asset (Sprite).
-        `.replace(/\s+/g, ' ').trim(); // 移除多餘空白
+        `.replace(/\s+/g, ' ').trim();
 
-        // ==========================================
-        //       Prompt 結束
-        // ==========================================
-        
-        console.log(`[圖片系統 v10.0] 步驟 1: 為「${canonicalNpcName}」請求圖片... Prompt長度: ${imagePrompt.length}`);
+        console.log(`[圖片系統 v10.1] Prompt 已生成 (長度: ${imagePrompt.length})`);
         
         // 4. 調用 AI 服務
         const tempImageUrl = await getAIGeneratedImage(imagePrompt);
@@ -152,14 +162,14 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             throw new Error('AI 畫師創作失敗，請稍後再試。');
         }
 
-        console.log(`[圖片系統 v10.0] 步驟 2: 從臨時 URL 下載圖片...`);
+        console.log(`[圖片系統 v10.1] 步驟 2: 下載圖片...`);
         const response = await gaxios.request({
             url: tempImageUrl,
             responseType: 'arraybuffer'
         });
         const imageBuffer = Buffer.from(response.data);
 
-        console.log(`[圖片系統 v10.0] 步驟 3: 將圖片上傳至 Firebase Storage...`);
+        console.log(`[圖片系統 v10.1] 步驟 3: 上傳至 Firebase Storage...`);
         const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
         const fileName = `npc-avatars/${canonicalNpcName}_${Date.now()}.png`;
         const file = bucket.file(fileName);
@@ -173,19 +183,17 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         
         await file.makePublic();
         const permanentUrl = file.publicUrl();
-        console.log(`[圖片系統 v10.0] 步驟 4: 獲取永久 URL: ${permanentUrl}`);
+        console.log(`[圖片系統 v10.1] 步驟 4: 獲取永久 URL: ${permanentUrl}`);
 
-        // 5. 更新資料庫
+        // 5. 更新資料庫與快取
         const npcTemplateRef = db.collection('npcs').doc(canonicalNpcName);
         await npcTemplateRef.set({
             avatarUrl: permanentUrl
         }, { merge: true });
 
-        // 6. 更新快取
         const updatedNpcTemplate = (await npcTemplateRef.get()).data();
         if (updatedNpcTemplate) {
             setTemplateInCache('npc', canonicalNpcName, updatedNpcTemplate);
-            console.log(`[圖片系統 v10.0] 已將「${canonicalNpcName}」快取更新。`);
         }
         
         res.json({
@@ -195,7 +203,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[圖片系統 v10.0] /generate/npc/${npcName} 發生錯誤:`, error);
+        console.error(`[圖片系統 v10.1] 嚴重錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
