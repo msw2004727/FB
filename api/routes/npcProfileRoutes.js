@@ -34,7 +34,7 @@ router.get('/profile/:npcName', async (req, res) => {
 
         const npcProfile = await getMergedNpcProfile(userId, npcName, roundData, playerProfile);
         
-        // 1. 如果是玩家自己
+        // 1. 如果是玩家自己，直接回傳
         if (playerProfile && playerProfile.username === npcName) {
             return res.json({
                 name: playerProfile.username,
@@ -47,7 +47,7 @@ router.get('/profile/:npcName', async (req, res) => {
             return res.status(404).json({ message: '找不到該人物的檔案。' });
         }
         
-        // --- 【核心修正 v3.5】位置與隊友檢查邏輯 ---
+        // --- 【核心修正 v4.0】以「人物見聞 (NPC列表)」作為在場證明 ---
         
         const playerLocationHierarchy = roundData.LOC || [];
         const npcLocationHierarchy = npcProfile.currentLocation;
@@ -60,15 +60,15 @@ router.get('/profile/:npcName', async (req, res) => {
             ? npcLocationHierarchy[0].trim()
             : (typeof npcLocationHierarchy === 'string' ? npcLocationHierarchy.trim() : null);
 
-        // [關鍵修復] 檢查該 NPC 是否為玩家的同行隊友 (Companions)
-        // 假設存檔結構中有 companions 陣列，若無則預設為空
-        const companions = roundData.companions || [];
-        const isCompanion = Array.isArray(companions) && companions.includes(npcName);
+        // [關鍵邏輯變更]
+        // 檢查該 NPC 是否存在於最新一回合的 "NPC" (人物見聞) 列表中
+        // 如果 AI 在這回合生成的資料裡包含了這個人，代表他就在現場，無需管他的資料庫地點在哪
+        const presentInScene = Array.isArray(roundData.NPC) && roundData.NPC.some(n => n.name === npcName);
 
         // [判定邏輯]
-        // 如果 (地點不同) 且 (不是隊友)，才拒絕存取
-        if ((!playerArea || !npcArea || playerArea !== npcArea) && !isCompanion) {
-            console.log(`[互動檢查] 玩家位於 "${playerArea}"，NPC "${npcName}" 位於 "${npcArea}"。地點不符且非隊友，系統拒絕連接。`);
+        // 如果 (地點不同) 且 (不在當前場景列表中)，才拒絕存取
+        if ((!playerArea || !npcArea || playerArea !== npcArea) && !presentInScene) {
+            console.log(`[互動檢查] 玩家位於 "${playerArea}"，NPC "${npcName}" 位於 "${npcArea}"。地點不符且未出現在場景列表中，系統拒絕連接。`);
             return res.status(403).json({ message: `[系統] 連接失敗... (你環顧四周，並未見到 ${npcName} 的身影。)` });
         }
         
