@@ -62,10 +62,10 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         }
 
         // ==========================================
-        //       【核心修改】 Prompt 建構邏輯 (防護升級)
+        //       【核心修改】 Prompt 建構邏輯 (防護升級 v999)
         // ==========================================
 
-        console.log(`[圖片系統] 正在處理 NPC: ${canonicalNpcName}, 原始個性資料:`, npcProfile.personality);
+        console.log(`[系統驗證 v999] 正在處理 NPC: ${canonicalNpcName}。若您看到此訊息，代表新程式碼已生效。`);
 
         // A. 畫風鎖定 (Style Anchor)
         const STYLE_ANCHOR = `
@@ -91,7 +91,8 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             role = String(npcProfile.occupation || npcProfile.identity || 'Wanderer');
             appearanceBase = String(npcProfile.appearance || 'Distinct eastern features');
             
-            // 這是最常出錯的地方，我們用 String() 包起來，並確保轉小寫
+            // 【這裡就是原本報錯的地方】
+            // 我們用 String() 包起來，這行代碼絕對不可能再報 "toLowerCase is not a function"
             personality = String(npcProfile.personality || '').toLowerCase(); 
             roleLower = String(role).toLowerCase();
         } catch (parseError) {
@@ -154,7 +155,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             - The image must look like a professional Visual Novel game asset (Sprite).
         `.replace(/\s+/g, ' ').trim();
 
-        console.log(`[圖片系統 v10.1] Prompt 已生成 (長度: ${imagePrompt.length})`);
+        console.log(`[圖片系統] Prompt 已生成 (長度: ${imagePrompt.length})`);
         
         // 4. 調用 AI 服務
         const tempImageUrl = await getAIGeneratedImage(imagePrompt);
@@ -162,14 +163,14 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
             throw new Error('AI 畫師創作失敗，請稍後再試。');
         }
 
-        console.log(`[圖片系統 v10.1] 步驟 2: 下載圖片...`);
+        console.log(`[圖片系統] 步驟 2: 下載圖片...`);
         const response = await gaxios.request({
             url: tempImageUrl,
             responseType: 'arraybuffer'
         });
         const imageBuffer = Buffer.from(response.data);
 
-        console.log(`[圖片系統 v10.1] 步驟 3: 上傳至 Firebase Storage...`);
+        console.log(`[圖片系統] 步驟 3: 上傳至 Firebase Storage...`);
         const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
         const fileName = `npc-avatars/${canonicalNpcName}_${Date.now()}.png`;
         const file = bucket.file(fileName);
@@ -183,7 +184,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         
         await file.makePublic();
         const permanentUrl = file.publicUrl();
-        console.log(`[圖片系統 v10.1] 步驟 4: 獲取永久 URL: ${permanentUrl}`);
+        console.log(`[圖片系統] 步驟 4: 獲取永久 URL: ${permanentUrl}`);
 
         // 5. 更新資料庫與快取
         const npcTemplateRef = db.collection('npcs').doc(canonicalNpcName);
@@ -203,7 +204,7 @@ router.post('/generate/npc/:npcName', authMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[圖片系統 v10.1] 嚴重錯誤:`, error);
+        console.error(`[圖片系統] 嚴重錯誤:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
