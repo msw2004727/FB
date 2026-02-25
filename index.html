@@ -24,11 +24,42 @@
         <main id="main-content" class="main-content">
             <header class="story-header">
                 <div id="status-bar" class="status-bar">
-                    <div class="status-item" id="date-status"><i class="fas fa-calendar-alt"></i> 日期: --</div>
-                    <div class="status-item" id="time-status"><i class="fas fa-clock"></i> 時辰: --</div>
+                    <div class="status-chip-grid">
+                        <div class="status-chip">
+                            <span class="status-chip-icon" aria-hidden="true"><i class="fas fa-calendar-alt"></i></span>
+                            <div class="status-chip-body">
+                                <span class="status-chip-label">日期</span>
+                                <span class="status-chip-value">--</span>
+                            </div>
+                        </div>
+                        <div class="status-chip">
+                            <span class="status-chip-icon" aria-hidden="true"><i class="fas fa-clock"></i></span>
+                            <div class="status-chip-body">
+                                <span class="status-chip-label">時辰</span>
+                                <span class="status-chip-value">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="status-info-list">
+                        <div class="status-info-row">
+                            <span class="status-info-icon" aria-hidden="true"><i class="fas fa-cloud-sun"></i></span>
+                            <span class="status-info-label">天氣</span>
+                            <span class="status-info-value">--</span>
+                        </div>
+                        <div class="status-info-row">
+                            <span class="status-info-icon" aria-hidden="true"><i class="fas fa-theater-masks"></i></span>
+                            <span class="status-info-label">氛圍</span>
+                            <span class="status-info-value">--</span>
+                        </div>
+                        <div class="status-info-row status-info-row-multiline">
+                            <span class="status-info-icon" aria-hidden="true"><i class="fas fa-map-marked-alt"></i></span>
+                            <span class="status-info-label">地點</span>
+                            <span class="status-info-value status-info-value-clamp-2">--</span>
+                        </div>
+                    </div>
                 </div>
-                <button id="header-toggle-btn" class="header-toggle-btn" title="收起/展開資訊欄">
-                    <i class="fas fa-chevron-up"></i>
+                <button id="header-toggle-btn" class="header-toggle-btn" type="button" title="收起/展開資訊欄" aria-label="收起或展開日期與時辰資訊欄" aria-controls="status-bar" aria-expanded="true">
+                    <i class="fas fa-chevron-up header-toggle-icon" aria-hidden="true"></i>
                 </button>
             </header>
             <div id="story-panel" class="story-panel">

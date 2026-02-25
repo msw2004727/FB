@@ -213,9 +213,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         dom.headerToggleButton.addEventListener('click', () => {
-            dom.storyHeader.classList.toggle('collapsed');
-            dom.headerToggleButton.querySelector('i').classList.toggle('fa-chevron-up');
-            dom.headerToggleButton.querySelector('i').classList.toggle('fa-chevron-down');
+            const isCollapsed = dom.storyHeader.classList.toggle('collapsed');
+            dom.headerToggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+            dom.headerToggleButton.title = isCollapsed ? '展開資訊欄' : '收起資訊欄';
+            dom.headerToggleButton.setAttribute('aria-label', isCollapsed ? '展開日期與時辰資訊欄' : '收起日期與時辰資訊欄');
         });
 
         dom.menuToggle.addEventListener('click', () => dom.gameContainer.classList.toggle('sidebar-open'));

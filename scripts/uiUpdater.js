@@ -106,17 +106,61 @@ export function addRoundTitleToStory(titleText) {
     storyTextContainer.appendChild(titleEl);
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function truncateByChars(value, maxChars) {
+    return Array.from(String(value ?? '').trim()).slice(0, maxChars).join('');
+}
+
+function renderStatusChip(iconClass, label, value) {
+    return `
+        <div class="status-chip">
+            <span class="status-chip-icon" aria-hidden="true"><i class="fas ${iconClass}"></i></span>
+            <div class="status-chip-body">
+                <span class="status-chip-label">${escapeHtml(label)}</span>
+                <span class="status-chip-value">${escapeHtml(value)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderStatusRow(iconClass, label, value, { multiline = false } = {}) {
+    const rowClass = multiline ? 'status-info-row status-info-row-multiline' : 'status-info-row';
+    const valueClass = multiline ? 'status-info-value status-info-value-clamp-2' : 'status-info-value';
+
+    return `
+        <div class="${rowClass}" title="${escapeHtml(value)}">
+            <span class="status-info-icon" aria-hidden="true"><i class="fas ${iconClass}"></i></span>
+            <span class="status-info-label">${escapeHtml(label)}</span>
+            <span class="${valueClass}">${escapeHtml(value)}</span>
+        </div>
+    `;
+}
+
 function updateStatusBar(roundData) {
-    const atmosphere = roundData.ATM?.[0] || '未知';
+    const atmosphere = truncateByChars(roundData.ATM?.[0] || '未知', 8) || '未知';
     const weather = roundData.WRD || '晴朗';
     const location = roundData.LOC?.[0] || '未知之地';
     const dateString = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日`;
+    const timeString = `約${roundData.timeOfDay || '未知'}`;
+
     statusBarEl.innerHTML = `
-        <div class="status-item"><i class="fas fa-calendar-alt"></i> ${dateString}</div>
-        <div class="status-item"><i class="fas fa-clock"></i> 時辰: 約${roundData.timeOfDay || '未知'}</div>
-        <div class="status-item"><i class="fas fa-cloud-sun"></i> 天氣: ${weather}</div>
-        <div class="status-item"><i class="fas fa-theater-masks"></i> 氛圍: ${atmosphere}</div>
-        <div class="status-item"><i class="fas fa-map-marked-alt"></i> 地點: ${location}</div>
+        <div class="status-chip-grid">
+            ${renderStatusChip('fa-calendar-alt', '日期', dateString)}
+            ${renderStatusChip('fa-clock', '時辰', timeString)}
+        </div>
+        <div class="status-info-list">
+            ${renderStatusRow('fa-cloud-sun', '天氣', weather)}
+            ${renderStatusRow('fa-theater-masks', '氛圍', atmosphere)}
+            ${renderStatusRow('fa-map-marked-alt', '地點', location, { multiline: true })}
+        </div>
     `;
 }
 

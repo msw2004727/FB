@@ -10,6 +10,26 @@ const { calculateNewStamina } = require('./staminaManager');
 const { addCurrency } = require('../economyManager');
 
 const db = admin.firestore();
+const ATMOSPHERE_LABEL_MAX_CHARS = 8;
+
+function clampTextByChars(value, maxChars) {
+    const normalized = String(value ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return Array.from(normalized).slice(0, maxChars).join('');
+}
+
+function normalizeAtmosphereField(value) {
+    const source = Array.isArray(value)
+        ? value
+        : (typeof value === 'string' ? [value] : ['']);
+    const normalized = [...source];
+
+    normalized[0] = clampTextByChars(normalized[0], ATMOSPHERE_LABEL_MAX_CHARS) || '未知';
+    if (normalized.length < 2) normalized.push('');
+
+    return normalized;
+}
 
 /**
  * 【核心修正 v3.3】更新遊戲狀態並將所有更改寫入資料庫
@@ -37,7 +57,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         romanceChanges = [], 
         npcUpdates = [], 
         locationUpdates = [], 
-        ATM = [''], 
+        ATM: rawATM = [''], 
         EVT = '江湖軼事', 
         LOC = player.currentLocation || ['未知之地'], 
         PSY = '心如止水', 
@@ -51,6 +71,8 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         timeOfDay: aiNextTimeOfDay, 
         daysToAdvance = 0 
     } = safeRoundData;
+
+    const ATM = normalizeAtmosphereField(rawATM);
 
     // --- 【核心修改】移除隨機事件系統 ---
     // let randomEvent = null;
