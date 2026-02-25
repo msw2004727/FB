@@ -77,7 +77,7 @@ function displayRomanceValue(value) {
 
     const heartsContainer = document.createElement('div');
     heartsContainer.className = 'romance-hearts';
-    heartsContainer.title = `???????? ${value}`;
+    heartsContainer.title = `情意值 ${value}`;
     for (let i = 0; i < 5; i++) {
         const heartSpan = document.createElement('span');
         heartSpan.className = i < level ? 'fas fa-heart' : 'far fa-heart';
@@ -99,7 +99,7 @@ function displayFriendlinessBar(value) {
     barContainer.className = 'friendliness-bar-container';
     const gradientColor = `linear-gradient(to right, #dc3545, #868e96 ${percentage}%, #198754)`;
     barContainer.innerHTML = `
-        <div class="friendliness-bar-labels"><span>?????/span><span>???????</span></div>
+        <div class="friendliness-bar-labels"><span>敵對</span><span>友善</span></div>
         <div class="friendliness-bar-background" style="background: ${gradientColor};">
             <div class="friendliness-bar-indicator" style="left: ${percentage}%;"></div>
         </div>
@@ -123,7 +123,7 @@ function clampCombatPercent(value) {
 }
 
 function createCharacterCard(character) {
-    const name = character?.name || character?.username || '????';
+    const name = character?.name || character?.username || '未知角色';
     const hp = Number(character?.hp ?? 0);
     const maxHp = Math.max(1, Number(character?.maxHp ?? 1));
     const hasMp = character?.mp !== undefined && character?.maxMp !== undefined;
@@ -372,10 +372,10 @@ export function openChatModalUI(profile, mode = 'chat') {
     if (!chatModal || !chatNpcName || !chatNpcInfo || !chatLog || !giveItemBtn || !chatFooter) return;
 
     if (mode === 'inquiry') {
-        chatNpcName.textContent = `??${profile.name} ???????????????`;
-        chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> ??????00????/span>`;
+        chatNpcName.textContent = `向 ${profile.name} 打聽消息`;
+        chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 每次提問消耗 100 銀兩</span>`;
     } else {
-        chatNpcName.textContent = `??${profile.name} ?????`;
+        chatNpcName.textContent = `與 ${profile.name} 對話`;
         chatNpcInfo.innerHTML = profile.status_title || '';
         displayRomanceValue(profile.romanceValue);
         displayFriendlinessBar(profile.friendlinessValue);
@@ -383,7 +383,7 @@ export function openChatModalUI(profile, mode = 'chat') {
 
     giveItemBtn.style.display = mode === 'inquiry' ? 'none' : 'inline-flex';
     chatFooter.style.display = mode === 'inquiry' ? 'none' : 'block';
-    chatLog.innerHTML = `<p class="system-message">???????????${profile.name}?????...</p>`;
+    chatLog.innerHTML = `<p class="system-message">你開始與 ${profile.name} 對話...</p>`;
 
     if (chatActionBtn) chatActionBtn.disabled = false;
 
@@ -592,7 +592,7 @@ function isPlainObject(value) {
 function isPlaceholderLocationName(value) {
     const text = String(value ?? '').trim();
     if (!text) return true;
-    return ['Unknown Location', 'Unknown', '\u672a\u77e5\u5730\u5340', '??????', '????'].includes(text);
+    return ['Unknown Location', 'Unknown', '\u672a\u77e5\u5730\u5340', '\u672a\u77e5'].includes(text);
 }
 
 function pickDisplayLocationName(...candidates) {
@@ -753,14 +753,14 @@ export function openLocationDetailsModal(locationData) {
     dom.locationModalTitle.textContent = summary.locationName || '\u5730\u5340\u8a73\u60c5';
 
     let bodyHtml = '';
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-compass"></i> ??????</h4>${formatObjectForDisplay({
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-compass"></i> 地區摘要</h4>${formatObjectForDisplay({
         locationType: summary.locationType,
-        address: summary.addressPath || '????',
+        address: summary.addressPath || '未知',
         ruler: summary.ruler,
         description: summary.description
     })}</div>`;
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> ??????????????????????????</h4>${formatObjectForDisplay(staticSection)}</div>`;
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> ????????????????????????</h4>${formatObjectForDisplay(dynamicSection)}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報（世界設定）</h4>${formatObjectForDisplay(staticSection)}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報（當前狀態）</h4>${formatObjectForDisplay(dynamicSection)}</div>`;
 
     dom.locationModalBody.innerHTML = bodyHtml;
     dom.locationDetailsModal.classList.add('visible');

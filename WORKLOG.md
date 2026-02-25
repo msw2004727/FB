@@ -265,3 +265,13 @@ ode --check.
 ### Task: Fix invalid NPC attack intention payload (completed)
 - Restored NPC attack intention button data-intention values in scripts/interactionHandlers.js to the backend whitelist values (切磋, 教訓, 打死) after they were corrupted to question marks, which caused /initiateCombat to return 無效的動手意圖。`r
 - Also restored the attack confirmation prompt text and attack-loading text for the NPC interaction menu.
+
+### Task: Stop local preview server (completed)
+- Checked local port 5500 listener status and found no active listener; preview server was already stopped.
+- No process termination was required.
+
+### Task: Comprehensive cleanup of visible garbled UI text (completed)
+- Audited core front-end interaction modules (scripts/gameLoop.js, scripts/interactionHandlers.js, scripts/modalManager.js, scripts/tradeManager.js) for user-facing strings rendering as question marks (????).
+- Restored Chinese copy for NPC interaction menu, chat modal, beggar inquiry prompts, combat target/action prompts, trade modal labels/buttons/alerts, location detail modal section titles, loading/epilogue/prequel messages, and related system messages.
+- Left encoding-garbled comments untouched (non-user-facing) and re-verified modified files with 
+ode --check.

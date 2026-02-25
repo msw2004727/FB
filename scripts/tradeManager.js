@@ -80,8 +80,8 @@ function createItemElement(item, owner, area) {
     const quantityText = item.quantity > 1 ? ` (x${item.quantity})` : '';
 
     li.className = 'bg-amber-50/50 border border-amber-200 p-1.5 rounded-md cursor-pointer flex justify-between items-center text-sm hover:border-amber-400 hover:bg-amber-50 transform hover:-translate-y-px transition-all';
-    li.title = item.description || item.baseDescription || '?豰刈????謢踵活????';
-    li.innerHTML = `<span class="font-semibold text-amber-900">${item.itemName}${quantityText}</span> <span class="text-xs text-amber-700">??${item.value || 0}</span>`;
+    li.title = item.description || item.baseDescription || '尚無物品描述';
+    li.innerHTML = `<span class="font-semibold text-amber-900">${item.itemName}${quantityText}</span> <span class="text-xs text-amber-700">價值 ${item.value || 0}</span>`;
     li.addEventListener('click', () => moveItem(uniqueId, owner, area));
     return li;
 }
@@ -121,7 +121,7 @@ function calculateSummary() {
 async function handleConfirmTrade() {
     DOMElements.confirmBtn.disabled = true;
     // ???箏??撠???????????Font Awesome ?????察??????????謜????
-    DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ???????..`;
+    DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 確認中...`;
 
     const playerMoneyOffer = Number(DOMElements.playerMoneyInput.value) || 0;
     const npcMoneyOffer = Number(DOMElements.npcMoneyInput.value) || 0;
@@ -129,13 +129,13 @@ async function handleConfirmTrade() {
     if (playerMoneyOffer > state.player.money) {
         alert('你的金錢不足。');
         DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `???`;
+        DOMElements.confirmBtn.innerHTML = `確認交易`;
         return;
     }
     if (npcMoneyOffer > state.npc.money) {
-        alert(`${currentNpcName} ??????????`);
+        alert(`${currentNpcName} 的金錢不足。`);
         DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `???`;
+        DOMElements.confirmBtn.innerHTML = `確認交易`;
         return;
     }
 
@@ -166,11 +166,11 @@ async function handleConfirmTrade() {
         }
 
     } catch (error) {
-        alert(`????????: ${error.message}`);
+        alert(`交易失敗：${error.message}`);
     } finally {
         // ???箏??撠??????????嚚???鞈??????謅?ㄞ??蝬踐ㄡ???????蹎折??蝞????
         DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `???`;
+        DOMElements.confirmBtn.innerHTML = `確認交易`;
     }
 }
 

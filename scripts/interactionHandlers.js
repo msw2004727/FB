@@ -10,7 +10,7 @@ let gameLoop = {};
 
 const COMBAT_STRATEGY_LABELS = {
     attack: '???',
-    defend: '????',
+    defend: '防禦',
     evade: '閃避',
     support: '輔助',
     heal: '?鞊??'
@@ -18,7 +18,7 @@ const COMBAT_STRATEGY_LABELS = {
 
 const COMBAT_CATEGORY_MAP = {
     attack: '???',
-    defend: '????',
+    defend: '防禦',
     evade: '閃避',
     support: '輔助',
     heal: '?鞊??'
@@ -73,7 +73,7 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
         avatarHtml = `<div class="npc-interaction-avatar-container">
                         <button class="npc-generate-avatar-btn" data-npc-name="${npcName}" ${disabledAttr}>
                             <i class="fas fa-camera-retro"></i>
-                            <span>??????</span>
+                            <span>生成頭像</span>
                         </button>
                       </div>`;
     }
@@ -81,9 +81,9 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     dom.npcInteractionMenu.innerHTML = `
         ${avatarHtml}
         <div class="npc-interaction-buttons">
-            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> ????</button>
-            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> ?????/button>
-            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> ???</button>
+            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> 交易</button>
+            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> 對話</button>
+            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> 動手</button>
         </div>
     `;
     
@@ -130,7 +130,7 @@ async function handleGenerateAvatarClick(event) {
     if (!npcName || gameState.isRequesting) return;
 
     const btn = event.currentTarget;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>??頩??雓?????1????雓????????????.</span>`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>正在生成頭像，請稍候...</span>`;
     btn.disabled = true;
     
     try {
@@ -147,7 +147,7 @@ async function handleGenerateAvatarClick(event) {
     } catch (error) {
         handleApiError(error);
         // ??????祈????????
-        btn.innerHTML = `<i class="fas fa-camera-retro"></i><span>??????</span>`;
+        btn.innerHTML = `<i class="fas fa-camera-retro"></i><span>生成頭像</span>`;
         btn.disabled = false;
     }
 }
@@ -212,7 +212,7 @@ async function endCombat() {
     gameState.combat.selectedTarget = null;
     modal.closeCombatModal();
 
-    gameLoop.setLoading(true, '??雓?豰??????????...');
+    gameLoop.setLoading(true, '正在結算戰鬥結果...');
 
     try {
         const data = await api.finalizeCombat({ model: dom.aiModelSelector.value });
@@ -232,7 +232,7 @@ async function handleTradeButtonClick(event) {
     
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-    gameLoop.setLoading(true, `?????${npcName} ?鞊臬???????...`);
+    gameLoop.setLoading(true, `正在與 ${npcName} 展開交易...`);
     try {
         const tradeData = await api.startTrade(npcName);
         
@@ -249,7 +249,7 @@ async function handleTradeButtonClick(event) {
         modal.openTradeModal(tradeData, npcName, onTradeComplete, modal.closeTradeModal);
 
     } catch (error) {
-        console.error("?????????秋鬲????抬????", error);
+        console.error('開啟交易失敗:', error);
         handleApiError(error);
     } finally {
         gameLoop.setLoading(false);
@@ -261,7 +261,7 @@ async function handleChatButtonClick(event) {
     const npcName = event.currentTarget.dataset.npcName;
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-    gameLoop.setLoading(true, '??????????頠??雓帖???...');
+    gameLoop.setLoading(true, '正在讀取人物資料並開啟對話...');
     try {
         const profile = await api.getNpcProfile(npcName);
         gameState.isInChat = true;
@@ -334,9 +334,9 @@ function getCombatTargetCandidates(strategy) {
 }
 
 function getCombatTargetHint(strategy) {
-    if (strategy === 'attack') return '????蝘?????????';
-    if (strategy === 'heal') return '????豲??????謅???????領?';
-    if (strategy === 'support') return '????????????謅???????領?';
+    if (strategy === 'attack') return '請選擇要攻擊的目標。';
+    if (strategy === 'heal') return '請選擇要治療的目標（通常是我方）。';
+    if (strategy === 'support') return '請選擇要輔助的目標（通常是我方）。';
     if (strategy === 'defend') return '防禦會以自身為目標。';
     if (strategy === 'evade') return '閃避會以自身為目標。';
     return '請選擇目標。';
@@ -350,7 +350,7 @@ function renderCombatTargetSelection(strategy) {
     targetContainer.innerHTML = '';
 
     if (!strategy) {
-        targetContainer.innerHTML = '<div class="system-message">?嚚???????氯??/div>';
+        targetContainer.innerHTML = '<div class="system-message">請先選擇策略。</div>';
         return;
     }
 
@@ -380,7 +380,7 @@ function renderCombatTargetSelection(strategy) {
         btn.dataset.targetSide = target.side;
         btn.innerHTML = `
             <span class="combat-target-name">${target.name}</span>
-            <span class="combat-target-side">${target.side === 'enemy' ? '??謚?' : (target.side === 'ally' ? '??撖?' : '??鞊?')}</span>
+            <span class="combat-target-side">${target.side === 'enemy' ? '敵方' : (target.side === 'ally' ? '我方' : '自己')}</span>
         `;
         if (target.name === gameState.combat.selectedTarget) {
             btn.classList.add('selected');
@@ -460,7 +460,7 @@ function resetCombatActionComposer() {
             <div class="system-message">
                 <div class="combat-empty-state">
                     <i class="fas fa-compass"></i>
-                    <span>????????????謢瘀???雓▽?雓??頩??謢遴?????綜敢??/span>
+                    <span>先選擇策略，再挑選技能與目標。</span>
                 </div>
             </div>
         `;
@@ -468,12 +468,12 @@ function resetCombatActionComposer() {
 
     const targetSelection = document.getElementById('combat-target-selection');
     if (targetSelection) {
-        targetSelection.innerHTML = '<div class="system-message">?嚚???????氯??/div>';
+        targetSelection.innerHTML = '<div class="system-message">請先選擇策略。</div>';
     }
 
     const summaryEl = document.getElementById('combat-action-summary');
     if (summaryEl) {
-        summaryEl.textContent = 'Choose an action to prepare.';
+        summaryEl.textContent = '請選擇策略來準備行動。';
     }
 
     updateCombatConfirmState();
@@ -643,7 +643,7 @@ async function handleBeggarInquiry(npcName, npcProfile) {
     gameState.chatHistory = [];
     
     modal.openChatModalUI(npcProfile, 'inquiry'); 
-    modal.appendChatMessage('npc', "????????????鞊荒???????雓????????????????00?????");
+    modal.appendChatMessage('npc', '有什麼想打聽的？先付 100 銀兩，我就替你探探消息。');
     dom.chatInput.focus();
 }
 
@@ -677,7 +677,7 @@ export async function handleNpcClick(event) {
 
         const localNpcData = gameState.roundData?.NPC?.find(npc => npc.name === npcName);
 
-        if (localNpcData && (localNpcData.status_title === '?鞊???????' || localNpcData.isTemp)) {
+        if (localNpcData && ((localNpcData.status_title || '').includes('丐') || localNpcData.isTemp)) {
             await handleBeggarInquiry(npcName, localNpcData);
         } else {
             try {
@@ -686,7 +686,7 @@ export async function handleNpcClick(event) {
                 const profile = await api.getNpcProfile(npcName);
                 targetIsNpc.style.cursor = 'pointer';
 
-                if (profile.status_title === '?鞊???????') {
+                if ((profile.status_title || '').includes('丐')) {
                     await handleBeggarInquiry(npcName, profile);
                 } else {
                     showNpcInteractionMenu(targetIsNpc, profile, isDeceased);
@@ -719,7 +719,7 @@ export async function sendChatMessage() {
                 }
             } catch (error) {
                 if (error.message.includes('not enough') || error.message.includes('不足')) {
-                    modal.appendChatMessage('npc', '??銵???雓????剜迫????????????????????謜????..');
+                    modal.appendChatMessage('npc', '你身上的銀兩不夠，等你湊夠了再來問吧。');
                     dom.chatActionBtn.disabled = true;
                     return; 
                 } else {
@@ -746,7 +746,7 @@ export async function sendChatMessage() {
             gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
         }
     } catch (error) {
-        modal.appendChatMessage('system', `[?鞈??????: ${error.message}]`);
+        modal.appendChatMessage('system', `[系統訊息：${error.message}]`);
     } finally {
         gameLoop.setLoading(false);
     }
@@ -768,7 +768,7 @@ export async function endChatSession() {
     
     modal.closeChatModal();
     gameState.isInChat = false; 
-    gameLoop.setLoading(true, '????鞊堊????頩????????????鞊船?????..');
+    gameLoop.setLoading(true, '正在整理對話紀錄並更新回合...');
 
     try {
         const data = await api.endChat({
@@ -795,7 +795,7 @@ export async function handleGiveItem(giveData) {
     modal.closeGiveItemModal(); 
     modal.closeChatModal(); 
     gameState.isInChat = false;
-    gameLoop.setLoading(true, "?????豲???雓??????..."); 
+    gameLoop.setLoading(true, "正在將物品交給對方..."); 
 
     try {
         const body = {
@@ -824,7 +824,7 @@ export async function handleCombatSurrender() {
     if (!gameState.isInCombat || gameState.isRequesting) return;
     if (!window.confirm('確定要投降並結束戰鬥嗎？')) return;
 
-    gameLoop.setLoading(true, '??雓?雓高??甇???..');
+    gameLoop.setLoading(true, '正在處理投降...');
 
     try {
         const data = await api.combatSurrender({ model: dom.aiModelSelector.value });
@@ -847,7 +847,7 @@ export async function handleCombatSurrender() {
             gameLoop.setLoading(false);
         }
     } catch (error) {
-        modal.updateCombatLog(`[?賹??荒鳥 ?甇???佗?????{error.message}`, 'system-message');
+        modal.updateCombatLog(`[系統錯誤] 投降處理失敗：${error.message}`, 'system-message');
         gameLoop.setLoading(false);
     }
 }
@@ -866,7 +866,7 @@ export async function handleConfirmCombatAction() {
 
     const relevantSkills = getRelevantCombatSkills(gameState.combat.selectedStrategy);
     if (relevantSkills.length > 0 && !gameState.combat.selectedSkill && gameState.combat.selectedStrategy !== 'defend' && gameState.combat.selectedStrategy !== 'evade') {
-        if (!window.confirm('??軋???????????????擳??????甇????鞈???????游??')) {
+        if (!window.confirm('尚未選擇技能。確定要以基本行動執行本回合嗎？')) {
             return;
         }
     }
@@ -896,7 +896,7 @@ export async function handleConfirmCombatAction() {
             gameLoop.setLoading(false);
         }
     } catch (error) {
-        modal.updateCombatLog(`[?賹??荒鳥 ?????雓???璈??謜???????{error.message}`, 'system-message');
+        modal.updateCombatLog(`[系統錯誤] 戰鬥行動失敗：${error.message}`, 'system-message');
         gameLoop.setLoading(false);
     }
 }
