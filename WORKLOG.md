@@ -125,13 +125,13 @@
 - Confirmed the route caches and reuses an existing `avatarUrl`, which already improves per-NPC visual consistency by avoiding re-generation.
 - Prepared recommendation: for cheaper API image generation with good quality and easier future editing/consistency workflows, consider switching to `gpt-image-1-mini` (or `gpt-image-1` if higher consistency/quality is worth the extra cost), and keep a strong shared style anchor prompt + cached portraits.
 
-### Task: Inspect local file `AI¼Ò«¬«¬¸¹` purpose (inspection)
-- Confirmed `AI¼Ò«¬«¬¸¹` is a plain text file without extension in the project root, containing a manually maintained table of AI-core display names, model IDs, and providers.
+### Task: Inspect local file `AIï¿½Ò«ï¿½ï¿½ï¿½ï¿½ï¿½` purpose (inspection)
+- Confirmed `AIï¿½Ò«ï¿½ï¿½ï¿½ï¿½ï¿½` is a plain text file without extension in the project root, containing a manually maintained table of AI-core display names, model IDs, and providers.
 - Searched the codebase and found no runtime references to the file path/name; current matches for listed model IDs are from the file itself (and historical notes in `WORKLOG.md`).
 - Conclusion: this file is not used by the app at runtime; it serves as a human-readable reference/checklist and may be outdated relative to current `services/aiService.js` mappings.
 
-### Task: Convert `AI¼Ò«¬«¬¸¹` to Markdown and sync to current effective versions (completed)
-- Replaced the root plain-text file `AI¼Ò«¬«¬¸¹` with `AI¼Ò«¬«¬¸¹.md` in UTF-8 Markdown format.
+### Task: Convert `AIï¿½Ò«ï¿½ï¿½ï¿½ï¿½ï¿½` to Markdown and sync to current effective versions (completed)
+- Replaced the root plain-text file `AIï¿½Ò«ï¿½ï¿½ï¿½ï¿½ï¿½` with `AIï¿½Ò«ï¿½ï¿½ï¿½ï¿½ï¿½.md` in UTF-8 Markdown format.
 - Synced the document to current runtime mappings from `services/aiService.js` and current UI selector labels in `index.html`.
 - Document now includes: player AI-core mappings, compatibility aliases (`gpt5.2`, `cluade`), backend fallback behavior (auto-retry to `openai -> gpt-5.2`), and a note that NPC image generation is currently fixed to `dall-e-3`.
 
@@ -174,16 +174,16 @@
 - Validation: `node --check` passed for `api/worldStateHelpers.js`, `api/worldEngine.js`, `scripts/modalManager.js`, `scripts/uiUpdater.js`, and `scripts/localPreviewMockApi.js`.
 
 ### Task: Convert current-location field labels back to Chinese (completed)
-- Updated current-location sidebar card label and button tooltip in `scripts/uiUpdater.js` to Chinese (`²ÎªvªÌ`, `¬d¬Ý¦a°Ï¸Ô±¡`) and restored Chinese loading/fallback text.
-- Updated location-details modal labels/section titles in `scripts/modalManager.js` to Chinese, including summary/static/dynamic section headers and field-name mappings (`Ãþ«¬`, `¦a§}`, `¼h¯Å¸ô®|`, `²ÎªvªÌ`, etc.).
-- Restored visible fallback strings in the modal from English (`N/A`, `Unknown`) to Chinese (`µL`, `¥¼ª¾`) to avoid mixed-language UI in the current-location feature.
+- Updated current-location sidebar card label and button tooltip in `scripts/uiUpdater.js` to Chinese (`ï¿½Îªvï¿½ï¿½`, `ï¿½dï¿½Ý¦aï¿½Ï¸Ô±ï¿½`) and restored Chinese loading/fallback text.
+- Updated location-details modal labels/section titles in `scripts/modalManager.js` to Chinese, including summary/static/dynamic section headers and field-name mappings (`ï¿½ï¿½ï¿½ï¿½`, `ï¿½aï¿½}`, `ï¿½hï¿½Å¸ï¿½ï¿½|`, `ï¿½Îªvï¿½ï¿½`, etc.).
+- Restored visible fallback strings in the modal from English (`N/A`, `Unknown`) to Chinese (`ï¿½L`, `ï¿½ï¿½ï¿½ï¿½`) to avoid mixed-language UI in the current-location feature.
 - Validation: `node --check` passed for `scripts/uiUpdater.js` and `scripts/modalManager.js`.
 
 ### Task: Fix remaining English field label and location-detail modal title fallback (completed)
 - Added Chinese label mapping for field key description in location-details modal so it no longer renders as raw English key.
 - Hardened modal title/name resolution in scripts/modalManager.js: ignores placeholder names (e.g. Unknown Location) and falls back to currentMerged.name, legacy locationData.name, and the last item of locationHierarchy.
 - Updated backend uildLocationSummary() in pi/worldStateHelpers.js to also read legacy 
-ame fields and use Chinese fallback strings (¥¼ª¾¦a°Ï, ¦a°Ï±¡³ø¸ü¤J¤¤...) to reduce placeholder leakage into UI.
+ame fields and use Chinese fallback strings (ï¿½ï¿½ï¿½ï¿½ï¿½aï¿½ï¿½, ï¿½aï¿½Ï±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Jï¿½ï¿½...) to reduce placeholder leakage into UI.
 - Validation: 
 ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 
@@ -192,3 +192,9 @@ ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 - Hardened `normalizeLocationModalData()` title/name resolution to ignore placeholder names (e.g., `Unknown Location`) and fall back to `currentMerged.name`, legacy `locationData.name`, and the last item of `locationHierarchy`.
 - Updated backend `buildLocationSummary()` in `api/worldStateHelpers.js` to support legacy `name` fields and use Chinese fallback strings, reducing placeholder leakage into UI responses.
 - Validation: `node --check` passed for `scripts/modalManager.js` and `api/worldStateHelpers.js`.
+
+### Task: Fix GitHub Pages build failure (UTF-8 + nojekyll) (completed)
+- Diagnosed likely GitHub Pages build failure cause: `WORKLOG.md` contained invalid UTF-8 bytes, which can break Pages/Jekyll build processing.
+- Rewrote `WORKLOG.md` as valid UTF-8 (invalid byte sequences were replaced during conversion to restore build compatibility).
+- Added root `.nojekyll` file so GitHub Pages serves the repo as static files instead of trying to process it as a Jekyll site.
+- Validation: project text-file UTF-8 scan now passes (`ALL_TEXT_FILES_UTF8_OK`).
