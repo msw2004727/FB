@@ -69,6 +69,7 @@ export function isLocalPreviewMockEnabled() {
     const likelyGamePage =
         pathname.endsWith('/index.html') ||
         pathname.endsWith('/map.html') ||
+        pathname.endsWith('/relations.html') ||
         pathname === '/' ||
         pathname === '';
     if (likelyGamePage) {

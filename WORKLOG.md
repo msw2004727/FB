@@ -207,3 +207,38 @@ ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 - Updated item-drop flow in `scripts/main.js` to refresh `??` after inventory changes, preventing stale currency display after dropping currency items.
 - Added small UI styles in `styles/components.css` for multi-line money bag rendering (`.money-display-list`, `.money-line`, `.money-amount`).
 - Validation: `node --check` passed for `scripts/uiUpdater.js`, `scripts/interactionHandlers.js`, and `scripts/main.js`.
+
+### Task: Rebuild character relations graph (data-driven + radial UI) (completed)
+- Replaced `/api/game/state/get-relations` AI-summary Mermaid generation with a data-driven graph builder in `api/stateRoutes.js` using actual `npc_states` + `npcs` template relationships, with typed edges, dedupe, player-centered relations, and `cacheKey`.
+- Redesigned `relations.html` into a dedicated graph workspace (toolbar, filter chips, zoom controls, side meta/legend panel, improved loading/empty states).
+- Rewrote `scripts/relations.js` to render a protagonist-centered 360-degree radial SVG graph with pan/zoom, fit-to-view, relation-type hide/show filters, and local cache-first loading (revalidate and only rerender when `cacheKey` changes).
+- Added local preview support for `relations.html` mock mode in `scripts/localPreviewMode.js`.
+- Added mock endpoints in `scripts/localPreviewMockApi.js` for `/api/game/state/get-relations` and `/api/game/npc/profile/:npcName` so relations page works in localhost preview.
+- Validation: `node --check` passed for `api/stateRoutes.js`, `scripts/relations.js`, `scripts/localPreviewMode.js`, and `scripts/localPreviewMockApi.js`.
+
+### Task: Deep review of NPC attack/combat system (analysis only)
+- Reviewed end-to-end NPC attack/combat flow across front-end interaction (`scripts/interactionHandlers.js`, `scripts/modalManager.js`, `scripts/main.js`) and backend combat lifecycle (`api/gameplay/combatManager.js`, `api/combatRoutes.js`, `services/aiService.js`, `prompts/combatPrompt.js`).
+- Identified critical defects: a TDZ runtime bug in `/finalize-combat` (`killedNpcNames` referenced before declaration), client-trusted `combatResult` finalization payload, and likely missing `getInventoryState` export/implementation causing runtime failures in surrender/finalization paths.
+- Identified major logic gaps: front-end `powerLevel`/`target` selections are sent but backend combat action ignores them; target selection UI state appears unwired; location co-presence validation is type-fragile (`includes(npcLocation)` on mixed array/string shapes).
+- Identified UX/state issues: closing combat modal can leave `gameState.isInCombat = true` (soft-lock behavior), and skill-required flows can proceed without enforcing a selected skill.
+- Prepared prioritized remediation order and risk notes for follow-up implementation.
+
+### Task: Implement NPC attack/combat fixes + full combat UI redesign (completed)
+- Rebuilt backend combat flow in `api/combatRoutes.js` to validate `strategy`, `powerLevel`, and `target`, pass them to AI combat resolution, and clamp combatant HP/MP updates when merging AI state changes.
+- Removed client authority over combat finalization: `/combat/action` now stores a server-side `pending_combat_result`, and `/combat/finalize-combat` reads that server-stored result instead of trusting client-submitted `combatResult`.
+- Fixed the `/finalize-combat` TDZ issue by restructuring settlement logic (including killed-NPC extraction before player transaction updates) as part of the route rewrite.
+- Added missing `getInventoryState()` implementation/export in `api/playerStateHelpers.js` and reused it for combat surrender/finalization inventory + money snapshots.
+- Rewrote `api/gameplay/combatManager.js` to normalize AI combat setup payloads, validate attack intentions, harden same-location checks for mixed location formats, and reject attacks on deceased targets.
+- Replaced broken `prompts/combatPrompt.js` with a clean prompt that explicitly includes `powerLevel` and `target`, and enforces JSON-only combat outputs.
+- Redesigned combat modal UX in `scripts/modalManager.js` + `styles/modals_interaction.css` (new roster card styling, battle status strip, target selection panel, action summary chips, and denser action composer layout).
+- Reworked front-end combat interaction flow in `scripts/interactionHandlers.js` to support target selection UI, action summary updates, confirm-button state management, and safer combat log rendering defaults.
+- Fixed combat modal cancel behavior soft-lock by clearing `gameState.isInCombat` and combat selection state on close/cancel paths.
+- Validation: `node --check` passed for `api/combatRoutes.js`, `api/gameplay/combatManager.js`, `api/playerStateHelpers.js`, `prompts/combatPrompt.js`, `scripts/interactionHandlers.js`, `scripts/modalManager.js`, and `scripts/gameState.js`.
+
+### Task: Combat flow validation checklist (runtime-feasible subset) (completed)
+- Re-ran syntax validation for the rebuilt combat stack (`api/combatRoutes.js`, `api/gameplay/combatManager.js`, `api/playerStateHelpers.js`, `prompts/combatPrompt.js`, `scripts/interactionHandlers.js`, `scripts/modalManager.js`, `scripts/gameState.js`) and all passed `node --check`.
+- Verified front-end finalize flow no longer posts client-controlled `combatResult` payload (`scripts/interactionHandlers.js` now calls `api.finalizeCombat({ model })` only), matching the server-side pending-result settlement design in `api/combatRoutes.js`.
+- Verified server-side pending combat settlement path is wired (`PENDING_COMBAT_RESULT_DOC_ID`, pending result write on `COMBAT_END`, finalize reads pending snapshot existence before settlement).
+- Verified target-selection UI wiring exists in front-end combat flow (`renderCombatTargetSelection`, `updateCombatConfirmState`, `selectedTarget` resets/updates in multiple combat lifecycle points).
+- Identified remaining E2E blocker for localhost mock validation: `scripts/localPreviewMockApi.js` dispatcher still has no `/api/game/combat/*` mock routes, so `?mock=1` cannot execute the full “動手→戰鬥→結算→投降→再進戰鬥” flow.
+- Note: Full browser click-through E2E was not executable in this shell environment (no browser automation step available here).

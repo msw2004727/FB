@@ -377,6 +377,130 @@ function buildMockMapResponse() {
     };
 }
 
+function buildMockRelationsResponse() {
+    const state = readState();
+    const roundData = state.roundData || {};
+    const identity = getLocalPreviewIdentity();
+    const username = identity.username || '主角';
+    const sceneNpcs = Array.isArray(roundData.NPC) ? roundData.NPC : [];
+
+    const nodes = [
+        {
+            id: 'player',
+            kind: 'player',
+            name: username,
+            label: username,
+            statusTitle: '主角'
+        }
+    ];
+
+    const edges = [];
+    const relationTypes = [
+        { key: 'family', label: '親人', color: '#d97706' },
+        { key: 'romance', label: '情感', color: '#db2777' },
+        { key: 'faction', label: '門派', color: '#2563eb' },
+        { key: 'friend', label: '朋友', color: '#16a34a' },
+        { key: 'enemy', label: '敵對', color: '#dc2626' },
+        { key: 'acquaintance', label: '熟識', color: '#0f766e' },
+        { key: 'unfamiliar', label: '不熟', color: '#64748b' }
+    ];
+
+    const mockNames = sceneNpcs.slice(0, 8).map(n => String(n.name || '').trim()).filter(Boolean);
+    const uniqueNames = Array.from(new Set(mockNames));
+
+    uniqueNames.forEach((name, index) => {
+        const sceneInfo = sceneNpcs.find(n => n && n.name === name) || {};
+        const friendliness = String(sceneInfo.friendliness || '').toLowerCase();
+        let playerType = 'acquaintance';
+        if (friendliness.includes('hostile') || friendliness.includes('enemy')) playerType = 'enemy';
+        else if (friendliness.includes('friendly') || friendliness.includes('trusted')) playerType = 'friend';
+        else if (friendliness.includes('neutral')) playerType = 'unfamiliar';
+
+        nodes.push({
+            id: `npc:${name}`,
+            kind: 'npc',
+            name,
+            label: name,
+            statusTitle: String(sceneInfo.status || '江湖人物'),
+            friendlinessValue: playerType === 'friend' ? 40 : (playerType === 'enemy' ? -40 : 5),
+            romanceValue: index === 0 ? 15 : 0,
+            inCurrentScene: true,
+            degree: 0
+        });
+
+        edges.push({
+            source: 'player',
+            target: `npc:${name}`,
+            type: playerType,
+            label: relationTypes.find(t => t.key === playerType)?.label || '熟識',
+            directed: false,
+            strength: playerType === 'friend' ? 40 : (playerType === 'enemy' ? 45 : 8)
+        });
+    });
+
+    if (uniqueNames.length >= 2) {
+        edges.push({
+            source: `npc:${uniqueNames[0]}`,
+            target: `npc:${uniqueNames[1]}`,
+            type: 'faction',
+            label: '同門',
+            directed: false,
+            strength: 18
+        });
+    }
+    if (uniqueNames.length >= 3) {
+        edges.push({
+            source: `npc:${uniqueNames[1]}`,
+            target: `npc:${uniqueNames[2]}`,
+            type: 'friend',
+            label: '朋友',
+            directed: false,
+            strength: 22
+        });
+    }
+    if (uniqueNames.length >= 4) {
+        edges.push({
+            source: `npc:${uniqueNames[2]}`,
+            target: `npc:${uniqueNames[3]}`,
+            type: 'family',
+            label: '兄妹',
+            directed: false,
+            strength: 28
+        });
+    }
+
+    return {
+        graph: {
+            version: 2,
+            cacheKey: `mock-rel-${Number(roundData.R) || 0}-${nodes.length}-${edges.length}`,
+            centerNodeId: 'player',
+            generatedAt: new Date().toISOString(),
+            relationTypes,
+            nodes,
+            edges,
+            meta: {
+                latestRound: Number(roundData.R) || 0,
+                nodeCount: nodes.length,
+                edgeCount: edges.length,
+                source: 'local-preview-mock'
+            }
+        },
+        mermaidSyntax: null
+    };
+}
+
+function buildMockNpcProfile(path) {
+    const name = decodeURIComponent(String(path || '').split('/').pop() || '').trim();
+    const state = readState();
+    const roundNpcs = Array.isArray(state.roundData?.NPC) ? state.roundData.NPC : [];
+    const match = roundNpcs.find(n => n && String(n.name || '').trim() === name) || null;
+    return {
+        name: name || '未知人物',
+        status_title: match ? String(match.status || '江湖人物').slice(0, 18) : '江湖人物',
+        avatarUrl: null
+    };
+}
+
 function nextTimeOfDay(current) {
     const currentIndex = TIME_SEQUENCE.indexOf(current);
     const nextIndex = (currentIndex + 1) % TIME_SEQUENCE.length;
@@ -618,6 +742,12 @@ export async function handleLocalPreviewMockRequest(endpoint, options = {}) {
     // Homepage helpers
     if (method === 'GET' && path === '/api/game/state/skills') {
         return maybeDelay(handleGetSkills());
+    }
+    if (method === 'GET' && path === '/api/game/state/get-relations') {
+        return maybeDelay(buildMockRelationsResponse());
+    }
+    if (method === 'GET' && path.startsWith('/api/game/npc/profile/')) {
+        return maybeDelay(buildMockNpcProfile(path));
     }
     if (method === 'GET' && path === '/api/map/world-map') {
         return maybeDelay(buildMockMapResponse());

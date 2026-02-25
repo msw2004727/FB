@@ -8,6 +8,24 @@ import { dom } from './dom.js';
 
 let gameLoop = {};
 
+const COMBAT_STRATEGY_LABELS = {
+    attack: '?餅?',
+    defend: '?脩戌',
+    evade: '餈湧',
+    support: '頛',
+    heal: '瘝餌?'
+};
+
+const COMBAT_CATEGORY_MAP = {
+    attack: '?餅?',
+    defend: '?脩戌',
+    evade: '餈湧',
+    support: '頛',
+    heal: '瘝餌?'
+};
+
+const SELF_TARGET_STRATEGIES = new Set(['defend', 'evade']);
+
 function syncSilverBalanceToInventory(newBalance) {
     if (!gameState.roundData) return;
     if (!Array.isArray(gameState.roundData.inventory)) {
@@ -44,18 +62,18 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     const npcName = npcProfile.name;
 
     let avatarHtml = '';
-    // 檢查 NPC 是否已有頭像 URL
+    // 瑼Ｘ NPC ?臬撌脫??剖? URL
     if (npcProfile.avatarUrl) {
-        // 如果有，就顯示圖片
+        // 憒???撠梢＊蝷箏???
         avatarHtml = `<div class="npc-interaction-avatar-container">
                         <div class="npc-interaction-avatar" style="background-image: url('${npcProfile.avatarUrl}')"></div>
                       </div>`;
     } else {
-        // 如果沒有，就顯示 "查看照片" 按鈕
+        // 憒?瘝?嚗停憿舐內 "?亦??抒?" ??
         avatarHtml = `<div class="npc-interaction-avatar-container">
                         <button class="npc-generate-avatar-btn" data-npc-name="${npcName}" ${disabledAttr}>
                             <i class="fas fa-camera-retro"></i>
-                            <span>查看照片</span>
+                            <span>?亦??抒?</span>
                         </button>
                       </div>`;
     }
@@ -63,15 +81,15 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
     dom.npcInteractionMenu.innerHTML = `
         ${avatarHtml}
         <div class="npc-interaction-buttons">
-            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> 交易</button>
-            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> 聊天</button>
-            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> 動手</button>
+            <button class="npc-interaction-btn trade" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-exchange-alt"></i> 鈭斗?</button>
+            <button class="npc-interaction-btn chat" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-comments"></i> ?予</button>
+            <button class="npc-interaction-btn attack" data-npc-name="${npcName}" ${disabledAttr}><i class="fas fa-khanda"></i> ??</button>
         </div>
     `;
     
-    // 為所有按鈕綁定事件
+    // ?箸?????摰?隞?
     if (!isDeceased) {
-        // 為 "查看照片" 按鈕綁定生成事件
+        // ??"?亦??抒?" ??蝬???鈭辣
         const generateBtn = dom.npcInteractionMenu.querySelector('.npc-generate-avatar-btn');
         if (generateBtn) {
             generateBtn.addEventListener('click', handleGenerateAvatarClick);
@@ -81,7 +99,7 @@ function showNpcInteractionMenu(targetElement, npcProfile, isDeceased = false) {
         dom.npcInteractionMenu.querySelector('.attack').addEventListener('click', showAttackIntention);
     }
 
-    // --- (後續的選單定位程式碼保持不變) ---
+    // --- (敺???桀?雿?撘Ⅳ靽?銝?) ---
     const menuRect = dom.npcInteractionMenu.getBoundingClientRect();
     const targetRect = targetElement.getBoundingClientRect();
     const panelRect = dom.storyPanel.getBoundingClientRect();
@@ -112,24 +130,24 @@ async function handleGenerateAvatarClick(event) {
     if (!npcName || gameState.isRequesting) return;
 
     const btn = event.currentTarget;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>畫師繪圖至少1分鐘，可先推進劇情..</span>`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>?怠葦蝜芸??喳?1??嚗??脣???.</span>`;
     btn.disabled = true;
     
     try {
         const result = await api.generateNpcAvatar(npcName);
         if (result.success && result.avatarUrl) {
-            // 成功後，替換按鈕為圖片
+            // ??敺??踵????箏???
             const avatarContainer = btn.parentElement;
             avatarContainer.innerHTML = `<div class="npc-interaction-avatar" style="background-image: url('${result.avatarUrl}')"></div>`;
-            // 【核心修正】更新提示文字
-            appendMessageToStory(`靈魂畫師為 ${npcName} 繪製了一張新的肖像。`, 'system-message');
+            // ?敹耨甇??唳?蝷箸?摮?
+            appendMessageToStory(`???怠葦??${npcName} 蝜芾ˊ鈭?撘菜???, 'system-message');
         } else {
-            throw new Error(result.message || '生成失敗但未回傳原因。');
+            throw new Error(result.message || '??憭望?雿?????);
         }
     } catch (error) {
         handleApiError(error);
-        // 失敗後恢復按鈕
-        btn.innerHTML = `<i class="fas fa-camera-retro"></i><span>查看照片</span>`;
+        // 憭望?敺敺拇???
+        btn.innerHTML = `<i class="fas fa-camera-retro"></i><span>?亦??抒?</span>`;
         btn.disabled = false;
     }
 }
@@ -141,9 +159,9 @@ function showAttackIntention(event) {
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
         buttonContainer.innerHTML = `
-            <button class="npc-interaction-btn intention" data-intention="切磋" data-npc-name="${npcName}">切磋</button>
-            <button class="npc-interaction-btn intention" data-intention="教訓" data-npc-name="${npcName}">教訓</button>
-            <button class="npc-interaction-btn intention attack" data-intention="打死" data-npc-name="${npcName}">打死</button>
+            <button class="npc-interaction-btn intention" data-intention="??" data-npc-name="${npcName}">??</button>
+            <button class="npc-interaction-btn intention" data-intention="??" data-npc-name="${npcName}">??</button>
+            <button class="npc-interaction-btn intention attack" data-intention="?香" data-npc-name="${npcName}">?香</button>
         `;
         buttonContainer.querySelectorAll('.intention').forEach(btn => {
             btn.addEventListener('click', showFinalConfirmation);
@@ -159,9 +177,9 @@ function showFinalConfirmation(event) {
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
         buttonContainer.innerHTML = `
-            <span class="confirm-prompt-text">確定要「${intention}」？</span>
-            <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="取消"><i class="fas fa-times"></i></button>
-            <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}" title="確認"><i class="fas fa-check"></i></button>
+            <span class="confirm-prompt-text">蝣箏?閬?{intention}??</span>
+            <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="??"><i class="fas fa-times"></i></button>
+            <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}" title="蝣箄?"><i class="fas fa-check"></i></button>
         `;
 
         buttonContainer.querySelector('.cancel-attack').addEventListener('click', async (e) => {
@@ -185,22 +203,19 @@ function showFinalConfirmation(event) {
 }
 
 
-async function endCombat(combatResult) {
+async function endCombat() {
     gameState.isInCombat = false;
+    gameState.combat.state = null;
+    gameState.combat.selectedStrategy = null;
+    gameState.combat.selectedSkill = null;
+    gameState.combat.selectedPowerLevel = null;
+    gameState.combat.selectedTarget = null;
     modal.closeCombatModal();
 
-    if (!combatResult) {
-        gameLoop.setLoading(false);
-        return;
-    }
-
-    gameLoop.setLoading(true, "正在結算戰鬥結果...");
+    gameLoop.setLoading(true, '正在結算戰鬥結果...');
 
     try {
-        const data = await api.finalizeCombat({
-            combatResult: combatResult,
-            model: dom.aiModelSelector.value
-        });
+        const data = await api.finalizeCombat({ model: dom.aiModelSelector.value });
         gameLoop.processNewRoundData(data);
     } catch (error) {
         handleApiError(error);
@@ -217,14 +232,14 @@ async function handleTradeButtonClick(event) {
     
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-    gameLoop.setLoading(true, `正在與 ${npcName} 準備交易...`);
+    gameLoop.setLoading(true, `甇???${npcName} 皞?鈭斗?...`);
     try {
         const tradeData = await api.startTrade(npcName);
         
         const onTradeComplete = (newRound) => {
             modal.closeTradeModal(); 
             if (newRound && newRound.roundData) {
-                addRoundTitleToStory(newRound.roundData.EVT || `第 ${newRound.roundData.R} 回`);
+                addRoundTitleToStory(newRound.roundData.EVT || `蝚?${newRound.roundData.R} ?);
                 updateUI(newRound.story, newRound.roundData, null, newRound.locationData);
                 gameState.currentRound = newRound.roundData.R;
                 gameState.roundData = newRound.roundData;
@@ -234,7 +249,7 @@ async function handleTradeButtonClick(event) {
         modal.openTradeModal(tradeData, npcName, onTradeComplete, modal.closeTradeModal);
 
     } catch (error) {
-        console.error("處理交易點擊時出錯:", error);
+        console.error("??鈭斗?暺????", error);
         handleApiError(error);
     } finally {
         gameLoop.setLoading(false);
@@ -246,7 +261,7 @@ async function handleChatButtonClick(event) {
     const npcName = event.currentTarget.dataset.npcName;
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-    gameLoop.setLoading(true, '正在查找此人檔案...');
+    gameLoop.setLoading(true, '甇??交甇支犖瑼?...');
     try {
         const profile = await api.getNpcProfile(npcName);
         gameState.isInChat = true;
@@ -255,7 +270,7 @@ async function handleChatButtonClick(event) {
         modal.openChatModalUI(profile, 'chat'); 
         dom.chatInput.focus();
     } catch (error) {
-        if (error.message && error.message.includes('並未見到')) {
+        if (error.message && error.message.includes('銝行閬')) {
             appendMessageToStory(error.message, 'system-message');
         } else {
             handleApiError(error);
@@ -271,12 +286,12 @@ async function confirmAndInitiateAttack(event) {
     const intention = event.currentTarget.dataset.intention;
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
-    
-    gameLoop.setLoading(true, `準備與 ${npcName} 對決...`);
+
+    gameLoop.setLoading(true, `正在向 ${npcName} 發起衝突...`);
     try {
-        const data = await api.initiateCombat({ 
-            targetNpcName: npcName, 
-            intention: intention
+        const data = await api.initiateCombat({
+            targetNpcName: npcName,
+            intention
         });
         if (data.status === 'COMBAT_START') {
             startCombat(data.initialState);
@@ -285,160 +300,338 @@ async function confirmAndInitiateAttack(event) {
         handleApiError(error);
     } finally {
         if (!gameState.isInCombat) {
-             gameLoop.setLoading(false);
+            gameLoop.setLoading(false);
         }
     }
+}
+
+function getRelevantCombatSkills(strategy) {
+    const targetCategory = COMBAT_CATEGORY_MAP[strategy];
+    const playerSkills = gameState.combat.state?.player?.skills || [];
+    return playerSkills.filter(skill => {
+        const category = skill?.combatCategory;
+        if (!targetCategory) return false;
+        return category === targetCategory || category === strategy;
+    });
+}
+
+function getCombatTargetCandidates(strategy) {
+    const state = gameState.combat.state || {};
+    const playerName = state.player?.username;
+    const allies = (state.allies || []).filter(ally => Number(ally?.hp || 0) > 0).map(ally => ({ name: ally.name, side: 'ally' }));
+    const enemies = (state.enemies || []).filter(enemy => Number(enemy?.hp || 0) > 0).map(enemy => ({ name: enemy.name, side: 'enemy' }));
+
+    if (!strategy) return [];
+    if (SELF_TARGET_STRATEGIES.has(strategy)) {
+        return playerName ? [{ name: playerName, side: 'player' }] : [];
+    }
+    if (strategy === 'attack') return enemies;
+    if (strategy === 'heal' || strategy === 'support') {
+        const self = playerName ? [{ name: playerName, side: 'player' }] : [];
+        return [...self, ...allies];
+    }
+    return [];
+}
+
+function getCombatTargetHint(strategy) {
+    if (strategy === 'attack') return '選擇要出手的敵人';
+    if (strategy === 'heal') return '選擇治療目標（可選自己）';
+    if (strategy === 'support') return '選擇支援目標（可選自己）';
+    if (strategy === 'defend') return '防禦動作預設作用於自己';
+    if (strategy === 'evade') return '迴避動作預設作用於自己';
+    return '請先選擇策略';
+}
+
+function renderCombatTargetSelection(strategy) {
+    const targetContainer = document.getElementById('combat-target-selection');
+    if (!targetContainer) return;
+
+    const targets = getCombatTargetCandidates(strategy);
+    targetContainer.innerHTML = '';
+
+    if (!strategy) {
+        targetContainer.innerHTML = '<div class="system-message">請先選擇策略</div>';
+        return;
+    }
+
+    if (targets.length === 0) {
+        targetContainer.innerHTML = `<div class="system-message">${getCombatTargetHint(strategy)}</div>`;
+        gameState.combat.selectedTarget = null;
+        return;
+    }
+
+    const hint = document.createElement('div');
+    hint.className = 'combat-target-hint';
+    hint.textContent = getCombatTargetHint(strategy);
+    targetContainer.appendChild(hint);
+
+    const list = document.createElement('div');
+    list.className = 'combat-target-list';
+    const targetNames = new Set(targets.map(target => target.name));
+    if (!targetNames.has(gameState.combat.selectedTarget)) {
+        gameState.combat.selectedTarget = targets[0].name;
+    }
+
+    targets.forEach(target => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `combat-target-btn side-${target.side}`;
+        btn.dataset.targetName = target.name;
+        btn.dataset.targetSide = target.side;
+        btn.innerHTML = `
+            <span class="combat-target-name">${target.name}</span>
+            <span class="combat-target-side">${target.side === 'enemy' ? '敵方' : (target.side === 'ally' ? '同伴' : '自己')}</span>
+        `;
+        if (target.name === gameState.combat.selectedTarget) {
+            btn.classList.add('selected');
+        }
+        btn.addEventListener('click', () => {
+            gameState.combat.selectedTarget = target.name;
+            renderCombatTargetSelection(strategy);
+            updateCombatActionSummary();
+            updateCombatConfirmState();
+        });
+        list.appendChild(btn);
+    });
+
+    targetContainer.appendChild(list);
+}
+
+function updateCombatActionSummary() {
+    const summaryEl = document.getElementById('combat-action-summary');
+    if (!summaryEl) return;
+
+    const strategy = gameState.combat.selectedStrategy;
+    if (!strategy) {
+        summaryEl.textContent = '尚未決定行動。';
+        return;
+    }
+
+    const skillText = gameState.combat.selectedSkill ? `招式：${gameState.combat.selectedSkill}` : '招式：不使用武學';
+    const powerText = gameState.combat.selectedSkill ? `成數：${gameState.combat.selectedPowerLevel || 1} 成` : '成數：1 成';
+    const targetText = gameState.combat.selectedTarget ? `目標：${gameState.combat.selectedTarget}` : '目標：無';
+    summaryEl.innerHTML = `
+        <span class="summary-chip strategy">策略：${COMBAT_STRATEGY_LABELS[strategy] || strategy}</span>
+        <span class="summary-chip">${targetText}</span>
+        <span class="summary-chip">${skillText}</span>
+        <span class="summary-chip">${powerText}</span>
+    `;
+}
+
+function updateCombatConfirmState() {
+    const confirmBtn = document.getElementById('combat-confirm-btn');
+    if (!confirmBtn) return;
+
+    const strategy = gameState.combat.selectedStrategy;
+    if (!strategy) {
+        confirmBtn.disabled = true;
+        return;
+    }
+
+    const targetCandidates = getCombatTargetCandidates(strategy);
+    const requiresTarget = targetCandidates.length > 0;
+    const hasTarget = !requiresTarget || targetCandidates.some(target => target.name === gameState.combat.selectedTarget);
+
+    let hasEnoughMp = true;
+    if (gameState.combat.selectedSkill) {
+        const playerSkills = gameState.combat.state?.player?.skills || [];
+        const skill = playerSkills.find(entry => entry.skillName === gameState.combat.selectedSkill);
+        if (skill) {
+            const powerLevel = Number(gameState.combat.selectedPowerLevel || 1);
+            const totalCost = Number(skill.cost || 5) * powerLevel;
+            hasEnoughMp = totalCost <= Number(gameState.combat.state?.player?.mp || 0);
+        }
+    }
+
+    confirmBtn.disabled = !hasTarget || !hasEnoughMp;
+}
+
+function resetCombatActionComposer() {
+    gameState.combat.selectedStrategy = null;
+    gameState.combat.selectedSkill = null;
+    gameState.combat.selectedPowerLevel = null;
+    gameState.combat.selectedTarget = null;
+
+    document.querySelectorAll('.strategy-btn.selected, .skill-controls.selected').forEach(el => el.classList.remove('selected'));
+
+    const skillSelection = document.getElementById('skill-selection');
+    if (skillSelection) {
+        skillSelection.innerHTML = `
+            <div class="system-message">
+                <div class="combat-empty-state">
+                    <i class="fas fa-compass"></i>
+                    <span>先選擇策略，再決定目標、招式與成數。</span>
+                </div>
+            </div>
+        `;
+    }
+
+    const targetSelection = document.getElementById('combat-target-selection');
+    if (targetSelection) {
+        targetSelection.innerHTML = '<div class="system-message">請先選擇策略</div>';
+    }
+
+    const summaryEl = document.getElementById('combat-action-summary');
+    if (summaryEl) {
+        summaryEl.textContent = '尚未決定行動。';
+    }
+
+    updateCombatConfirmState();
 }
 
 function startCombat(initialState) {
     gameState.isInCombat = true;
     gameState.combat.state = initialState;
-    
+    gameState.combat.selectedStrategy = null;
+    gameState.combat.selectedSkill = null;
+    gameState.combat.selectedPowerLevel = null;
+    gameState.combat.selectedTarget = null;
+
     const cancelCombat = () => {
-        gameState.isInChat = false;
-        gameLoop.setLoading(false); 
+        gameState.isInCombat = false;
+        gameState.combat.state = null;
+        gameState.combat.selectedStrategy = null;
+        gameState.combat.selectedSkill = null;
+        gameState.combat.selectedPowerLevel = null;
+        gameState.combat.selectedTarget = null;
+        gameLoop.setLoading(false);
     };
-    
+
     modal.openCombatModal(initialState, cancelCombat);
-    
+
     document.querySelectorAll('.strategy-btn').forEach(btn => {
         btn.addEventListener('click', () => handleStrategySelection(btn.dataset.strategy));
     });
 
     const surrenderBtn = document.getElementById('combat-surrender-btn');
-    if(surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
+    if (surrenderBtn) surrenderBtn.addEventListener('click', handleCombatSurrender);
+
+    resetCombatActionComposer();
 }
 
 function handleStrategySelection(strategy) {
     gameState.combat.selectedStrategy = strategy;
-    gameState.combat.selectedSkill = null; 
+    gameState.combat.selectedSkill = null;
     gameState.combat.selectedPowerLevel = 1;
 
     document.querySelectorAll('.strategy-btn').forEach(btn => {
         btn.classList.toggle('selected', btn.dataset.strategy === strategy);
     });
 
+    renderCombatTargetSelection(strategy);
+    updateCombatActionSummary();
+
     const skillSelectionContainer = document.getElementById('skill-selection');
-    const confirmBtn = document.getElementById('combat-confirm-btn');
+    if (!skillSelectionContainer) return;
     skillSelectionContainer.innerHTML = '';
-    
+
     const playerSkills = gameState.combat.state?.player?.skills || [];
-    const currentWeaponType = gameState.combat.state?.player?.currentWeaponType;
-    
-    const categoryMap = { 
-        'attack': '攻擊', 
-        'defend': '防禦', 
-        'evade': '迴避',
-        'support': '輔助',
-        'heal': '治癒'
-    };
-    const targetCategory = categoryMap[strategy];
+    const currentWeaponType = gameState.combat.state?.player?.currentWeaponType ?? null;
+    const relevantSkills = getRelevantCombatSkills(strategy);
 
-    const relevantSkills = playerSkills.filter(skill => skill.combatCategory === targetCategory);
+    const helper = document.createElement('div');
+    helper.className = 'combat-skill-header';
+    helper.textContent = relevantSkills.length > 0 ? '可用武學（可選擇成數）' : `此策略可不使用武學，直接以基本${COMBAT_STRATEGY_LABELS[strategy] || '動作'}應對。`;
+    skillSelectionContainer.appendChild(helper);
 
-    if (relevantSkills.length > 0) {
-        relevantSkills.forEach(skill => {
-            const requiredWeapon = skill.requiredWeaponType;
-            
-            const isUsable = 
-                (requiredWeapon && requiredWeapon !== '無' && requiredWeapon === currentWeaponType) ||
-                (requiredWeapon === '無' && currentWeaponType === null);
+    if (relevantSkills.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'system-message';
+        empty.textContent = playerSkills.length === 0 ? '目前尚無可用武學，將使用基礎動作。' : '此策略沒有對應武學，將使用基礎動作。';
+        skillSelectionContainer.appendChild(empty);
+        updateCombatConfirmState();
+        return;
+    }
 
-            const disabledClass = isUsable ? '' : 'disabled';
+    relevantSkills.forEach(skill => {
+        const requiredWeapon = skill.requiredWeaponType;
+        const skillLevel = Math.max(1, Number(skill.level || 1));
+        const baseCost = Math.max(0, Number(skill.cost || 5));
+        const isUsable =
+            (requiredWeapon && requiredWeapon !== '無' && requiredWeapon === currentWeaponType) ||
+            (requiredWeapon === '無' && currentWeaponType === null) ||
+            (!requiredWeapon);
 
-            let weaponStatusHtml = '';
-            if (requiredWeapon && requiredWeapon !== '無') {
-                if (isUsable) {
-                    weaponStatusHtml = `<span class="weapon-status equipped">&lt;已裝備兵器&gt;</span>`;
-                } else {
-                    weaponStatusHtml = `<span class="weapon-status missing">需裝備：${requiredWeapon}</span>`;
+        const skillControl = document.createElement('div');
+        skillControl.className = `skill-controls${isUsable ? '' : ' disabled'}`;
+        skillControl.dataset.skillName = skill.skillName;
+        skillControl.innerHTML = `
+            <button class="skill-btn" type="button" ${isUsable ? '' : 'disabled'}>
+                <span class="skill-name">${skill.skillName} (L${skillLevel})</span>
+                ${requiredWeapon && requiredWeapon !== '無' ? `<span class="weapon-status ${isUsable ? 'equipped' : 'missing'}">${isUsable ? '武器符合' : `需 ${requiredWeapon}`}</span>` : ''}
+                <span class="skill-cost" data-base-cost="${baseCost}">內力 ${baseCost}</span>
+            </button>
+            <div class="power-level-adjuster">
+                <input type="range" class="power-level-slider" min="1" max="${skillLevel}" value="1" step="1" ${isUsable ? '' : 'disabled'}>
+                <span class="power-level-display">1 成</span>
+            </div>
+        `;
+
+        if (isUsable) {
+            skillControl.querySelector('.skill-btn').addEventListener('click', () => handleSkillSelection(skill.skillName));
+            const slider = skillControl.querySelector('.power-level-slider');
+            slider.addEventListener('input', () => {
+                const powerLevel = Number(slider.value || 1);
+                const totalCost = baseCost * powerLevel;
+                const currentMp = Number(gameState.combat.state?.player?.mp || 0);
+                const costSpan = skillControl.querySelector('.skill-cost');
+                const powerDisplay = skillControl.querySelector('.power-level-display');
+
+                powerDisplay.textContent = `${powerLevel} 成`;
+                costSpan.textContent = `內力 ${totalCost}`;
+                costSpan.style.color = totalCost > currentMp ? '#dc3545' : '';
+
+                if (gameState.combat.selectedSkill === skill.skillName) {
+                    gameState.combat.selectedPowerLevel = powerLevel;
+                    updateCombatActionSummary();
+                    updateCombatConfirmState();
                 }
-            }
+            });
+        }
 
-            const skillControl = document.createElement('div');
-            skillControl.className = `skill-controls ${disabledClass}`;
-            skillControl.dataset.skillName = skill.skillName;
+        skillSelectionContainer.appendChild(skillControl);
+    });
 
-            skillControl.innerHTML = `
-                <button class="skill-btn" ${isUsable ? '' : 'disabled'}>
-                    <span class="skill-name">${skill.skillName} (L${skill.level})</span>
-                    ${weaponStatusHtml}
-                    <span class="skill-cost" data-base-cost="${skill.cost || 5}">內力 ${skill.cost || 5}</span>
-                </button>
-                <div class="power-level-adjuster">
-                    <input type="range" class="power-level-slider" min="1" max="${skill.level}" value="1" step="1" ${isUsable ? '' : 'disabled'}>
-                    <span class="power-level-display">1 成</span>
-                </div>
-            `;
-            
-            if (isUsable) {
-                skillControl.querySelector('.skill-btn').addEventListener('click', () => handleSkillSelection(skill.skillName));
-                
-                const slider = skillControl.querySelector('.power-level-slider');
-                slider.addEventListener('input', () => {
-                    const powerLevel = slider.value;
-                    const costSpan = skillControl.querySelector('.skill-cost');
-                    const baseCost = parseInt(costSpan.dataset.baseCost, 10);
-                    const totalCost = baseCost * powerLevel;
-                    const currentMp = gameState.combat.state.player.mp;
-
-                    skillControl.querySelector('.power-level-display').textContent = `${powerLevel} 成`;
-                    costSpan.textContent = `內力 ${totalCost}`;
-
-                    if (totalCost > currentMp) {
-                        costSpan.style.color = '#dc3545'; 
-                        confirmBtn.disabled = true;
-                    } else {
-                        costSpan.style.color = ''; 
-                        confirmBtn.disabled = false;
-                    }
-                    
-                    if (gameState.combat.selectedSkill === skill.skillName) {
-                        gameState.combat.selectedPowerLevel = parseInt(powerLevel, 10);
-                    }
-                });
-            }
-
-            skillSelectionContainer.appendChild(skillControl);
-        });
-    } else {
-         skillSelectionContainer.innerHTML = `<p class="system-message">你沒有可用於此策略的武學。</p>`;
-    }
-    
-    if (confirmBtn) {
-        confirmBtn.disabled = false;
-    }
+    updateCombatConfirmState();
 }
 
-
 function handleSkillSelection(skillName) {
+    const controls = document.querySelectorAll('.skill-controls');
+
     if (gameState.combat.selectedSkill === skillName) {
         gameState.combat.selectedSkill = null;
         gameState.combat.selectedPowerLevel = null;
-        document.querySelector(`.skill-controls[data-skill-name="${skillName}"]`)?.classList.remove('selected');
+        controls.forEach(control => {
+            if (control.dataset.skillName === skillName) control.classList.remove('selected');
+        });
+        updateCombatActionSummary();
+        updateCombatConfirmState();
         return;
     }
 
     gameState.combat.selectedSkill = skillName;
-    gameState.combat.selectedPowerLevel = 1; 
+    gameState.combat.selectedPowerLevel = 1;
 
-    document.querySelectorAll('.skill-controls').forEach(control => {
+    controls.forEach(control => {
         const isSelected = control.dataset.skillName === skillName;
         control.classList.toggle('selected', isSelected);
+        const slider = control.querySelector('.power-level-slider');
+        const display = control.querySelector('.power-level-display');
+        const costSpan = control.querySelector('.skill-cost');
+        const baseCost = Number(costSpan?.dataset.baseCost || 5);
+
         if (isSelected) {
-            const slider = control.querySelector('.power-level-slider');
-            const display = control.querySelector('.power-level-display');
-            const costSpan = control.querySelector('.skill-cost');
-            const baseCost = parseInt(costSpan.dataset.baseCost, 10);
-            
-            if(slider) slider.value = 1;
-            if(display) display.textContent = `1 成`;
-            if(costSpan) costSpan.textContent = `內力 ${baseCost}`;
+            if (slider) slider.value = '1';
+            if (display) display.textContent = '1 成';
+            if (costSpan) {
+                costSpan.textContent = `內力 ${baseCost}`;
+                costSpan.style.color = '';
+            }
         }
     });
-    
-    const confirmBtn = document.getElementById('combat-confirm-btn');
-    if (confirmBtn) confirmBtn.disabled = false;
+
+    updateCombatActionSummary();
+    updateCombatConfirmState();
 }
 
 async function handleBeggarInquiry(npcName, npcProfile) {
@@ -450,7 +643,7 @@ async function handleBeggarInquiry(npcName, npcProfile) {
     gameState.chatHistory = [];
     
     modal.openChatModalUI(npcProfile, 'inquiry'); 
-    modal.appendChatMessage('npc', "客官想打聽點什麼？（每次提問將花費100銀兩）");
+    modal.appendChatMessage('npc', "摰Ｗ??單??賡?隞暻潘?嚗?甈⊥????梯祥100??抬?");
     dom.chatInput.focus();
 }
 
@@ -484,7 +677,7 @@ export async function handleNpcClick(event) {
 
         const localNpcData = gameState.roundData?.NPC?.find(npc => npc.name === npcName);
 
-        if (localNpcData && (localNpcData.status_title === '丐幫弟子' || localNpcData.isTemp)) {
+        if (localNpcData && (localNpcData.status_title === '銝鼠撘?' || localNpcData.isTemp)) {
             await handleBeggarInquiry(npcName, localNpcData);
         } else {
             try {
@@ -493,7 +686,7 @@ export async function handleNpcClick(event) {
                 const profile = await api.getNpcProfile(npcName);
                 targetIsNpc.style.cursor = 'pointer';
 
-                if (profile.status_title === '丐幫弟子') {
+                if (profile.status_title === '銝鼠撘?') {
                     await handleBeggarInquiry(npcName, profile);
                 } else {
                     showNpcInteractionMenu(targetIsNpc, profile, isDeceased);
@@ -525,8 +718,8 @@ export async function sendChatMessage() {
                     updateMoneyBagDisplay(gameState.roundData.inventory);
                 }
             } catch (error) {
-                if(error.message.includes('銀兩不足')) {
-                    modal.appendChatMessage('npc', '嘿嘿，客官，您的銀兩似乎不太夠啊...');
+                if(error.message.includes('??拐?頞?)) {
+                    modal.appendChatMessage('npc', '?踹嚗恥摰??函???拐撮銋?憭芸???..');
                     dom.chatActionBtn.disabled = true;
                     return; 
                 } else {
@@ -553,7 +746,7 @@ export async function sendChatMessage() {
             gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
         }
     } catch (error) {
-        modal.appendChatMessage('system', `[系統錯誤: ${error.message}]`);
+        modal.appendChatMessage('system', `[蝟餌絞?航炊: ${error.message}]`);
     } finally {
         gameLoop.setLoading(false);
     }
@@ -575,7 +768,7 @@ export async function endChatSession() {
     
     modal.closeChatModal();
     gameState.isInChat = false; 
-    gameLoop.setLoading(true, '正在總結對話，更新江湖事態...');
+    gameLoop.setLoading(true, '甇?蝮賜?撠店嚗?唳?皝???..');
 
     try {
         const data = await api.endChat({
@@ -584,10 +777,10 @@ export async function endChatSession() {
             model: dom.aiModelSelector.value
         });
         if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
-            appendMessageToStory(`結束了與${npcNameToSummarize}的交談。`, 'system-message');
+            appendMessageToStory(`蝯?鈭?${npcNameToSummarize}?漱隢, 'system-message');
             gameLoop.processNewRoundData(data);
         } else {
-            throw new Error('從伺服器收到的回應格式不正確。');
+            throw new Error('敺撩??嗅???撘?甇?Ⅱ??);
         }
     } catch (error) {
         handleApiError(error);
@@ -602,7 +795,7 @@ export async function handleGiveItem(giveData) {
     modal.closeGiveItemModal(); 
     modal.closeChatModal(); 
     gameState.isInChat = false;
-    gameLoop.setLoading(true, "正在更新江湖事態..."); 
+    gameLoop.setLoading(true, "甇??湔瘙?鈭?..."); 
 
     try {
         const body = {
@@ -616,7 +809,7 @@ export async function handleGiveItem(giveData) {
         if (data && data.roundData) {
             gameLoop.processNewRoundData(data);
         } else {
-            throw new Error("從伺服器收到的回應格式不正確。");
+            throw new Error("敺撩??嗅???撘?甇?Ⅱ??);
         }
     } catch (error) {
         handleApiError(error); 
@@ -629,40 +822,53 @@ export async function handleGiveItem(giveData) {
 
 export async function handleCombatSurrender() {
     if (!gameState.isInCombat || gameState.isRequesting) return;
-    if (!window.confirm("你確定要在此刻認輸嗎？")) return;
-    
-    gameLoop.setLoading(true, "正在與對方交涉...");
+    if (!window.confirm('確定要認輸嗎？')) return;
+
+    gameLoop.setLoading(true, '正在嘗試認輸...');
 
     try {
         const data = await api.combatSurrender({ model: dom.aiModelSelector.value });
 
         if (data.status === 'SURRENDER_ACCEPTED') {
-            modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
+            modal.updateCombatLog(data.narrative || '你選擇認輸，戰鬥結束。', 'system-message');
             setTimeout(() => {
+                gameState.isInCombat = false;
+                gameState.combat.state = null;
+                gameState.combat.selectedStrategy = null;
+                gameState.combat.selectedSkill = null;
+                gameState.combat.selectedPowerLevel = null;
+                gameState.combat.selectedTarget = null;
                 modal.closeCombatModal();
                 gameLoop.processNewRoundData(data.newRound);
                 gameLoop.setLoading(false);
-            }, 2000);
+            }, 1200);
         } else {
-            modal.updateCombatLog(`<p class="system-message">${data.narrative}</p>`);
+            modal.updateCombatLog(data.narrative || '對方拒絕你的認輸。', 'system-message');
             gameLoop.setLoading(false);
         }
     } catch (error) {
-        modal.updateCombatLog(`[系統] 你的認輸請求似乎被對方無視了。(${error.message})`, 'system-message');
+        modal.updateCombatLog(`[系統] 認輸失敗：${error.message}`, 'system-message');
         gameLoop.setLoading(false);
     }
 }
 
 export async function handleConfirmCombatAction() {
     if (!gameState.combat.selectedStrategy) {
-        alert('請選擇一個策略！');
+        alert('請先選擇戰鬥策略。');
         return;
     }
-    
-    const relevantSkills = (gameState.combat.state?.player?.skills || []).filter(s => s.combatCategory === {attack: '攻擊', defend: '防禦', evade: '迴避', support: '輔助', heal: '治癒'}[gameState.combat.selectedStrategy]);
 
-    if (relevantSkills.length > 0 && !gameState.combat.selectedSkill) {
-         // 允許不選技能，視為普通攻擊
+    const targets = getCombatTargetCandidates(gameState.combat.selectedStrategy);
+    if (targets.length > 0 && !targets.some(target => target.name === gameState.combat.selectedTarget)) {
+        alert('請先選擇目標。');
+        return;
+    }
+
+    const relevantSkills = getRelevantCombatSkills(gameState.combat.selectedStrategy);
+    if (relevantSkills.length > 0 && !gameState.combat.selectedSkill && gameState.combat.selectedStrategy !== 'defend' && gameState.combat.selectedStrategy !== 'evade') {
+        if (!window.confirm('此策略有可用武學，是否確認使用基礎動作？')) {
+            return;
+        }
     }
 
     gameLoop.setLoading(true);
@@ -671,32 +877,26 @@ export async function handleConfirmCombatAction() {
         const combatActionPayload = {
             strategy: gameState.combat.selectedStrategy,
             skill: gameState.combat.selectedSkill,
-            powerLevel: gameState.combat.selectedPowerLevel || 1, 
-            target: gameState.combat.selectedTarget, 
+            powerLevel: gameState.combat.selectedPowerLevel || 1,
+            target: gameState.combat.selectedTarget,
             model: dom.aiModelSelector.value
         };
 
         const data = await api.combatAction(combatActionPayload);
-        
+
         modal.setTurnCounter(data.updatedState.turn);
         modal.updateCombatLog(data.narrative);
         modal.updateCombatUI(data.updatedState);
         gameState.combat.state = data.updatedState;
 
         if (data.status === 'COMBAT_END') {
-            setTimeout(() => endCombat(data.combatResult), 1500);
+            setTimeout(() => endCombat(), 1200);
         } else {
-            document.querySelectorAll('.strategy-btn.selected, .skill-controls.selected').forEach(el => el.classList.remove('selected'));
-            document.getElementById('skill-selection').innerHTML = '<p class="system-message">請先選擇一個策略</p>';
-            document.getElementById('combat-confirm-btn').disabled = true;
-            gameState.combat.selectedStrategy = null;
-            gameState.combat.selectedSkill = null;
-            gameState.combat.selectedPowerLevel = null;
+            resetCombatActionComposer();
             gameLoop.setLoading(false);
         }
-
     } catch (error) {
-        modal.updateCombatLog(`[系統] 你的招式似乎沒有生效，江湖的氣息有些不穩，請再試一次。(${error.message})`, 'system-message');
+        modal.updateCombatLog(`[系統] 你的招式未能穩定施展：${error.message}`, 'system-message');
         gameLoop.setLoading(false);
     }
 }

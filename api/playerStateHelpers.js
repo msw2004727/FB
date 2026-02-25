@@ -19,6 +19,26 @@ function calculateBulkScore(inventoryList) {
     }, 0);
 }
 
+const CURRENCY_ITEM_NAMES = new Set([
+    '\u9280\u5169',
+    '\u9ec3\u91d1',
+    '\u91d1\u5e63',
+    '\u9280\u5e63',
+    '\u9285\u9322',
+    '\u788e\u9280'
+]);
+
+function isCurrencyLikeItem(item) {
+    if (!item || typeof item !== 'object') return false;
+    const name = String(item.itemName || item.templateId || '').trim();
+    const type = String(item.itemType || '').trim();
+    const category = String(item.category || '').trim();
+    if (CURRENCY_ITEM_NAMES.has(name)) return true;
+    if (category === '\u8ca8\u5e63') return true;
+    if (type === '\u8ca8\u5e63') return true;
+    return /[\u91d1\u9280\u9322]/.test(name) && /(幣|兩|金|銀|錢)/.test(name);
+}
+
 
 async function getOrGenerateItemTemplate(itemName, roundData = {}) {
     if (!itemName) return null;
@@ -215,6 +235,36 @@ async function getRawInventory(userId) {
     return results.filter(item => item !== null);
 }
 
+async function getInventoryState(userId) {
+    const inventory = await getRawInventory(userId);
+    let money = 0;
+    const visibleItems = [];
+
+    for (const item of inventory) {
+        if (!item) continue;
+        if (isCurrencyLikeItem(item)) {
+            const itemName = String(item.itemName || item.templateId || '');
+            const qty = Number(item.quantity || 0);
+            if (itemName === '\u9280\u5169' && Number.isFinite(qty)) {
+                money += Math.max(0, qty);
+            }
+            continue;
+        }
+        visibleItems.push(item);
+    }
+
+    const itemsString = visibleItems.length > 0
+        ? visibleItems.map(item => `${item.itemName}${item.quantity > 1 ? `x${item.quantity}` : ''}`).join('、')
+        : '無';
+
+    return {
+        inventory,
+        itemsString,
+        money,
+        bulkScore: calculateBulkScore(inventory)
+    };
+}
+
 async function getRawNpcInventory(npcProfile) {
     if (!npcProfile) return [];
 
@@ -382,6 +432,7 @@ module.exports = {
     getOrGenerateSkillTemplate,
     updateInventory,
     getRawInventory,
+    getInventoryState,
     getRawNpcInventory,
     updateSkills,
     getPlayerSkills,

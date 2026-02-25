@@ -14,6 +14,7 @@ export const gameState = {
         state: null,
         selectedStrategy: null,
         selectedSkill: null,
+        selectedPowerLevel: null,
         selectedTarget: null,
     },
     deceasedNpcs: [] 

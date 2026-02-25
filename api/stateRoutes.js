@@ -8,6 +8,202 @@ const { getMergedLocationData, invalidateNovelCache, updateLibraryNovel } = requ
 
 const db = admin.firestore();
 
+const RELATION_GRAPH_VERSION = 2;
+
+const RELATION_TYPE_CONFIG = {
+    family: { label: '親人', color: '#d97706', priority: 90 },
+    romance: { label: '情感', color: '#db2777', priority: 85 },
+    faction: { label: '門派', color: '#2563eb', priority: 75 },
+    friend: { label: '朋友', color: '#16a34a', priority: 65 },
+    enemy: { label: '敵對', color: '#dc2626', priority: 60 },
+    acquaintance: { label: '熟識', color: '#0f766e', priority: 50 },
+    unfamiliar: { label: '不熟', color: '#64748b', priority: 40 },
+    other: { label: '其他', color: '#6d28d9', priority: 10 }
+};
+
+function toSafeString(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+}
+
+function normalizeName(value) {
+    return toSafeString(value);
+}
+
+function hashString(input) {
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i++) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+}
+
+function relationConfigKey(typeKey) {
+    return RELATION_TYPE_CONFIG[typeKey] ? typeKey : 'other';
+}
+
+function classifyExplicitRelationType(rawLabel) {
+    const label = toSafeString(rawLabel);
+    if (!label) return 'other';
+
+    const familyRegex = /(父|母|兄|弟|姐|姊|妹|子|女|兒|叔|伯|姑|姨|舅|祖|孫|親屬|家人|夫妻|夫君|娘子|娘親|爹|娘)/;
+    const romanceRegex = /(戀人|情人|伴侶|心上人|愛慕|未婚)/;
+    const factionRegex = /(門派|同門|師父|師傅|師徒|師兄|師弟|師姐|師妹|弟子|掌門|長老|宗主|宗門|幫主|幫眾|門主|堂主)/;
+    const friendRegex = /(朋友|好友|知己|摯友|結拜|盟友|同伴|夥伴|伙伴|友人)/;
+    const enemyRegex = /(仇|敵|宿敵|死對頭|冤家|追殺|通緝|仇人)/;
+    const unfamiliarRegex = /(不熟|陌生|路人|萍水|點頭之交)/;
+
+    if (familyRegex.test(label)) return 'family';
+    if (romanceRegex.test(label)) return 'romance';
+    if (factionRegex.test(label)) return 'faction';
+    if (friendRegex.test(label)) return 'friend';
+    if (enemyRegex.test(label)) return 'enemy';
+    if (unfamiliarRegex.test(label)) return 'unfamiliar';
+    return 'other';
+}
+
+function classifyPlayerRelationFromState(npcState = {}) {
+    const romanceValue = Number(npcState.romanceValue) || 0;
+    const friendlinessValue = Number(npcState.friendlinessValue) || 0;
+
+    if (romanceValue >= 60) return 'romance';
+    if (friendlinessValue >= 60) return 'friend';
+    if (friendlinessValue <= -40) return 'enemy';
+    if (Math.abs(friendlinessValue) <= 10) return 'unfamiliar';
+    return 'acquaintance';
+}
+
+function normalizeRelationshipTargets(rawValue) {
+    if (!rawValue) return [];
+
+    if (typeof rawValue === 'string') {
+        const name = normalizeName(rawValue);
+        return name ? [{ name }] : [];
+    }
+
+    if (Array.isArray(rawValue)) {
+        return rawValue.flatMap(item => normalizeRelationshipTargets(item));
+    }
+
+    if (typeof rawValue === 'object') {
+        if (typeof rawValue.name === 'string' || typeof rawValue.targetName === 'string') {
+            const name = normalizeName(rawValue.name || rawValue.targetName);
+            if (!name) return [];
+            return [{
+                name,
+                note: toSafeString(rawValue.note || rawValue.description || rawValue.remark)
+            }];
+        }
+        return [];
+    }
+
+    return [];
+}
+
+function isPlayerAlias(name, username) {
+    const n = normalizeName(name);
+    if (!n) return false;
+    if (n === normalizeName(username)) return true;
+    return ['玩家', '主角', '你', '自己', '本人'].includes(n);
+}
+
+function makePlayerNode(username) {
+    return {
+        id: 'player',
+        kind: 'player',
+        name: username || '主角',
+        label: username || '主角',
+        statusTitle: '主角',
+        allegiance: null,
+        isDeceased: false,
+        friendlinessValue: 0,
+        romanceValue: 0,
+        degree: 0
+    };
+}
+
+function makeNpcNode(name, template = {}, state = {}) {
+    const nodeName = normalizeName(template.name || state.name || name) || name;
+    return {
+        id: `npc:${nodeName}`,
+        kind: 'npc',
+        name: nodeName,
+        label: nodeName,
+        statusTitle: toSafeString(template.status_title || state.status_title) || '身份不明',
+        allegiance: toSafeString(template.allegiance || state.allegiance) || null,
+        currentLocation: Array.isArray(template.currentLocation)
+            ? template.currentLocation.map(toSafeString).filter(Boolean)
+            : (toSafeString(template.currentLocation) ? [toSafeString(template.currentLocation)] : []),
+        isDeceased: Boolean(state.isDeceased || template.isDeceased),
+        friendlinessValue: Number(state.friendlinessValue) || 0,
+        romanceValue: Number(state.romanceValue) || 0,
+        degree: 0
+    };
+}
+
+function buildRelationTypeList(edges) {
+    const usedTypes = new Set(edges.map(edge => relationConfigKey(edge.type)));
+    return Object.entries(RELATION_TYPE_CONFIG)
+        .filter(([key]) => usedTypes.has(key))
+        .sort((a, b) => b[1].priority - a[1].priority)
+        .map(([key, value]) => ({ key, label: value.label, color: value.color }));
+}
+
+function createRelationGraphPayload({ username, nodes, edges, meta = {} }) {
+    const sortedNodes = [...nodes].sort((a, b) => a.id.localeCompare(b.id, 'zh-Hant'));
+    const sortedEdges = [...edges].sort((a, b) => {
+        const keyA = `${a.source}|${a.target}|${a.type}|${a.label || ''}`;
+        const keyB = `${b.source}|${b.target}|${b.type}|${b.label || ''}`;
+        return keyA.localeCompare(keyB, 'zh-Hant');
+    });
+
+    const relationTypes = buildRelationTypeList(sortedEdges);
+
+    const digestSource = JSON.stringify({
+        v: RELATION_GRAPH_VERSION,
+        username: username || '',
+        nodes: sortedNodes.map(n => ({
+            id: n.id,
+            name: n.name,
+            statusTitle: n.statusTitle || '',
+            allegiance: n.allegiance || '',
+            isDeceased: !!n.isDeceased,
+            friendlinessValue: Number(n.friendlinessValue) || 0,
+            romanceValue: Number(n.romanceValue) || 0
+        })),
+        edges: sortedEdges.map(e => ({
+            s: e.source,
+            t: e.target,
+            type: relationConfigKey(e.type),
+            label: e.label || ''
+        }))
+    });
+
+    const cacheKey = `rel-${RELATION_GRAPH_VERSION}-${hashString(digestSource)}`;
+    const graph = {
+        version: RELATION_GRAPH_VERSION,
+        cacheKey,
+        centerNodeId: 'player',
+        generatedAt: new Date().toISOString(),
+        relationTypes,
+        nodes: sortedNodes,
+        edges: sortedEdges,
+        meta: {
+            nodeCount: sortedNodes.length,
+            edgeCount: sortedEdges.length,
+            npcCount: sortedNodes.filter(node => node.kind === 'npc').length,
+            ...meta
+        }
+    };
+
+    return {
+        graph,
+        // Backward-compatible placeholder; relations page no longer relies on Mermaid.
+        mermaidSyntax: null
+    };
+}
+
 // ... (所有其他路由保持不變) ...
 
 // ... (自廢武功、丟棄物品、獲取最新遊戲、庫存、技能、關係圖、百科等路由) ...
@@ -238,26 +434,206 @@ router.get('/get-relations', async (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     try {
-        const summaryDocRef = db.collection('users').doc(userId).collection('game_state').doc('summary');
-        const npcsSnapshot = await db.collection('users').doc(userId).collection('npc_states').get();
-        const summaryDoc = await summaryDocRef.get();
+        const userRef = db.collection('users').doc(userId);
+        const npcStatesRef = userRef.collection('npc_states');
+        const latestSaveQuery = userRef.collection('game_saves').orderBy('R', 'desc').limit(1);
 
-        if (!summaryDoc.exists || !summaryDoc.data().text) {
-            return res.json({ mermaidSyntax: 'graph TD;\nA["尚無足夠的江湖經歷來繪製關係圖"];' });
+        const [npcsSnapshot, latestSaveSnapshot] = await Promise.all([
+            npcStatesRef.get(),
+            latestSaveQuery.get()
+        ]);
+
+        const latestRound = latestSaveSnapshot.empty ? null : (latestSaveSnapshot.docs[0].data()?.R ?? null);
+        const currentSceneNpcNames = new Set(
+            latestSaveSnapshot.empty
+                ? []
+                : ((latestSaveSnapshot.docs[0].data()?.NPC || [])
+                    .map(npc => normalizeName(npc?.name))
+                    .filter(Boolean))
+        );
+
+        const npcStateMap = new Map();
+        for (const doc of npcsSnapshot.docs) {
+            npcStateMap.set(doc.id, { ...(doc.data() || {}) });
         }
 
-        const longTermSummary = summaryDoc.data().text;
-        const npcDetails = {};
-        npcsSnapshot.forEach(doc => {
-            const data = doc.data();
-            npcDetails[doc.id] = { romanceValue: data.romanceValue || 0 };
+        const npcTemplateCache = new Map();
+        const fetchNpcTemplate = async (npcName) => {
+            const safeName = normalizeName(npcName);
+            if (!safeName) return null;
+            if (npcTemplateCache.has(safeName)) return npcTemplateCache.get(safeName);
+            const templateDoc = await db.collection('npcs').doc(safeName).get();
+            const template = templateDoc.exists ? (templateDoc.data() || {}) : null;
+            npcTemplateCache.set(safeName, template);
+            return template;
+        };
+
+        const knownNpcNames = new Set(npcStateMap.keys());
+        await Promise.all([...knownNpcNames].map(fetchNpcTemplate));
+
+        const relationshipReferencedNpcNames = new Set();
+        for (const [npcName, npcState] of npcStateMap.entries()) {
+            const template = npcTemplateCache.get(npcName) || null;
+            const mergedRelationships = {
+                ...(template?.relationships || {}),
+                ...(npcState?.relationships || {})
+            };
+            for (const [, targetRaw] of Object.entries(mergedRelationships)) {
+                const targets = normalizeRelationshipTargets(targetRaw);
+                for (const target of targets) {
+                    const targetName = normalizeName(target.name);
+                    if (!targetName || isPlayerAlias(targetName, username)) continue;
+                    relationshipReferencedNpcNames.add(targetName);
+                }
+            }
+        }
+
+        const extraNpcNames = [...relationshipReferencedNpcNames].filter(name => !knownNpcNames.has(name));
+        if (extraNpcNames.length > 0) {
+            await Promise.all(extraNpcNames.map(fetchNpcTemplate));
+        }
+
+        const allNpcNames = new Set([
+            ...knownNpcNames,
+            ...[...relationshipReferencedNpcNames].filter(name => npcTemplateCache.get(name))
+        ]);
+
+        const nodes = [];
+        const nodeById = new Map();
+        const npcNodeByName = new Map();
+        const playerNode = makePlayerNode(username);
+        nodes.push(playerNode);
+        nodeById.set(playerNode.id, playerNode);
+
+        for (const npcName of [...allNpcNames].sort((a, b) => a.localeCompare(b, 'zh-Hant'))) {
+            const template = npcTemplateCache.get(npcName) || {};
+            const npcState = npcStateMap.get(npcName) || {};
+            const node = makeNpcNode(npcName, template, npcState);
+            node.inCurrentScene = currentSceneNpcNames.has(node.name);
+            nodes.push(node);
+            nodeById.set(node.id, node);
+            npcNodeByName.set(node.name, node);
+        }
+
+        const edges = [];
+        const edgeDedup = new Set();
+        const addEdge = ({ sourceId, targetId, type, label = '', directed = false, strength = null, sourceKind = 'derived' }) => {
+            const safeType = relationConfigKey(type);
+            if (!sourceId || !targetId || sourceId === targetId) return;
+
+            const pair = directed ? [sourceId, targetId] : [sourceId, targetId].sort();
+            const dedupKey = pair[0] + '|' + pair[1] + '|' + safeType + '|' + label + '|' + (directed ? 'd' : 'u');
+            if (edgeDedup.has(dedupKey)) return;
+            edgeDedup.add(dedupKey);
+
+            const sourceNode = nodeById.get(sourceId);
+            const targetNode = nodeById.get(targetId);
+            if (!sourceNode || !targetNode) return;
+            sourceNode.degree = (Number(sourceNode.degree) || 0) + 1;
+            targetNode.degree = (Number(targetNode.degree) || 0) + 1;
+
+            edges.push({
+                id: 'edge:' + hashString(dedupKey),
+                source: sourceId,
+                target: targetId,
+                type: safeType,
+                label: toSafeString(label) || RELATION_TYPE_CONFIG[safeType]?.label || '??',
+                directed: !!directed,
+                strength: strength === null ? undefined : (Number(strength) || 0),
+                sourceKind,
+                color: RELATION_TYPE_CONFIG[safeType]?.color || RELATION_TYPE_CONFIG.other.color
+            });
+        };
+
+        const playerExplicitRelationTypes = new Map();
+        for (const node of nodes) {
+            if (node.kind !== 'npc') continue;
+            const npcName = node.name;
+            const template = npcTemplateCache.get(npcName) || {};
+            const state = npcStateMap.get(npcName) || {};
+            const mergedRelationships = {
+                ...(template.relationships || {}),
+                ...(state.relationships || {})
+            };
+
+            for (const [relationLabel, targetRaw] of Object.entries(mergedRelationships)) {
+                const relationType = classifyExplicitRelationType(relationLabel);
+                const targets = normalizeRelationshipTargets(targetRaw);
+                for (const target of targets) {
+                    const targetName = normalizeName(target.name);
+                    if (!targetName) continue;
+
+                    if (isPlayerAlias(targetName, username)) {
+                        if (!playerExplicitRelationTypes.has(node.id)) {
+                            playerExplicitRelationTypes.set(node.id, new Set());
+                        }
+                        playerExplicitRelationTypes.get(node.id).add(relationType);
+                        continue;
+                    }
+
+                    const targetNode = npcNodeByName.get(targetName);
+                    if (!targetNode) continue;
+
+                    addEdge({
+                        sourceId: node.id,
+                        targetId: targetNode.id,
+                        type: relationType,
+                        label: relationLabel,
+                        directed: false,
+                        sourceKind: 'explicit'
+                    });
+                }
+            }
+        }
+
+        const playerPriority = ['family', 'romance', 'faction', 'friend', 'enemy', 'acquaintance', 'unfamiliar', 'other'];
+        for (const node of nodes) {
+            if (node.kind !== 'npc') continue;
+            const npcState = npcStateMap.get(node.name) || {};
+            let playerEdgeType = classifyPlayerRelationFromState(npcState);
+
+            const explicitTypes = playerExplicitRelationTypes.get(node.id);
+            if (explicitTypes && explicitTypes.size > 0) {
+                for (const candidate of playerPriority) {
+                    if (explicitTypes.has(candidate)) {
+                        playerEdgeType = candidate;
+                        break;
+                    }
+                }
+            }
+
+            const strength = Math.max(
+                Math.abs(Number(npcState.friendlinessValue) || 0),
+                Math.abs(Number(npcState.romanceValue) || 0)
+            );
+
+            addEdge({
+                sourceId: 'player',
+                targetId: node.id,
+                type: playerEdgeType,
+                label: RELATION_TYPE_CONFIG[playerEdgeType]?.label || '??',
+                directed: false,
+                strength,
+                sourceKind: 'player'
+            });
+        }
+
+        const payload = createRelationGraphPayload({
+            username,
+            nodes,
+            edges,
+            meta: {
+                latestRound,
+                sceneNpcCount: currentSceneNpcNames.size,
+                cacheSourceNpcStateCount: npcsSnapshot.size,
+                referencedNpcCount: relationshipReferencedNpcNames.size
+            }
         });
 
-        const mermaidSyntax = await getRelationGraph(longTermSummary, username, npcDetails);
-        res.json({ mermaidSyntax });
+        res.json(payload);
     } catch (error) {
-        console.error(`[關係圖API] 替玩家 ${username} 生成關係圖時出錯:`, error);
-        res.status(500).json({ message: '梳理人物脈絡時發生未知錯誤。' });
+        console.error('[???API] ?? ' + username + ' ?????????:', error);
+        res.status(500).json({ message: '????????????????' });
     }
 });
 

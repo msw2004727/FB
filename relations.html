@@ -8,48 +8,317 @@
     <link rel="stylesheet" href="styles/base.css">
     <link rel="stylesheet" href="styles/novel.css">
     <style>
-        /* 關係圖頁面專用樣式 */
+        .relations-page {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 12% 12%, rgba(180, 122, 54, 0.08), transparent 38%),
+                radial-gradient(circle at 88% 6%, rgba(31, 91, 140, 0.10), transparent 42%),
+                linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0));
+        }
         .relations-container {
-            max-width: 1200px;
+            max-width: 1360px;
             margin: 0 auto;
-            padding: 2rem;
-            text-align: center;
+            padding: 1.5rem 1.25rem 2rem;
         }
-        .mermaid-chart {
-            margin-top: 2rem;
-            padding: 2rem;
-            background-color: var(--light-surface-bg);
-            border: 1px solid var(--light-border);
-            border-radius: 12px;
+        .relations-header {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 50vh;
-            overflow: auto;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
-        body.dark-theme .mermaid-chart {
-            background-color: var(--dark-surface-bg);
-            border-color: var(--dark-border);
+        .relations-header h1 {
+            margin: 0;
         }
-        .loading-text {
-            font-family: var(--font-serif);
+        .relations-header p {
+            margin: 0.35rem 0 0;
             color: var(--light-text-secondary);
         }
-        body.dark-theme .loading-text {
+        body.dark-theme .relations-header p {
             color: var(--dark-text-secondary);
         }
-        .mermaid svg {
-            max-width: 100%;
-            height: auto;
+        .relations-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
-
-        /* --- NPC 肖像彈窗樣式 --- */
-        .portrait-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
+        .back-to-game-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0.9rem;
+            border-radius: 999px;
+            border: 1px solid var(--light-border);
+            background: var(--light-surface-bg);
+            color: var(--light-text);
+            text-decoration: none;
+        }
+        .back-to-game-btn:hover {
+            border-color: var(--light-accent);
+            color: var(--light-accent);
+        }
+        body.dark-theme .back-to-game-btn {
+            border-color: var(--dark-border);
+            background: var(--dark-surface-bg);
+            color: var(--dark-text);
+        }
+        body.dark-theme .back-to-game-btn:hover {
+            border-color: var(--dark-accent);
+            color: var(--dark-accent);
+        }
+        .relations-panel {
+            border: 1px solid var(--light-border);
+            border-radius: 16px;
+            background: color-mix(in srgb, var(--light-surface-bg) 92%, #fff 8%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.07);
+            overflow: hidden;
+        }
+        body.dark-theme .relations-panel {
+            border-color: var(--dark-border);
+            background: color-mix(in srgb, var(--dark-surface-bg) 92%, #000 8%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+        }
+        .relations-toolbar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.9rem;
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid var(--light-border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+        }
+        body.dark-theme .relations-toolbar {
+            border-bottom-color: var(--dark-border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+        }
+        .toolbar-left,
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+        .toolbar-label {
+            font-size: 0.9rem;
+            color: var(--light-text-secondary);
+            margin-right: 0.15rem;
+            white-space: nowrap;
+        }
+        body.dark-theme .toolbar-label {
+            color: var(--dark-text-secondary);
+        }
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--light-border);
+            padding: 0.42rem 0.8rem;
+            background: var(--light-surface-bg);
+            color: var(--light-text);
+            font-size: 0.9rem;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+        }
+        .filter-chip:hover { transform: translateY(-1px); }
+        .filter-chip.hidden-type {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+        .filter-chip .chip-dot {
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.06);
+        }
+        body.dark-theme .filter-chip {
+            border-color: var(--dark-border);
+            background: var(--dark-surface-bg);
+            color: var(--dark-text);
+        }
+        .tool-btn {
+            border: 1px solid var(--light-border);
+            background: var(--light-surface-bg);
+            color: var(--light-text);
+            border-radius: 10px;
+            height: 36px;
+            min-width: 36px;
+            padding: 0 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+        }
+        .tool-btn:hover {
+            border-color: var(--light-accent);
+            color: var(--light-accent);
+        }
+        body.dark-theme .tool-btn {
+            border-color: var(--dark-border);
+            background: var(--dark-surface-bg);
+            color: var(--dark-text);
+        }
+        body.dark-theme .tool-btn:hover {
+            border-color: var(--dark-accent);
+            color: var(--dark-accent);
+        }
+        .tool-btn.icon-only { width: 36px; padding: 0; }
+        .graph-stage {
+            position: relative;
+            min-height: 68vh;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 280px;
+        }
+        .graph-viewport-wrap {
+            min-width: 0;
+            padding: 0.75rem;
+        }
+        .graph-viewport {
+            position: relative;
+            height: 100%;
+            min-height: 60vh;
+            border-radius: 14px;
+            border: 1px solid var(--light-border);
+            background:
+                radial-gradient(circle at 50% 50%, rgba(180,122,54,0.06), transparent 55%),
+                linear-gradient(0deg, rgba(0,0,0,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px),
+                var(--light-bg);
+            background-size: auto, 26px 26px, 26px 26px, auto;
+            overflow: hidden;
+        }
+        body.dark-theme .graph-viewport {
+            border-color: var(--dark-border);
+            background:
+                radial-gradient(circle at 50% 50%, rgba(140,166,204,0.08), transparent 55%),
+                linear-gradient(0deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+                var(--dark-bg);
+            background-size: auto, 26px 26px, 26px 26px, auto;
+        }
+        .graph-viewport.is-dragging { cursor: grabbing; }
+        .graph-viewport svg {
             width: 100%;
             height: 100%;
+            display: block;
+            cursor: grab;
+        }
+        .graph-overlay {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            pointer-events: none;
+            padding: 1rem;
+        }
+        .graph-overlay.hidden { display: none; }
+        .overlay-card {
+            pointer-events: auto;
+            border-radius: 14px;
+            border: 1px solid var(--light-border);
+            background: rgba(255,255,255,0.92);
+            padding: 0.9rem 1rem;
+            color: var(--light-text-secondary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+            max-width: 520px;
+        }
+        body.dark-theme .overlay-card {
+            border-color: var(--dark-border);
+            background: rgba(19, 24, 31, 0.92);
+            color: var(--dark-text-secondary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+        }
+        .graph-side-panel {
+            border-left: 1px solid var(--light-border);
+            padding: 0.9rem 1rem 1rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+        }
+        body.dark-theme .graph-side-panel {
+            border-left-color: var(--dark-border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+        }
+        .panel-block + .panel-block { margin-top: 1rem; }
+        .panel-block h3 {
+            margin: 0 0 0.55rem;
+            font-size: 0.95rem;
+            color: var(--light-text);
+        }
+        body.dark-theme .panel-block h3 { color: var(--dark-text); }
+        .panel-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 0.5rem;
+        }
+        .panel-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.8rem;
+            font-size: 0.9rem;
+            color: var(--light-text-secondary);
+            border-bottom: 1px dashed rgba(127,127,127,0.2);
+            padding-bottom: 0.35rem;
+        }
+        .panel-item:last-child { border-bottom: none; padding-bottom: 0; }
+        body.dark-theme .panel-item { color: var(--dark-text-secondary); }
+        .legend-list {
+            display: grid;
+            gap: 0.45rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.88rem;
+            color: var(--light-text-secondary);
+        }
+        body.dark-theme .legend-item { color: var(--dark-text-secondary); }
+        .legend-line {
+            width: 1.1rem;
+            height: 0;
+            border-top: 3px solid currentColor;
+            border-radius: 999px;
+            opacity: 0.95;
+        }
+        .cache-status {
+            font-size: 0.82rem;
+            color: var(--light-text-secondary);
+            white-space: nowrap;
+        }
+        body.dark-theme .cache-status { color: var(--dark-text-secondary); }
+        .node-label-main {
+            font-size: 13px;
+            font-weight: 600;
+            paint-order: stroke;
+            stroke: rgba(255,255,255,0.92);
+            stroke-width: 4px;
+            stroke-linejoin: round;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+        body.dark-theme .node-label-main {
+            stroke: rgba(0,0,0,0.68);
+        }
+        .node-label-sub {
+            font-size: 11px;
+            fill: #64748b;
+            paint-order: stroke;
+            stroke: rgba(255,255,255,0.92);
+            stroke-width: 3px;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+        body.dark-theme .node-label-sub {
+            fill: #93a6bc;
+            stroke: rgba(0,0,0,0.68);
+        }
+        .portrait-modal-overlay {
+            position: fixed;
+            inset: 0;
             background-color: rgba(0, 0, 0, 0.7);
             z-index: 1050;
             display: flex;
@@ -57,8 +326,8 @@
             align-items: center;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-            backdrop-filter: blur(5px);
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+            backdrop-filter: blur(4px);
         }
         .portrait-modal-overlay.visible {
             opacity: 1;
@@ -67,16 +336,13 @@
         .portrait-modal-content {
             background-color: var(--light-surface-bg);
             border-radius: 12px;
-            width: 90%;
-            max-width: 380px;
+            width: min(90vw, 380px);
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            transform: scale(0.95);
-            transition: transform 0.3s ease;
+            transform: scale(0.96);
+            transition: transform 0.25s ease;
             overflow: hidden;
         }
-        .portrait-modal-overlay.visible .portrait-modal-content {
-            transform: scale(1);
-        }
+        .portrait-modal-overlay.visible .portrait-modal-content { transform: scale(1); }
         body.dark-theme .portrait-modal-content {
             background-color: var(--dark-surface-bg);
             border: 1px solid var(--dark-border);
@@ -91,8 +357,8 @@
             color: var(--light-text-secondary);
         }
         body.dark-theme .portrait-image-container {
-             background-color: var(--dark-bg);
-             color: var(--dark-text-secondary);
+            background-color: var(--dark-bg);
+            color: var(--dark-text-secondary);
         }
         .portrait-image-container img {
             width: 100%;
@@ -100,42 +366,117 @@
             object-fit: cover;
         }
         .portrait-info {
-            padding: 1.5rem;
+            padding: 1.1rem 1.25rem 1.25rem;
             text-align: center;
         }
         .portrait-info h3 {
-            margin: 0 0 0.5rem 0;
+            margin: 0 0 0.4rem;
             font-family: var(--font-serif);
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             color: var(--light-accent);
         }
-        body.dark-theme .portrait-info h3 {
-             color: var(--dark-accent);
-        }
+        body.dark-theme .portrait-info h3 { color: var(--dark-accent); }
         .portrait-info p {
             margin: 0;
             color: var(--light-text-secondary);
             font-style: italic;
         }
+        body.dark-theme .portrait-info p { color: var(--dark-text-secondary); }
+        @media (max-width: 1024px) {
+            .graph-stage {
+                grid-template-columns: 1fr;
+            }
+            .graph-side-panel {
+                border-left: none;
+                border-top: 1px solid var(--light-border);
+            }
+            body.dark-theme .graph-side-panel {
+                border-top-color: var(--dark-border);
+            }
+        }
+        @media (max-width: 720px) {
+            .relations-container { padding: 1rem 0.75rem 1.25rem; }
+            .relations-header { flex-direction: column; }
+            .relations-actions { width: 100%; justify-content: space-between; }
+            .relations-toolbar { grid-template-columns: 1fr; }
+            .graph-viewport { min-height: 56vh; }
+            .node-label-main { font-size: 12px; }
+            .node-label-sub { font-size: 10px; }
+        }
     </style>
 </head>
-<body class="light-theme">
-
+<body class="light-theme relations-page">
     <div class="relations-container">
-        <header class="novel-header">
-            <h1 id="relations-title">人物關係圖</h1>
-            <p>記載著你與江湖中人的恩怨情仇</p>
-            <a href="index.html" class="back-to-game-btn">
-                <i class="fas fa-arrow-left"></i> 返回遊戲
-            </a>
+        <header class="relations-header">
+            <div>
+                <h1 id="relations-title">人物關係圖</h1>
+                <p>以主角為中心的放射式關係圖，可快速檢視江湖人物互動、親疏與關聯。</p>
+            </div>
+            <div class="relations-actions">
+                <span id="cache-status" class="cache-status">尚未載入</span>
+                <a href="index.html" class="back-to-game-btn">
+                    <i class="fas fa-arrow-left"></i>
+                    返回遊戲
+                </a>
+            </div>
         </header>
 
-        <main id="relations-content" class="mermaid-chart">
-            <p class="loading-text">
-                <i class="fas fa-spinner fa-spin"></i>
-                正在梳理人物脈絡，繪製關係圖中...
-            </p>
-        </main>
+        <section class="relations-panel">
+            <div class="relations-toolbar">
+                <div class="toolbar-left">
+                    <span class="toolbar-label">關係類型：</span>
+                    <div id="relation-type-filters" class="toolbar-left" style="gap:0.45rem;"></div>
+                    <button id="filter-reset-btn" class="tool-btn" type="button">全部顯示</button>
+                </div>
+                <div class="toolbar-right">
+                    <button id="zoom-out-btn" class="tool-btn icon-only" type="button" title="縮小"><i class="fas fa-search-minus"></i></button>
+                    <button id="zoom-in-btn" class="tool-btn icon-only" type="button" title="放大"><i class="fas fa-search-plus"></i></button>
+                    <button id="fit-btn" class="tool-btn" type="button"><i class="fas fa-expand"></i> 自動縮放</button>
+                    <button id="reset-view-btn" class="tool-btn" type="button"><i class="fas fa-crosshairs"></i> 回到中心</button>
+                    <button id="refresh-relations-btn" class="tool-btn" type="button"><i class="fas fa-rotate"></i> 重新載入</button>
+                </div>
+            </div>
+
+            <div class="graph-stage">
+                <div class="graph-viewport-wrap">
+                    <div id="relations-content" class="graph-viewport">
+                        <svg id="relations-svg" viewBox="0 0 800 600" aria-label="人物關係圖">
+                            <g id="relations-grid-layer"></g>
+                            <g id="relations-world"></g>
+                        </svg>
+                        <div id="graph-loading-overlay" class="graph-overlay">
+                            <div class="overlay-card"><i class="fas fa-spinner fa-spin"></i> 正在載入人物關係圖...</div>
+                        </div>
+                        <div id="graph-empty-overlay" class="graph-overlay hidden">
+                            <div id="graph-empty-text" class="overlay-card">尚無可顯示的人物關係資料。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="graph-side-panel">
+                    <div class="panel-block">
+                        <h3>圖譜資訊</h3>
+                        <ul id="graph-meta" class="panel-list">
+                            <li class="panel-item"><span>節點</span><strong>--</strong></li>
+                            <li class="panel-item"><span>連線</span><strong>--</strong></li>
+                            <li class="panel-item"><span>可見節點</span><strong>--</strong></li>
+                            <li class="panel-item"><span>可見連線</span><strong>--</strong></li>
+                        </ul>
+                    </div>
+                    <div class="panel-block">
+                        <h3>顯示說明</h3>
+                        <div id="graph-legend" class="legend-list"></div>
+                    </div>
+                    <div class="panel-block">
+                        <h3>狀態</h3>
+                        <ul class="panel-list">
+                            <li class="panel-item"><span>資料來源</span><strong id="graph-source">--</strong></li>
+                            <li class="panel-item"><span>更新狀態</span><strong id="graph-status-text">待載入</strong></li>
+                        </ul>
+                    </div>
+                </aside>
+            </div>
+        </section>
     </div>
 
     <div id="portrait-modal" class="portrait-modal-overlay">
@@ -144,22 +485,12 @@
                 <i class="fas fa-spinner fa-spin fa-2x"></i>
             </div>
             <div class="portrait-info">
-                <h3 id="portrait-name">讀取中...</h3>
-                <p id="portrait-title">身份稱號</p>
+                <h3 id="portrait-name">載入中...</h3>
+                <p id="portrait-title">正在整理人物資料</p>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        // --- 【核心修正】加入 securityLevel: 'loose' 來解鎖點擊事件 ---
-        mermaid.initialize({ 
-            startOnLoad: false,
-            securityLevel: 'loose' 
-        });
-        window.mermaid = mermaid; // 將mermaid掛載到window上，方便我們的腳本呼叫
-    </script>
-    
     <script type="module" src="scripts/relations.js"></script>
 </body>
 </html>
