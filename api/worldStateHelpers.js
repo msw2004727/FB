@@ -111,56 +111,245 @@ async function updateLibraryNovel(userId, username, newRoundData) {
 }
 
 
-async function getMergedLocationData(userId, locationHierarchyArray) {
-    if (!Array.isArray(locationHierarchyArray) || locationHierarchyArray.length === 0) {
-        console.error('[讀取系統] 錯誤：傳入的地點資料不是有效的陣列。', locationHierarchyArray);
+function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneValue(value) {
+    if (Array.isArray(value)) return value.map(cloneValue);
+    if (isPlainObject(value)) {
+        const out = {};
+        Object.entries(value).forEach(([key, nestedValue]) => {
+            out[key] = cloneValue(nestedValue);
+        });
+        return out;
+    }
+    return value;
+}
+
+function deepMergeObjects(base, override) {
+    const baseObj = isPlainObject(base) ? base : {};
+    const overrideObj = isPlainObject(override) ? override : {};
+    const merged = cloneValue(baseObj);
+
+    Object.entries(overrideObj).forEach(([key, overrideValue]) => {
+        const baseValue = merged[key];
+        if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+            merged[key] = deepMergeObjects(baseValue, overrideValue);
+            return;
+        }
+        merged[key] = cloneValue(overrideValue);
+    });
+
+    return merged;
+}
+
+function normalizeLocationHierarchyInput(locationHierarchyInput) {
+    if (Array.isArray(locationHierarchyInput)) {
+        return locationHierarchyInput
+            .map(value => (typeof value === 'string' ? value.trim() : ''))
+            .filter(Boolean);
+    }
+    if (typeof locationHierarchyInput === 'string' && locationHierarchyInput.trim()) {
+        return [locationHierarchyInput.trim()];
+    }
+    return [];
+}
+
+function getAddressPath(address) {
+    if (!isPlainObject(address)) return '';
+    const preferredOrder = ['country', 'province', 'state', 'region', 'city', 'district', 'town', 'village'];
+    const orderedValues = [];
+    const seen = new Set();
+
+    preferredOrder.forEach((key) => {
+        const value = typeof address[key] === 'string' ? address[key].trim() : '';
+        if (!value) return;
+        seen.add(key);
+        orderedValues.push(value);
+    });
+
+    Object.entries(address).forEach(([key, rawValue]) => {
+        if (seen.has(key)) return;
+        const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+        if (value) orderedValues.push(value);
+    });
+
+    return orderedValues.join(' > ');
+}
+
+function buildLocationSummary(currentMerged, inheritedMerged) {
+    const resolved = isPlainObject(inheritedMerged) ? inheritedMerged : {};
+    const current = isPlainObject(currentMerged) ? currentMerged : {};
+    const name = current.locationName || current.name || resolved.locationName || resolved.name || '未知地區';
+    const description = current.description || resolved.description || '地區情報載入中...';
+    const governance = deepMergeObjects(resolved.governance, current.governance);
+    const address = deepMergeObjects(resolved.address, current.address);
+
+    return {
+        locationName: name,
+        description,
+        ruler: governance && governance.ruler ? governance.ruler : '未知',
+        addressPath: getAddressPath(address),
+        locationType: current.locationType || resolved.locationType || '未知'
+    };
+}
+
+function createFallbackLocationData(locationName) {
+    const safeName = typeof locationName === 'string' && locationName.trim() ? locationName.trim() : '未知地區';
+    const description = '地區情報載入失敗，請稍後再試。';
+    const summary = {
+        locationName: safeName,
+        description,
+        ruler: '未知',
+        addressPath: '',
+        locationType: '未知'
+    };
+
+    return {
+        locationId: safeName,
+        locationName: safeName,
+        description,
+        locationHierarchy: [safeName],
+        schemaVersion: 2,
+        summary,
+        current: {
+            static: {},
+            dynamic: {},
+            merged: { locationName: safeName, description },
+            inheritedMerged: { locationName: safeName, description },
+            summary
+        },
+        hierarchy: [],
+        layers: {
+            currentStatic: {},
+            currentDynamic: {},
+            currentMerged: { locationName: safeName, description },
+            inheritedMerged: { locationName: safeName, description }
+        }
+    };
+}
+
+async function getMergedLocationData(userId, locationHierarchyInput) {
+    const normalizedHierarchy = normalizeLocationHierarchyInput(locationHierarchyInput);
+    if (normalizedHierarchy.length === 0) {
+        console.error('[LocationData] Invalid location hierarchy input:', locationHierarchyInput);
         return null;
     }
-    let currentLocationName = locationHierarchyArray[locationHierarchyArray.length - 1];
-    let mergedData = {};
+
+    let currentLocationName = normalizedHierarchy[normalizedHierarchy.length - 1];
     const processedHierarchy = [];
+    const visitedLocations = new Set();
+
     try {
         while (currentLocationName) {
-            if (typeof currentLocationName !== 'string' || currentLocationName.trim() === '') {
-                 console.error(`[讀取系統] 偵測到無效的地點名稱，停止向上查找:`, currentLocationName);
-                 break;
+            if (typeof currentLocationName !== 'string' || !currentLocationName.trim()) {
+                console.error('[LocationData] Invalid location name in hierarchy traversal:', currentLocationName);
+                break;
             }
+
+            currentLocationName = currentLocationName.trim();
+
+            if (visitedLocations.has(currentLocationName)) {
+                console.warn('[LocationData] Detected hierarchy cycle, abort traversal at:', currentLocationName);
+                break;
+            }
+            visitedLocations.add(currentLocationName);
+
             const staticDocRef = db.collection('locations').doc(currentLocationName);
             const dynamicDocRef = db.collection('users').doc(userId).collection('location_states').doc(currentLocationName);
 
-            const [staticDoc, dynamicDoc] = await Promise.all([staticDocRef.get(), dynamicDocRef.get()]);
+            let [staticDoc, dynamicDoc] = await Promise.all([staticDocRef.get(), dynamicDocRef.get()]);
 
             if (!staticDoc.exists) {
-                console.log(`[讀取系統] 偵測到全新地點: ${currentLocationName}，將在背景生成...`);
-                await generateAndCacheLocation(userId, currentLocationName, '未知', '初次抵達，資訊尚不明朗。');
-                const tempNewLoc = { locationId: currentLocationName, locationName: currentLocationName, description: "此地詳情尚在傳聞之中..." };
-                processedHierarchy.unshift(tempNewLoc);
-                break;
+                console.log('[LocationData] Missing static location ' + currentLocationName + ', generating...');
+                await generateAndCacheLocation(userId, currentLocationName, '未知', '世界摘要未提供', normalizedHierarchy);
+                [staticDoc, dynamicDoc] = await Promise.all([staticDocRef.get(), dynamicDocRef.get()]);
+            } else if (!dynamicDoc.exists) {
+                console.log('[LocationData] Missing dynamic location state for ' + currentLocationName + ' (user=' + userId + '), generating...');
+                await generateAndCacheLocation(userId, currentLocationName, '未知', '世界摘要未提供', normalizedHierarchy);
+                dynamicDoc = await dynamicDocRef.get();
             }
-            if (staticDoc.exists && !dynamicDoc.exists) {
-                 console.log(`[讀取系統] 模板存在，但玩家 ${userId} 的地點狀態不存在: ${currentLocationName}，將在背景初始化...`);
-                 await generateAndCacheLocation(userId, currentLocationName, '未知', '初次抵達，資訊尚不明朗。');
+
+            if (!staticDoc.exists) {
+                const tempMerged = {
+                    locationId: currentLocationName,
+                    locationName: currentLocationName,
+                    description: '地區情報生成中，請稍後再試。'
+                };
+                processedHierarchy.unshift({
+                    locationName: currentLocationName,
+                    static: {},
+                    dynamic: {},
+                    merged: tempMerged
+                });
+                break;
             }
 
             const staticData = staticDoc.data() || {};
-            const dynamicData = dynamicDoc.exists ? dynamicDoc.data() : {};
-            processedHierarchy.unshift({ ...staticData, ...dynamicData });
-            currentLocationName = staticData.parentLocation;
+            const dynamicData = dynamicDoc.exists ? (dynamicDoc.data() || {}) : {};
+            const mergedForNode = deepMergeObjects(staticData, dynamicData);
+            const resolvedLocationName = mergedForNode.locationName || mergedForNode.name || staticData.locationName || staticData.name || currentLocationName;
+
+            processedHierarchy.unshift({
+                locationName: resolvedLocationName,
+                static: staticData,
+                dynamic: dynamicData,
+                merged: mergedForNode
+            });
+
+            currentLocationName = typeof staticData.parentLocation === 'string' ? staticData.parentLocation.trim() : '';
         }
-        processedHierarchy.forEach(loc => { mergedData = { ...mergedData, ...loc }; });
-        const deepestLocation = processedHierarchy[processedHierarchy.length - 1];
-        if (deepestLocation) {
-            mergedData.locationName = deepestLocation.locationName;
-            mergedData.description = deepestLocation.description;
-        }
-        mergedData.locationHierarchy = processedHierarchy.map(loc => loc.locationName);
-        return mergedData;
+
+        let inheritedMerged = {};
+        processedHierarchy.forEach((node) => {
+            inheritedMerged = deepMergeObjects(inheritedMerged, node.merged);
+        });
+
+        const currentNode = processedHierarchy[processedHierarchy.length - 1] || null;
+        const currentStatic = currentNode && currentNode.static ? currentNode.static : {};
+        const currentDynamic = currentNode && currentNode.dynamic ? currentNode.dynamic : {};
+        const currentMerged = currentNode && currentNode.merged ? currentNode.merged : {};
+        const summary = buildLocationSummary(currentMerged, inheritedMerged);
+
+        const hierarchy = processedHierarchy.map((node) => ({
+            locationName: node.locationName || (node.merged && (node.merged.locationName || node.merged.name)) || '未知地區',
+            static: node.static || {},
+            dynamic: node.dynamic || {},
+            merged: node.merged || {},
+            summary: buildLocationSummary(node.merged || {}, node.merged || {})
+        }));
+
+        const compatibilityPayload = deepMergeObjects({}, inheritedMerged);
+        compatibilityPayload.locationId = compatibilityPayload.locationId || summary.locationName;
+        compatibilityPayload.locationName = summary.locationName;
+        compatibilityPayload.description = summary.description;
+        compatibilityPayload.locationHierarchy = hierarchy.map(node => node.locationName);
+
+        return {
+            ...compatibilityPayload,
+            schemaVersion: 2,
+            summary,
+            current: {
+                static: currentStatic,
+                dynamic: currentDynamic,
+                merged: currentMerged,
+                inheritedMerged,
+                summary
+            },
+            hierarchy,
+            layers: {
+                currentStatic,
+                currentDynamic,
+                currentMerged,
+                inheritedMerged
+            }
+        };
     } catch (error) {
-        console.error(`[讀取系統] 獲取地點「${locationHierarchyArray.join(',')}」的層級資料時出錯:`, error);
-        return { locationId: currentLocationName, locationName: currentLocationName, description: "讀取此地詳情時發生錯誤..." };
+        console.error('[LocationData] Failed to merge location data for ' + normalizedHierarchy.join(' > '), error);
+        return createFallbackLocationData(currentLocationName || normalizedHierarchy[normalizedHierarchy.length - 1]);
     }
 }
-
 module.exports = {
     TIME_SEQUENCE,
     DAYS_IN_MONTH,

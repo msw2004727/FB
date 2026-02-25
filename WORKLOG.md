@@ -134,3 +134,61 @@
 - Replaced the root plain-text file `AI模型型號` with `AI模型型號.md` in UTF-8 Markdown format.
 - Synced the document to current runtime mappings from `services/aiService.js` and current UI selector labels in `index.html`.
 - Document now includes: player AI-core mappings, compatibility aliases (`gpt5.2`, `cluade`), backend fallback behavior (auto-retry to `openai -> gpt-5.2`), and a note that NPC image generation is currently fixed to `dall-e-3`.
+
+### Task: Deep inspection of `map.html` / world-map generation failure and design issues (inspection only)
+- Confirmed `map.html` uses `scripts/map.js -> api.getMap() -> GET /api/map/world-map` and renders returned `mermaidSyntax` via Mermaid on the client.
+- Confirmed `/api/map` routes are mounted behind `authMiddleware` in `server.js`, so the backend route itself is authenticated correctly.
+- Identified a confirmed local-preview failure path: localhost mock mode persists across pages, but `scripts/localPreviewMockApi.js` does not implement `/api/map/world-map`, so `map.html` will fail in mock mode with an unsupported-endpoint error.
+- Identified map-generation robustness risks in `api/mapRoutes.js`: direct interpolation of AI/location strings into Mermaid syntax without escaping (location names / travel times can break Mermaid parsing), and schema assumptions around `nearbyLocations` shape.
+- Identified design issues in current map logic: mixing hierarchy (`parentLocation`) and proximity (`nearbyLocations`) into one Mermaid flowchart (`graph TD`) creates unstable, non-geographic layouts and often disconnected graphs because only discovered locations are loaded into the node set.
+- Discussion-only phase requested: no implementation changes made.
+
+### Task: Implement map feature fixes and map-generation logic refactor (completed)
+- Rebuilt `api/mapRoutes.js` for stronger map generation: normalizes `nearbyLocations` schema (string/object forms), escapes Mermaid labels, separates hierarchy and adjacency edges, and returns structured map payload (`views.hierarchy` / `views.adjacency`) while keeping legacy `mermaidSyntax` for backward compatibility.
+- Added a thin context-ring fetch (parents/nearby referenced locations from static `locations`) to reduce disconnected map graphs; context nodes are included and styled as undiscovered placeholders.
+- Updated `scripts/map.js` to support the new structured map payload, render switchable map views (hierarchy/adjacency), show map metadata, and keep compatibility with legacy `mermaidSyntax` responses.
+- Updated `map.html` with toolbar/meta UI styles and containers for the new map view controls.
+- Added local preview mock support for `/api/map/world-map` in `scripts/localPreviewMockApi.js` so `map.html` no longer fails in localhost mock mode.
+- Extended localhost auto-mock convenience to include `map.html` in `scripts/localPreviewMode.js`.
+- Validation: `node --check` passed for `api/mapRoutes.js`, `scripts/map.js`, `scripts/localPreviewMockApi.js`, and `scripts/localPreviewMode.js`.
+
+### Task: Deep inspection of current location info/details feature anomalies (inspection only)
+- Traced current-location info flow end-to-end: backend `getMergedLocationData()` -> API responses -> `gameState.currentLocationData` -> sidebar card (`updateLocationInfo`) and location-details modal (`openLocationDetailsModal`).
+- Identified a major data-loss bug in `getMergedLocationData()`: static and dynamic location docs are merged shallowly (`{...staticData, ...dynamicData}`), which overwrites nested objects like `economy` / `lore` and causes loss of static fields such as `prosperityPotential`, `specialty`, and `history`.
+- Identified a first-load inconsistency bug: when a static location exists but dynamic state is missing, `generateAndCacheLocation()` is called, but `dynamicDoc` is not re-fetched in the same request, so the first rendered location details may miss newly-created dynamic fields.
+- Identified generation-contract mismatch: `locationGeneratorPrompt` requires `initialDynamicState`, but `worldEngine` stores only `loc.staticTemplate` and later creates a generic dynamic state, so AI-generated dynamic richness is discarded.
+- Identified modal-rendering quality issues: address path uses `Object.values(address)` (unstable ordering / blank entries), and modal HTML rendering is largely unescaped (can produce malformed display when AI text contains HTML-like characters).
+- Identified local-preview mock schema mismatch for location details: mock `locationData` uses `name` and top-level `nearbyLocations` instead of runtime schema (`locationName`, `geography.nearbyLocations`), making the location details modal look incomplete/weird in mock mode.
+- Discussion-only phase requested: no fixes implemented yet.
+
+### Task: Major location-data API structure refactor + location details UI/mock alignment (completed)
+- Rebuilt backend `getMergedLocationData()` in `api/worldStateHelpers.js` to return a structured payload (`schemaVersion: 2`) with `summary`, `current.{static,dynamic,merged,inheritedMerged}`, `hierarchy[]`, and `layers`, while preserving legacy top-level fields (`locationName`, `description`, `governance`, etc.) for backward compatibility.
+- Fixed the nested-field overwrite bug by replacing shallow merges with deep merges for location data; static and dynamic nested objects (e.g., `economy`, `lore`, `governance`, `geography`) now merge without losing static fields.
+- Fixed first-load inconsistency: when location static/dynamic docs are generated on demand, `getMergedLocationData()` now re-fetches the docs in the same request before building the response.
+- Added traversal hardening in `getMergedLocationData()`: accepts string-or-array inputs, normalizes hierarchy names, and guards against parent-location cycles.
+- Updated `api/worldEngine.js` so initial dynamic location state can ingest AI-generated `initialDynamicState` (when present) and deep-merge it into the default dynamic template instead of always discarding it.
+- Refactored `scripts/modalManager.js` location-details modal rendering to consume the new structured location payload, with legacy fallback support; added stable address ordering and safe HTML escaping for strings/arrays/objects to reduce malformed rendering/XSS risk in modal content.
+- Updated `scripts/uiUpdater.js` current-location sidebar card to prefer `locationData.summary` (ruler/description) while preserving fallback to legacy top-level fields.
+- Aligned localhost mock location payload in `scripts/localPreviewMockApi.js` with the new runtime schema (including `summary`, `current`, `hierarchy`, `layers`) and kept legacy aliases (`name`, top-level `nearbyLocations`) for existing mock map helpers.
+- Updated mock `roundData.LOC` to match the new mock location hierarchy so local map preview and location-details UI stay consistent.
+- Validation: `node --check` passed for `api/worldStateHelpers.js`, `api/worldEngine.js`, `scripts/modalManager.js`, `scripts/uiUpdater.js`, and `scripts/localPreviewMockApi.js`.
+
+### Task: Convert current-location field labels back to Chinese (completed)
+- Updated current-location sidebar card label and button tooltip in `scripts/uiUpdater.js` to Chinese (`統治者`, `查看地區詳情`) and restored Chinese loading/fallback text.
+- Updated location-details modal labels/section titles in `scripts/modalManager.js` to Chinese, including summary/static/dynamic section headers and field-name mappings (`類型`, `地址`, `層級路徑`, `統治者`, etc.).
+- Restored visible fallback strings in the modal from English (`N/A`, `Unknown`) to Chinese (`無`, `未知`) to avoid mixed-language UI in the current-location feature.
+- Validation: `node --check` passed for `scripts/uiUpdater.js` and `scripts/modalManager.js`.
+
+### Task: Fix remaining English field label and location-detail modal title fallback (completed)
+- Added Chinese label mapping for field key description in location-details modal so it no longer renders as raw English key.
+- Hardened modal title/name resolution in scripts/modalManager.js: ignores placeholder names (e.g. Unknown Location) and falls back to currentMerged.name, legacy locationData.name, and the last item of locationHierarchy.
+- Updated backend uildLocationSummary() in pi/worldStateHelpers.js to also read legacy 
+ame fields and use Chinese fallback strings (未知地區, 地區情報載入中...) to reduce placeholder leakage into UI.
+- Validation: 
+ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
+
+### Task: Fix current-location modal English `description` label and title fallback (completed)
+- Added explicit Chinese label mapping for `description` in `scripts/modalManager.js` (written as Unicode escape to avoid console/codepage corruption in source edits).
+- Hardened `normalizeLocationModalData()` title/name resolution to ignore placeholder names (e.g., `Unknown Location`) and fall back to `currentMerged.name`, legacy `locationData.name`, and the last item of `locationHierarchy`.
+- Updated backend `buildLocationSummary()` in `api/worldStateHelpers.js` to support legacy `name` fields and use Chinese fallback strings, reducing placeholder leakage into UI responses.
+- Validation: `node --check` passed for `scripts/modalManager.js` and `api/worldStateHelpers.js`.

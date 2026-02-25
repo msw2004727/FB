@@ -262,23 +262,26 @@ export function updateBulkStatus(score) {
 }
 
 function updateLocationInfo(locationData) {
-     if (locationInfo) {
-        if (locationData) {
-            const rulerName = escapeHtml(locationData.governance?.ruler || '未知');
-            const locationDescription = escapeHtml(locationData.description || '此地詳情尚在傳聞之中...');
-            locationInfo.innerHTML = `
-                <div class="location-ruler-info"><span class="location-ruler-label">統治者：</span><span class="location-ruler" title="${rulerName}">${rulerName}</span></div>
-                <div class="location-desc-container">
-                    <p class="location-desc">${locationDescription}</p>
-                    <button id="view-location-details-btn" class="header-icon-btn" title="查看地區詳情">
-                        <i class="fas fa-info-circle"></i>
-                    </button>
-                </div>
-            `;
-        } else {
-            locationInfo.innerHTML = '此地詳情尚在傳聞之中...';
-        }
+    if (!locationInfo) return;
+
+    if (!locationData) {
+        locationInfo.innerHTML = '地區情報載入中...';
+        return;
     }
+
+    const summary = locationData.summary || locationData.current?.summary || null;
+    const rulerName = escapeHtml(summary?.ruler || locationData.governance?.ruler || '未知');
+    const locationDescription = escapeHtml(summary?.description || locationData.description || '地區情報載入中...');
+
+    locationInfo.innerHTML = `
+        <div class="location-ruler-info"><span class="location-ruler-label">統治者：</span><span class="location-ruler" title="${rulerName}">${rulerName}</span></div>
+        <div class="location-desc-container">
+            <p class="location-desc">${locationDescription}</p>
+            <button id="view-location-details-btn" class="header-icon-btn" title="查看地區詳情">
+                <i class="fas fa-info-circle"></i>
+            </button>
+        </div>
+    `;
 }
 
 function updateNpcList(npcs) {

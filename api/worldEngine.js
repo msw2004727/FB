@@ -26,12 +26,58 @@ function sanitizeLocationData(template) {
 }
 
 
+function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneValue(value) {
+    if (Array.isArray(value)) return value.map(cloneValue);
+    if (isPlainObject(value)) {
+        const out = {};
+        Object.entries(value).forEach(([key, nestedValue]) => {
+            out[key] = cloneValue(nestedValue);
+        });
+        return out;
+    }
+    return value;
+}
+
+function deepMergeObjects(base, override) {
+    const merged = isPlainObject(base) ? cloneValue(base) : {};
+    if (!isPlainObject(override)) return merged;
+
+    Object.entries(override).forEach(([key, value]) => {
+        if (isPlainObject(merged[key]) && isPlainObject(value)) {
+            merged[key] = deepMergeObjects(merged[key], value);
+            return;
+        }
+        merged[key] = cloneValue(value);
+    });
+
+    return merged;
+}
+
+function sanitizeInitialDynamicState(initialDynamicState) {
+    if (!isPlainObject(initialDynamicState)) return {};
+
+    const sanitized = deepMergeObjects({}, initialDynamicState);
+    sanitized.governance = isPlainObject(sanitized.governance) ? sanitized.governance : {};
+    sanitized.economy = isPlainObject(sanitized.economy) ? sanitized.economy : {};
+    sanitized.lore = isPlainObject(sanitized.lore) ? sanitized.lore : {};
+    sanitized.facilities = Array.isArray(sanitized.facilities) ? sanitized.facilities : [];
+    sanitized.buildings = Array.isArray(sanitized.buildings) ? sanitized.buildings : [];
+    if (!Array.isArray(sanitized.lore.currentIssues)) sanitized.lore.currentIssues = [];
+    return sanitized;
+}
+
 async function generateAndCacheLocation(userId, locationName, locationType = '未知', worldSummary = '江湖軼事無可考。', knownHierarchy = []) {
     if (!userId || !locationName) return;
     console.log(`[世界引擎 4.0] 收到為玩家 ${userId} 初始化地點「${locationName}」的請求...`);
 
     const staticLocationRef = db.collection('locations').doc(locationName);
     const dynamicLocationRef = db.collection('users').doc(userId).collection('location_states').doc(locationName);
+
+    let generatedLocationMap = new Map();
 
     try {
         let staticDoc = await staticLocationRef.get();
@@ -52,6 +98,9 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
             const batch = db.batch();
 
             for (const loc of locationDataArray) {
+                if (loc && typeof loc.locationName === 'string' && loc.locationName.trim()) {
+                    generatedLocationMap.set(loc.locationName.trim(), loc);
+                }
                 const locRef = db.collection('locations').doc(loc.locationName);
                 const docToCheck = await locRef.get();
                 if (!docToCheck.exists) {
@@ -77,13 +126,16 @@ async function generateAndCacheLocation(userId, locationName, locationType = '�
             
             const staticData = staticDoc.data(); 
 
-            const initialDynamicData = {
-                governance: { ruler: staticData.governance?.ruler || '未知', allegiance: staticData.governance?.allegiance ||'獨立', security: '普通' },
-                economy: { currentProsperity: '普通' },
+            const defaultInitialDynamicData = {
+                governance: { ruler: staticData.governance?.ruler || 'unknown', allegiance: staticData.governance?.allegiance || 'unknown', security: 'stable' },
+                economy: { currentProsperity: 'stable' },
                 facilities: staticData.facilities || [],
                 buildings: staticData.buildings || [],
-                lore: { currentIssues: ['暫無江湖傳聞'] }
+                lore: { currentIssues: ['No notable issues.'] }
             };
+            const generatedLocationSeed = generatedLocationMap.get(String(locationName).trim());
+            const aiInitialDynamicData = sanitizeInitialDynamicState(generatedLocationSeed?.initialDynamicState);
+            const initialDynamicData = deepMergeObjects(defaultInitialDynamicData, aiInitialDynamicData);
 
             await dynamicLocationRef.set(initialDynamicData);
             console.log(`[世界引擎 4.0] 成功為玩家 ${userId} 初始化了「${locationName}」的個人地點狀態。`);

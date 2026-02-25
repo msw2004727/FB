@@ -66,7 +66,11 @@ export function isLocalPreviewMockEnabled() {
     }
 
     // Convenience auto-enable for localhost game-page preview.
-    const likelyGamePage = pathname.endsWith('/index.html') || pathname === '/' || pathname === '';
+    const likelyGamePage =
+        pathname.endsWith('/index.html') ||
+        pathname.endsWith('/map.html') ||
+        pathname === '/' ||
+        pathname === '';
     if (likelyGamePage) {
         safeLocalStorageSet(LOCAL_PREVIEW_FLAG_KEY, '1');
         return true;

@@ -490,101 +490,211 @@ export function closeSkillsModal() {
 }
 
 // --- 地點詳情彈窗 ---
-const keyMap = {
-    類型: '類型',
-    層級: '層級',
-    地理: '地理',
-    terrain: '地形',
+const LOCATION_DETAIL_LABELS = {
+    locationType: '類型',
+    address: '地址',
+    hierarchyPath: '層級路徑',
+    geography: '地理',
     nearbyLocations: '鄰近地點',
-    經濟潛力: '經濟潛力',
-    特產: '特產',
-    歷史: '歷史',
+    prosperityPotential: '繁榮潛力',
+    specialty: '特產',
+    history: '歷史',
+    description: '\u63cf\u8ff0',
     currentProsperity: '當前繁榮度',
-    統治: '統治資訊',
     governance: '統治資訊',
     ruler: '統治者',
     allegiance: '歸屬',
-    security: '安全狀況',
-    當前事務: '當前事務',
-    設施: '設施',
-    buildings: '建築',
+    security: '治安',
+    currentIssues: '當前事務',
+    facilities: '設施',
+    buildings: '建築'
 };
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPlaceholderLocationName(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return true;
+    return ['Unknown Location', 'Unknown', '\u672a\u77e5\u5730\u5340', '??????', '????'].includes(text);
+}
+
+function pickDisplayLocationName(...candidates) {
+    for (const candidate of candidates) {
+        const text = typeof candidate === 'string' ? candidate.trim() : '';
+        if (!text) continue;
+        if (isPlaceholderLocationName(text)) continue;
+        return text;
+    }
+    return '\u672a\u77e5\u5730\u5340';
+}
+
+function formatAddressPath(address) {
+    if (!isPlainObject(address)) return '';
+    const preferredOrder = ['country', 'province', 'state', 'region', 'city', 'district', 'town', 'village'];
+    const parts = [];
+    const seen = new Set();
+
+    preferredOrder.forEach((key) => {
+        const value = typeof address[key] === 'string' ? address[key].trim() : '';
+        if (!value) return;
+        parts.push(value);
+        seen.add(key);
+    });
+
+    Object.entries(address).forEach(([key, raw]) => {
+        if (seen.has(key)) return;
+        const value = typeof raw === 'string' ? raw.trim() : '';
+        if (value) parts.push(value);
+    });
+
+    return parts.join(' > ');
+}
+
+function formatPrimitiveValue(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return '無';
+    return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
+function formatArrayValue(value, keysToExclude) {
+    if (!Array.isArray(value) || value.length === 0) return '無';
+    let html = '<ul class="nested-list">';
+    value.forEach((item) => {
+        if (isPlainObject(item)) {
+            const itemName = item.name ? formatPrimitiveValue(item.name) : null;
+            const itemType = item.type ? formatPrimitiveValue(item.type) : null;
+            const itemTravelTime = item.travelTime ? formatPrimitiveValue(item.travelTime) : null;
+            if (itemName || itemType || itemTravelTime) {
+                const bits = [];
+                if (itemName) bits.push(itemName);
+                if (itemType) bits.push('(' + itemType + ')');
+                if (itemTravelTime) bits.push('[' + itemTravelTime + ']');
+                html += '<li>' + bits.join(' ') + '</li>';
+            } else {
+                html += '<li>' + formatObjectForDisplay(item, keysToExclude) + '</li>';
+            }
+            return;
+        }
+        html += '<li>' + formatPrimitiveValue(item) + '</li>';
+    });
+    html += '</ul>';
+    return html;
+}
+
 function formatObjectForDisplay(obj, keysToExclude = []) {
-    if (obj === null || typeof obj !== 'object') {
-        return obj || '無';
+    if (!isPlainObject(obj)) {
+        return formatPrimitiveValue(obj);
     }
 
     let html = '<ul class="location-detail-list">';
     for (const [key, value] of Object.entries(obj)) {
         if (keysToExclude.includes(key) || value === undefined || value === null) continue;
 
-        const displayKey = keyMap[key] || key; 
-        let displayValue;
+        const displayKey = escapeHtml(LOCATION_DETAIL_LABELS[key] || key);
+        let displayValue = '無';
+        const isNestedObject = isPlainObject(value);
 
         if (Array.isArray(value)) {
-            if (value.length === 0) {
-                displayValue = '無';
-            } else {
-                displayValue = '<ul class="nested-list">';
-                value.forEach(item => {
-                    if (typeof item === 'object' && item !== null) {
-                        const name = item.name || '未知項目';
-                        const travelTime = item.travelTime ? ` (${item.travelTime})` : '';
-                        displayValue += `<li>${name}${travelTime}</li>`;
-                    } else {
-                        displayValue += `<li>${item}</li>`;
-                    }
-                });
-                displayValue += '</ul>';
-            }
-        } else if (typeof value === 'object') {
-            displayValue = formatObjectForDisplay(value, keysToExclude); 
+            displayValue = formatArrayValue(value, keysToExclude);
+        } else if (isNestedObject) {
+            displayValue = formatObjectForDisplay(value, keysToExclude);
         } else {
-            displayValue = value.toString().trim() !== '' ? value.toString().replace(/\n/g, '<br>') : '無';
+            displayValue = formatPrimitiveValue(value);
         }
 
-        if (typeof value === 'object' && value !== null) {
-            html += `<li class="nested-object">
-                        <span class="key">${displayKey}:</span>
-                        <div class="value">${displayValue}</div>
-                     </li>`;
+        if (isNestedObject) {
+            html += `<li class="nested-object"><span class="key">${displayKey}:</span><div class="value">${displayValue}</div></li>`;
         } else {
-            html += `<li>
-                       <span class="key">${displayKey}:</span>
-                       <span class="value">${displayValue}</span>
-                     </li>`;
+            html += `<li><span class="key">${displayKey}:</span><span class="value">${displayValue}</span></li>`;
         }
     }
     html += '</ul>';
     return html;
 }
 
-export function openLocationDetailsModal(locationData) {
-    if (!dom.locationDetailsModal || !locationData) return;
-    dom.locationModalTitle.textContent = locationData.locationName || '地區情報';
-    
-    let bodyHtml = '';
-    
-    const staticData = {
-        類型: locationData.locationType,
-        層級: locationData.address ? Object.values(locationData.address).join(' > ') : '未知',
-        地理: locationData.geography,
-        經濟潛力: locationData.economy?.prosperityPotential,
-        特產: locationData.economy?.specialty?.join(', ') || '無',
-        歷史: locationData.lore?.history,
-    };
-    
-    const dynamicData = {
-        當前繁榮度: locationData.economy?.currentProsperity,
-        統治: locationData.governance,
-        當前事務: locationData.lore?.currentIssues?.join('<br>') || '暫無',
-        設施: locationData.facilities?.map(f => `${f.name} (${f.type})`).join(', ') || '無',
-        建築: locationData.buildings?.map(b => `${b.name} (${b.type})`).join(', ') || '無',
+function normalizeLocationModalData(locationData) {
+    const current = isPlainObject(locationData?.current) ? locationData.current : {};
+    const layers = isPlainObject(locationData?.layers) ? locationData.layers : {};
+    const currentStatic = isPlainObject(current.static) ? current.static : (isPlainObject(layers.currentStatic) ? layers.currentStatic : {});
+    const currentDynamic = isPlainObject(current.dynamic) ? current.dynamic : (isPlainObject(layers.currentDynamic) ? layers.currentDynamic : {});
+    const currentMerged = isPlainObject(current.merged) ? current.merged : (isPlainObject(layers.currentMerged) ? layers.currentMerged : (isPlainObject(locationData) ? locationData : {}));
+    const inheritedMerged = isPlainObject(current.inheritedMerged) ? current.inheritedMerged : (isPlainObject(layers.inheritedMerged) ? layers.inheritedMerged : currentMerged);
+
+    const summaryCandidate = isPlainObject(locationData?.summary)
+        ? locationData.summary
+        : (isPlainObject(current.summary) ? current.summary : {});
+
+    const hierarchyNames = Array.isArray(locationData?.locationHierarchy)
+        ? locationData.locationHierarchy.filter(v => typeof v === 'string' && v.trim())
+        : (Array.isArray(locationData?.hierarchy) ? locationData.hierarchy.map(node => node?.locationName).filter(Boolean) : []);
+    const hierarchyTail = hierarchyNames.length > 0 ? hierarchyNames[hierarchyNames.length - 1] : '';
+
+    const mergedAddress = isPlainObject(inheritedMerged.address) ? inheritedMerged.address : (isPlainObject(currentMerged.address) ? currentMerged.address : {});
+    const summary = {
+        locationName: pickDisplayLocationName(
+            summaryCandidate.locationName,
+            currentMerged.locationName,
+            currentMerged.name,
+            locationData?.locationName,
+            locationData?.name,
+            hierarchyTail
+        ),
+        description: summaryCandidate.description || currentMerged.description || locationData?.description || '\u5c1a\u7121\u5730\u5340\u63cf\u8ff0\u3002',
+        ruler: summaryCandidate.ruler || currentMerged.governance?.ruler || inheritedMerged.governance?.ruler || '\u672a\u77e5',
+        addressPath: summaryCandidate.addressPath || formatAddressPath(mergedAddress),
+        locationType: summaryCandidate.locationType || currentMerged.locationType || inheritedMerged.locationType || '\u672a\u77e5'
     };
 
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報 (世界設定)</h4>${formatObjectForDisplay(staticData)}</div>`;
-    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報 (玩家專屬)</h4>${formatObjectForDisplay(dynamicData)}</div>`;
+    const mergedNearby = currentDynamic.geography?.nearbyLocations || currentMerged.geography?.nearbyLocations || currentMerged.nearbyLocations || [];
+
+    const staticSection = {
+        locationType: summary.locationType,
+        address: summary.addressPath || '\u672a\u77e5',
+        hierarchyPath: hierarchyNames.length ? hierarchyNames.join(' > ') : undefined,
+        geography: currentStatic.geography || currentMerged.geography,
+        prosperityPotential: currentStatic.economy?.prosperityPotential ?? currentMerged.economy?.prosperityPotential,
+        specialty: currentStatic.economy?.specialty ?? currentMerged.economy?.specialty ?? [],
+        history: currentStatic.lore?.history ?? currentMerged.lore?.history,
+        nearbyLocations: mergedNearby
+    };
+
+    const dynamicSection = {
+        currentProsperity: currentDynamic.economy?.currentProsperity ?? currentMerged.economy?.currentProsperity,
+        governance: currentDynamic.governance || currentMerged.governance,
+        currentIssues: currentDynamic.lore?.currentIssues ?? currentMerged.lore?.currentIssues ?? [],
+        facilities: currentDynamic.facilities ?? currentMerged.facilities ?? [],
+        buildings: currentDynamic.buildings ?? currentMerged.buildings ?? []
+    };
+
+    return { summary, staticSection, dynamicSection };
+}
+
+export function openLocationDetailsModal(locationData) {
+    if (!dom.locationDetailsModal || !locationData) return;
+
+    const { summary, staticSection, dynamicSection } = normalizeLocationModalData(locationData);
+    dom.locationModalTitle.textContent = summary.locationName || '\u5730\u5340\u8a73\u60c5';
+
+    let bodyHtml = '';
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-compass"></i> 地區摘要</h4>${formatObjectForDisplay({
+        locationType: summary.locationType,
+        address: summary.addressPath || '未知',
+        ruler: summary.ruler,
+        description: summary.description
+    })}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-landmark"></i> 靜態情報（世界設定）</h4>${formatObjectForDisplay(staticSection)}</div>`;
+    bodyHtml += `<div class="location-section"><h4><i class="fas fa-users"></i> 動態情報（玩家狀態）</h4>${formatObjectForDisplay(dynamicSection)}</div>`;
 
     dom.locationModalBody.innerHTML = bodyHtml;
     dom.locationDetailsModal.classList.add('visible');

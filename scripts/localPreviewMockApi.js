@@ -91,15 +91,99 @@ function createInitialState() {
     ];
 
     const locationData = {
-        name: '臨江鎮',
-        description: '河道穿鎮而過，商旅雜沓，白日喧鬧，夜裡也不算太平。',
-        terrain: '水路集鎮',
-        governance: {
-            ruler: '鎮守衙門',
-            security: '尚可',
-            allegiance: '本朝'
+        locationId: 'qingshi-town',
+        locationName: 'Qingshi Town',
+        name: 'Qingshi Town', // legacy mock alias for map preview helper
+        description: 'A busy market town at the crossing of a mountain road and river route.',
+        terrain: 'Mountain valley',
+        locationType: 'town',
+        address: { country: 'Liang', region: 'Eastern March', city: 'Linchuan', town: 'Qingshi Town' },
+        governance: { ruler: 'Garrison Magistrate Han Chuan', security: 'medium', allegiance: 'Linchuan Prefecture' },
+        economy: { prosperityPotential: 'trade hub', specialty: ['herbs', 'hides'], currentProsperity: 'busy' },
+        lore: { history: 'Expanded from an old relay station.', currentIssues: ['Suspicious scouts appear after dark'] },
+        facilities: [{ name: 'Relay Station', type: 'transport' }, { name: 'Herbal Shop', type: 'market' }],
+        buildings: [{ name: 'Town Office', type: 'government' }, { name: 'West Market', type: 'market' }],
+        geography: {
+            terrain: 'Mountain valley',
+            nearbyLocations: [
+                { name: 'Linchuan City', travelTime: 'half day' },
+                { name: 'Black Pine Woods', travelTime: '30 min' },
+                { name: 'River Ferry', travelTime: '15 min' }
+            ]
         },
-        nearbyLocations: ['東碼頭', '茶棚', '舊戲臺']
+        nearbyLocations: [
+            { name: 'Linchuan City', travelTime: 'half day' },
+            { name: 'Black Pine Woods', travelTime: '30 min' },
+            { name: 'River Ferry', travelTime: '15 min' }
+        ],
+        locationHierarchy: ['Liang', 'Eastern March', 'Linchuan', 'Qingshi Town'],
+        schemaVersion: 2,
+        summary: {
+            locationName: 'Qingshi Town',
+            description: 'A busy market town at the crossing of a mountain road and river route.',
+            ruler: 'Garrison Magistrate Han Chuan',
+            addressPath: 'Liang > Eastern March > Linchuan > Qingshi Town',
+            locationType: 'town'
+        },
+        current: {
+            static: {
+                locationId: 'qingshi-town',
+                locationName: 'Qingshi Town',
+                locationType: 'town',
+                description: 'A busy market town at the crossing of a mountain road and river route.',
+                address: { country: 'Liang', region: 'Eastern March', city: 'Linchuan', town: 'Qingshi Town' },
+                geography: {
+                    terrain: 'Mountain valley',
+                    nearbyLocations: [
+                        { name: 'Linchuan City', travelTime: 'half day' },
+                        { name: 'Black Pine Woods', travelTime: '30 min' },
+                        { name: 'River Ferry', travelTime: '15 min' }
+                    ]
+                },
+                economy: { prosperityPotential: 'trade hub', specialty: ['herbs', 'hides'] },
+                lore: { history: 'Expanded from an old relay station.' },
+                governance: { ruler: 'Garrison Magistrate Han Chuan', allegiance: 'Linchuan Prefecture' },
+                facilities: [{ name: 'Relay Station', type: 'transport' }, { name: 'Herbal Shop', type: 'market' }],
+                buildings: [{ name: 'Town Office', type: 'government' }, { name: 'West Market', type: 'market' }]
+            },
+            dynamic: {
+                governance: { ruler: 'Garrison Magistrate Han Chuan', security: 'medium', allegiance: 'Linchuan Prefecture' },
+                economy: { currentProsperity: 'busy' },
+                lore: { currentIssues: ['Suspicious scouts appear after dark'] },
+                facilities: [{ name: 'Relay Station', type: 'transport' }, { name: 'Herbal Shop', type: 'market' }],
+                buildings: [{ name: 'Town Office', type: 'government' }, { name: 'West Market', type: 'market' }]
+            },
+            merged: {},
+            inheritedMerged: {}
+        },
+        hierarchy: [
+            { locationName: 'Liang', static: { locationName: 'Liang', locationType: 'country' }, dynamic: {}, merged: { locationName: 'Liang', locationType: 'country' } },
+            { locationName: 'Eastern March', static: { locationName: 'Eastern March', locationType: 'region' }, dynamic: {}, merged: { locationName: 'Eastern March', locationType: 'region' } },
+            { locationName: 'Linchuan', static: { locationName: 'Linchuan', locationType: 'city' }, dynamic: {}, merged: { locationName: 'Linchuan', locationType: 'city' } },
+            { locationName: 'Qingshi Town', static: {}, dynamic: {}, merged: {} }
+        ],
+        layers: { currentStatic: {}, currentDynamic: {}, currentMerged: {}, inheritedMerged: {} }
+    };
+    locationData.current.merged = {
+        ...locationData.current.static,
+        ...locationData.current.dynamic,
+        governance: { ...locationData.current.static.governance, ...locationData.current.dynamic.governance },
+        economy: { ...locationData.current.static.economy, ...locationData.current.dynamic.economy },
+        lore: { ...locationData.current.static.lore, ...locationData.current.dynamic.lore },
+        geography: { ...locationData.current.static.geography }
+    };
+    locationData.current.inheritedMerged = { ...locationData.current.merged };
+    locationData.layers = {
+        currentStatic: deepClone(locationData.current.static),
+        currentDynamic: deepClone(locationData.current.dynamic),
+        currentMerged: deepClone(locationData.current.merged),
+        inheritedMerged: deepClone(locationData.current.inheritedMerged)
+    };
+    locationData.hierarchy[3] = {
+        locationName: 'Qingshi Town',
+        static: deepClone(locationData.current.static),
+        dynamic: deepClone(locationData.current.dynamic),
+        merged: deepClone(locationData.current.merged)
     };
 
     const roundData = {
@@ -108,7 +192,7 @@ function createInitialState() {
         story: '你在臨江鎮的茶棚落座，聽見行腳商低聲談論碼頭夜裡的異動。',
         ATM: ['微雨將至', '空氣裡帶著潮氣與茶煙'],
         WRD: '陰',
-        LOC: ['臨江鎮', '茶棚'],
+        LOC: ['Liang', 'Eastern March', 'Linchuan', 'Qingshi Town'],
         PC: '你稍作歇息，氣息平順，仍保持對四周動靜的警戒。',
         NPC: [
             { name: '店小二', status: '忙著添茶，眼神卻不時瞥向街口。', friendliness: 'friendly' },
@@ -174,6 +258,122 @@ function withResponseShape(state, extra = {}) {
         inventory: deepClone(state.inventory),
         hasNewBounties: state.hasNewBounties,
         ...extra
+    };
+}
+
+function buildMockMapResponse() {
+    const state = readState();
+    const roundData = state.roundData || {};
+    const locationData = state.locationData || {};
+
+    const hierarchy = Array.isArray(roundData.LOC) && roundData.LOC.length > 0
+        ? roundData.LOC.map(name => String(name || '').trim()).filter(Boolean)
+        : [String(locationData.name || '當前地點')];
+
+    const discoveredNames = Array.from(new Set(hierarchy));
+    const nearbyRaw = Array.isArray(locationData.nearbyLocations) ? locationData.nearbyLocations : [];
+    const nearbyNames = nearbyRaw.map(entry => {
+        if (typeof entry === 'string') return entry.trim();
+        if (entry && typeof entry === 'object') return String(entry.name || entry.locationName || '').trim();
+        return '';
+    }).filter(Boolean);
+
+    const allNames = Array.from(new Set([...discoveredNames, ...nearbyNames]));
+    const idMap = new Map(allNames.map((name, index) => [name, `loc${index}`]));
+    const discoveredSet = new Set(discoveredNames);
+
+    const escapeNode = (value) => String(value || '未知地點')
+        .replace(/\r?\n/g, ' ')
+        .replace(/"/g, "'")
+        .replace(/\[/g, '（')
+        .replace(/\]/g, '）')
+        .replace(/\|/g, '｜');
+
+    const hierarchyEdges = [];
+    for (let i = 0; i < hierarchy.length - 1; i++) {
+        hierarchyEdges.push({
+            source: hierarchy[i],
+            target: hierarchy[i + 1],
+            relation: 'hierarchy',
+            label: '所屬'
+        });
+    }
+
+    const currentName = hierarchy[hierarchy.length - 1];
+    const adjacencyEdges = [];
+    for (const nearbyName of nearbyNames) {
+        if (!currentName || !nearbyName || currentName === nearbyName) continue;
+        const ordered = [currentName, nearbyName].sort();
+        const duplicate = adjacencyEdges.some(edge => edge.source === ordered[0] && edge.target === ordered[1]);
+        if (!duplicate) {
+            adjacencyEdges.push({
+                source: ordered[0],
+                target: ordered[1],
+                relation: 'adjacent',
+                label: '半日'
+            });
+        }
+    }
+
+    const buildSyntax = (direction, edges) => {
+        let syntax = `graph ${direction};\n`;
+        for (const name of allNames) {
+            syntax += `    ${idMap.get(name)}["${escapeNode(name)}"];\n`;
+        }
+        for (const name of allNames) {
+            const style = discoveredSet.has(name)
+                ? 'fill:#f5f1ea,stroke:#8c6f54,stroke-width:2px,color:#3a2d21'
+                : 'fill:#eef2f6,stroke:#8a97a6,stroke-width:1px,color:#4c5560,stroke-dasharray: 4 2';
+            syntax += `    style ${idMap.get(name)} ${style};\n`;
+        }
+        for (const edge of edges) {
+            const sourceId = idMap.get(edge.source);
+            const targetId = idMap.get(edge.target);
+            if (!sourceId || !targetId) continue;
+            if (edge.relation === 'hierarchy') {
+                syntax += `    ${sourceId} -->|"${edge.label}"| ${targetId};\n`;
+            } else {
+                syntax += `    ${sourceId} -.-|"${edge.label}"| ${targetId};\n`;
+            }
+        }
+        return syntax;
+    };
+
+    const nodes = allNames.map(name => ({
+        name,
+        label: name,
+        discovered: discoveredSet.has(name),
+        locationType: discoveredSet.has(name) ? '已探索' : '關聯地點'
+    }));
+
+    const hierarchySyntax = buildSyntax('TD', hierarchyEdges);
+    const adjacencySyntax = buildSyntax('LR', adjacencyEdges);
+
+    return {
+        mapVersion: 2,
+        defaultView: 'hierarchy',
+        mermaidSyntax: hierarchySyntax,
+        views: {
+            hierarchy: {
+                title: '階層圖',
+                mermaidSyntax: hierarchySyntax,
+                nodes,
+                edges: hierarchyEdges
+            },
+            adjacency: {
+                title: '鄰接圖',
+                mermaidSyntax: adjacencySyntax,
+                nodes,
+                edges: adjacencyEdges
+            }
+        },
+        meta: {
+            discoveredCount: discoveredNames.length,
+            renderedNodeCount: allNames.length,
+            contextNodeCount: Math.max(0, allNames.length - discoveredNames.length),
+            hierarchyEdgeCount: hierarchyEdges.length,
+            adjacencyEdgeCount: adjacencyEdges.length
+        }
     };
 }
 
@@ -419,6 +619,9 @@ export async function handleLocalPreviewMockRequest(endpoint, options = {}) {
     if (method === 'GET' && path === '/api/game/state/skills') {
         return maybeDelay(handleGetSkills());
     }
+    if (method === 'GET' && path === '/api/map/world-map') {
+        return maybeDelay(buildMockMapResponse());
+    }
     if (method === 'POST' && path === '/api/game/cultivation/start') {
         return maybeDelay(handleStartCultivation(options));
     }
@@ -441,4 +644,3 @@ export async function handleLocalPreviewMockRequest(endpoint, options = {}) {
     console.warn('[Local Preview Mock API] Unsupported endpoint requested.', { endpoint: path, method, identity });
     return maybeDelay(unsupported(path));
 }
-
