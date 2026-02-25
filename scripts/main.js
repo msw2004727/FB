@@ -7,7 +7,7 @@ import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
-import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory } from './uiUpdater.js';
+import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory, updateMoneyBagDisplay } from './uiUpdater.js';
 import { ensureLocalPreviewAuthSession, isLocalPreviewMockEnabled } from './localPreviewMode.js';
 import { restoreAiModelSelection, setStoredAiModel } from './aiModelPreference.js';
 
@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     gameState.roundData.bulkScore = result.bulkScore;
                     appendMessageToStory(result.message, 'system-message');
                     renderInventory(gameState.roundData.inventory);
+                    updateMoneyBagDisplay(gameState.roundData.inventory);
                     updateBulkStatus(gameState.roundData.bulkScore);
                 } else {
                     throw new Error(result.message);

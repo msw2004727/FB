@@ -3,10 +3,39 @@
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 import * as modal from './modalManager.js';
-import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError } from './uiUpdater.js';
+import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError, updateMoneyBagDisplay } from './uiUpdater.js';
 import { dom } from './dom.js';
 
 let gameLoop = {};
+
+function syncSilverBalanceToInventory(newBalance) {
+    if (!gameState.roundData) return;
+    if (!Array.isArray(gameState.roundData.inventory)) {
+        gameState.roundData.inventory = [];
+    }
+
+    const numericBalance = Number(newBalance);
+    if (!Number.isFinite(numericBalance) || numericBalance < 0) return;
+
+    const silverIndex = gameState.roundData.inventory.findIndex(item => item && (item.templateId === '\u9280\u5169' || item.itemName === '\u9280\u5169'));
+    if (silverIndex >= 0) {
+        gameState.roundData.inventory[silverIndex] = {
+            ...gameState.roundData.inventory[silverIndex],
+            quantity: numericBalance
+        };
+        return;
+    }
+
+    gameState.roundData.inventory.push({
+        instanceId: 'currency-silver-liang',
+        templateId: '\u9280\u5169',
+        itemName: '\u9280\u5169',
+        quantity: numericBalance,
+        itemType: '\u8ca1\u5bf6',
+        category: '\u8ca8\u5e63'
+    });
+}
+
 
 // --- Helper Functions (Internal to this module) ---
 
@@ -492,8 +521,8 @@ export async function sendChatMessage() {
             try {
                 const paymentResult = await api.startBeggarInquiry();
                 if (gameState.roundData) {
-                    const moneyContent = document.getElementById('money-content');
-                    if (moneyContent) moneyContent.textContent = `${paymentResult.newBalance} 兩銀子`;
+                    syncSilverBalanceToInventory(paymentResult.newBalance);
+                    updateMoneyBagDisplay(gameState.roundData.inventory);
                 }
             } catch (error) {
                 if(error.message.includes('銀兩不足')) {

@@ -52,6 +52,10 @@ const itemTypeConfig = {
     '財寶': { icon: 'fa-coins' },
     '其他': { icon: 'fa-box' }
 };
+const CURRENCY_NAME_PRIORITY = ['\u9ec3\u91d1', '\u91d1\u689d', '\u91d1\u5e63', '\u9280\u7968', '\u9280\u5169', '\u788e\u9280', '\u9280\u5e63', '\u9285\u9322', '\u9285\u5e63'];
+const CURRENCY_NAME_KEYWORDS = ['\u9ec3\u91d1', '\u91d1\u689d', '\u91d1\u5e63', '\u9280\u7968', '\u9280\u5169', '\u788e\u9280', '\u9280\u5e63', '\u9285\u9322', '\u9285\u5e63', '\u5143\u5bf6'];
+const CURRENCY_TYPE_KEYWORDS = ['\u8ca1\u5bf6', '\u8ca8\u5e63', '\u91d1\u9322'];
+const CURRENCY_CATEGORY_KEYWORDS = ['\u8ca8\u5e63', '\u8ca1\u5bf6'];
 
 // 【規則修正】調整裝備顯示順序，以符合 "左腰 > 右腰 > 背後" 的規則
 const equipOrder = ['weapon_left', 'weapon_right', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
@@ -83,16 +87,82 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateBulkStatus(roundData.bulkScore || 0); 
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData.inventory); 
-    
-    const silverItem = (roundData.inventory || []).find(item => item.itemName === '銀兩' || item.templateId === '銀兩');
-    const silverAmount = silverItem ? silverItem.quantity : 0;
-    moneyContent.textContent = `${silverAmount} 兩銀子`;
+    renderInventory(roundData.inventory);
+    updateMoneyBagDisplay(roundData.inventory);
 
     qstContent.textContent = roundData.QST || '暫無要事';
     psyContent.textContent = roundData.PSY || '心如止水';
     clsContent.textContent = roundData.CLS || '尚無線索';
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
+}
+
+function getItemDisplayName(item) {
+    return String(item?.itemName || item?.templateId || '').trim();
+}
+
+function containsKeyword(text, keywords) {
+    return keywords.some(keyword => text.includes(keyword));
+}
+
+export function isCurrencyItem(item) {
+    if (!item || typeof item !== 'object') return false;
+
+    const name = getItemDisplayName(item);
+    const itemType = String(item.itemType || '').trim();
+    const category = String(item.category || '').trim();
+
+    if (itemType && containsKeyword(itemType, CURRENCY_TYPE_KEYWORDS)) return true;
+    if (category && containsKeyword(category, CURRENCY_CATEGORY_KEYWORDS)) return true;
+    if (name && containsKeyword(name, CURRENCY_NAME_KEYWORDS)) return true;
+
+    return false;
+}
+
+function getCurrencyEntries(inventory) {
+    const totals = new Map();
+
+    (inventory || []).forEach((item) => {
+        if (!isCurrencyItem(item)) return;
+        const amount = Number(item.quantity) || 0;
+        if (amount <= 0) return;
+
+        const name = getItemDisplayName(item) || '\u8ca8\u5e63';
+        totals.set(name, (totals.get(name) || 0) + amount);
+    });
+
+    const priorityIndex = new Map(CURRENCY_NAME_PRIORITY.map((name, index) => [name, index]));
+
+    return [...totals.entries()]
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => {
+            const aPriority = priorityIndex.has(a.name) ? priorityIndex.get(a.name) : Number.MAX_SAFE_INTEGER;
+            const bPriority = priorityIndex.has(b.name) ? priorityIndex.get(b.name) : Number.MAX_SAFE_INTEGER;
+            if (aPriority !== bPriority) return aPriority - bPriority;
+            return a.name.localeCompare(b.name, 'zh-Hant');
+        });
+}
+
+export function updateMoneyBagDisplay(inventory) {
+    if (!moneyContent) return;
+
+    const currencyEntries = getCurrencyEntries(inventory);
+    if (currencyEntries.length === 0) {
+        moneyContent.classList.remove('money-display-list');
+        moneyContent.textContent = '\u7121\u8ca8\u5e63';
+        return;
+    }
+
+    if (currencyEntries.length === 1 && currencyEntries[0].name === '\u9280\u5169') {
+        moneyContent.classList.remove('money-display-list');
+        moneyContent.textContent = `${currencyEntries[0].amount} \u5169\u9280\u5b50`;
+        return;
+    }
+
+    moneyContent.classList.add('money-display-list');
+    moneyContent.innerHTML = currencyEntries.map((entry) => {
+        const safeName = escapeHtml(entry.name);
+        return `<div class=\"money-line\"><span class=\"money-name\">${safeName}</span><span class=\"money-amount\">x${entry.amount}</span></div>`;
+    }).join('');
 }
 
 export function appendMessageToStory(htmlContent, className, options = {}) {
@@ -325,8 +395,8 @@ function highlightNpcNames(text, npcs) {
 export function renderInventory(inventory) {
     if (!itmContent) return;
     itmContent.innerHTML = '';
-    
-    const allItems = inventory || [];
+
+    const allItems = (inventory || []).filter(item => !isCurrencyItem(item));
 
     allItems.sort((a, b) => {
         const isEquippedA = a.isEquipped;
@@ -341,7 +411,7 @@ export function renderInventory(inventory) {
     });
 
     if (allItems.length === 0) {
-        itmContent.textContent = '身無長物';
+        itmContent.textContent = '\u7121\u4e00\u822c\u7269\u54c1';
         return;
     }
 

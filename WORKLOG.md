@@ -198,3 +198,12 @@ ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 - Rewrote `WORKLOG.md` as valid UTF-8 (invalid byte sequences were replaced during conversion to restore build compatibility).
 - Added root `.nojekyll` file so GitHub Pages serves the repo as static files instead of trying to process it as a Jekyll site.
 - Validation: project text-file UTF-8 scan now passes (`ALL_TEXT_FILES_UTF8_OK`).
+
+### Task: Auto-group currency items into Money Bag (completed)
+- Added front-end currency detection in `scripts/uiUpdater.js` (`isCurrencyItem`) using item name/type/category keywords so currency-like items (e.g., ??/??/??/??) are automatically recognized even if mixed into normal inventory payloads.
+- Updated `renderInventory()` to exclude detected currency items from the `???? (ITM)` list and show only general items there.
+- Added `updateMoneyBagDisplay()` in `scripts/uiUpdater.js` to aggregate and render multi-currency balances inside the `??` card (single `??` keeps legacy compact display, multi-currency shows a list).
+- Updated post-payment beggar inquiry flow in `scripts/interactionHandlers.js` to sync `??` balance back into `gameState.roundData.inventory` and refresh the money bag UI via the shared helper instead of directly overwriting `#money-content` text.
+- Updated item-drop flow in `scripts/main.js` to refresh `??` after inventory changes, preventing stale currency display after dropping currency items.
+- Added small UI styles in `styles/components.css` for multi-line money bag rendering (`.money-display-list`, `.money-line`, `.money-amount`).
+- Validation: `node --check` passed for `scripts/uiUpdater.js`, `scripts/interactionHandlers.js`, and `scripts/main.js`.

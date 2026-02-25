@@ -80,6 +80,26 @@ body.dark-theme .info-card:hover {
     flex-grow: 1;
     text-align: center;
 }
+.money-display.money-display-list {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.money-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+.money-name {
+    color: inherit;
+}
+.money-amount {
+    font-weight: 700;
+    white-space: nowrap;
+}
 .silver-display {
     background-color: #e9ecef;
     color: #495057;
