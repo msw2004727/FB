@@ -366,7 +366,7 @@ const finalizeCombatHandler = async (req, res) => {
 
         const longTermSummary = (await summaryDocRef.get()).data()?.text || '...';
         const newSummary = await getAISummary(longTermSummary, finalRoundData);
-        const suggestion = await getAISuggestion(finalRoundData);
+        const suggestion = await getAISuggestion(finalRoundData, playerModelChoice);
 
         await summaryDocRef.set({ text: newSummary, lastUpdated: newRoundNumber });
         await userDocRef.collection('game_saves').doc(`R${newRoundNumber}`).set(finalRoundData);

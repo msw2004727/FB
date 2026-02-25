@@ -80,7 +80,7 @@ async function handleAction(req, res, player, newRoundNumber) {
                 }
             };
             const finalRoundData = await updateGameState(userId, username, player, playerAction, anachronismRoundData, newRoundNumber);
-            const suggestion = await getAISuggestion(finalRoundData);
+            const suggestion = await getAISuggestion(finalRoundData, playerModelChoice);
 
             return res.json({
                 story: finalRoundData.story,
@@ -139,7 +139,7 @@ async function handleAction(req, res, player, newRoundNumber) {
         
         const finalRoundData = await updateGameState(userId, username, player, playerAction, aiResponse, newRoundNumber);
         
-        const suggestion = await getAISuggestion(finalRoundData);
+        const suggestion = await getAISuggestion(finalRoundData, playerModelChoice);
         finalRoundData.suggestion = suggestion;
         
         // 【效能優化】使用 Promise.all 並行撈取地點資訊與背包資訊

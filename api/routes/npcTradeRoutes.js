@@ -115,7 +115,7 @@ router.post('/confirm-trade', async (req, res) => {
         };
         
         const newSummary = await getAISummary(longTermSummary, newRoundData);
-        const suggestion = await getAISuggestion(newRoundData);
+        const suggestion = await getAISuggestion(newRoundData, model);
 
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);
         await db.collection('users').doc(userId).collection('game_state').doc('summary').set({ text: newSummary, lastUpdated: newRoundNumber });

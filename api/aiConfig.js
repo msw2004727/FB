@@ -8,7 +8,8 @@
  * 指定要使用的AI模型。
  *
  * 可用模型名稱:
- * - 'openai'   : GPT-5-Nano (原 GPT-4.1-mini)，速度極快且成本低。
+ * - 'openai'   : GPT-4o-mini，速度快且成本低。
+ * - 'gpt5.2'   : GPT-5.2，品質較高（通常較慢/較貴）。
  * - 'deepseek' : DeepSeek-Chat，創造力和遵循複雜指令的能力很強，文筆奇幻。
  * - 'grok'     : Grok-3-Fast，速度快，反應不按常理出牌，風格獨特。
  * - 'gemini'   : Gemini-1.5-Flash，目前服務不穩，暫不建議使用。
@@ -29,7 +30,7 @@ const aiConfig = {
     // --- 遊戲邏輯與數據處理 ---
     summary: 'openai',        // 將回合數據總結為長期記憶
     actionClassifier: 'openai',// 玩家行動意圖分類器
-    suggestion: 'grok',     // 書僮的行動建議
+    suggestion: 'gpt5.2',   // 書僮的行動建議（避免 grok 故障）
     
     // --- 戰鬥相關 ---
     combat: 'openai',       // 戰鬥過程裁決

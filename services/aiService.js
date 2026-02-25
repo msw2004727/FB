@@ -7,7 +7,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 
 // 1. Google Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-3.1"});
 
 // 2. OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -63,7 +63,13 @@ const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
 // 統一的AI調度中心
-async function callAI(modelName, prompt, isJsonExpected = false) {
+function canRetryWithDefaultModel(modelName) {
+    const normalized = String(modelName || '').trim().toLowerCase();
+    return normalized !== 'openai' && normalized !== 'gpt5.2';
+}
+
+async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {}) {
+    const allowDefaultFallback = retryConfig.allowDefaultFallback !== false;
     console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
     try {
         let textResponse = "";
@@ -74,16 +80,25 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
 
         switch (modelName) {
             case 'openai':
-                // 【核心修改】已升級為 gpt-4o-mini (速度極快)
-                options.model = "gpt-4o-mini"; 
+                // OpenAI default route (upgraded to GPT-5.2)
+                options.model = "gpt-5.2";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
                 const openaiResult = await openai.chat.completions.create(options);
                 textResponse = openaiResult.choices[0].message.content;
                 break;
+            case 'gpt5.2':
+                // OpenAI 高品質模型（常用於需要更穩定建議/推理的任務）
+                options.model = "gpt-5.2";
+                if (isJsonExpected) {
+                    options.response_format = { type: "json_object" };
+                }
+                const gpt52Result = await openai.chat.completions.create(options);
+                textResponse = gpt52Result.choices[0].message.content;
+                break;
             case 'deepseek':
-                options.model = "deepseek-chat";
+                options.model = "deepseek-v3.2";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -91,7 +106,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 textResponse = deepseekResult.choices[0].message.content;
                 break;
             case 'grok':
-                options.model = "grok-3-fast";
+                options.model = "grok-4.20";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -106,9 +121,10 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
                 break;
+            case 'cluade':
             case 'claude':
                 const claudeOptions = {
-                    model: "claude-3-5-sonnet-20240620", 
+                    model: "claude-sonnet-4.6", 
                     max_tokens: 4096,
                     messages: [{ role: "user", content: prompt }],
                 };
@@ -120,7 +136,7 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
                 break;
             default:
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
-                options.model = "gpt-4o-mini";
+                options.model = "gpt-5.2";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -129,6 +145,14 @@ async function callAI(modelName, prompt, isJsonExpected = false) {
         }
         return textResponse;
     } catch (error) {
+        if (allowDefaultFallback && canRetryWithDefaultModel(modelName)) {
+            console.warn(`[AI Fallback] ${modelName} failed. Retrying with default GPT route (openai/gpt-5.2).`);
+            try {
+                return await callAI('openai', prompt, isJsonExpected, { allowDefaultFallback: false });
+            } catch (fallbackError) {
+                console.error(`[AI Fallback] openai retry failed after ${modelName}:`, fallbackError);
+            }
+        }
         console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, error);
         throw new Error(`AI模型 ${modelName} 呼叫失敗，請檢查API金鑰與服務狀態。`);
     }
@@ -264,10 +288,11 @@ async function getAIPrequel(playerModelChoice, recentHistory) {
     }
 }
 
-async function getAISuggestion(roundData) {
+async function getAISuggestion(roundData, playerModelChoice = null) {
     const prompt = getSuggestionPrompt(roundData);
     try {
-        const text = await callAI(aiConfig.suggestion, prompt, false);
+        const modelToUse = playerModelChoice || aiConfig.suggestion || 'openai';
+        const text = await callAI(modelToUse, prompt, false);
         return text.replace(/["“”]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 機靈書僮任務:", error);

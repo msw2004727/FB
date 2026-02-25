@@ -18,7 +18,7 @@ async function handleForgetSkill(skillName, skillType) {
     gameLoop.setLoading(true, '正在散去功力，重塑經脈...');
 
     try {
-        const result = await api.forgetSkill({ skillName: skillName, skillType: skillType });
+        const result = await api.forgetSkill({ skillName: skillName, skillType: skillType, model: dom.aiModelSelector?.value });
         
         if (result.success && result.roundData) {
             processNewRoundData(result);

@@ -86,3 +86,51 @@
 - Added `.mjs -> text/javascript; charset=utf-8` to `.codex-preview-server.js` MIME map so browser module imports load correctly.
 - Identified that port `5500` was still occupied by a stale preview server process serving the old MIME map, then restarted the local preview server.
 - Verified `http://127.0.0.1:5500/shared/gameConstants.mjs` now returns `Content-Type: text/javascript; charset=utf-8` and `index.html` returns HTTP 200.
+
+### Task: Switch failing suggestion AI task from Grok to GPT-5.2 (completed)
+- Investigated backend error log (`[AI ‰ªªÂãôÂ§±Êïó] Ê©üÈùàÊõ∏ÂÉÆ‰ªªÂãô`) and confirmed it maps to `getAISuggestion()` using `aiConfig.suggestion`.
+- Changed `aiConfig.suggestion` from `grok` to `gpt5.2` in `api/aiConfig.js` to avoid the failing Grok path for the bookboy suggestion task.
+- Added `gpt5.2` model routing in `services/aiService.js` (`OpenAI` client with model `gpt-5.2`) while keeping existing `openai` tasks on `gpt-4o-mini`.
+- Validation: `node --check api/aiConfig.js` and `node --check services/aiService.js` passed.
+
+### Task: Audit dashboard AI-core selector behavior and model mapping (inspection)
+- Confirmed the dashboard `AIÊ†∏ÂøÉ` selector is a real control (`index.html`) and its current default option is `openai` (selected in markup).
+- Verified frontend sends the selected model value with multiple gameplay requests (main action loop, NPC interaction flows, combat flows, and some state actions such as force-suicide).
+- Verified backend receives `req.body.model` and many AI tasks use `playerModelChoice || aiConfig.<task>`; however some tasks still ignore the selector and use fixed `aiConfig` routes (notably `getAISuggestion()` uses `aiConfig.suggestion`, and `getAISummary()` uses `aiConfig.summary`).
+- Recorded current selector option -> actual model mapping from `services/aiService.js` (`openai` now routes to `gpt-5.2`, `gemini` -> `gemini-1.5-flash`, `deepseek` -> `deepseek-chat`, `grok` -> `grok-3-fast`, `claude` -> `claude-3-5-sonnet-20240620`).
+
+### Task: AI core selector persistence + fallback + bookboy suggestion follows selector (completed)
+- Added persistent AI-core selection restore/save logic in frontend (`scripts/aiModelPreference.js`, wired in `scripts/main.js`) so the dashboard selector remembers the last choice via localStorage.
+- Added `cluade` selector option alias in `index.html` and backend alias support in `services/aiService.js` (`case 'cluade'` falls through to Claude handling).
+- Updated `services/aiService.js` `callAI()` to auto-retry failed non-default providers with default GPT route (`openai` -> `gpt-5.2`) before surfacing an error.
+- Updated frontend error handling (`scripts/uiUpdater.js`) to reset the AI-core selector back to default GPT when an AI-model runtime failure still reaches the client.
+- Updated `getAISuggestion()` to accept `playerModelChoice` and wired all major round-producing routes to pass the selected model (main action, combat finalize, cultivation, NPC give-item/end-chat, trade, forget-skill), including frontend request bodies for cultivation and forget-skill.
+- Validation: `node --check` passed for `services/aiService.js`, `scripts/main.js`, `scripts/uiUpdater.js`, `scripts/aiModelPreference.js`, `api/gameplay/actionHandler.js`, `api/combatRoutes.js`, `api/gameplay/cultivationRoutes.js`, `api/routes/npcChatRoutes.js`, `api/routes/npcTradeRoutes.js`, `api/stateRoutes.js`.
+
+### Task: Inspect duplicate Claude/Cluade options and current AI-core model mapping (inspection)
+- Confirmed the AI-core selector currently contains both `claude` and `cluade` options in `index.html` (`Claude` + alias entry), which explains the apparent duplicate Claude option in the dropdown.
+- Confirmed backend routing maps both `case 'claude'` and `case 'cluade'` to the same Anthropic model path in `services/aiService.js`.
+- Re-verified current selector-model mappings: `openai -> gpt-5.2`, `gemini -> gemini-1.5-flash`, `deepseek -> deepseek-chat`, `grok -> grok-3-fast`, `claude/cluade -> claude-3-5-sonnet-20240620`.
+
+### Task: Remove duplicate Cluade UI option and update AI-core model versions (completed)
+- Removed the extra `cluade` dropdown option from the AI-core selector and kept the original `claude` option only (`index.html`).
+- Updated selector labels to display requested versions: `GPT-5.2`, `Gemini 3.1`, `DeepSeek-V3.2`, `Grok-4.20`, `Claude-Sonnet-4.6`.
+- Kept backward compatibility for older saved `cluade` values by normalizing `cluade -> claude` in `scripts/aiModelPreference.js`.
+- Updated backend model routing strings in `services/aiService.js` to the requested versions (`gpt-5.2`, `gemini-3.1`, `deepseek-v3.2`, `grok-4.20`, `claude-sonnet-4.6`).
+- Validation: `node --check services/aiService.js` and `node --check scripts/aiModelPreference.js` passed.
+
+### Task: Inspect NPC avatar generation model and recommend lower-cost consistent image model (inspection/recommendation)
+- Confirmed NPC avatar generation route `/api/image/generate/npc/:npcName` calls `getAIGeneratedImage(imagePrompt)` in `api/imageRoutes.js`.
+- Confirmed current image generation implementation uses OpenAI Images API with `model: "dall-e-3"`, `quality: "hd"`, and `style: "vivid"` in `services/aiService.js`.
+- Confirmed the route caches and reuses an existing `avatarUrl`, which already improves per-NPC visual consistency by avoiding re-generation.
+- Prepared recommendation: for cheaper API image generation with good quality and easier future editing/consistency workflows, consider switching to `gpt-image-1-mini` (or `gpt-image-1` if higher consistency/quality is worth the extra cost), and keep a strong shared style anchor prompt + cached portraits.
+
+### Task: Inspect local file `AIº“´¨´¨∏π` purpose (inspection)
+- Confirmed `AIº“´¨´¨∏π` is a plain text file without extension in the project root, containing a manually maintained table of AI-core display names, model IDs, and providers.
+- Searched the codebase and found no runtime references to the file path/name; current matches for listed model IDs are from the file itself (and historical notes in `WORKLOG.md`).
+- Conclusion: this file is not used by the app at runtime; it serves as a human-readable reference/checklist and may be outdated relative to current `services/aiService.js` mappings.
+
+### Task: Convert `AIº“´¨´¨∏π` to Markdown and sync to current effective versions (completed)
+- Replaced the root plain-text file `AIº“´¨´¨∏π` with `AIº“´¨´¨∏π.md` in UTF-8 Markdown format.
+- Synced the document to current runtime mappings from `services/aiService.js` and current UI selector labels in `index.html`.
+- Document now includes: player AI-core mappings, compatibility aliases (`gpt5.2`, `cluade`), backend fallback behavior (auto-retry to `openai -> gpt-5.2`), and a note that NPC image generation is currently fixed to `dall-e-3`.

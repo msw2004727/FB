@@ -1,6 +1,0 @@
-顯示名稱 (前端)	實際調用模型 (後端)	所屬機構
-Gemini (快 & 穩)	gemini-1.5-flash	Google
-GPT (快 & 省)    gpt-5-nano    OpenAI
-Grok (快 & 怪)	grok-3-fast	xAI
-DeepSeek (強 & 奇)	deepseek-chat	DeepSeek
-Claude (文筆 & 邏輯)	claude-4-sonnet	Anthropic

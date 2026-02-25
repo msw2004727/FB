@@ -12,7 +12,7 @@ const db = admin.firestore();
 // 新的閉關請求處理路由
 router.post('/start', async (req, res) => {
     const { id: userId, username } = req.user;
-    const { skillName, days } = req.body;
+    const { skillName, days, model: playerModelChoice } = req.body;
 
     try {
         // 獲取最新的玩家數據，以便傳遞給閉關管理器
@@ -39,7 +39,7 @@ router.post('/start', async (req, res) => {
         const playerAction = `透過彈窗閉關修練「${skillName}」${days}日`;
 
         const finalRoundData = await updateGameState(userId, username, playerProfile, playerAction, { roundData: cultivationResult.data }, newRoundNumber);
-        const suggestion = await getAISuggestion(finalRoundData);
+        const suggestion = await getAISuggestion(finalRoundData, playerModelChoice);
         finalRoundData.suggestion = suggestion;
         
         const finalLocationData = await getMergedLocationData(userId, finalRoundData.LOC);

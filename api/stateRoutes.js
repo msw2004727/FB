@@ -12,7 +12,7 @@ const db = admin.firestore();
 
 // ... (自廢武功、丟棄物品、獲取最新遊戲、庫存、技能、關係圖、百科等路由) ...
 router.post('/forget-skill', async (req, res) => {
-    const { skillName, skillType } = req.body;
+    const { skillName, skillType, model: playerModelChoice } = req.body;
     const { id: userId, username } = req.user;
 
     if (!skillName) {
@@ -51,7 +51,7 @@ router.post('/forget-skill', async (req, res) => {
             NPC: lastRoundData.NPC || [] 
         };
 
-        const story = await getAIForgetSkillStory(playerProfile.preferredModel, profileForPrompt, skillName);
+        const story = await getAIForgetSkillStory(playerModelChoice || playerProfile.preferredModel, profileForPrompt, skillName);
 
         const batch = db.batch();
 
@@ -96,7 +96,7 @@ router.post('/forget-skill', async (req, res) => {
             bulkScore: bulkScore,
         };
         
-        const suggestion = await getAISuggestion(newRoundData);
+        const suggestion = await getAISuggestion(newRoundData, playerModelChoice);
         newRoundData.suggestion = suggestion;
         
         await db.collection('users').doc(userId).collection('game_saves').doc(`R${newRoundNumber}`).set(newRoundData);

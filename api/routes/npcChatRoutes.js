@@ -194,7 +194,7 @@ router.post('/give-item', async (req, res) => {
         
         const [newSummary, suggestion] = await Promise.all([
             getAISummary(longTermSummary, newRoundData),
-            getAISuggestion(newRoundData)
+            getAISuggestion(newRoundData, model)
         ]);
 
         newRoundData.suggestion = suggestion;
@@ -255,7 +255,7 @@ router.post('/end-chat', async (req, res) => {
         newRoundData.PC = `你與${npcName}深入交談了一番。`;
 
         const newOverallSummary = await getAISummary(longTermSummary, newRoundData);
-        const suggestion = await getAISuggestion(newRoundData);
+        const suggestion = await getAISuggestion(newRoundData, playerModelChoice);
         newRoundData.suggestion = suggestion;
         
         const updatePromises = [

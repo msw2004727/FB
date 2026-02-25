@@ -9,6 +9,7 @@ import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
 import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory } from './uiUpdater.js';
 import { ensureLocalPreviewAuthSession, isLocalPreviewMockEnabled } from './localPreviewMode.js';
+import { restoreAiModelSelection, setStoredAiModel } from './aiModelPreference.js';
 
 
 interaction.setGameLoop(gameLoop);
@@ -26,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (isLocalPreviewMockEnabled()) {
         console.info('[Local Preview] Mock API mode enabled for localhost preview.');
+    }
+
+    if (dom.aiModelSelector) {
+        restoreAiModelSelection(dom.aiModelSelector);
+        dom.aiModelSelector.addEventListener('change', () => {
+            setStoredAiModel(dom.aiModelSelector.value);
+        });
     }
 
     const username = localStorage.getItem('username');
@@ -191,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameLoop.setLoading(true, `正在閉關修練 ${skillName}，預計耗時${days}日...`);
         
         try {
-            const result = await api.startCultivation({ skillName, days });
+            const result = await api.startCultivation({ skillName, days, model: dom.aiModelSelector?.value });
             if (result.success) {
                 gameLoop.processNewRoundData(result);
             } else {

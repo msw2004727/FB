@@ -2,6 +2,7 @@
 import { MAX_POWER } from './config.js';
 import { api } from './api.js';
 import { gameState } from './gameState.js';
+import { DEFAULT_AI_MODEL, resetAiModelSelectionToDefault } from './aiModelPreference.js';
 
 // --- DOM元素獲取 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
@@ -431,13 +432,55 @@ async function handleEquipToggle(itemId, shouldEquip) {
 
 
 export function handleApiError(error) {
-    console.error('API 錯誤:', error);
-    appendMessageToStory(`[系統] 連接失敗... (${error.message})`, 'system-message');
-    if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
+    console.error('API error:', error);
+    const errorMessage = String(error?.message || '');
+    const normalizedError = errorMessage.toLowerCase();
+
+    if (isAiModelRuntimeFailure(errorMessage)) {
+        const aiSelector = document.getElementById('ai-model-selector');
+        const previousModel = aiSelector?.value || '';
+        const resetModel = resetAiModelSelectionToDefault(aiSelector);
+        if (previousModel && previousModel !== resetModel) {
+            appendMessageToStory(`AI core failed and was reset to default GPT (${DEFAULT_AI_MODEL}/gpt-5.2).`, 'system-message');
+        }
+    }
+
+    appendMessageToStory(`[System] Connection failed... (${errorMessage})`, 'system-message');
+    if (
+        errorMessage.includes('\u672a\u7d93\u6388\u6b0a') ||
+        errorMessage.includes('\u7121\u6548\u7684\u8eab\u4efd\u4ee4\u724c') ||
+        normalizedError.includes('unauthorized') ||
+        normalizedError.includes('invalid token') ||
+        normalizedError.includes('jwt')
+    ) {
         setTimeout(() => {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('username');
             window.location.href = 'login.html';
         }, 3000);
     }
+}
+
+function isAiModelRuntimeFailure(message) {
+    const normalized = String(message || '').toLowerCase();
+    if (!normalized) return false;
+
+    const hasAiSignal =
+        normalized.includes('ai') ||
+        normalized.includes('openai') ||
+        normalized.includes('gemini') ||
+        normalized.includes('grok') ||
+        normalized.includes('claude') ||
+        normalized.includes('cluade') ||
+        normalized.includes('deepseek');
+
+    const hasFailureSignal =
+        normalized.includes('api') ||
+        normalized.includes('model') ||
+        normalized.includes('\u6a21\u578b') ||
+        normalized.includes('\u5931\u6557') ||
+        normalized.includes('failed') ||
+        normalized.includes('timeout');
+
+    return hasAiSignal && hasFailureSignal;
 }
