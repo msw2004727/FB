@@ -103,7 +103,168 @@ function clampCombatantResourceValue(character) {
     return next;
 }
 
-function mergeCombatStateWithAIResult(combatState, combatResult) {
+function normalizeCombatantUpdatesArray(rawUpdates) {
+    if (Array.isArray(rawUpdates)) {
+        return rawUpdates.filter(u => u && typeof u === 'object');
+    }
+
+    if (rawUpdates && typeof rawUpdates === 'object') {
+        return Object.entries(rawUpdates).map(([name, delta]) => {
+            const base = delta && typeof delta === 'object' ? delta : {};
+            return { ...base, name: base.name || name };
+        });
+    }
+
+    return null;
+}
+
+function findCombatantDeltaByNameOrIndex(updates, originalCombatant, index) {
+    if (!Array.isArray(updates)) return null;
+
+    const originalName = getCharacterName(originalCombatant);
+    if (originalName) {
+        const byName = updates.find(u => getCharacterName(u) === originalName);
+        if (byName) return byName;
+    }
+
+    const byIndex = updates[index];
+    return byIndex && typeof byIndex === 'object' ? byIndex : null;
+}
+
+function projectCombatResources(state) {
+    const normalizeList = (list) => (Array.isArray(list) ? list : []).map((c, index) => ({
+        key: getCharacterName(c) || `#${index}`,
+        hp: toSafeNumber(c?.hp, 0),
+        maxHp: toSafeNumber(c?.maxHp, 0),
+        mp: toSafeNumber(c?.mp, 0),
+        maxMp: toSafeNumber(c?.maxMp, 0)
+    }));
+
+    return {
+        player: state?.player ? {
+            key: getCharacterName(state.player) || 'player',
+            hp: toSafeNumber(state.player.hp, 0),
+            maxHp: toSafeNumber(state.player.maxHp, 0),
+            mp: toSafeNumber(state.player.mp, 0),
+            maxMp: toSafeNumber(state.player.maxMp, 0)
+        } : null,
+        allies: normalizeList(state?.allies),
+        enemies: normalizeList(state?.enemies)
+    };
+}
+
+function applyDeterministicCombatFallback(beforeState, nextState, actionContext = {}) {
+    if (!nextState || typeof nextState !== 'object') return nextState;
+
+    const strategy = String(actionContext.strategy || '').trim().toLowerCase();
+    const targetName = String(actionContext.targetName || '').trim();
+    const selectedSkill = actionContext.selectedSkill && typeof actionContext.selectedSkill === 'object'
+        ? actionContext.selectedSkill
+        : null;
+    const powerLevel = Math.max(1, Math.floor(toSafeNumber(actionContext.powerLevel, 1)));
+
+    const beforePlayer = beforeState?.player || null;
+    const nextPlayer = nextState.player || null;
+    const expectedMpCost = selectedSkill
+        ? Math.max(0, toSafeNumber(selectedSkill.cost, 5)) * powerLevel
+        : 0;
+
+    if (nextPlayer && expectedMpCost > 0) {
+        const beforeMp = toSafeNumber(beforePlayer?.mp, toSafeNumber(nextPlayer.mp, 0));
+        const currentMp = toSafeNumber(nextPlayer.mp, beforeMp);
+        if (currentMp >= beforeMp) {
+            nextPlayer.mp = Math.max(0, beforeMp - expectedMpCost);
+            nextState.player = clampCombatantResourceValue(nextPlayer);
+        }
+    }
+
+    const beforeResources = JSON.stringify(projectCombatResources(beforeState));
+    const afterResources = JSON.stringify(projectCombatResources(nextState));
+    if (beforeResources !== afterResources) {
+        return nextState;
+    }
+
+    const skillLevel = Math.max(1, Math.floor(toSafeNumber(selectedSkill?.level, 1)));
+    const baseMagnitude = Math.max(4, (skillLevel * 2) + (powerLevel * 3));
+
+    const applyEnemyDamage = () => {
+        const enemies = Array.isArray(nextState.enemies) ? nextState.enemies : [];
+        if (enemies.length === 0) return false;
+
+        let targetIndex = enemies.findIndex(e => getCharacterName(e) === targetName);
+        if (targetIndex < 0) targetIndex = enemies.findIndex(e => toSafeNumber(e?.hp, 0) > 0);
+        if (targetIndex < 0) return false;
+
+        const target = { ...enemies[targetIndex] };
+        const targetBefore = (Array.isArray(beforeState?.enemies) ? beforeState.enemies : [])[targetIndex] || {};
+        const beforeHp = toSafeNumber(targetBefore.hp, toSafeNumber(target.hp, 0));
+        const damage = Math.max(1, baseMagnitude + (selectedSkill ? 3 : 0));
+        target.hp = Math.max(0, beforeHp - damage);
+        enemies[targetIndex] = clampCombatantResourceValue(target);
+        nextState.enemies = enemies;
+
+        if (nextState.player && target.hp > 0) {
+            const player = { ...nextState.player };
+            const beforeHpPlayer = toSafeNumber(beforeState?.player?.hp, toSafeNumber(player.hp, 0));
+            const counterDamage = Math.max(0, Math.floor(baseMagnitude * 0.45));
+            if (counterDamage > 0) {
+                player.hp = Math.max(0, beforeHpPlayer - counterDamage);
+                nextState.player = clampCombatantResourceValue(player);
+            }
+        }
+        return true;
+    };
+
+    const applyAllyHealOrSupport = (mode) => {
+        const allies = [nextState.player, ...(Array.isArray(nextState.allies) ? nextState.allies : [])];
+        const beforeAllies = [beforeState?.player, ...((Array.isArray(beforeState?.allies) ? beforeState.allies : []))];
+        if (allies.length === 0) return false;
+
+        let targetIndex = allies.findIndex(a => getCharacterName(a) === targetName);
+        if (targetIndex < 0) {
+            if (mode === 'heal') {
+                targetIndex = allies.findIndex(a => a && toSafeNumber(a.hp, 0) > 0 && toSafeNumber(a.hp, 0) < toSafeNumber(a.maxHp, a.hp || 0));
+            } else {
+                targetIndex = 0;
+            }
+        }
+        if (targetIndex < 0 || !allies[targetIndex]) return false;
+
+        const target = { ...allies[targetIndex] };
+        const beforeTarget = beforeAllies[targetIndex] || {};
+        if (mode === 'heal') {
+            const beforeHp = toSafeNumber(beforeTarget.hp, toSafeNumber(target.hp, 0));
+            const maxHp = Math.max(1, toSafeNumber(target.maxHp, beforeTarget.maxHp || beforeHp || 1));
+            target.hp = Math.min(maxHp, beforeHp + Math.max(4, baseMagnitude));
+        } else {
+            const beforeMp = toSafeNumber(beforeTarget.mp, toSafeNumber(target.mp, 0));
+            const maxMp = Math.max(0, toSafeNumber(target.maxMp, beforeTarget.maxMp || beforeMp || 0));
+            target.mp = Math.min(maxMp, beforeMp + Math.max(2, Math.floor(baseMagnitude / 2)));
+        }
+        const clampedTarget = clampCombatantResourceValue(target);
+
+        if (targetIndex === 0) {
+            nextState.player = clampedTarget;
+        } else {
+            const nextAllies = Array.isArray(nextState.allies) ? [...nextState.allies] : [];
+            nextAllies[targetIndex - 1] = clampedTarget;
+            nextState.allies = nextAllies;
+        }
+        return true;
+    };
+
+    if (strategy === 'attack') {
+        applyEnemyDamage();
+    } else if (strategy === 'heal') {
+        applyAllyHealOrSupport('heal');
+    } else if (strategy === 'support') {
+        applyAllyHealOrSupport('support');
+    }
+
+    return nextState;
+}
+
+function mergeCombatStateWithAIResult(combatState, combatResult, actionContext = {}) {
     const finalUpdatedState = {
         ...combatState,
         turn: (toSafeNumber(combatState.turn, 1) || 1) + 1,
@@ -123,21 +284,23 @@ function mergeCombatStateWithAIResult(combatState, combatResult) {
         if (originalSkills) finalUpdatedState.player.skills = originalSkills;
     }
 
-    if (Array.isArray(combatResult.updatedState.enemies)) {
-        finalUpdatedState.enemies = (finalUpdatedState.enemies || []).map(enemy => {
-            const updatedEnemy = combatResult.updatedState.enemies.find(u => getCharacterName(u) === getCharacterName(enemy));
+    const enemyUpdates = normalizeCombatantUpdatesArray(combatResult.updatedState.enemies);
+    if (enemyUpdates) {
+        finalUpdatedState.enemies = (finalUpdatedState.enemies || []).map((enemy, index) => {
+            const updatedEnemy = findCombatantDeltaByNameOrIndex(enemyUpdates, enemy, index);
             return updatedEnemy ? clampCombatantResourceValue({ ...enemy, ...updatedEnemy }) : enemy;
         });
     }
 
-    if (Array.isArray(combatResult.updatedState.allies)) {
-        finalUpdatedState.allies = (finalUpdatedState.allies || []).map(ally => {
-            const updatedAlly = combatResult.updatedState.allies.find(u => getCharacterName(u) === getCharacterName(ally));
+    const allyUpdates = normalizeCombatantUpdatesArray(combatResult.updatedState.allies);
+    if (allyUpdates) {
+        finalUpdatedState.allies = (finalUpdatedState.allies || []).map((ally, index) => {
+            const updatedAlly = findCombatantDeltaByNameOrIndex(allyUpdates, ally, index);
             return updatedAlly ? clampCombatantResourceValue({ ...ally, ...updatedAlly }) : ally;
         });
     }
 
-    return finalUpdatedState;
+    return applyDeterministicCombatFallback(combatState, finalUpdatedState, actionContext);
 }
 
 function normalizePowerChange(powerChange) {
@@ -266,7 +429,18 @@ async function combatActionRouteHandler(req, res) {
             combatResult.narrative = '雙方身影交錯，戰局一時難分高下。';
         }
 
-        const finalUpdatedState = mergeCombatStateWithAIResult(combatState, combatResult);
+        const finalUpdatedState = mergeCombatStateWithAIResult(combatState, combatResult, {
+            strategy,
+            selectedSkill,
+            powerLevel,
+            targetName
+        });
+
+        const computedStatus = (Array.isArray(finalUpdatedState.enemies) && finalUpdatedState.enemies.length > 0 && finalUpdatedState.enemies.every(e => toSafeNumber(e?.hp, 0) <= 0))
+            ? 'COMBAT_END'
+            : 'COMBAT_ONGOING';
+        const resolvedCombatStatus = combatResult.status === 'COMBAT_END' ? 'COMBAT_END' : computedStatus;
+        combatResult.status = resolvedCombatStatus;
 
         if (combatResult.status === 'COMBAT_END') {
             const pendingPayload = {

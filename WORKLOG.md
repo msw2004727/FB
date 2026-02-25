@@ -275,3 +275,11 @@ ode --check.
 - Restored Chinese copy for NPC interaction menu, chat modal, beggar inquiry prompts, combat target/action prompts, trade modal labels/buttons/alerts, location detail modal section titles, loading/epilogue/prequel messages, and related system messages.
 - Left encoding-garbled comments untouched (non-user-facing) and re-verified modified files with 
 ode --check.
+
+### Task: Fix combat HP/MP not changing after action confirmation (completed)
+- Hardened backend combat state merge in pi/combatRoutes.js to accept AI updatedState arrays with either named entries or unnamed index-aligned entries, reducing no-op turns caused by inconsistent AI JSON shape.
+- Added deterministic server-side fallback resource updates (MP cost deduction and minimal attack/heal/support effects) when AI combat output produces no HP/MP deltas, so combat rounds visibly progress instead of appearing stuck.
+- Normalized combat status after merge based on final enemy HP (prevents AI status omissions from stalling combat end detection).
+- Updated prompts/combatPrompt.js to explicitly require 
+ame on changed enemies/allies entries and included a JSON example.
+- Improved combat card DOM lookup robustness in scripts/modalManager.js by escaping data-name selector values.

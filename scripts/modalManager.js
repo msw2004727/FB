@@ -116,6 +116,14 @@ function escapeCombatText(value) {
         .replace(/'/g, '&#39;');
 }
 
+function escapeSelectorAttrValue(value) {
+    const text = String(value ?? '');
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(text);
+    }
+    return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function clampCombatPercent(value) {
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
@@ -289,7 +297,7 @@ export function updateCombatUI(updatedState) {
     allCombatants.forEach(character => {
         if (!character) return;
         const characterName = character.name || character.username;
-        const card = combatModal.querySelector(`.character-card[data-name="${characterName}"]`);
+        const card = combatModal.querySelector(`.character-card[data-name="${escapeSelectorAttrValue(characterName)}"]`);
         if (!card) return;
 
         const hpBar = card.querySelector('.hp-bar-fill');

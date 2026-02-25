@@ -22,12 +22,15 @@
 `3. 傷害/治療/輔助效果需與 powerLevel 成正比，powerLevel 越高效果越強、風險也可略增。\n` +
 `4. target 是玩家本回合優先作用目標；敘事與 updatedState 應反映此目標受影響。\n` +
 `5. HP/MP 不能低於 0；HP 不可高於 maxHp；MP 不可高於 maxMp。\n` +
-`6. 若任一方全滅，status 回傳 COMBAT_END，否則 COMBAT_ONGOING。\n\n` +
+`6. 若 updatedState.enemies / allies 有任何角色數值變動，該陣列元素必須包含 name（名稱要與當前戰況完全一致）。\n` +
+`7. 若任一方全滅，status 回傳 COMBAT_END，否則 COMBAT_ONGOING。\n\n` +
 `[輸出格式]\n` +
 `請輸出 JSON，包含：\n` +
 `- narrative: string（本回合戰鬥敘事，請描述目標互動與結果）\n` +
-`- updatedState: object（只包含有變動的 player/enemies/allies 的 hp/mp 欄位）\n` +
+`- updatedState: object（只包含有變動的 player/enemies/allies 的 hp/mp 欄位；enemies/allies 每個項目需含 name）\n` +
 `- status: "COMBAT_ONGOING" | "COMBAT_END"\n\n` +
+`[範例片段]\n` +
+`{"updatedState":{"player":{"hp":96,"mp":28},"enemies":[{"name":"山賊甲","hp":41}]}}\n\n` +
 `[當前戰況]\n` +
 `玩家: ${playerProfile?.username || '玩家'} (HP:${playerProfile?.hp}/${playerProfile?.maxHp}, MP:${playerProfile?.mp}/${playerProfile?.maxMp})\n` +
 `同伴: ${alliesString}\n` +
