@@ -159,9 +159,9 @@ function showAttackIntention(event) {
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
         buttonContainer.innerHTML = `
-            <button class="npc-interaction-btn intention" data-intention="???" data-npc-name="${npcName}">???</button>
-            <button class="npc-interaction-btn intention" data-intention="???" data-npc-name="${npcName}">???</button>
-            <button class="npc-interaction-btn intention attack" data-intention="????" data-npc-name="${npcName}">????</button>
+            <button class="npc-interaction-btn intention" data-intention="切磋" data-npc-name="${npcName}">切磋</button>
+            <button class="npc-interaction-btn intention" data-intention="教訓" data-npc-name="${npcName}">教訓</button>
+            <button class="npc-interaction-btn intention attack" data-intention="打死" data-npc-name="${npcName}">打死</button>
         `;
         buttonContainer.querySelectorAll('.intention').forEach(btn => {
             btn.addEventListener('click', showFinalConfirmation);
@@ -177,9 +177,9 @@ function showFinalConfirmation(event) {
     const buttonContainer = dom.npcInteractionMenu.querySelector('.npc-interaction-buttons');
     if (buttonContainer) {
         buttonContainer.innerHTML = `
-            <span class="confirm-prompt-text">??????????{intention}???</span>
-            <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="???"><i class="fas fa-times"></i></button>
-            <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}" title="????"><i class="fas fa-check"></i></button>
+            <span class="confirm-prompt-text">確定要對 ${npcName} 採取「${intention}」嗎？</span>
+            <button class="npc-interaction-btn cancel-attack" data-npc-name="${npcName}" title="取消"><i class="fas fa-times"></i></button>
+            <button class="npc-interaction-btn confirm-attack" data-npc-name="${npcName}" data-intention="${intention}" title="確認"><i class="fas fa-check"></i></button>
         `;
 
         buttonContainer.querySelector('.cancel-attack').addEventListener('click', async (e) => {
@@ -287,7 +287,7 @@ async function confirmAndInitiateAttack(event) {
     hideNpcInteractionMenu();
     if (gameState.isRequesting) return;
 
-    gameLoop.setLoading(true, `??雓??${npcName} ???蝯????...`);
+    gameLoop.setLoading(true, `正在對 ${npcName} 發起動手...`);
     try {
         const data = await api.initiateCombat({
             targetNpcName: npcName,

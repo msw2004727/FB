@@ -29,7 +29,7 @@ export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
     dom.playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
     dom.submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    dom.submitButton.textContent = isLoading ? '??????..' : '???';
+    dom.submitButton.textContent = isLoading ? '送出中...' : '送出';
     dom.chatInput.disabled = isLoading;
     dom.chatActionBtn.disabled = isLoading;
     dom.endChatBtn.disabled = isLoading;
@@ -241,7 +241,7 @@ export async function handlePlayerAction() {
         dom.storyTextContainer.innerHTML = '';
     }
 
-    setLoading(true, '??????????????????..');
+    setLoading(true, '正在處理你的行動...');
     appendMessageToStory(`> ${actionText}`, 'player-action-log');
 
     try {
@@ -284,7 +284,7 @@ export async function handlePlayerAction() {
 
 // ??????獢??????????????獢?????????
 export async function loadInitialGame() {
-    setLoading(true, '????????????????????????????????...');
+    setLoading(true, '正在連接你的世界，讀取記憶中...');
     try {
         const data = await api.getLatestGame();
         dom.storyTextContainer.innerHTML = '';

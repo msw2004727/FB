@@ -256,3 +256,12 @@ ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 - Restored user-facing Chinese labels/messages in combat modal, combat handlers, loading flow, trade modal, and skill/location detail sections after the temporary ASCII-safe syntax rescue.
 - Kept syntax-safe structure intact and re-verified scripts/modalManager.js, scripts/interactionHandlers.js, scripts/gameLoop.js, scripts/tradeManager.js, and scripts/main.js with 
 ode --check.
+
+### Task: Fix garbled loading text on game screen (completed)
+- Restored corrupted loading-related UI strings in scripts/gameLoop.js (setLoading button text, action loading message, and initial world-loading message) so the loading overlay no longer shows question marks.
+- Verified scripts/gameLoop.js with 
+ode --check.
+
+### Task: Fix invalid NPC attack intention payload (completed)
+- Restored NPC attack intention button data-intention values in scripts/interactionHandlers.js to the backend whitelist values (切磋, 教訓, 打死) after they were corrupted to question marks, which caused /initiateCombat to return 無效的動手意圖。`r
+- Also restored the attack confirmation prompt text and attack-loading text for the NPC interaction menu.
