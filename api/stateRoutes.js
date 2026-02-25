@@ -196,10 +196,9 @@ router.get('/latest-game', async (req, res) => {
             silver: silverAmount
         });
 
-        const [prequelText, suggestion] = await Promise.all([
-            getAIPrequel(userData.preferredModel, [latestGameData]),
-            getAISuggestion(latestGameData)
-        ]);
+        // Initial page refresh should return immediately; skip AI prequel/suggestion generation here.
+        const prequelText = null;
+        const suggestion = typeof latestGameData.suggestion === 'string' ? latestGameData.suggestion : '';
 
         res.json({
             prequel: prequelText,

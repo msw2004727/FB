@@ -555,7 +555,7 @@ export async function endChatSession() {
             model: dom.aiModelSelector.value
         });
         if (data && data.roundData && typeof data.roundData.R !== 'undefined') {
-            appendMessageToStory(`<p class="system-message">結束了與${npcNameToSummarize}的交談。</p>`);
+            appendMessageToStory(`結束了與${npcNameToSummarize}的交談。`, 'system-message');
             gameLoop.processNewRoundData(data);
         } else {
             throw new Error('從伺服器收到的回應格式不正確。');

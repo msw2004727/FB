@@ -1,7 +1,9 @@
+﻿import { MAX_POWER as SHARED_MAX_POWER } from '../shared/gameConstants.mjs';
+
 // scripts/config.js
 
-// 將後端 URL 獨立出來，方便未來修改
+// Backend API base URL
 export const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 
-// 遊戲中的常數
-export const MAX_POWER = 999;
+// Shared gameplay max power cap (used by UI bar display)
+export const MAX_POWER = SHARED_MAX_POWER;

@@ -8,11 +8,14 @@ import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
 import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory } from './uiUpdater.js';
+import { ensureLocalPreviewAuthSession, isLocalPreviewMockEnabled } from './localPreviewMode.js';
 
 
 interaction.setGameLoop(gameLoop);
 
 document.addEventListener('DOMContentLoaded', () => {
+    ensureLocalPreviewAuthSession();
+
     const token = localStorage.getItem('jwt_token');
     if (!token) {
         window.location.href = 'login.html';
@@ -20,6 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initializeDOM();
+
+    if (isLocalPreviewMockEnabled()) {
+        console.info('[Local Preview] Mock API mode enabled for localhost preview.');
+    }
 
     const username = localStorage.getItem('username');
     if (dom.playerInput && username) {
@@ -219,11 +226,30 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.headerToggleButton.setAttribute('aria-label', isCollapsed ? '展開日期與時辰資訊欄' : '收起日期與時辰資訊欄');
         });
 
-        dom.menuToggle.addEventListener('click', () => dom.gameContainer.classList.toggle('sidebar-open'));
+        const menuToggleIcon = dom.menuToggle?.querySelector('i');
+        const setSidebarOpenState = (isOpen) => {
+            dom.gameContainer.classList.toggle('sidebar-open', isOpen);
+            if (dom.menuToggle) {
+                dom.menuToggle.setAttribute('aria-expanded', String(isOpen));
+                dom.menuToggle.title = isOpen ? '收起右側欄' : '展開右側欄';
+                dom.menuToggle.setAttribute('aria-label', isOpen ? '收起右側欄' : '展開右側欄');
+            }
+            if (menuToggleIcon) {
+                menuToggleIcon.classList.toggle('fa-bars', !isOpen);
+                menuToggleIcon.classList.toggle('fa-xmark', isOpen);
+            }
+        };
+        setSidebarOpenState(dom.gameContainer.classList.contains('sidebar-open'));
 
-        dom.mainContent.addEventListener('click', () => {
+        dom.menuToggle.addEventListener('click', () => {
+            const willOpen = !dom.gameContainer.classList.contains('sidebar-open');
+            setSidebarOpenState(willOpen);
+        });
+
+        dom.mainContent.addEventListener('click', (e) => {
+            if (e.target !== dom.mainContent) return;
             if (window.innerWidth <= 1024 && dom.gameContainer.classList.contains('sidebar-open')) {
-                dom.gameContainer.classList.remove('sidebar-open');
+                setSidebarOpenState(false);
             }
         });
 

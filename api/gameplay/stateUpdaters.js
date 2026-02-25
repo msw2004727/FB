@@ -11,6 +11,39 @@ const { addCurrency } = require('../economyManager');
 
 const db = admin.firestore();
 const ATMOSPHERE_LABEL_MAX_CHARS = 8;
+const FALLBACK_PLAYER_POWER_MAX = 999;
+let sharedGameConstantsPromise = null;
+
+function toFiniteNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+async function getSharedMaxPower() {
+    if (!sharedGameConstantsPromise) {
+        sharedGameConstantsPromise = import('../../shared/gameConstants.mjs')
+            .catch((error) => {
+                console.warn('[stateUpdaters] Failed to load shared MAX_POWER. Using fallback 999.', error);
+                return { MAX_POWER: FALLBACK_PLAYER_POWER_MAX };
+            });
+    }
+
+    const gameConstants = await sharedGameConstantsPromise;
+    return toFiniteNumber(gameConstants.MAX_POWER, FALLBACK_PLAYER_POWER_MAX);
+}
+
+function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function normalizePowerChange(powerChange) {
+    const source = (powerChange && typeof powerChange === 'object') ? powerChange : {};
+    return {
+        internal: toFiniteNumber(source.internal, 0),
+        external: toFiniteNumber(source.external, 0),
+        lightness: toFiniteNumber(source.lightness, 0)
+    };
+}
 
 function clampTextByChars(value, maxChars) {
     const normalized = String(value ?? '')
@@ -144,8 +177,8 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
     
     // --- 【核心修改】移除隨機事件對數據的影響 ---
     const finalPC = PC;
-    const finalPowerChange = powerChange;
-    const finalMoralityChange = moralityChange;
+    const finalPowerChange = normalizePowerChange(powerChange);
+    const finalMoralityChange = toFiniteNumber(moralityChange, 0);
     // --- 修改結束 ---
 
     const finalSaveData = { 
@@ -176,9 +209,10 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         await processLocationUpdates(userId, finalSaveData.LOC[0], locationUpdates);
     }
 
-    const newInternalPower = (player.internalPower || 0) + (finalPowerChange?.internal || 0);
-    const newExternalPower = (player.externalPower || 0) + (finalPowerChange?.external || 0);
-    const newLightnessPower = (player.lightness || 0) + (finalPowerChange?.lightness || 0);
+    const playerPowerMax = await getSharedMaxPower();
+    const newInternalPower = clampNumber((player.internalPower || 0) + (finalPowerChange?.internal || 0), 0, playerPowerMax);
+    const newExternalPower = clampNumber((player.externalPower || 0) + (finalPowerChange?.external || 0), 0, playerPowerMax);
+    const newLightnessPower = clampNumber((player.lightness || 0) + (finalPowerChange?.lightness || 0), 0, playerPowerMax);
 
     const playerUpdatesForDb = {
         timeOfDay: finalTimeOfDay,
@@ -195,7 +229,7 @@ async function updateGameState(userId, username, player, playerAction, aiRespons
         maxInternalPowerAchieved: Math.max(player.maxInternalPowerAchieved || 0, newInternalPower),
         maxExternalPowerAchieved: Math.max(player.maxExternalPowerAchieved || 0, newExternalPower),
         maxLightnessAchieved: Math.max(player.maxLightnessAchieved || 0, newLightnessPower),
-        morality: admin.firestore.FieldValue.increment(Number(finalMoralityChange || 0)),
+        morality: admin.firestore.FieldValue.increment(finalMoralityChange),
         R: newRoundNumber
     };
     batch.update(userDocRef, playerUpdatesForDb);

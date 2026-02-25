@@ -173,15 +173,6 @@ export async function processNewRoundData(data) {
 
     // --- 本地 gameState 水合開始 ---
     // 1. 更新核心數值
-    if (data.roundData.powerChange) {
-        gameState.roundData.internalPower += data.roundData.powerChange.internal || 0;
-        gameState.roundData.externalPower += data.roundData.powerChange.external || 0;
-        gameState.roundData.lightness += data.roundData.powerChange.lightness || 0;
-    }
-    if (data.roundData.moralityChange) {
-        gameState.roundData.morality += data.roundData.moralityChange;
-    }
-    gameState.roundData.stamina = data.roundData.stamina;
 
     // 2. 更新物品 (【優化】現在這個 data.inventory 來自後端的一次性回傳)
     if(data.inventory) {
@@ -276,13 +267,13 @@ export async function handlePlayerAction() {
 
     } catch (error) {
         console.error('API 錯誤或通訊中斷:', error);
-        const errorMessage = error.message.replace(/\n/g, '<br>');
+        const errorMessage = String(error.message || '');
         const cultivationErrorKeywords = ["閉關", "靜修", "修行", "糧食飲水不足", "身心俱疲", "尚未習得", "身無長技", "身負數門絕學", "人多嘴雜"];
         const isCultivationError = cultivationErrorKeywords.some(keyword => errorMessage.includes(keyword));
         if (isCultivationError) {
-            appendMessageToStory(`<div class="cultivation-error">${errorMessage}</div>`, 'system-message');
+            appendMessageToStory(errorMessage, 'system-message cultivation-error');
         } else {
-            appendMessageToStory(`【系統提示】<br>${errorMessage}`, 'system-message');
+            appendMessageToStory(`【系統提示】\n${errorMessage}`, 'system-message');
         }
     } finally {
         if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {

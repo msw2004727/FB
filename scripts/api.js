@@ -1,7 +1,13 @@
 // scripts/api.js
 import { backendBaseUrl } from './config.js';
+import { isLocalPreviewMockEnabled } from './localPreviewMode.js';
+import { handleLocalPreviewMockRequest } from './localPreviewMockApi.js';
 
 async function fetchApi(endpoint, options = {}) {
+    if (isLocalPreviewMockEnabled()) {
+        return handleLocalPreviewMockRequest(endpoint, options);
+    }
+
     const token = localStorage.getItem('jwt_token');
     const headers = {
         'Content-Type': 'application/json',

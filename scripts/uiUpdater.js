@@ -61,13 +61,16 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (randomEvent && randomEvent.description) {
         const eventDiv = document.createElement('div');
         eventDiv.className = 'random-event-message';
-        eventDiv.innerHTML = `<strong>【奇遇】</strong> ${randomEvent.description}`;
+        const eventLabel = document.createElement('strong');
+        eventLabel.textContent = '【奇遇】';
+        eventDiv.appendChild(eventLabel);
+        eventDiv.append(` ${String(randomEvent.description)}`);
         storyTextContainer.appendChild(eventDiv);
     }
 
     if (storyText) {
         const processedStory = highlightNpcNames(storyText, roundData.NPC);
-        appendMessageToStory(processedStory, 'story-text');
+        appendMessageToStory(processedStory, 'story-text', { allowHtml: true });
     }
     if (!roundData) return;
 
@@ -91,10 +94,22 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
 }
 
-export function appendMessageToStory(htmlContent, className) {
+export function appendMessageToStory(htmlContent, className, options = {}) {
     const p = document.createElement('p');
-    p.innerHTML = typeof htmlContent === 'string' ? htmlContent.replace(/\n/g, '<br>') : htmlContent;
     if (className) p.className = className;
+    const allowHtml = options.allowHtml === true;
+
+    if (allowHtml) {
+        p.innerHTML = typeof htmlContent === 'string' ? htmlContent.replace(/\n/g, '<br>') : String(htmlContent ?? '');
+    } else {
+        const safeText = String(htmlContent ?? '');
+        const lines = safeText.split('\n');
+        lines.forEach((line, index) => {
+            if (index > 0) p.appendChild(document.createElement('br'));
+            p.appendChild(document.createTextNode(line));
+        });
+    }
+
     storyTextContainer.appendChild(p);
     storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
 }
@@ -117,6 +132,21 @@ function escapeHtml(value) {
 
 function truncateByChars(value, maxChars) {
     return Array.from(String(value ?? '').trim()).slice(0, maxChars).join('');
+}
+
+const ALLOWED_NPC_FRIENDLINESS_CLASSES = new Set([
+    'devoted',
+    'trusted',
+    'friendly',
+    'neutral',
+    'wary',
+    'hostile',
+    'sworn_enemy'
+]);
+
+function normalizeNpcFriendlinessClass(value) {
+    const normalized = String(value || 'neutral').trim();
+    return ALLOWED_NPC_FRIENDLINESS_CLASSES.has(normalized) ? normalized : 'neutral';
 }
 
 function renderStatusChip(iconClass, label, value) {
@@ -183,19 +213,21 @@ function updatePowerBars(roundData) {
 
 function updatePowerBar(barEl, valueEl, current, max) {
     if (barEl && valueEl) {
-        const percentage = Math.min(((current || 0) / max) * 100, 100);
+        const safeCurrent = Number.isFinite(Number(current)) ? Number(current) : 0;
+        const percentage = Math.max(0, Math.min((safeCurrent / max) * 100, 100));
         barEl.style.width = `${percentage}%`;
-        valueEl.textContent = `${current || 0}/${max}`;
+        valueEl.textContent = `${safeCurrent}/${max}`;
     }
 }
 
 function updateMoralityBar(morality) {
     if (moralityBarIndicator) {
-        const percentage = ((morality || 0) + 100) / 200 * 100;
+        const safeMorality = Number.isFinite(Number(morality)) ? Number(morality) : 0;
+        const percentage = Math.max(0, Math.min(((safeMorality + 100) / 200) * 100, 100));
         moralityBarIndicator.style.left = `${percentage}%`;
         let colorVar;
-        if (morality > 10) colorVar = document.body.classList.contains('dark-theme') ? 'var(--morality-justice-dark)' : 'var(--morality-justice-light)';
-        else if (morality < -10) colorVar = document.body.classList.contains('dark-theme') ? 'var(--morality-evil-dark)' : 'var(--morality-evil-light)';
+        if (safeMorality > 10) colorVar = document.body.classList.contains('dark-theme') ? 'var(--morality-justice-dark)' : 'var(--morality-justice-light)';
+        else if (safeMorality < -10) colorVar = document.body.classList.contains('dark-theme') ? 'var(--morality-evil-dark)' : 'var(--morality-evil-light)';
         else colorVar = document.body.classList.contains('dark-theme') ? 'var(--dark-text-secondary)' : 'var(--morality-neutral-light)';
         moralityBarIndicator.style.backgroundColor = colorVar;
     }
@@ -231,10 +263,12 @@ export function updateBulkStatus(score) {
 function updateLocationInfo(locationData) {
      if (locationInfo) {
         if (locationData) {
+            const rulerName = escapeHtml(locationData.governance?.ruler || '未知');
+            const locationDescription = escapeHtml(locationData.description || '此地詳情尚在傳聞之中...');
             locationInfo.innerHTML = `
-                <div class="location-ruler-info">統治者：<span class="location-ruler">${locationData.governance?.ruler || '未知'}</span></div>
+                <div class="location-ruler-info"><span class="location-ruler-label">統治者：</span><span class="location-ruler" title="${rulerName}">${rulerName}</span></div>
                 <div class="location-desc-container">
-                    <p class="location-desc">${locationData.description || '此地詳情尚在傳聞之中...'}</p>
+                    <p class="location-desc">${locationDescription}</p>
                     <button id="view-location-details-btn" class="header-icon-btn" title="查看地區詳情">
                         <i class="fas fa-info-circle"></i>
                     </button>
@@ -252,7 +286,10 @@ function updateNpcList(npcs) {
     if (aliveNpcs.length > 0) {
         aliveNpcs.forEach(npc => {
             const npcLine = document.createElement('div');
-            npcLine.innerHTML = `<span class="npc-name npc-${npc.friendliness}" data-npc-name="${npc.name}">${npc.name}</span>: ${npc.status || '狀態不明'}`;
+            const npcName = escapeHtml(npc.name || '未知人物');
+            const npcStatus = escapeHtml(npc.status || '狀態不明');
+            const friendlinessClass = normalizeNpcFriendlinessClass(npc.friendliness);
+            npcLine.innerHTML = `<span class="npc-name npc-${friendlinessClass}" data-npc-name="${npcName}">${npcName}</span>: ${npcStatus}`;
             npcContent.appendChild(npcLine);
         });
     } else {
@@ -262,14 +299,19 @@ function updateNpcList(npcs) {
 
 function highlightNpcNames(text, npcs) {
     if (!text) return '';
-    let highlightedText = text;
+    let highlightedText = escapeHtml(text);
     if (npcs && Array.isArray(npcs) && npcs.length > 0) {
-        const sortedNpcs = [...npcs].sort((a, b) => b.name.length - a.name.length);
+        const sortedNpcs = [...npcs].sort((a, b) => String(b?.name || '').length - String(a?.name || '').length);
         sortedNpcs.forEach(npc => {
-            const npcNameEscaped = npc.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(npcNameEscaped, 'g');
+            const rawNpcName = String(npc?.name || '').trim();
+            if (!rawNpcName) return;
+
+            const safeNpcName = escapeHtml(rawNpcName);
+            const npcNamePattern = safeNpcName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(npcNamePattern, 'g');
+            const friendlinessClass = normalizeNpcFriendlinessClass(npc.friendliness);
             const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
-            const replacement = `<span class="npc-name npc-${npc.friendliness || 'neutral'}" data-npc-name="${npc.name}"${isDeceasedAttr}>${npc.name}</span>`;
+            const replacement = `<span class="npc-name npc-${friendlinessClass}" data-npc-name="${safeNpcName}"${isDeceasedAttr}>${safeNpcName}</span>`;
             highlightedText = highlightedText.replace(regex, replacement);
         });
     }
@@ -310,6 +352,9 @@ function createItemEntry(item) {
     const entry = document.createElement('div');
     entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
     entry.dataset.id = item.instanceId;
+    const safeItemId = escapeHtml(item.instanceId || '');
+    const safeItemName = escapeHtml(item.itemName || '未知物品');
+    const quantity = Number(item.quantity) || 0;
 
     let iconClass = 'fa-box';
     if (item.itemType && itemTypeConfig[item.itemType]) {
@@ -324,7 +369,7 @@ function createItemEntry(item) {
         equipControls = `
             <div class="item-controls">
                 <label class="switch">
-                    <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${item.instanceId}">
+                    <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${safeItemId}">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -335,8 +380,8 @@ function createItemEntry(item) {
         <div class="item-info">
              <i class="item-icon fa-solid ${iconClass}"></i>
             <div>
-                 <a href="#" class="item-link" data-item-id="${item.instanceId}">${item.itemName}</a>
-                 ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
+                 <a href="#" class="item-link" data-item-id="${safeItemId}">${safeItemName}</a>
+                 ${quantity > 1 ? `<span class="item-quantity">x${quantity}</span>` : ''}
             </div>
         </div>
         ${equipControls}
