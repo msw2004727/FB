@@ -39,7 +39,7 @@ function cacheDOMElements() {
 function render() {
     if (!DOMElements.playerInventory) return; 
 
-    // 渲染雙方的物品欄和出價區
+    // ?謚哨???雓??????頩???蝬踝????
     ['player', 'npc'].forEach(owner => {
         const inventoryEl = DOMElements[`${owner}Inventory`];
         const offerEl = DOMElements[`${owner}Offer`];
@@ -47,29 +47,29 @@ function render() {
         offerEl.innerHTML = '';
 
         if (state[owner].inventory.length === 0) {
-            inventoryEl.innerHTML = `<p class="text-xs text-center text-gray-400 italic mt-4">行囊空空</p>`;
+            inventoryEl.innerHTML = `<p class="text-xs text-center text-gray-400 italic mt-4">??ㄝ??謜???/p>`;
         } else {
             state[owner].inventory.forEach(item => inventoryEl.appendChild(createItemElement(item, owner, 'inventory')));
         }
 
         if (state[owner].offer.items.length === 0) {
-            offerEl.innerHTML = `<p class="text-xs text-center text-gray-400 italic mt-4">尚未出價</p>`;
+            offerEl.innerHTML = `<p class="text-xs text-center text-gray-400 italic mt-4">?蹎批雓???</p>`;
         } else {
             state[owner].offer.items.forEach(item => offerEl.appendChild(createItemElement(item, owner, 'offer')));
         }
     });
 
-    // 渲染金錢
+    // ?謚哨??????
     DOMElements.playerMoneyDisplay.textContent = state.player.money;
     DOMElements.npcMoneyDisplay.textContent = state.npc.money;
     
-    // 渲染NPC名稱
+    // ?謚哨??NPC??謕?
     DOMElements.npcHeaderName.textContent = currentNpcName;
     DOMElements.npcNameDisplay.textContent = `${currentNpcName} 的出價`;
     
-    // 添加監聽器
+    // ?謜????頩??
     DOMElements.playerMoneyInput.oninput = () => calculateSummary();
-    DOMElements.npcMoneyInput.oninput = () => calculateSummary(); // NPC出價也應觸發計算
+    DOMElements.npcMoneyInput.oninput = () => calculateSummary(); // NPC??????????雓謘??
     
     calculateSummary();
 }
@@ -80,8 +80,8 @@ function createItemElement(item, owner, area) {
     const quantityText = item.quantity > 1 ? ` (x${item.quantity})` : '';
 
     li.className = 'bg-amber-50/50 border border-amber-200 p-1.5 rounded-md cursor-pointer flex justify-between items-center text-sm hover:border-amber-400 hover:bg-amber-50 transform hover:-translate-y-px transition-all';
-    li.title = item.description || item.baseDescription || '一個神秘的物品';
-    li.innerHTML = `<span class="font-semibold text-amber-900">${item.itemName}${quantityText}</span> <span class="text-xs text-amber-700">價:${item.value || 0}</span>`;
+    li.title = item.description || item.baseDescription || '?豰刈????謢踵活????';
+    li.innerHTML = `<span class="font-semibold text-amber-900">${item.itemName}${quantityText}</span> <span class="text-xs text-amber-700">??${item.value || 0}</span>`;
     li.addEventListener('click', () => moveItem(uniqueId, owner, area));
     return li;
 }
@@ -120,22 +120,22 @@ function calculateSummary() {
 
 async function handleConfirmTrade() {
     DOMElements.confirmBtn.disabled = true;
-    // 【核心修正】使用 Font Awesome 的旋轉圖示作為加載動畫
-    DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 交割中...`;
+    // ???箏??撠???????????Font Awesome ?????察??????????謜????
+    DOMElements.confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ???????..`;
 
     const playerMoneyOffer = Number(DOMElements.playerMoneyInput.value) || 0;
     const npcMoneyOffer = Number(DOMElements.npcMoneyInput.value) || 0;
 
     if (playerMoneyOffer > state.player.money) {
-        alert('你的文錢不夠！');
+        alert('你的金錢不足。');
         DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `成交`;
+        DOMElements.confirmBtn.innerHTML = `???`;
         return;
     }
     if (npcMoneyOffer > state.npc.money) {
-        alert(`${currentNpcName} 的文錢不夠！`);
+        alert(`${currentNpcName} ??????????`);
         DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `成交`;
+        DOMElements.confirmBtn.innerHTML = `???`;
         return;
     }
 
@@ -166,11 +166,11 @@ async function handleConfirmTrade() {
         }
 
     } catch (error) {
-        alert(`交易失敗: ${error.message}`);
+        alert(`????????: ${error.message}`);
     } finally {
-        // 【核心修正】無論成功或失敗，最後都將按鈕恢復原狀
+        // ???箏??撠??????????嚚???鞈??????謅?ㄞ??蝬踐ㄡ???????蹎折??蝞????
         DOMElements.confirmBtn.disabled = false;
-        DOMElements.confirmBtn.innerHTML = `成交`;
+        DOMElements.confirmBtn.innerHTML = `???`;
     }
 }
 
@@ -183,7 +183,7 @@ export function initializeTrade(tradeData, npcName, onTradeComplete, closeCallba
 
     state = {
         player: {
-            inventory: tradeData.player.items.filter(item => item.itemType !== '財寶'),
+            inventory: tradeData.player.items.filter(item => item.itemType !== 'currency' && item.itemType !== '貨幣'),
             offer: { items: [], money: 0 },
             money: tradeData.player.money,
         },

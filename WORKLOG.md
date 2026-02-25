@@ -246,3 +246,13 @@ ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 ### Task: Hotfix modalManager syntax error after combat refactor (completed)
 - Fixed `scripts/modalManager.js` parse failure (`Invalid or unexpected token` around line 26) caused by encoding-corrupted/broken string literals in the top helper section (`handleForgetSkill` / `openTradeModal`).
 - Rewrote the affected string literals to ASCII-safe messages to avoid codepage corruption during local edits and confirmed `node --check scripts/modalManager.js` passes.
+
+### Task: Hotfix homepage loading freeze caused by corrupted JS strings (completed)
+- Fixed multiple syntax errors caused by encoding-corrupted string literals in scripts/modalManager.js, scripts/interactionHandlers.js, scripts/gameLoop.js, and scripts/tradeManager.js so the homepage import chain can parse again.
+- Replaced several corrupted UI strings with ASCII-safe fallback text in combat modal, combat handlers, skill/trade modals, and loading/epilogue gift message paths to avoid further codepage-induced parse failures during local edits.
+- Verified critical modules now import without syntax errors (remaining Node-side failures are expected document is not defined runtime errors outside a browser context).
+
+### Task: Restore Chinese UI copy after syntax hotfix (completed)
+- Restored user-facing Chinese labels/messages in combat modal, combat handlers, loading flow, trade modal, and skill/location detail sections after the temporary ASCII-safe syntax rescue.
+- Kept syntax-safe structure intact and re-verified scripts/modalManager.js, scripts/interactionHandlers.js, scripts/gameLoop.js, scripts/tradeManager.js, and scripts/main.js with 
+ode --check.
