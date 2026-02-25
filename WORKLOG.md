@@ -242,3 +242,7 @@ ode --check passed for scripts/modalManager.js and pi/worldStateHelpers.js.
 - Verified target-selection UI wiring exists in front-end combat flow (`renderCombatTargetSelection`, `updateCombatConfirmState`, `selectedTarget` resets/updates in multiple combat lifecycle points).
 - Identified remaining E2E blocker for localhost mock validation: `scripts/localPreviewMockApi.js` dispatcher still has no `/api/game/combat/*` mock routes, so `?mock=1` cannot execute the full “動手→戰鬥→結算→投降→再進戰鬥” flow.
 - Note: Full browser click-through E2E was not executable in this shell environment (no browser automation step available here).
+
+### Task: Hotfix modalManager syntax error after combat refactor (completed)
+- Fixed `scripts/modalManager.js` parse failure (`Invalid or unexpected token` around line 26) caused by encoding-corrupted/broken string literals in the top helper section (`handleForgetSkill` / `openTradeModal`).
+- Rewrote the affected string literals to ASCII-safe messages to avoid codepage corruption during local edits and confirmed `node --check scripts/modalManager.js` passes.
