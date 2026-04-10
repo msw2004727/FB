@@ -98,14 +98,14 @@ body.dark-theme .ai-thinking-loader .loader-dots span {
 
 .loader-timer {
     font-family: var(--font-sans);
-    font-size: 0.8rem;
-    color: var(--light-text-secondary);
-    opacity: 0.5;
+    font-size: 1.6rem;
+    color: var(--light-text-primary, #333);
+    opacity: 0.7;
     letter-spacing: 0.05em;
     margin-top: 0.25rem;
 }
 body.dark-theme .loader-timer {
-    color: var(--dark-text-secondary);
+    color: var(--dark-text-primary, #e0e0e0);
 }
 
 .loader-tip {
