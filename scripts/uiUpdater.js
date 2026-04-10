@@ -41,12 +41,23 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     // 回合計數
     if (roundCounter) roundCounter.textContent = `第 ${roundData.R || 0} 回`;
 
+    // 歸途印記
+    updateMilestoneRunes(roundData.milestonesCount);
+
     // 任務日誌（來自 AI 的線索追蹤）
     if (questJournal && roundData.questJournal) {
         questJournal.textContent = roundData.questJournal;
     }
 
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
+}
+
+function updateMilestoneRunes(count) {
+    const container = document.getElementById('milestone-runes');
+    if (!container) return;
+    const runes = container.querySelectorAll('.rune');
+    const lit = typeof count === 'number' ? count : 0;
+    runes.forEach((r, i) => r.classList.toggle('lit', i < lit));
 }
 
 export function appendMessageToStory(htmlContent, className, options = {}) {

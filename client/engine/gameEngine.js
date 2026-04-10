@@ -75,10 +75,13 @@ export async function getLatestGame() {
         if (!lastSave) throw new Error('找不到存檔資料。');
     }
 
+    const milestonesData = await clientDB.state.get(profileId, 'milestones');
+
     const roundData = {
         ...lastSave,
         morality: profile.morality,
-        suggestion: lastSave.suggestion || '先觀察場面，再採取行動。'
+        suggestion: lastSave.suggestion || '先觀察場面，再採取行動。',
+        milestonesCount: (milestonesData || []).length
     };
 
     let locationData = null;
@@ -145,7 +148,8 @@ export async function interact({ action, model }) {
         story: roundData.story,
         roundData: {
             ...roundData,
-            ...result.profile
+            ...result.profile,
+            milestonesCount: achievedMilestones.length
         },
         suggestion: aiResult.suggestion || roundData.suggestion || '繼續探索。',
         locationData: context.locationContext
