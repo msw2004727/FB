@@ -196,13 +196,7 @@ export async function handlePlayerAction(actionOverride) {
     } catch (error) {
         console.error('API 互動請求失敗', error);
         const errorMessage = String(error.message || '');
-        const cultivationErrorKeywords = ['cultivation', 'training', 'stamina', 'internal', 'external', 'lightness'];
-        const isCultivationError = cultivationErrorKeywords.some(keyword => errorMessage.includes(keyword));
-        if (isCultivationError) {
-            appendMessageToStory(errorMessage, 'system-message cultivation-error');
-        } else {
-            appendMessageToStory('操作失敗：' + errorMessage, 'system-message');
-        }
+        appendMessageToStory('操作失敗：' + errorMessage, 'system-message');
     } finally {
         if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
              setLoading(false);

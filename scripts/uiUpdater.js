@@ -274,32 +274,6 @@ function updateStatusBar(roundData) {
     updateTimeTheme(roundData.timeOfDay);
 }
 
-function updatePowerBars(roundData) {
-    updatePowerBar(internalPowerBar, internalPowerValue, roundData.internalPower, MAX_POWER);
-    updatePowerBar(externalPowerBar, externalPowerValue, roundData.externalPower, MAX_POWER);
-    updatePowerBar(lightnessPowerBar, lightnessPowerValue, roundData.lightness, MAX_POWER);
-
-    if (staminaBar && staminaValue) {
-        const currentStamina = roundData.stamina || 0;
-        updatePowerBar(staminaBar, staminaValue, currentStamina, 100);
-        
-        if (currentStamina < 30) {
-            staminaBar.classList.add('pulsing-danger');
-        } else {
-            staminaBar.classList.remove('pulsing-danger');
-        }
-    }
-}
-
-function updatePowerBar(barEl, valueEl, current, max) {
-    if (barEl && valueEl) {
-        const safeCurrent = Number.isFinite(Number(current)) ? Number(current) : 0;
-        const percentage = Math.max(0, Math.min((safeCurrent / max) * 100, 100));
-        barEl.style.width = `${percentage}%`;
-        valueEl.textContent = `${safeCurrent}/${max}`;
-    }
-}
-
 function updateMoralityBar(morality) {
     if (moralityBarIndicator) {
         const safeMorality = Number.isFinite(Number(morality)) ? Number(morality) : 0;
