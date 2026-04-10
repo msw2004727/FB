@@ -183,14 +183,6 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
     } catch (error) {
         const detail = error?.message || String(error);
         console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, detail);
-        if (allowDefaultFallback && canRetryWithDefaultModel(modelName)) {
-            console.warn(`[AI Fallback] ${modelName} failed (${detail}). Retrying with minimax.`);
-            try {
-                return await callAI('minimax', prompt, isJsonExpected, { allowDefaultFallback: false });
-            } catch (fallbackError) {
-                console.error(`[AI Fallback] minimax retry also failed:`, fallbackError.message);
-            }
-        }
         throw new Error(`AI模型 ${modelName} 呼叫失敗: ${detail}`);
     }
 }
