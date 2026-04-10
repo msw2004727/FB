@@ -5,11 +5,17 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 const Anthropic = require("@anthropic-ai/sdk");
 
-// 僅初始化擁有伺服器端金鑰的模型（MiniMax）
-const minimax = new OpenAI({
-    apiKey: process.env.MINIMAX_API_KEY || 'dummy-key-will-fail-at-runtime',
-    baseURL: "https://api.minimaxi.chat/v1",
-});
+// MiniMax 延遲初始化（確保 Vercel env var 已載入）
+let _minimaxClient = null;
+function getMinimax() {
+    if (!_minimaxClient) {
+        _minimaxClient = new OpenAI({
+            apiKey: process.env.MINIMAX_API_KEY,
+            baseURL: "https://api.minimaxi.chat/v1",
+        });
+    }
+    return _minimaxClient;
+}
 
 // --- 動態建立 AI 客戶端（使用用戶提供的 API Key）---
 function createOpenAIClient(apiKey) {
@@ -149,7 +155,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                const minimaxResult = await minimax.chat.completions.create(options);
+                const minimaxResult = await getMinimax().chat.completions.create(options);
                 textResponse = minimaxResult.choices[0].message.content;
                 // 清理 MiniMax 的 <think> 標籤
                 textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -160,7 +166,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                const defaultResult = await minimax.chat.completions.create(options);
+                const defaultResult = await getMinimax().chat.completions.create(options);
                 textResponse = defaultResult.choices[0].message.content;
                 textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         }
