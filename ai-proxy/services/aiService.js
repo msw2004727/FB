@@ -107,7 +107,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 const key = userApiKey || process.env.DEEPSEEK_API_KEY;
                 if (!key) throw new Error('缺少 DeepSeek API Key，請在前端設定頁面填寫。');
                 const client = createDeepSeekClient(key);
-                options.model = "deepseek-v4";
+                options.model = "deepseek-chat";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -181,16 +181,16 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
         }
         return textResponse;
     } catch (error) {
+        const detail = error?.message || String(error);
+        console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, detail);
         if (allowDefaultFallback && canRetryWithDefaultModel(modelName)) {
-            console.warn(`[AI Fallback] ${modelName} failed. Retrying with default minimax.`);
+            console.warn(`[AI Fallback] ${modelName} failed (${detail}). Retrying with minimax.`);
             try {
                 return await callAI('minimax', prompt, isJsonExpected, { allowDefaultFallback: false });
             } catch (fallbackError) {
-                console.error(`[AI Fallback] minimax retry failed after ${modelName}:`, fallbackError);
+                console.error(`[AI Fallback] minimax retry also failed:`, fallbackError.message);
             }
         }
-        console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, error);
-        const detail = error?.message || String(error);
         throw new Error(`AI模型 ${modelName} 呼叫失敗: ${detail}`);
     }
 }

@@ -392,15 +392,14 @@ router.post('/generate', async (req, res, next) => {
             const { getOptionsPrompt } = require('../prompts/optionsPrompt');
             const t0 = Date.now();
 
-            // 並行發出兩個 AI 呼叫
+            // 並行發出兩個 AI 呼叫（選項也用玩家選的模型）
             const [storyRaw, optionsRaw] = await Promise.all([
                 callAI(modelToUse, prompt, true, {}, apiKey || null),
-                // 選項 prompt 極短，用同一個模型但獨立呼叫
-                callAI('minimax', getOptionsPrompt(
+                callAI(modelToUse, getOptionsPrompt(
                     context.playerAction || '',
                     context.recentHistory?.[context.recentHistory.length - 1]?.EVT || '',
                     context.player?.PC || ''
-                ), true, {}),
+                ), true, {}, apiKey || null),
             ]);
 
             console.log(`[AI Proxy] Parallel calls done in ${Date.now() - t0}ms`);
