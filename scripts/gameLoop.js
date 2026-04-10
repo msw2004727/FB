@@ -207,7 +207,9 @@ export function switchToOptionsMode(options) {
     gameState.currentActionOptions = options.slice(0, 3);
     if (dom.actionOptionButtons) {
         dom.actionOptionButtons.forEach((btn, i) => {
-            btn.textContent = options[i] || '';
+            const textEl = btn.querySelector('.option-text');
+            if (textEl) textEl.textContent = options[i] || '';
+            else btn.textContent = options[i] || '';
             btn.disabled = false;
         });
     }

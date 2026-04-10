@@ -367,7 +367,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (dom.actionOptionButtons) {
             dom.actionOptionButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const text = btn.textContent;
+                    const textEl = btn.querySelector('.option-text');
+                    const text = textEl ? textEl.textContent : btn.textContent;
                     if (text && !gameState.isRequesting) {
                         gameLoop.handlePlayerAction(text);
                     }

@@ -776,58 +776,91 @@ body.dark-theme .action-suggestion {
 /* --- 行動選項按鈕（一般回合）--- */
 .action-options-wrapper {
     display: flex;
-    gap: 0;
-    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
 }
 
 .action-option-btn {
     flex: 1;
-    padding: 1rem 0.75rem;
-    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 0.75rem;
+    font-size: 0.88rem;
     font-family: var(--font-sans);
-    line-height: 1.5;
-    border: none;
-    border-left: 1px solid var(--light-border);
-    background: transparent;
+    line-height: 1.45;
+    border: 1px solid var(--light-border);
+    border-radius: 10px;
+    background: var(--light-surface-bg, #faf8f5);
     color: var(--light-text-primary);
     cursor: pointer;
-    transition: background-color 0.2s, color 0.2s;
-    text-align: center;
+    transition: all 0.2s ease;
+    text-align: left;
     white-space: normal;
-    word-break: break-word;
-    min-height: 3rem;
+    overflow-wrap: break-word;
+    word-break: keep-all;
+    position: relative;
 }
 
-.action-option-btn:first-child {
-    border-left: none;
+.option-label {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--light-accent, #8c6f54);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: var(--font-serif);
+    letter-spacing: 0.02em;
+}
+
+.option-text {
+    flex: 1;
 }
 
 .action-option-btn:hover {
-    background-color: rgba(140, 111, 84, 0.1);
-    color: var(--light-accent);
+    border-color: var(--light-accent);
+    background: rgba(140, 111, 84, 0.06);
+    box-shadow: 0 2px 8px rgba(140, 111, 84, 0.1);
+    transform: translateY(-1px);
 }
 
 .action-option-btn:active {
-    background-color: rgba(140, 111, 84, 0.18);
+    transform: translateY(0);
+    box-shadow: none;
+    background: rgba(140, 111, 84, 0.12);
 }
 
 .action-option-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 body.dark-theme .action-option-btn {
-    border-left-color: var(--dark-border);
+    border-color: var(--dark-border);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--dark-text-primary);
 }
 
+body.dark-theme .option-label {
+    background: var(--dark-accent, #c3a98a);
+    color: #1a1a1e;
+}
+
 body.dark-theme .action-option-btn:hover {
-    background-color: rgba(195, 169, 138, 0.12);
-    color: var(--dark-accent);
+    border-color: var(--dark-accent);
+    background: rgba(195, 169, 138, 0.1);
+    box-shadow: 0 2px 8px rgba(195, 169, 138, 0.12);
 }
 
 body.dark-theme .action-option-btn:active {
-    background-color: rgba(195, 169, 138, 0.2);
+    background: rgba(195, 169, 138, 0.18);
 }
 
 /* --- 字數計數器 --- */
@@ -889,8 +922,13 @@ body.dark-theme .char-counter-full {
 }
 
 @media (max-width: 640px) {
+    .action-options-wrapper {
+        flex-direction: column;
+        gap: 0.4rem;
+        padding: 0.5rem 0.6rem;
+    }
     .action-option-btn {
-        padding: 0.85rem 0.5rem;
+        padding: 0.6rem 0.65rem;
         font-size: 0.85rem;
     }
 }
