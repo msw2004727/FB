@@ -32,7 +32,7 @@ const TASK_HANDLERS = {
     'story': (ctx) => {
         const { getStoryPrompt } = require('../prompts/storyPrompt');
         const player = ctx.player || ctx.userProfile || {};
-        const prompt = getStoryPrompt(
+        let prompt = getStoryPrompt(
             ctx.longTermSummary,
             ctx.recentHistory,
             ctx.playerAction,
@@ -50,6 +50,10 @@ const TASK_HANDLERS = {
             ctx.actorCandidates,
             ctx.blackShadowEvent
         );
+        // Phase 2: 注入深度記憶上下文
+        if (ctx.deepMemoryContext) {
+            prompt += `\n\n## 【深度記憶 — AI 長期記憶系統提供的相關歷史資訊】\n以下是與當前行動相關的過往記憶。請自然地將這些記憶融入你的故事敘述中（例如角色提起過去的事、呼應之前的伏筆），但不要生硬地逐條列出。如果記憶與當前場景無關，可以忽略。\n${ctx.deepMemoryContext}\n`;
+        }
         return { prompt, json: true, configKey: 'story' };
     },
 
@@ -337,6 +341,23 @@ router.post('/generate', async (req, res, next) => {
                 success: false,
                 error: `Unknown task: "${task}". Available tasks: ${Object.keys(TASK_HANDLERS).join(', ')}`,
             });
+        }
+
+        // Phase 2: 在生成故事前，從 MemPalace 搜尋相關記憶注入 context
+        if (task === 'story') {
+            try {
+                const mempalace = require('../services/mempalaceClient');
+                const playerId = context.player?.id || context.profileId || 'unknown';
+                const playerAction = context.playerAction || '';
+                const npcNames = context.actorCandidates || Object.keys(context.npcContext || {});
+                const deepMemory = await mempalace.buildDeepMemoryContext(playerId, playerAction, npcNames);
+                if (deepMemory) {
+                    context.deepMemoryContext = deepMemory;
+                    console.log(`[MemPalace Phase 2] Injected ${deepMemory.length} chars of memory context`);
+                }
+            } catch (memErr) {
+                console.warn('[MemPalace Phase 2] Search failed (non-blocking):', memErr.message);
+            }
         }
 
         // Build prompt from context
