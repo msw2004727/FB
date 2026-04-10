@@ -10,7 +10,7 @@ function detectDefaultProxyUrl() {
     if (host === 'localhost' || host === '127.0.0.1') {
         return 'http://localhost:3001';
     }
-    return 'https://ai-proxy-cyan.vercel.app';
+    return 'https://wenjiang-ai-proxy-322557520154.asia-east2.run.app';
 }
 
 function getProxyUrl() {
