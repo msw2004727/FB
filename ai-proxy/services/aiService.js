@@ -160,6 +160,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
             }
             case 'minimax':
                 options.model = "MiniMax-M2.7";
+                options.max_tokens = 2048;
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }

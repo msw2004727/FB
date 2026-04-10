@@ -45,20 +45,9 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 `;
 
     const spatialContextRule = `
-## 【空間情境與移動鐵律 (極高優先級)】
-你必須嚴格區分「內部移動」和「外部移動」，以確保空間的邏輯性。
-
-1.  **內部移動 (優先判定)**:
-    * **定義**: 指在同一個上級地點內部的移動。例如，從「無名村」的廣場移動到「無名村」的「葉家鐵鋪」。
-    * **觸發條件**: 當玩家的指令是前往一個**通用設施**（如 "去鐵匠鋪", "進客棧", "找藥鋪"）時，你**必須**首先檢查【重要地點情境參考】中，當前地點 \`${locationContext?.locationName || '未知'}\` 是否已存在對應的設施 (\`facilities\`)。
-    * **執行鐵律**:
-        * 如果**存在**對應設施（例如，玩家要去鐵匠鋪，而地點內正好有「葉家鐵鋪」），你**必須**將劇情導向這個已存在的設施。你的 \`roundData.LOC\` 回傳值**必須**是原地點層級上追加子地點，例如：從 \`["無名村"]\` 變成 \`["無名村", "葉家鐵鋪"]\`。
-        * 在這種情況下，**絕對禁止**創造任何新的父級地點（如新的村莊或城鎮）。
-
-2.  **外部移動 (次級判定)**:
-    * **定義**: 指從一個上級地點前往另一個完全不同的上級地點。例如，從「無名村」前往「開封府」。
-    * **觸發條件**: 只有在玩家的指令中包含**明確的、不存在於當前地點層級中的地名**（如 "前往開封府"），或者當玩家的「內部移動」指令在當前地點找不到對應設施時，你才能將其視為一次外部移動。
-    * **執行鐵律**: 當你判定為外部移動時，你可以發揮想像力，創造前往新地點的過程，並在 \`roundData.LOC\` 中設定新的地點層級。
+## 空間移動規則
+- **內部移動**：前往同一地點內的設施（如「去鐵匠鋪」）→ LOC 追加子地點，如 ["無名村", "葉家鐵鋪"]。優先使用地點情境中已有的設施。
+- **外部移動**：前往不同地點（如「前往開封府」）→ LOC 設定新的地點層級。
 `;
     
 
@@ -87,20 +76,12 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
 
     const npcContextInstruction = Object.keys(npcContext).length > 0
-        ? `\n## 【重要NPC情境參考(最高優先級)】\n以下是當前場景中所有NPC的完整檔案。你在生成他們的行為、反應和對話時，**必須優先且嚴格地**參考這些檔案中記錄的資訊，確保他們的言行舉止符合其深度設定，而不僅僅是基於短期記憶！
-        ### 【復仇行為鐵律】
-        如果NPC的檔案中存在 'revengeInfo' 欄位，這代表他心中燃燒著復仇的怒火。這將成為他本回合行動的**最主要動機**，其優先級高於一切。你必須：
-        1. 讓他對復仇目標（玩家）表現出極度的敵意。
-        2. 根據他的個性，生成充滿仇恨的狀態描述或對白。
-        3. 如果情境合適（例如雙方獨處或狹路相逢），你**必須**讓他主動發起攻擊，並在回傳中觸發戰鬥系統。
-        \`\`\`json
-        ${JSON.stringify(npcContext, null, 2)}
-        \`\`\``
+        ? `\n## NPC 情境參考\n${JSON.stringify(npcContext)}`
         : '';
 
     const locationContextInstruction = locationContext
-        ? `\n## 【重要地點情境參考】\n你當前正處於「${locationContext.locationName}」，以下是關於此地的詳細情報，你在生成故事時必須嚴格參考這些設定，確保你的描述（如天氣、統治者、氛圍等）與之相符：\n\`\`\`json\n${JSON.stringify(locationContext, null, 2)}\n\`\`\``
-        : `\n## 【重要地點情境參考】\n你目前身處一個未知之地，關於此地的詳細情報尚不明朗。`;
+        ? `\n## 地點情境：${locationContext.locationName}\n${JSON.stringify(locationContext)}`
+        : '';
 
     
     const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality });
