@@ -10,6 +10,8 @@ MemPalace HTTP Server v3.0 — 5 項優化
 import os, json, sqlite3, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+MAX_BODY_SIZE = 1_048_576  # 1 MB — 防止 OOM (HIGH #5)
+
 PALACE_DIR = os.environ.get("MEMPALACE_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "mempalace_data"))
 PORT = int(os.environ.get("MEMPALACE_PORT", "8200"))
 os.makedirs(PALACE_DIR, exist_ok=True)
@@ -95,7 +97,7 @@ def _parse_round_int(val):
 
 class MemPalaceHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        print(f"[MemPalace] {args[0]}")
+        print(f"[MemPalace] {format % args}" if args else f"[MemPalace] {format}")
 
     def _json_response(self, status, data):
         self.send_response(status)
@@ -123,6 +125,9 @@ class MemPalaceHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", 0))
+            if length > MAX_BODY_SIZE:
+                self._json_response(413, {"error": "payload too large"})
+                return
             body = json.loads(self.rfile.read(length)) if length else {}
         except Exception as e:
             self._json_response(400, {"error": f"invalid body: {e}"})
@@ -176,9 +181,12 @@ class MemPalaceHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass  # 去重失敗不影響正常寫入
 
-        doc_id = body.get("id") or f"doc_{col.count()+1}_{os.urandom(4).hex()}"
-        col.add(documents=[content], ids=[doc_id], metadatas=[{**metadata, "wing": wing, "room": room}])
-        self._json_response(200, {"success": True, "id": doc_id, "deduplicated": False, "total": col.count()})
+        doc_id = body.get("id") or f"doc_{os.urandom(8).hex()}"
+        try:
+            col.add(documents=[content], ids=[doc_id], metadatas=[{**metadata, "wing": wing, "room": room}])
+            self._json_response(200, {"success": True, "id": doc_id, "deduplicated": False, "total": col.count()})
+        except Exception as e:
+            self._json_response(409, {"error": f"add failed: {e}"})
 
     # ── 基礎搜索（向下相容）─────────────────────────────
     def _handle_search(self, body):
@@ -189,6 +197,10 @@ class MemPalaceHandler(BaseHTTPRequestHandler):
         room = body.get("room")
         if not query:
             self._json_response(400, {"error": "query is required"})
+            return
+
+        if col.count() == 0:
+            self._json_response(200, {"results": []})
             return
 
         # 優化 #2: 支援 room 過濾
@@ -224,14 +236,18 @@ class MemPalaceHandler(BaseHTTPRequestHandler):
         wing = body.get("wing")
         room = body.get("room")
         current_round = body.get("current_round", 0)
-        decay_rate = body.get("decay_rate", 0.98)
-        w_rel = body.get("w_relevance", 0.5)
-        w_rec = body.get("w_recency", 0.35)
-        w_imp = body.get("w_importance", 0.15)
-        max_distance = body.get("max_distance", 0.5)  # cosine distance 門檻
+        decay_rate = max(0.01, min(float(body.get("decay_rate", 0.98)), 1.0))
+        w_rel = max(0, min(float(body.get("w_relevance", 0.5)), 1.0))
+        w_rec = max(0, min(float(body.get("w_recency", 0.35)), 1.0))
+        w_imp = max(0, min(float(body.get("w_importance", 0.15)), 1.0))
+        max_distance = max(0.01, min(float(body.get("max_distance", 0.5)), 1.0))
 
         if not query:
             self._json_response(400, {"error": "query is required"})
+            return
+
+        if col.count() == 0:
+            self._json_response(200, {"results": []})
             return
 
         # 過度取回 3 倍候選
@@ -343,12 +359,13 @@ class MemPalaceHandler(BaseHTTPRequestHandler):
             self._json_response(400, {"error": "subject, predicate required"})
             return
         ended_int = _parse_round_int(ended)
+        # CRITICAL 修復：只 invalidate「比當前回合更早」的事實，防止競態條件誤刪新事實
         if obj:
-            kg.execute("UPDATE facts SET ended=?, ended_int=? WHERE wing=? AND subject=? AND predicate=? AND object=? AND ended IS NULL",
-                       [ended, ended_int, wing, subject, predicate, obj])
+            kg.execute("UPDATE facts SET ended=?, ended_int=? WHERE wing=? AND subject=? AND predicate=? AND object=? AND ended IS NULL AND valid_from_int < ?",
+                       [ended, ended_int, wing, subject, predicate, obj, ended_int])
         else:
-            kg.execute("UPDATE facts SET ended=?, ended_int=? WHERE wing=? AND subject=? AND predicate=? AND ended IS NULL",
-                       [ended, ended_int, wing, subject, predicate])
+            kg.execute("UPDATE facts SET ended=?, ended_int=? WHERE wing=? AND subject=? AND predicate=? AND ended IS NULL AND valid_from_int < ?",
+                       [ended, ended_int, wing, subject, predicate, ended_int])
         kg.commit()
         self._json_response(200, {"success": True})
 

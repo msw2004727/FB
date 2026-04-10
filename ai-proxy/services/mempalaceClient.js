@@ -21,6 +21,10 @@ async function request(path, body) {
             signal: controller.signal
         });
         clearTimeout(timer);
+        if (!res.ok) {
+            console.warn(`[MemPalace] ${path} HTTP ${res.status}`);
+            return null;
+        }
         return await res.json();
     } catch (err) {
         clearTimeout(timer);
@@ -63,8 +67,14 @@ function addMemory(wing, room, content, metadata = {}, dedup = false) {
         if (r && r.success) {
             const tag = r.deduplicated ? 'DEDUP' : 'NEW';
             console.log(`[MemPalace] [${tag}] ${wing}/${room} (${r.total})`);
+        } else if (r === null) {
+            console.warn(`[MemPalace] Write failed (network) ${wing}/${room}`);
+        } else {
+            console.warn(`[MemPalace] Write rejected ${wing}/${room}:`, r?.error || 'unknown');
         }
-    }).catch(() => {});
+    }).catch(err => {
+        console.warn(`[MemPalace] Write error ${wing}/${room}:`, err.message);
+    });
 }
 
 function saveRoundMemory(playerId, roundData, story) {
@@ -173,13 +183,16 @@ async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], cur
 
     try {
         // 優化: 所有搜索並行執行（vector + KG 同時跑）
+        const MAX_NPCS = 3;
+        const effectiveNpcs = npcNames.slice(0, MAX_NPCS);
+
         const searches = [
             searchRanked(playerAction, wing, 3, currentRound),
         ];
         const npcSearches = [];
         const timelineSearches = [];
 
-        for (const name of npcNames.slice(0, 3)) {
+        for (const name of effectiveNpcs) {
             npcSearches.push(searchRanked(name, wing, 2, currentRound));
             timelineSearches.push(getTimeline(name, wing, 5));
         }
@@ -187,8 +200,8 @@ async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], cur
         const allResults = await Promise.all([...searches, ...npcSearches, ...timelineSearches]);
 
         const actionMemories = allResults[0];
-        const npcMemResults = allResults.slice(1, 1 + npcNames.slice(0, 3).length);
-        const npcTimelines = allResults.slice(1 + npcNames.slice(0, 3).length);
+        const npcMemResults = allResults.slice(1, 1 + effectiveNpcs.length);
+        const npcTimelines = allResults.slice(1 + effectiveNpcs.length);
 
         let context = '';
         let tokens = 0;
@@ -206,8 +219,8 @@ async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], cur
 
         // 2. NPC Timeline（KG 時間線）
         const timelineParts = [];
-        for (let i = 0; i < npcNames.length && i < npcTimelines.length; i++) {
-            const tl = buildTimelineString(npcNames[i], npcTimelines[i]);
+        for (let i = 0; i < effectiveNpcs.length && i < npcTimelines.length; i++) {
+            const tl = buildTimelineString(effectiveNpcs[i], npcTimelines[i]);
             if (tl) timelineParts.push(tl);
         }
         if (timelineParts.length > 0) {
@@ -222,11 +235,11 @@ async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], cur
         // 3. NPC 互動記憶（如果 token 預算允許）
         if (tokens < TOKEN_BUDGET - 100) {
             const npcMemParts = [];
-            for (let i = 0; i < npcNames.length && i < npcMemResults.length; i++) {
+            for (let i = 0; i < effectiveNpcs.length && i < npcMemResults.length; i++) {
                 const results = npcMemResults[i];
                 if (results && results.length > 0) {
                     const memories = results.map(m => m.content).join('; ');
-                    npcMemParts.push(`${npcNames[i]}: ${memories}`);
+                    npcMemParts.push(`${effectiveNpcs[i]}: ${memories}`);
                 }
             }
             if (npcMemParts.length > 0) {
