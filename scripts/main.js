@@ -8,26 +8,55 @@ import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
 import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory, updateMoneyBagDisplay } from './uiUpdater.js';
-import { ensureLocalPreviewAuthSession, isLocalPreviewMockEnabled } from './localPreviewMode.js';
 import { restoreAiModelSelection, setStoredAiModel } from './aiModelPreference.js';
+import clientDB from '../client/db/clientDB.js';
+import * as gameEngine from '../client/engine/gameEngine.js';
+import { exportSave, importSave, shouldRemindBackup, markBackupReminded, isIOSSafari } from '../client/utils/exportImport.js';
 
 
 interaction.setGameLoop(gameLoop);
 
-document.addEventListener('DOMContentLoaded', () => {
-    ensureLocalPreviewAuthSession();
+document.addEventListener('DOMContentLoaded', async () => {
+    // 初始化 IndexedDB
+    await clientDB.init();
 
-    const token = localStorage.getItem('jwt_token');
-    if (!token) {
-        window.location.href = 'login.html';
-        return;
+    // 註冊 Service Worker (PWA)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+            console.warn('[SW] Service Worker 註冊失敗:', err);
+        });
+    }
+
+    // 檢查是否有活躍檔案
+    const savedProfileId = localStorage.getItem('wenjiang_active_profile');
+    let activeProfile = null;
+
+    if (savedProfileId) {
+        activeProfile = await clientDB.profiles.get(savedProfileId);
+    }
+
+    if (!activeProfile) {
+        // 檢查是否有任何存檔
+        const allProfiles = await clientDB.profiles.list();
+        if (allProfiles.length > 0) {
+            activeProfile = allProfiles[0];
+        } else {
+            // 第一次遊玩：自動建立新角色
+            const result = await gameEngine.createNewGame('無名俠客', '男');
+            activeProfile = result.profile;
+        }
+    }
+
+    // 設定活躍檔案
+    gameEngine.setActiveProfile(activeProfile.id);
+    localStorage.setItem('wenjiang_active_profile', activeProfile.id);
+    localStorage.setItem('username', activeProfile.username);
+    // 為了向後相容，設定一個假的 jwt_token
+    if (!localStorage.getItem('jwt_token')) {
+        localStorage.setItem('jwt_token', 'local-pwa-token');
     }
 
     initializeDOM();
-
-    if (isLocalPreviewMockEnabled()) {
-        console.info('[Local Preview] Mock API mode enabled for localhost preview.');
-    }
 
     if (dom.aiModelSelector) {
         restoreAiModelSelection(dom.aiModelSelector);
@@ -36,11 +65,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const username = localStorage.getItem('username');
+    const username = activeProfile.username;
     if (dom.playerInput && username) {
         dom.playerInput.placeholder = `${username}接下來...`;
     } else if (dom.playerInput) {
         dom.playerInput.placeholder = '接下來...';
+    }
+
+    // 備份提醒
+    if (shouldRemindBackup()) {
+        const iosWarning = isIOSSafari() ? '\n\n⚠️ 您正在使用 iOS Safari，長時間未使用可能導致存檔被系統清除！' : '';
+        setTimeout(() => {
+            if (confirm(`建議定期匯出存檔以防資料遺失。${iosWarning}\n\n是否現在匯出存檔？`)) {
+                exportSave(activeProfile.id).then(filename => {
+                    alert(`存檔已匯出: ${filename}`);
+                });
+            }
+            markBackupReminded();
+        }, 3000);
     }
 
     const itemDetailsModal = document.getElementById('item-details-modal');
@@ -262,10 +304,45 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        dom.logoutButton.addEventListener('click', () => {
-            localStorage.removeItem('jwt_token');
-            localStorage.removeItem('username');
-            window.location.href = 'login.html';
+        dom.logoutButton.addEventListener('click', async () => {
+            const choice = prompt(
+                '存檔管理：\n1 = 匯出存檔\n2 = 匯入存檔\n3 = 新建角色\n4 = 切換存檔\n\n請輸入數字：'
+            );
+            if (choice === '1') {
+                try {
+                    const filename = await exportSave(gameEngine.getActiveProfileId());
+                    alert(`存檔已匯出: ${filename}`);
+                } catch (e) { alert('匯出失敗: ' + e.message); }
+            } else if (choice === '2') {
+                try {
+                    const profileId = await importSave();
+                    gameEngine.setActiveProfile(profileId);
+                    localStorage.setItem('wenjiang_active_profile', profileId);
+                    window.location.reload();
+                } catch (e) { alert('匯入失敗: ' + e.message); }
+            } else if (choice === '3') {
+                const name = prompt('角色名稱：');
+                if (name) {
+                    const gender = prompt('性別（男/女）：') || '男';
+                    const result = await gameEngine.createNewGame(name, gender);
+                    gameEngine.setActiveProfile(result.profile.id);
+                    localStorage.setItem('wenjiang_active_profile', result.profile.id);
+                    localStorage.setItem('username', name);
+                    window.location.reload();
+                }
+            } else if (choice === '4') {
+                const profiles = await clientDB.profiles.list();
+                if (profiles.length <= 1) { alert('目前只有一個存檔。'); return; }
+                const list = profiles.map((p, i) => `${i + 1}. ${p.username} (${p.isDeceased ? '已故' : '存活'})`).join('\n');
+                const idx = parseInt(prompt(`選擇存檔：\n${list}\n\n請輸入數字：`));
+                if (idx >= 1 && idx <= profiles.length) {
+                    const selected = profiles[idx - 1];
+                    gameEngine.setActiveProfile(selected.id);
+                    localStorage.setItem('wenjiang_active_profile', selected.id);
+                    localStorage.setItem('username', selected.username);
+                    window.location.reload();
+                }
+            }
         });
 
         dom.suicideButton.addEventListener('click', async () => {

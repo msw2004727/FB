@@ -1,9 +1,7 @@
-﻿import { MAX_POWER as SHARED_MAX_POWER } from '../shared/gameConstants.mjs';
-
 // scripts/config.js
+// 設定檔 — PWA 本機化版本
 
-// Backend API base URL
-export const backendBaseUrl = 'https://ai-novel-final.onrender.com';
+export const MAX_POWER = 999;
 
-// Shared gameplay max power cap (used by UI bar display)
-export const MAX_POWER = SHARED_MAX_POWER;
+// AI Proxy URL（可在設定中更改）
+export const AI_PROXY_URL = localStorage.getItem('wenjiang_ai_proxy_url') || 'https://ai-wenjiang-proxy.vercel.app';

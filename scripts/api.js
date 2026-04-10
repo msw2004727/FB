@@ -1,109 +1,241 @@
 // scripts/api.js
-import { backendBaseUrl } from './config.js';
-import { isLocalPreviewMockEnabled } from './localPreviewMode.js';
-import { handleLocalPreviewMockRequest } from './localPreviewMockApi.js';
+// 重寫：所有 API 呼叫改為本機 IndexedDB + AI Proxy
+// 保持與原 API 完全相同的介面，讓 UI 層不需要任何改動
 
-async function fetchApi(endpoint, options = {}) {
-    if (isLocalPreviewMockEnabled()) {
-        return handleLocalPreviewMockRequest(endpoint, options);
+import * as gameEngine from '../client/engine/gameEngine.js';
+import clientDB from '../client/db/clientDB.js';
+
+// 初始化標記
+let _initialized = false;
+
+/**
+ * 確保 clientDB 已初始化且有活躍檔案
+ */
+async function ensureReady() {
+    if (!_initialized) {
+        await clientDB.init();
+        _initialized = true;
     }
-
-    const token = localStorage.getItem('jwt_token');
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${backendBaseUrl}${endpoint}`, {
-        ...options,
-        headers,
-    });
-
-    const responseBody = await response.text();
-    let data;
-    try {
-        data = JSON.parse(responseBody);
-    } catch (e) {
-        if (!response.ok) {
-            throw new Error(responseBody || `伺服器錯誤: ${response.status}`);
+    // 如果沒有活躍檔案，嘗試從 localStorage 恢復
+    if (!gameEngine.getActiveProfileId()) {
+        const savedId = localStorage.getItem('wenjiang_active_profile');
+        if (savedId) {
+            const profile = await clientDB.profiles.get(savedId);
+            if (profile) {
+                gameEngine.setActiveProfile(savedId);
+            }
         }
-        return responseBody;
     }
+}
 
-    if (!response.ok) {
-        throw new Error(data.message || `伺服器錯誤: ${response.status}`);
-    }
-    return data;
+/**
+ * 包裝函式：自動初始化 + 錯誤處理
+ */
+async function safeCall(fn) {
+    await ensureReady();
+    return fn();
 }
 
 export const api = {
-    // Gameplay Routes
-    interact: (body) => fetchApi('/api/game/play/interact', { method: 'POST', body: JSON.stringify(body) }),
-    startCultivation: (body) => fetchApi('/api/game/cultivation/start', { method: 'POST', body: JSON.stringify(body) }),
+    // ── Gameplay Routes ─────────────────────
+    interact: (body) => safeCall(() => gameEngine.interact({
+        action: body.action,
+        model: body.model
+    })),
 
-    // Combat Routes
-    initiateCombat: (body) => fetchApi('/api/game/combat/initiate', { method: 'POST', body: JSON.stringify(body) }),
-    combatAction: (body) => fetchApi('/api/game/combat/action', { method: 'POST', body: JSON.stringify(body) }),
-    combatSurrender: (body) => fetchApi('/api/game/combat/surrender', { method: 'POST', body: JSON.stringify(body) }),
-    finalizeCombat: (body) => fetchApi('/api/game/combat/finalize-combat', { method: 'POST', body: JSON.stringify(body) }),
+    startCultivation: (body) => safeCall(() => gameEngine.startCultivation({
+        skillName: body.skillName,
+        days: body.days,
+        model: body.model
+    })),
 
-    // NPC Routes
-    getNpcProfile: (npcName) => fetchApi(`/api/game/npc/profile/${npcName}`),
-    startTrade: (npcName) => fetchApi(`/api/game/npc/start-trade/${npcName}`),
-    confirmTrade: (body) => fetchApi('/api/game/npc/confirm-trade', { method: 'POST', body: JSON.stringify(body) }),
-    npcChat: (body) => fetchApi('/api/game/npc/chat', { method: 'POST', body: JSON.stringify(body) }),
-    giveItemToNpc: (body) => fetchApi('/api/game/npc/give-item', { method: 'POST', body: JSON.stringify(body) }),
-    endChat: (body) => fetchApi('/api/game/npc/end-chat', { method: 'POST', body: JSON.stringify(body) }),
+    // ── Combat Routes ───────────────────────
+    initiateCombat: (body) => safeCall(() => gameEngine.initiateCombat({
+        targetNpcName: body.targetNpcName,
+        intention: body.intention,
+        model: body.model
+    })),
 
-    // State Routes
-    getLatestGame: () => fetchApi('/api/game/state/latest-game'),
-    startNewGame: () => fetchApi('/api/game/state/restart', { method: 'POST' }),
-    forceSuicide: (body) => fetchApi('/api/game/state/force-suicide', { method: 'POST', body: JSON.stringify(body) }),
-    getInventory: () => fetchApi('/api/game/state/inventory'),
-    getRelations: () => fetchApi('/api/game/state/get-relations'),
-    getNovel: () => fetchApi('/api/game/state/get-novel'),
-    getEncyclopedia: () => fetchApi('/api/game/state/get-encyclopedia'),
-    getSkills: () => fetchApi('/api/game/state/skills'),
-    dropItem: (body) => fetchApi('/api/game/state/drop-item', { method: 'POST', body: JSON.stringify(body) }),
-    forgetSkill: (body) => fetchApi('/api/game/state/forget-skill', { method: 'POST', body: JSON.stringify(body) }),
+    combatAction: (body) => safeCall(() => gameEngine.combatAction({
+        strategy: body.strategy,
+        skill: body.skill,
+        powerLevel: body.powerLevel,
+        target: body.target,
+        model: body.model
+    })),
 
-    // Inventory Routes
-    equipItem: (instanceId) => fetchApi(`/api/inventory/equip/${instanceId}`, { method: 'POST' }),
-    unequipItem: (instanceId) => fetchApi(`/api/inventory/unequip/${instanceId}`, { method: 'POST' }),
+    combatSurrender: (body) => safeCall(() => gameEngine.combatSurrender({
+        model: body.model
+    })),
 
-    // Bounty Route
-    getBounties: () => fetchApi('/api/bounties'),
+    finalizeCombat: (body) => safeCall(() => gameEngine.finalizeCombat({
+        model: body.model
+    })),
 
-    // Epilogue Route
-    getEpilogue: () => fetchApi('/api/epilogue'),
+    // ── NPC Routes ──────────────────────────
+    getNpcProfile: (npcName) => safeCall(() => gameEngine.getNpcProfile(npcName)),
 
-    // Map Route
-    getMap: () => fetchApi('/api/map/world-map'),
+    startTrade: (npcName) => safeCall(() => gameEngine.startTrade(npcName)),
 
-    // Beggar (丐幫) Routes
-    summonBeggar: (body) => fetchApi('/api/beggar/summon', { method: 'POST', body: JSON.stringify(body) }),
-    startBeggarInquiry: (body) => fetchApi('/api/beggar/start-inquiry', { method: 'POST', body: JSON.stringify(body) }),
-    askBeggarQuestion: (body) => fetchApi('/api/beggar/ask', { method: 'POST', body: JSON.stringify(body) }),
+    confirmTrade: (body) => safeCall(() => gameEngine.confirmTrade({
+        npcName: body.npcName,
+        tradeDetails: body.tradeDetails || body.tradeState,
+        model: body.model
+    })),
 
-    // 【核心新增】圖片生成路由
-    generateNpcAvatar: (npcName) => fetchApi(`/api/image/generate/npc/${npcName}`, { method: 'POST' }),
+    npcChat: (body) => safeCall(() => gameEngine.npcChat({
+        npcName: body.npcName,
+        chatHistory: body.chatHistory,
+        playerMessage: body.playerMessage,
+        model: body.model
+    })),
 
-    // GM Panel Routes
-    getNpcsForGM: () => fetchApi('/api/gm/npcs'),
-    updateNpcForGM: (body) => fetchApi('/api/gm/update-npc', { method: 'POST', body: JSON.stringify(body) }),
-    rebuildNpcForGM: (body) => fetchApi('/api/gm/rebuild-npc', { method: 'POST', body: JSON.stringify(body) }),
-    getLocationsForGM: () => fetchApi('/api/gm/locations'),
-    rebuildLocationForGM: (body) => fetchApi('/api/gm/rebuild-location', { method: 'POST', body: JSON.stringify(body) }),
-    getItemTemplatesForGM: () => fetchApi('/api/gm/item-templates'),
-    updatePlayerResourcesForGM: (body) => fetchApi('/api/gm/update-player-resources', { method: 'POST', body: JSON.stringify(body) }),
-    getPlayerStateForGM: () => fetchApi('/api/gm/player-state'),
-    updatePlayerStateForGM: (body) => fetchApi('/api/gm/player-state', { method: 'POST', body: JSON.stringify(body) }),
-    teleportPlayer: (body) => fetchApi('/api/gm/teleport', { method: 'POST', body: JSON.stringify(body) }),
-    getCharactersForGM: () => fetchApi('/api/gm/characters'),
-    updateNpcRelationship: (body) => fetchApi('/api/gm/update-npc-relationship', { method: 'POST', body: JSON.stringify(body) }),
-    gmCreateItemTemplate: (body) => fetchApi('/api/gm/create-item-template', { method: 'POST', body: JSON.stringify(body) }),
-    gmCreateNpcTemplate: (body) => fetchApi('/api/gm/create-npc-template', { method: 'POST', body: JSON.stringify(body) }),
+    giveItemToNpc: (body) => safeCall(() => {
+        // interactionHandlers 包裝在 body.giveData 內，需要解構
+        const giveData = body.giveData || body;
+        return gameEngine.giveItemToNpc({
+            targetNpcName: giveData.target || giveData.targetNpcName || body.targetNpcName,
+            itemName: giveData.itemName || body.itemName,
+            amount: giveData.amount || giveData.quantity || body.amount || 1,
+            itemType: giveData.itemType || body.itemType,
+            model: body.model
+        });
+    }),
+
+    endChat: (body) => safeCall(() => gameEngine.endChat({
+        npcName: body.npcName,
+        fullChatHistory: body.fullChatHistory || body.chatHistory,
+        model: body.model
+    })),
+
+    // ── State Routes ────────────────────────
+    getLatestGame: () => safeCall(() => gameEngine.getLatestGame()),
+    startNewGame: () => safeCall(() => gameEngine.startNewGame()),
+    forceSuicide: (body) => safeCall(() => gameEngine.forceSuicide({ model: body?.model })),
+    getInventory: () => safeCall(() => gameEngine.getInventory()),
+    getRelations: () => safeCall(() => gameEngine.getRelations()),
+    getNovel: () => safeCall(() => gameEngine.getNovel()),
+    getEncyclopedia: () => safeCall(() => gameEngine.getEncyclopedia()),
+    getSkills: () => safeCall(() => gameEngine.getSkills()),
+    dropItem: (body) => safeCall(() => gameEngine.dropItem({ itemId: body.itemId })),
+    forgetSkill: (body) => safeCall(() => gameEngine.forgetSkill({
+        skillName: body.skillName,
+        model: body.model
+    })),
+
+    // ── Inventory Routes ────────────────────
+    equipItem: (instanceId) => safeCall(() => gameEngine.equipItem(instanceId)),
+    unequipItem: (instanceId) => safeCall(() => gameEngine.unequipItem(instanceId)),
+
+    // ── Bounty Route ────────────────────────
+    getBounties: () => safeCall(() => gameEngine.getBounties()),
+
+    // ── Epilogue Route ──────────────────────
+    getEpilogue: () => safeCall(() => gameEngine.getEpilogue()),
+
+    // ── Map Route ───────────────────────────
+    getMap: () => safeCall(() => gameEngine.getMap()),
+
+    // ── Beggar Routes ───────────────────────
+    summonBeggar: (body) => safeCall(async () => ({ success: true })),
+    startBeggarInquiry: (body) => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        const inv = await clientDB.inventory.list(profileId);
+        const silver = inv.find(i => i.itemName === '銀兩' || i.templateId === '銀兩');
+        if (!silver || silver.quantity < 100) throw new Error('銀兩不足，需要至少 100 兩。');
+        const newBalance = silver.quantity - 100;
+        await clientDB.inventory.update(profileId, silver.instanceId, { quantity: newBalance });
+        return { success: true, newBalance };
+    }),
+    askBeggarQuestion: (body) => safeCall(async () => {
+        const { default: aiProxy } = await import('../client/ai/aiProxy.js');
+        const { buildLightContext } = await import('../client/engine/contextBuilder.js');
+        const profileId = gameEngine.getActiveProfileId();
+        const context = await buildLightContext(profileId);
+        return aiProxy.generate('beggar-inquiry', body.model, {
+            ...context,
+            userQuery: body.userQuery || body.question
+        });
+    }),
+
+    // ── Image Route ─────────────────────────
+    generateNpcAvatar: (npcName) => safeCall(() => gameEngine.generateNpcAvatar(npcName)),
+
+    // ── GM Panel Routes ─────────────────────
+    getNpcsForGM: () => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        const states = await clientDB.npcs.listStates(profileId);
+        const templates = await clientDB.npcs.listTemplates();
+        const names = new Set([...states.map(s => s.npcName), ...templates.map(t => t.name)]);
+        const result = [];
+        for (const name of names) {
+            const tpl = templates.find(t => t.name === name) || {};
+            const st = states.find(s => s.npcName === name) || {};
+            result.push({ ...tpl, ...st, name });
+        }
+        return result;
+    }),
+    updateNpcForGM: (body) => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        const npcName = body.npcName || body.npcId || body.name;
+        const existing = await clientDB.npcs.getState(profileId, npcName);
+        await clientDB.npcs.setState(profileId, npcName, {
+            ...(existing || {}),
+            friendlinessValue: body.friendlinessValue ?? existing?.friendlinessValue,
+            romanceValue: body.romanceValue ?? existing?.romanceValue
+        });
+        return { success: true };
+    }),
+    rebuildNpcForGM: (body) => safeCall(async () => ({ success: true, message: '本機模式暫不支援重建 NPC。' })),
+    getLocationsForGM: () => safeCall(() => clientDB.locations.listTemplates()),
+    rebuildLocationForGM: (body) => safeCall(async () => ({ success: true, message: '本機模式暫不支援重建地點。' })),
+    getItemTemplatesForGM: () => safeCall(async () => {
+        // 使用 clientDB 抽象層
+        const items = [];
+        // item_templates 沒有 list 方法，直接回傳空陣列
+        return items;
+    }),
+    updatePlayerResourcesForGM: (body) => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        if (body.money !== undefined) {
+            const inv = await clientDB.inventory.list(profileId);
+            const silver = inv.find(i => i.itemName === '銀兩' || i.templateId === '銀兩');
+            if (silver) {
+                await clientDB.inventory.update(profileId, silver.instanceId, { quantity: body.money });
+            }
+        }
+        return { success: true };
+    }),
+    getPlayerStateForGM: () => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        const profile = await clientDB.profiles.get(profileId);
+        const inv = await clientDB.inventory.list(profileId);
+        const silver = inv.find(i => i.itemName === '銀兩' || i.templateId === '銀兩');
+        return {
+            internalPower: profile.internalPower,
+            externalPower: profile.externalPower,
+            lightness: profile.lightness,
+            morality: profile.morality,
+            money: silver?.quantity || 0
+        };
+    }),
+    updatePlayerStateForGM: (body) => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        const updates = {};
+        if (body.internalPower !== undefined) updates.internalPower = body.internalPower;
+        if (body.externalPower !== undefined) updates.externalPower = body.externalPower;
+        if (body.lightness !== undefined) updates.lightness = body.lightness;
+        if (body.morality !== undefined) updates.morality = body.morality;
+        await clientDB.profiles.update(profileId, updates);
+        return { success: true };
+    }),
+    teleportPlayer: (body) => safeCall(async () => ({ success: true, message: '本機模式暫不支援傳送。' })),
+    getCharactersForGM: () => safeCall(async () => {
+        const profileId = gameEngine.getActiveProfileId();
+        const profile = await clientDB.profiles.get(profileId);
+        return [{ type: 'player', name: profile.username, ...profile }];
+    }),
+    updateNpcRelationship: (body) => safeCall(async () => ({ success: true })),
+    gmCreateItemTemplate: (body) => safeCall(async () => ({ success: true, message: '本機模式暫不支援建立物品模板。' })),
+    gmCreateNpcTemplate: (body) => safeCall(async () => ({ success: true, message: '本機模式暫不支援建立 NPC 模板。' })),
 };

@@ -1,0 +1,21 @@
+{
+  "name": "wenjiang-ai-proxy",
+  "version": "1.0.0",
+  "description": "AI Proxy server for the 文江 game - routes game context to AI providers",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.24.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "openai": "^4.82.0"
+  }
+}
