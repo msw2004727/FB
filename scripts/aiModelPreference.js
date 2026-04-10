@@ -6,7 +6,8 @@ const VALID_AI_MODELS = new Set([
     'gemini',
     'deepseek',
     'grok',
-    'claude'
+    'claude',
+    'minimax'
 ]);
 
 function canUseBrowserStorage() {

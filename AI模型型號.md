@@ -1,6 +1,6 @@
 ﻿# AI模型型號
 
-最後同步時間：2026-02-25（依目前程式碼實際生效設定）
+最後同步時間：2026-04-10（依目前程式碼實際生效設定）
 
 ## AI核心（玩家下拉選單）
 
@@ -13,6 +13,7 @@
 | `deepseek` | DeepSeek-V3.2 | `deepseek-v3.2` | DeepSeek |
 | `grok` | Grok-4.20 | `grok-4.20` | xAI |
 | `claude` | Claude-Sonnet-4.6 | `claude-sonnet-4.6` | Anthropic |
+| `minimax` | MiniMax-M2.7 | `MiniMax-M1` | MiniMax |
 
 ## 相容別名（非UI選單）
 
@@ -23,7 +24,7 @@
 
 ## 失敗回退機制
 
-- 非預設模型（例如 `grok` / `gemini` / `deepseek` / `claude`）呼叫失敗時，後端會自動重試預設 GPT 路徑：`openai -> gpt-5.2`
+- 非預設模型（例如 `grok` / `gemini` / `deepseek` / `claude` / `minimax`）呼叫失敗時，後端會自動重試預設 GPT 路徑：`openai -> gpt-5.2`
 - 前端若仍收到 AI 模型錯誤，會將 AI核心選單重設回預設 `GPT-5.2`
 
 ## 其他（目前與 AI核心選單無關）

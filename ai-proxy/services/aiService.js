@@ -30,6 +30,12 @@ const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// 6. MiniMax M2.7（OpenAI 相容 API）
+const minimax = new OpenAI({
+    apiKey: process.env.MINIMAX_API_KEY,
+    baseURL: "https://api.minimaxi.chat/v1",
+});
+
 
 const { aiConfig } = require('../aiConfig.js');
 
@@ -133,6 +139,14 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 }
                 const claudeResult = await anthropic.messages.create(claudeOptions);
                 textResponse = claudeResult.content[0].text;
+                break;
+            case 'minimax':
+                options.model = "MiniMax-M1";
+                if (isJsonExpected) {
+                    options.response_format = { type: "json_object" };
+                }
+                const minimaxResult = await minimax.chat.completions.create(options);
+                textResponse = minimaxResult.choices[0].message.content;
                 break;
             default:
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
