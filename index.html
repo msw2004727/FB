@@ -371,6 +371,26 @@
             </div>
         </div>
 
+        <!-- 開局角色建立 -->
+        <div id="intro-modal" class="intro-modal-overlay" style="display:none;">
+            <div class="intro-modal-content">
+                <div class="intro-story">
+                    <p>你睜開眼睛，頭痛欲裂。</p>
+                    <p>你試著回想自己是誰，記憶像碎片一樣慢慢浮現......你努力抓住腦中最清晰的那一塊——</p>
+                    <p class="intro-prompt">你叫什麼名字？</p>
+                </div>
+                <input type="text" id="intro-name-input" class="intro-input" placeholder="輸入你的名字" maxlength="8" autocomplete="off" spellcheck="false" />
+                <div class="intro-story intro-story-2" style="display:none;">
+                    <p>名字想起來了。你低頭看了看自己的身體——</p>
+                    <p class="intro-prompt">你是？</p>
+                </div>
+                <div class="intro-gender-btns" style="display:none;">
+                    <button class="intro-gender-btn" data-gender="男"><i class="fas fa-mars"></i> 男</button>
+                    <button class="intro-gender-btn" data-gender="女"><i class="fas fa-venus"></i> 女</button>
+                </div>
+            </div>
+        </div>
+
     <script type="module" src="scripts/main.js"></script>
 </body>
 </html>

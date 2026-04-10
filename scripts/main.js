@@ -83,22 +83,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!activeProfile) {
-        // 檢查是否有任何存檔
         const allProfiles = await clientDB.profiles.list();
         if (allProfiles.length > 0) {
             activeProfile = allProfiles[0];
-        } else {
-            // 第一次遊玩：自動建立新角色
-            const result = await gameEngine.createNewGame('無名俠客', '男');
-            activeProfile = result.profile;
         }
+    }
+
+    // 第一次遊玩 → 顯示開局建角畫面
+    if (!activeProfile) {
+        const introModal = document.getElementById('intro-modal');
+        const introNameInput = document.getElementById('intro-name-input');
+        const introStory2 = introModal.querySelector('.intro-story-2');
+        const introGenderBtns = introModal.querySelector('.intro-gender-btns');
+
+        introModal.style.display = 'flex';
+
+        // 輸入名字後 → 顯示性別選擇
+        introNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
+                const name = introNameInput.value.trim();
+                if (!name) return;
+                introNameInput.disabled = true;
+                introStory2.style.display = '';
+                introGenderBtns.style.display = '';
+            }
+        });
+
+        // 選擇性別 → 建立角色並開始遊戲
+        const genderSelected = await new Promise((resolve) => {
+            introGenderBtns.querySelectorAll('.intro-gender-btn').forEach(btn => {
+                btn.addEventListener('click', () => resolve(btn.dataset.gender));
+            });
+        });
+
+        const playerName = introNameInput.value.trim() || '無名俠客';
+        introModal.style.display = 'none';
+
+        const result = await gameEngine.createNewGame(playerName, genderSelected);
+        activeProfile = result.profile;
     }
 
     // 設定活躍檔案
     gameEngine.setActiveProfile(activeProfile.id);
     localStorage.setItem('wenjiang_active_profile', activeProfile.id);
     localStorage.setItem('username', activeProfile.username);
-    // 為了向後相容，設定一個假的 jwt_token
     if (!localStorage.getItem('jwt_token')) {
         localStorage.setItem('jwt_token', 'local-pwa-token');
     }

@@ -123,6 +123,98 @@ body.dark-theme .loader-tip {
     color: var(--dark-text-secondary);
 }
 
+/* --- 開局角色建立 --- */
+.intro-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: introFadeIn 1s ease;
+}
+@keyframes introFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.intro-modal-content {
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+    padding: 2rem 1.5rem;
+}
+.intro-story {
+    color: #ccc;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.8;
+    margin-bottom: 1.2rem;
+    animation: introTextFade 1.5s ease;
+}
+.intro-story-2 {
+    animation: introTextFade 1s ease;
+}
+@keyframes introTextFade {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.intro-prompt {
+    color: #e0d0c0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-top: 0.8rem;
+}
+.intro-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1.1rem;
+    font-family: var(--font-serif);
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #555;
+    color: #f0e6d8;
+    outline: none;
+    letter-spacing: 0.15em;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+.intro-input:focus {
+    border-bottom-color: #c3a98a;
+}
+.intro-input::placeholder {
+    color: #666;
+    letter-spacing: 0.05em;
+}
+.intro-gender-btns {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+    animation: introTextFade 0.8s ease;
+}
+.intro-gender-btn {
+    flex: 1;
+    padding: 0.8rem 1.2rem;
+    font-size: 1rem;
+    font-family: var(--font-serif);
+    border: 1px solid #555;
+    border-radius: 10px;
+    background: transparent;
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+.intro-gender-btn:hover {
+    border-color: #c3a98a;
+    color: #f0e6d8;
+    background: rgba(195, 169, 138, 0.12);
+}
+.intro-gender-btn:active {
+    background: rgba(195, 169, 138, 0.25);
+}
+
 
 /* --- 死亡畫面樣式 --- */
 .deceased-overlay {
