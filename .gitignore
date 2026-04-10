@@ -1,6 +1,11 @@
 ai-proxy/node_modules/
 ai-proxy/.env
+ai-proxy/.vercel/
 ai-proxy/mempalace_data/
 .env
 _mempalace_test/
 test_mempalace.py
+
+# 遊戲存檔（瀏覽器 IndexedDB，不在檔案系統）
+*.sqlite3
+chroma_db/
