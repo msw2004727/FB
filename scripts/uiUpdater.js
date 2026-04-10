@@ -8,7 +8,6 @@ const storyTextContainer = document.getElementById('story-text-wrapper');
 const statusBarEl = document.getElementById('status-bar');
 const pcContent = document.getElementById('pc-content');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
-const locationInfo = document.getElementById('location-info');
 const actionSuggestion = document.getElementById('action-suggestion');
 const roundCounter = document.getElementById('round-counter');
 const questJournal = document.getElementById('quest-journal');
@@ -38,7 +37,6 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     pcContent.title = pcText;
     updateDeathCountdownUI(roundData.deathCountdown);
     updateMoralityBar(roundData.morality);
-    updateLocationInfo(locationData);
 
     // 回合計數
     if (roundCounter) roundCounter.textContent = `第 ${roundData.R || 0} 回`;
@@ -199,45 +197,6 @@ function updateDeathCountdownUI(countdownValue) {
     }
 }
 
-function updateLocationInfo(locationData) {
-    if (!locationInfo) return;
-
-    if (!locationData) {
-        locationInfo.innerHTML = '地區情報載入中...';
-        return;
-    }
-
-    const summary = locationData.summary || locationData.current?.summary || null;
-    const rulerName = escapeHtml(summary?.ruler || locationData.governance?.ruler || '未知');
-    const locationDescription = escapeHtml(summary?.description || locationData.description || '地區情報載入中...');
-
-    locationInfo.innerHTML = `
-        <div class="location-ruler-info"><span class="location-ruler-label">統治者：</span><span class="location-ruler" title="${rulerName}">${rulerName}</span></div>
-        <div class="location-desc-container">
-            <p class="location-desc">${locationDescription}</p>
-            <button id="view-location-details-btn" class="header-icon-btn" title="查看地區詳情">
-                <i class="fas fa-info-circle"></i>
-            </button>
-        </div>
-    `;
-}
-
-function updateNpcList(npcs) {
-    npcContent.innerHTML = '';
-    const aliveNpcs = (npcs || []).filter(npc => !npc.isDeceased);
-    if (aliveNpcs.length > 0) {
-        aliveNpcs.forEach(npc => {
-            const npcLine = document.createElement('div');
-            const npcName = escapeHtml(npc.name || '未知人物');
-            const npcStatus = escapeHtml(npc.status || '狀態不明');
-            const friendlinessClass = normalizeNpcFriendlinessClass(npc.friendliness);
-            npcLine.innerHTML = `<span class="npc-name npc-${friendlinessClass}" data-npc-name="${npcName}">${npcName}</span>: ${npcStatus}`;
-            npcContent.appendChild(npcLine);
-        });
-    } else {
-        npcContent.textContent = '未見人煙';
-    }
-}
 
 function highlightNpcNames(text, npcs) {
     if (!text) return '';
