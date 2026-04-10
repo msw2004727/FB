@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="styles/gmPanel.css">
     <link rel="stylesheet" href="styles/trade.css">
     <link rel="stylesheet" href="styles/modals_item.css">
+    <link rel="stylesheet" href="styles/modals_info.css">
 </head>
 <body class="light-theme">
     <div class="game-container">
@@ -155,10 +156,10 @@
                     <details open style="margin-bottom:.75rem;">
                         <summary style="cursor:pointer;font-weight:bold;padding:.3rem 0;"><i class="fas fa-save" style="width:20px;text-align:center;margin-right:4px;"></i> 存檔功能</summary>
                         <div style="padding:.25rem 0 .25rem 24px;color:var(--text-secondary,#666);">
-                            <p><b>💾 儲存</b> — 遊戲在每次行動後自動儲存到你的瀏覽器。無需手動儲存。</p>
-                            <p><b>📤 匯出</b> — 將存檔下載為 JSON 檔案，可備份到電腦或傳給其他裝置。</p>
-                            <p><b>📥 載入</b> — 上傳之前匯出的 JSON 存檔，恢復遊戲進度。</p>
-                            <p style="color:var(--warning-color,#c47e00);">⚠️ 清除瀏覽器資料會丟失存檔，建議定期匯出備份。</p>
+                            <p><i class="fas fa-save" style="width:16px;text-align:center;margin-right:4px;"></i><b>儲存</b> — 遊戲在每次行動後自動儲存到你的瀏覽器。無需手動儲存。</p>
+                            <p><i class="fas fa-file-export" style="width:16px;text-align:center;margin-right:4px;"></i><b>匯出</b> — 將存檔下載為 JSON 檔案，可備份到電腦或傳給其他裝置。</p>
+                            <p><i class="fas fa-file-import" style="width:16px;text-align:center;margin-right:4px;"></i><b>載入</b> — 上傳之前匯出的 JSON 存檔，恢復遊戲進度。</p>
+                            <p style="color:var(--warning-color,#c47e00);"><i class="fas fa-exclamation-triangle" style="width:16px;text-align:center;margin-right:4px;"></i>清除瀏覽器資料會丟失存檔，建議定期匯出備份。</p>
                         </div>
                     </details>
 
@@ -191,7 +192,7 @@
                     </details>
 
                     <details style="margin-bottom:.75rem;">
-                        <summary style="cursor:pointer;font-weight:bold;padding:.3rem 0;"><i class="fas fa-keyboard" style="width:20px;text-align:center;margin-right:4px;"></i> 如何遊玩</summary>
+                        <summary style="cursor:pointer;font-weight:bold;padding:.3rem 0;"><i class="fas fa-pen-fancy" style="width:20px;text-align:center;margin-right:4px;"></i> 如何遊玩</summary>
                         <div style="padding:.25rem 0 .25rem 24px;color:var(--text-secondary,#666);">
                             <p>在底部輸入框描述你想做的任何事情，例如「向老者詢問山路」「拔劍攻擊盜匪」「在客棧休息」。AI 會根據你的行為推進故事。</p>
                             <p>點擊故事中<b>高亮的人名</b>可以與 NPC 互動（聊天、交易、攻擊）。</p>
