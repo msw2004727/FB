@@ -48,6 +48,7 @@ export function initializeDOM() {
             <div class="loader-disclaimer"></div>
             <div class="loader-text"></div>
             <div class="loader-dots"><span></span><span></span><span></span></div>
+            <div class="loader-timer">0s</div>
             <div class="loader-tip"></div>
         `;
         dom.mainContent.appendChild(aiThinkingLoader);

@@ -16,6 +16,8 @@ const loadingDisclaimers = [
 ];
 let tipInterval = null;
 let disclaimerInterval = null;
+let timerInterval = null;
+let timerStart = 0;
 
 export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
@@ -37,6 +39,8 @@ export function setLoading(isLoading, text = '') {
 
         const showGlobalLoader = isLoading && !document.getElementById('epilogue-modal').classList.contains('visible');
 
+        const loaderTimerElement = dom.aiThinkingLoader.querySelector('.loader-timer');
+
         if (showGlobalLoader) {
             const rotateDisclaimer = () => {
                 if (loadingDisclaimers.length > 0) {
@@ -48,24 +52,31 @@ export function setLoading(isLoading, text = '') {
             rotateDisclaimer();
             disclaimerInterval = setInterval(rotateDisclaimer, 10000);
 
-
             const rotateTip = () => {
                 if (gameTips.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * gameTips.length);
                     if (loaderTipElement) {
-                        loaderTipElement.innerHTML = gameTips.length > 0 ? gameTips.sort(() => 0.5 - Math.random())[0] : '';
+                        loaderTipElement.innerHTML = gameTips.sort(() => 0.5 - Math.random())[0];
                     }
                 }
             };
             rotateTip();
             tipInterval = setInterval(rotateTip, 10000);
 
+            // 計時器
+            timerStart = Date.now();
+            if (loaderTimerElement) loaderTimerElement.textContent = '0s';
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+                if (loaderTimerElement) loaderTimerElement.textContent = `${elapsed}s`;
+            }, 1000);
+
         } else {
             clearInterval(tipInterval);
-            if(disclaimerInterval) {
-                 clearInterval(disclaimerInterval);
-                 disclaimerInterval = null;
-            }
+            clearInterval(disclaimerInterval);
+            clearInterval(timerInterval);
+            disclaimerInterval = null;
+            timerInterval = null;
         }
         dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }

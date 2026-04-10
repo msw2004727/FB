@@ -96,8 +96,20 @@ body.dark-theme .ai-thinking-loader .loader-dots span {
     animation-delay: -0.16s;
 }
 
+.loader-timer {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: var(--light-text-secondary);
+    opacity: 0.5;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+body.dark-theme .loader-timer {
+    color: var(--dark-text-secondary);
+}
+
 .loader-tip {
-    margin-top: 2rem;
+    margin-top: 1.5rem;
     font-family: var(--font-sans);
     font-size: 0.95rem;
     color: var(--light-text-secondary);
