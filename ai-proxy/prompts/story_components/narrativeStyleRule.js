@@ -44,7 +44,6 @@ const getNarrativeStyleRule = (style = 'modern') => {
 6.  **事件摘要(EVT)風格**：EVT 可以帶點趣味，例如「差點被麵香跪倒」、「被老大爺教訓了一頓」。
 `;
     }
-    }
 
     // 預設或備用風格：傳統第三人稱武俠風
     return `

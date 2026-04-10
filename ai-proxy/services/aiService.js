@@ -7,7 +7,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 
 // 僅初始化擁有伺服器端金鑰的模型（MiniMax）
 const minimax = new OpenAI({
-    apiKey: process.env.MINIMAX_API_KEY,
+    apiKey: process.env.MINIMAX_API_KEY || 'dummy-key-will-fail-at-runtime',
     baseURL: "https://api.minimaxi.chat/v1",
 });
 
