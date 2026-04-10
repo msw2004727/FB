@@ -247,6 +247,22 @@ body.dark-theme .status-info-value {
     padding-bottom: 0;
 }
 
+/* --- 收折時的時辰 SVG 指示器 --- */
+.time-icon-indicator {
+    position: absolute;
+    top: 0.3rem;
+    right: 25%;
+    width: 1.5rem;
+    height: 1.5rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 11;
+}
+.story-header.collapsed .time-icon-indicator {
+    opacity: 1;
+}
+
 .story-panel {
     position: relative; /* 【關鍵新增】將此面板設為子元素的定位基準 */
     flex-grow: 1;
