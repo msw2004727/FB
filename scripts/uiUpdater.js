@@ -78,14 +78,22 @@ export function appendMessageToStory(htmlContent, className, options = {}) {
     }
 
     storyTextContainer.appendChild(p);
-    storyPanelWrapper.scrollTop = storyPanelWrapper.scrollHeight;
 }
 
 export function addRoundTitleToStory(titleText) {
+    // 將既有內容標記為歷史（變淡）
+    const existingItems = storyTextContainer.querySelectorAll(':scope > :not(.story-history)');
+    existingItems.forEach(el => el.classList.add('story-history'));
+
     const titleEl = document.createElement('h2');
-    titleEl.className = 'round-title';
+    titleEl.className = 'round-title round-title-current';
     titleEl.textContent = titleText;
     storyTextContainer.appendChild(titleEl);
+
+    // 捲動到新回合標題
+    requestAnimationFrame(() => {
+        titleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 }
 
 function escapeHtml(value) {
