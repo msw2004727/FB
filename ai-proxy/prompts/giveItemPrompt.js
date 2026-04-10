@@ -85,7 +85,18 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
 - **立場傾向 (morality)**: ${playerProfile.morality}
 
 ### 接收方 (NPC):
-- **檔案**: ${JSON.stringify(npcProfile, null, 2)}
+- **檔案**: ${JSON.stringify({
+    name: npcProfile.name || npcProfile.npcName,
+    personality: npcProfile.personality,
+    background: npcProfile.background,
+    goals: npcProfile.goals,
+    likes: npcProfile.likes,
+    dislikes: npcProfile.dislikes,
+    preferences: npcProfile.preferences,
+    friendlinessValue: npcProfile.friendlinessValue || 0,
+    inventory: npcProfile.inventory,
+    equipment: npcProfile.equipment
+}, null, 2)}
 
 ### 贈送的物品:
 - **物品**: ${itemGiven}

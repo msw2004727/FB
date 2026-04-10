@@ -1,13 +1,13 @@
 // client/db/schema.js
-// IndexedDB Schema Definition — 定義所有 Object Store 與索引
+// IndexedDB Schema Definition — 精簡版（移除已刪除功能的 Store）
 
 export const DB_NAME = 'WenJiang_Game';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2; // 升版：移除廢棄 Store
 
 /**
- * 定義所有 Store 與索引。
- * keyPath 為主鍵，indexes 為次索引。
- * 複合鍵用陣列表示，如 ['profileId', 'round']。
+ * 只保留實際使用中的 Store。
+ * 已移除：inventory, skills, npc_states, npc_templates,
+ *         item_templates, skill_templates, bounties
  */
 export const STORES = {
     profiles: {
@@ -24,48 +24,12 @@ export const STORES = {
             { name: 'by_profile_round', keyPath: ['profileId', 'R'] }
         ]
     },
-    inventory: {
-        keyPath: ['profileId', 'instanceId'],
-        indexes: [
-            { name: 'by_profile', keyPath: 'profileId' }
-        ]
-    },
-    skills: {
-        keyPath: ['profileId', 'skillName'],
-        indexes: [
-            { name: 'by_profile', keyPath: 'profileId' }
-        ]
-    },
-    npc_states: {
-        keyPath: ['profileId', 'npcName'],
-        indexes: [
-            { name: 'by_profile', keyPath: 'profileId' }
-        ]
-    },
-    npc_templates: {
-        keyPath: 'name',
-        indexes: []
-    },
-    item_templates: {
-        keyPath: 'itemName',
-        indexes: []
-    },
-    skill_templates: {
-        keyPath: 'skillName',
-        indexes: []
-    },
     locations: {
         keyPath: 'locationName',
         indexes: []
     },
     location_states: {
         keyPath: ['profileId', 'locationName'],
-        indexes: [
-            { name: 'by_profile', keyPath: 'profileId' }
-        ]
-    },
-    bounties: {
-        keyPath: ['profileId', 'bountyId'],
         indexes: [
             { name: 'by_profile', keyPath: 'profileId' }
         ]
@@ -88,6 +52,15 @@ export const STORES = {
  * 在 onupgradeneeded 中呼叫，建立或升級所有 Store。
  */
 export function applySchema(db) {
+    // 移除舊版廢棄的 Store
+    const deprecated = ['inventory', 'skills', 'npc_states', 'npc_templates', 'item_templates', 'skill_templates', 'bounties'];
+    for (const name of deprecated) {
+        if (db.objectStoreNames.contains(name)) {
+            db.deleteObjectStore(name);
+        }
+    }
+
+    // 建立新 Store（如果不存在）
     for (const [storeName, config] of Object.entries(STORES)) {
         if (db.objectStoreNames.contains(storeName)) continue;
 

@@ -106,7 +106,15 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
 ---
 
 這是【人物詳細情報】(包含姓名和心動值):
-${JSON.stringify(npcDetails, null, 2)}
+${JSON.stringify((npcDetails || []).map(npc => ({
+    name: npc.name || npc.npcName,
+    romanceValue: npc.romanceValue || 0,
+    friendlinessValue: npc.friendlinessValue || 0,
+    background: npc.background || '',
+    personality: npc.personality || '',
+    isDeceased: npc.isDeceased || false,
+    interactionSummary: npc.interactionSummary || ''
+})), null, 2)}
 
 ---
 

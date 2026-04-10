@@ -56,7 +56,12 @@ graph TD;
 
 ---
 ## 【人物詳細情報】(包含姓名和心動值):
-${JSON.stringify(npcDetails, null, 2)}
+${JSON.stringify((npcDetails || []).map(npc => ({
+    name: npc.name || npc.npcName,
+    romanceValue: npc.romanceValue || 0,
+    friendlinessValue: npc.friendlinessValue || 0,
+    isDeceased: npc.isDeceased || false
+})), null, 2)}
 
 ---
 

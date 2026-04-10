@@ -31,21 +31,22 @@ const TASK_HANDLERS = {
 
     'story': (ctx) => {
         const { getStoryPrompt } = require('../prompts/storyPrompt');
+        const player = ctx.player || ctx.userProfile || {};
         const prompt = getStoryPrompt(
             ctx.longTermSummary,
             ctx.recentHistory,
             ctx.playerAction,
-            ctx.userProfile,
-            ctx.username,
-            ctx.currentTimeOfDay,
-            ctx.playerPower,
-            ctx.playerMorality,
+            player,
+            player.username || ctx.username,
+            player.currentTimeOfDay || ctx.currentTimeOfDay,
+            player.power || ctx.playerPower,
+            player.morality ?? ctx.playerMorality,
             ctx.levelUpEvents,
             ctx.romanceEventToWeave,
             ctx.worldEventToWeave,
             ctx.locationContext,
             ctx.npcContext,
-            ctx.playerBulkScore,
+            ctx.bulkScore ?? ctx.playerBulkScore,
             ctx.actorCandidates,
             ctx.blackShadowEvent
         );

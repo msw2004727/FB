@@ -1,57 +1,23 @@
 // client/engine/contextBuilder.js
-// 客戶端版的遊戲上下文組裝器 — 從 IndexedDB 讀取所有資料，組裝成 AI Proxy 需要的 context
+// 客戶端版的遊戲上下文組裝器 — 精簡版
+// 從 IndexedDB 讀取資料，組裝成 AI Proxy 需要的 context
 
 import clientDB from '../db/clientDB.js';
-import { calculateBulkScore, toSafeNumber, deepClone, deepMergeObjects } from '../utils/gameUtils.js';
+import { toSafeNumber, deepMergeObjects } from '../utils/gameUtils.js';
 
 /**
  * 組裝完整的遊戲上下文，供 AI Proxy 使用
- * @param {string} profileId - 玩家檔案 ID
- * @returns {Promise<object>} 完整的遊戲上下文
  */
 export async function buildContext(profileId) {
-    const [
-        profile,
-        recentSaves,
-        skillsList,
-        inventoryList,
-        summaryData,
-        npcStates,
-    ] = await Promise.all([
+    const [profile, recentSaves, summaryData] = await Promise.all([
         clientDB.profiles.get(profileId),
         clientDB.saves.getRecent(profileId, 3),
-        clientDB.skills.list(profileId),
-        clientDB.inventory.list(profileId),
         clientDB.state.get(profileId, 'summary'),
-        clientDB.npcs.listStates(profileId),
     ]);
 
     if (!profile) throw new Error(`找不到玩家檔案: ${profileId}`);
 
     const lastSave = recentSaves.length > 0 ? recentSaves[recentSaves.length - 1] : null;
-    const totalBulkScore = calculateBulkScore(inventoryList);
-
-    // 組裝 NPC 上下文
-    const npcContext = {};
-    if (lastSave?.NPC && Array.isArray(lastSave.NPC)) {
-        for (const npcInScene of lastSave.NPC) {
-            const name = npcInScene.name;
-            const template = await clientDB.npcs.getTemplate(name);
-            const state = npcStates.find(s => s.npcName === name);
-            if (template || state) {
-                npcContext[name] = {
-                    ...(template || {}),
-                    ...(state || {}),
-                    name,
-                    friendlinessValue: state?.friendlinessValue ?? 0,
-                    romanceValue: state?.romanceValue ?? 0,
-                    interactionSummary: state?.interactionSummary || ''
-                };
-            } else {
-                npcContext[name] = { name, ...npcInScene };
-            }
-        }
-    }
 
     // 組裝地點上下文
     let locationContext = null;
@@ -70,16 +36,8 @@ export async function buildContext(profileId) {
     const playerContext = {
         ...profile,
         R: lastSave?.R || 0,
-        skills: skillsList,
-        inventory: inventoryList,
         currentLocation: lastSave?.LOC || [],
-        stamina: toSafeNumber(profile.stamina, 100),
         morality: toSafeNumber(profile.morality, 0),
-        power: {
-            internal: toSafeNumber(profile.internalPower, 5),
-            external: toSafeNumber(profile.externalPower, 5),
-            lightness: toSafeNumber(profile.lightness, 5)
-        },
         currentDate: {
             yearName: profile.yearName || '元祐',
             year: toSafeNumber(profile.year, 1),
@@ -94,14 +52,13 @@ export async function buildContext(profileId) {
         longTermSummary: summaryData?.text || summaryData || '遊戲剛剛開始...',
         recentHistory: recentSaves,
         locationContext,
-        npcContext,
-        bulkScore: totalBulkScore,
+        npcContext: {},
         isNewGame: !lastSave
     };
 }
 
 /**
- * 組裝精簡版上下文（用於非故事性 AI 任務，減少 payload）
+ * 組裝精簡版上下文（用於非故事性 AI 任務）
  */
 export async function buildLightContext(profileId) {
     const profile = await clientDB.profiles.get(profileId);
@@ -113,11 +70,7 @@ export async function buildLightContext(profileId) {
         lastRound: lastSave?.R || 0,
         summary: summary?.text || summary || '',
         player: {
-            internalPower: profile?.internalPower || 5,
-            externalPower: profile?.externalPower || 5,
-            lightness: profile?.lightness || 5,
-            morality: profile?.morality || 0,
-            stamina: profile?.stamina || 100
+            morality: profile?.morality || 0
         }
     };
 }

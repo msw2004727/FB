@@ -91,7 +91,6 @@ ${formattedHistory}
 {
   "response": "你根據最終態度和角色扮演，生成的對話內容（現在可能包含反問）。",
   "friendlinessChange": 0,
-  "romanceChange": 0,
   "itemChanges": []
 }
 \`\`\`
