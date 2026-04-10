@@ -94,14 +94,21 @@ function saveRoundMemory(playerId, roundData, story) {
         }, false);
     }
 
-    // NPC 互動（去重 — 重複率最高）
+    // NPC 互動 — 每個 NPC 存入自己的 room（記憶隔離）
     if (roundData.NPC && Array.isArray(roundData.NPC)) {
         for (const npc of roundData.NPC) {
             if (npc.name) {
+                // per-NPC room: 只有搜索該 NPC 時才會找到這些記憶
+                addMemory(wing, `npc_${npc.name}`,
+                    `[${roundId}] 在${loc}遇到${npc.name}：${npc.status || ''}`,
+                    { round: roundNum, npc: npc.name, halls: 'hall_relationships', importance },
+                    true
+                );
+                // 同時寫入共用 room（供行動搜索使用）
                 addMemory(wing, 'npc_interactions',
                     `[${roundId}] 在${loc}遇到${npc.name}：${npc.status || ''}`,
                     { round: roundNum, npc: npc.name, halls: 'hall_relationships', importance },
-                    true  // 優化 #4: 去重開啟
+                    true
                 );
                 // KG: 先 invalidate 舊的 located_at，再寫新的
                 invalidateFact(wing, npc.name, 'located_at', '', roundId);
@@ -137,9 +144,9 @@ async function search(query, wing = null, limit = 5) {
     return (result && result.results) ? result.results : [];
 }
 
-// 優化 #3: Recency Weighted Search
-async function searchRanked(query, wing = null, limit = 5, currentRound = 0) {
-    const result = await request('/search_ranked', {
+// 優化 #3: Recency Weighted Search（支援 room 過濾）
+async function searchRanked(query, wing = null, limit = 5, currentRound = 0, room = null) {
+    const body = {
         query, wing, limit,
         current_round: currentRound,
         decay_rate: 0.98,
@@ -147,7 +154,9 @@ async function searchRanked(query, wing = null, limit = 5, currentRound = 0) {
         w_recency: 0.35,
         w_importance: 0.15,
         max_distance: 0.5
-    });
+    };
+    if (room) body.room = room;
+    const result = await request('/search_ranked', body);
     return (result && result.results) ? result.results : [];
 }
 
@@ -193,7 +202,8 @@ async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], cur
         const timelineSearches = [];
 
         for (const name of effectiveNpcs) {
-            npcSearches.push(searchRanked(name, wing, 2, currentRound));
+            // 搜索該 NPC 自己的 room（記憶隔離：NPC 只記得自己經歷的事）
+            npcSearches.push(searchRanked(name, wing, 2, currentRound, `npc_${name}`));
             timelineSearches.push(getTimeline(name, wing, 5));
         }
 

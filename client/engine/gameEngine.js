@@ -113,7 +113,6 @@ export async function interact({ action, model, optionMorality = 0 }) {
     const aiResult = await aiProxy.generate('story', model, {
         ...context,
         playerAction: action,
-        actorCandidates: [],
         blackShadowEvent: Math.random() < 0.1,
         achievedMilestones,
         cluesSummary

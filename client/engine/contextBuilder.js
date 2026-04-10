@@ -47,12 +47,33 @@ export async function buildContext(profileId) {
         currentTimeOfDay: profile.timeOfDay || '上午'
     };
 
+    // 從最近存檔組裝 NPC 上下文（名字、狀態、好感度）
+    const npcContext = {};
+    const actorCandidates = [];
+    if (lastSave?.NPC && Array.isArray(lastSave.NPC)) {
+        for (const npc of lastSave.NPC) {
+            if (npc.name) {
+                actorCandidates.push(npc.name);
+                npcContext[npc.name] = {
+                    name: npc.name,
+                    status: npc.status || '',
+                    friendliness: npc.friendliness || 'neutral',
+                    friendlinessChange: npc.friendlinessChange || 0,
+                    isNew: npc.isNew || false,
+                    isDeceased: npc.isDeceased || false,
+                };
+            }
+        }
+    }
+
     return {
         player: playerContext,
         longTermSummary: summaryData?.text || summaryData || '遊戲剛剛開始...',
         recentHistory: recentSaves,
         locationContext,
-        npcContext: {},
+        npcContext,
+        actorCandidates,
+        currentRound: playerContext.R,
         isNewGame: !lastSave
     };
 }
