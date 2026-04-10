@@ -8,7 +8,7 @@ import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
 import { handleApiError, appendMessageToStory } from './uiUpdater.js';
-import { restoreAiModelSelection, setStoredAiModel } from './aiModelPreference.js';
+import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
 import { exportSave, importSave, shouldRemindBackup, markBackupReminded, isIOSSafari } from '../client/utils/exportImport.js';
@@ -58,10 +58,75 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initializeDOM();
 
+    // --- API Key 彈窗邏輯 ---
+    let _previousModel = null;
+
+    function openApiKeyModal(model) {
+        const info = AI_MODEL_INFO[model] || { name: model, hint: '' };
+        dom.apikeyModalTitle.textContent = `設定 ${info.name} API Key`;
+        dom.apikeyModalDesc.textContent = info.hint || '請輸入您的 API Key 以啟用此 AI 模型。';
+        dom.apikeyInput.value = getStoredApiKey(model) || '';
+        dom.apikeyInput.type = 'password';
+        if (dom.apikeyToggleBtn) {
+            dom.apikeyToggleBtn.querySelector('i').className = 'fas fa-eye';
+        }
+        dom.apikeyModal.classList.add('visible');
+        dom.apikeyInput.focus();
+    }
+
+    function closeApiKeyModal() {
+        dom.apikeyModal.classList.remove('visible');
+        dom.apikeyInput.value = '';
+    }
+
     if (dom.aiModelSelector) {
         restoreAiModelSelection(dom.aiModelSelector);
+        _previousModel = dom.aiModelSelector.value;
+
         dom.aiModelSelector.addEventListener('change', () => {
-            setStoredAiModel(dom.aiModelSelector.value);
+            const selected = dom.aiModelSelector.value;
+            if (needsUserApiKey(selected)) {
+                openApiKeyModal(selected);
+            } else {
+                _previousModel = selected;
+                setStoredAiModel(selected);
+            }
+        });
+    }
+
+    // 儲存 API Key
+    if (dom.apikeySaveBtn) {
+        dom.apikeySaveBtn.addEventListener('click', () => {
+            const model = dom.aiModelSelector.value;
+            const key = dom.apikeyInput.value.trim();
+            if (!key) {
+                dom.apikeyInput.classList.add('shake');
+                setTimeout(() => dom.apikeyInput.classList.remove('shake'), 400);
+                return;
+            }
+            setStoredApiKey(model, key);
+            setStoredAiModel(model);
+            _previousModel = model;
+            closeApiKeyModal();
+        });
+    }
+
+    // 取消 → 還原為上一個模型
+    if (dom.apikeyCancelBtn) {
+        dom.apikeyCancelBtn.addEventListener('click', () => {
+            if (_previousModel && dom.aiModelSelector) {
+                dom.aiModelSelector.value = _previousModel;
+            }
+            closeApiKeyModal();
+        });
+    }
+
+    // 顯示/隱藏密碼
+    if (dom.apikeyToggleBtn) {
+        dom.apikeyToggleBtn.addEventListener('click', () => {
+            const isPassword = dom.apikeyInput.type === 'password';
+            dom.apikeyInput.type = isPassword ? 'text' : 'password';
+            dom.apikeyToggleBtn.querySelector('i').className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
         });
     }
 
@@ -85,99 +150,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     }
 
-    // 【核心修改】重新獲取閉關彈窗的所有元素
-    const cultivationModal = document.getElementById('cultivation-modal');
-    const openCultivationBtn = document.getElementById('open-cultivation-btn');
-    const closeCultivationBtn = document.getElementById('close-cultivation-btn');
-    const skillSelect = document.getElementById('cultivation-skill-select');
-    const daysInput = document.getElementById('cultivation-days-input'); // 現在是 range slider
-    const daysDisplay = document.getElementById('cultivation-days-display'); // 新增的天數顯示標籤
-    const startCultivationBtn = document.getElementById('start-cultivation-btn');
-    const reqLocation = document.getElementById('req-location');
-    const reqStamina = document.getElementById('req-stamina');
-
     function setGameContainerHeight() {
         if (dom.gameContainer) {
             dom.gameContainer.style.height = `${window.innerHeight}px`;
         }
     }
-
-    // --- 【核心修改 v2.0】閉關系統相關函式 ---
-    function updateCultivationConditions() {
-        if (!gameState.roundData || !cultivationModal.classList.contains('visible')) return;
-
-        const { currentLocationData, roundData } = gameState;
-        const days = parseInt(daysInput.value, 10);
-
-        // 更新天數顯示
-        if(daysDisplay) daysDisplay.textContent = `${days} 天`;
-
-        // 條件1: 私密地點
-        const isPrivate = currentLocationData?.isPrivate === true;
-        reqLocation.innerHTML = `<i class="fas ${isPrivate ? 'fa-check-circle' : 'fa-times-circle'}"></i> 需身處私密地點 (${isPrivate ? '達成' : '未達成'})`;
-
-        // 條件2: 精力
-        const staminaSufficient = roundData.stamina >= 80;
-        reqStamina.innerHTML = `<i class="fas ${staminaSufficient ? 'fa-check-circle' : 'fa-times-circle'}"></i> 精力需高於80% (${roundData.stamina}%)`;
-
-        // 最終判斷
-        startCultivationBtn.disabled = !(isPrivate && staminaSufficient);
-    }
-
-    async function openCultivationModal() {
-        modal.closeSkillsModal();
-        cultivationModal.classList.add('visible');
-        skillSelect.innerHTML = '<option>載入武學中...</option>';
-        startCultivationBtn.disabled = true;
-
-        try {
-            const skills = await api.getSkills();
-            if (skills && skills.length > 0) {
-                skillSelect.innerHTML = skills.map(s => `<option value="${s.skillName}">${s.skillName} (Lv.${s.level})</option>`).join('');
-            } else {
-                skillSelect.innerHTML = '<option value="">無任何可修練的武學</option>';
-            }
-        } catch (error) {
-            handleApiError(error);
-            skillSelect.innerHTML = '<option value="">讀取武學失敗</option>';
-        } finally {
-            daysInput.value = 1; // 每次打開時重置為1天
-            updateCultivationConditions();
-        }
-    }
-    
-    async function handleStartCultivation() {
-        if (startCultivationBtn.disabled || gameState.isRequesting) return;
-
-        const skillName = skillSelect.value;
-        const days = parseInt(daysInput.value, 10);
-
-        if (!skillName) {
-            alert('請選擇一門要修練的武學。');
-            return;
-        }
-        if (!days || days <= 0) {
-            alert('請選擇有效的閉關天數。');
-            return;
-        }
-
-        cultivationModal.classList.remove('visible');
-        gameLoop.setLoading(true, `正在閉關修練 ${skillName}，預計耗時${days}日...`);
-        
-        try {
-            const result = await api.startCultivation({ skillName, days, model: dom.aiModelSelector?.value });
-            if (result.success) {
-                gameLoop.processNewRoundData(result);
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            gameLoop.setLoading(false);
-        }
-    }
-
 
     function initialize() {
         // ... (initialize 函式中的其他事件綁定保持不變) ...
@@ -268,6 +245,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        // 存檔按鈕
+        const saveGameBtn = document.getElementById('save-game-btn');
+        const exportSaveBtn = document.getElementById('export-save-btn');
+        const importSaveBtn = document.getElementById('import-save-btn');
+
+        if (saveGameBtn) {
+            saveGameBtn.addEventListener('click', () => {
+                alert('遊戲會在每次行動後自動儲存到瀏覽器本機。');
+            });
+        }
+        if (exportSaveBtn) {
+            exportSaveBtn.addEventListener('click', async () => {
+                try {
+                    const filename = await exportSave(gameEngine.getActiveProfileId());
+                    alert(`存檔已匯出: ${filename}`);
+                } catch (e) { alert('匯出失敗: ' + e.message); }
+            });
+        }
+        if (importSaveBtn) {
+            importSaveBtn.addEventListener('click', async () => {
+                try {
+                    const profileId = await importSave();
+                    gameEngine.setActiveProfile(profileId);
+                    localStorage.setItem('wenjiang_active_profile', profileId);
+                    window.location.reload();
+                } catch (e) { alert('載入失敗: ' + e.message); }
+            });
+        }
+
         dom.suicideButton.addEventListener('click', async () => {
             interaction.hideNpcInteractionMenu();
             if (gameState.isRequesting) return;
@@ -284,21 +290,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        if (dom.skillsBtn) {
-            dom.skillsBtn.addEventListener('click', async () => {
-                interaction.hideNpcInteractionMenu();
-                if (gameState.isRequesting) return;
-                gameLoop.setLoading(true, '獲取武學資料...');
-                try {
-                    const skills = await api.getSkills();
-                    modal.openSkillsModal(skills);
-                } catch (error) {
-                    handleApiError(error);
-                } finally {
-                    gameLoop.setLoading(false);
-                }
-            });
-        }
 
         document.addEventListener('click', (e) => {
             const locationBtn = e.target.closest('#view-location-details-btn');
@@ -336,8 +327,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         dom.endChatBtn.addEventListener('click', interaction.endChatSession);
 
-        dom.closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
-
         if (dom.closeLocationDetailsBtn) {
             dom.closeLocationDetailsBtn.addEventListener('click', modal.closeLocationDetailsModal);
         }
@@ -349,14 +338,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // --- 【核心修改 v2.0】為閉關系統綁定事件 ---
-        if (openCultivationBtn) openCultivationBtn.addEventListener('click', openCultivationModal);
-        if (closeCultivationBtn) closeCultivationBtn.addEventListener('click', () => cultivationModal.classList.remove('visible'));
-        if (skillSelect) skillSelect.addEventListener('change', updateCultivationConditions);
-        if (daysInput) { // 現在監聽 slider 的 input 事件
-            daysInput.addEventListener('input', updateCultivationConditions);
-        }
-        if (startCultivationBtn) startCultivationBtn.addEventListener('click', handleStartCultivation);
 
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);

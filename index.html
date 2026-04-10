@@ -80,63 +80,30 @@
         <aside id="dashboard" class="dashboard">
             <div class="dashboard-header">
                 <div class="header-buttons">
-                    <a href="novel.html" target="_blank" class="header-link-btn" title="閱讀完整小說">
-                        <i class="fas fa-book-open"></i>
-                    </a>
-                    <a href="relations.html" target="_blank" class="header-link-btn" title="人物關係圖">
-                        <i class="fas fa-project-diagram"></i>
-                    </a>
                     <button id="theme-switcher" class="theme-switcher" title="切換主題">
                         <i class="fas fa-moon"></i>
                     </button>
                     <button id="suicide-btn" class="header-link-btn" title="了卻此生">
                         <i class="fas fa-skull"></i>
                     </button>
-                    <button id="logout-btn" class="header-link-btn" title="登出江湖">
-                        <i class="fas fa-sign-out-alt"></i>
+                    <button id="save-game-btn" class="header-link-btn" title="儲存遊戲">
+                        <i class="fas fa-save"></i>
+                    </button>
+                    <button id="export-save-btn" class="header-link-btn" title="匯出存檔">
+                        <i class="fas fa-file-export"></i>
+                    </button>
+                    <button id="import-save-btn" class="header-link-btn" title="載入存檔">
+                        <i class="fas fa-file-import"></i>
+                    </button>
+                    <button id="logout-btn" class="header-link-btn" title="存檔管理">
+                        <i class="fas fa-bars"></i>
                     </button>
                 </div>
             </div>
             <div class="dashboard-content">
                 <div class="info-card">
-                    <div class="card-header-flex">
-                        <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
-                        <div class="header-action-group">
-                            <span class="header-prompt-text">武學總覽→</span>
-                            <button id="skills-btn" class="header-icon-btn" title="查看武學">
-                                <i class="fas fa-khanda"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="pc-content">--</div>
-                    <div class="power-display">
-                        <span class="power-label">內功</span>
-                        <div class="power-bar-container">
-                            <div id="internal-power-bar" class="power-bar"></div>
-                        </div>
-                        <span id="internal-power-value" class="power-value">--/999</span>
-                    </div>
-                    <div class="power-display">
-                        <span class="power-label">外功</span>
-                        <div class="power-bar-container">
-                            <div id="external-power-bar" class="power-bar"></div>
-                        </div>
-                        <span id="external-power-value" class="power-value">--/999</span>
-                    </div>
-                    <div class="power-display">
-                        <span class="power-label">輕功</span>
-                        <div class="power-bar-container">
-                            <div id="lightness-power-bar" class="power-bar"></div>
-                        </div>
-                        <span id="lightness-power-value" class="power-value">--/999</span>
-                    </div>
-                    <div class="power-display">
-                        <span class="power-label">精力</span>
-                        <div class="power-bar-container">
-                            <div id="stamina-bar" class="power-bar"></div>
-                        </div>
-                        <span id="stamina-value" class="power-value">--/100</span>
-                    </div>
+                    <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
+                    <div id="pc-content" class="status-text-field" style="max-width:14em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">--</div>
                 </div>
 
                 <div class="info-card">
@@ -151,32 +118,20 @@
                 </div>
                 
                 <div class="info-card">
-                    <div class="card-header-flex">
-                        <h4><i class="fas fa-map"></i> 當前地區</h4>
-                        <div class="header-action-group">
-                            <span class="header-prompt-text">世界地圖→</span>
-                            <a href="map.html" target="_blank" id="map-btn" class="header-icon-btn" title="查看世界地圖">
-                                <i class="fas fa-globe-asia"></i>
-                            </a>
-                        </div>
-                    </div>
+                    <h4><i class="fas fa-map"></i> 當前地區</h4>
                     <div id="location-info">讀取中...</div>
-                </div>
-                <div class="info-card">
-                    <h4><i class="fas fa-users"></i> 人物見聞 (NPC)</h4>
-                    <div id="npc-content">--</div>
                 </div>
                 
                 <div class="info-card">
                     <h4><i class="fas fa-brain-circuit"></i> AI 核心</h4>
                     <div class="select-wrapper">
                         <select id="ai-model-selector">
+                            <option value="minimax" selected>MiniMax-M2.7</option>
+                            <option value="openai">GPT-5.2</option>
                             <option value="gemini">Gemini 3.1</option>
-                            <option value="openai" selected>GPT-5.2</option>
                             <option value="deepseek">DeepSeek-V3.2</option>
                             <option value="grok">Grok-4.20</option>
                             <option value="claude">Claude-Sonnet-4.6</option>
-                            <option value="minimax">MiniMax-M2.7</option>
                         </select>
                     </div>
                     <small class="ai-switcher-note">注意：更換核心後，故事風格與文筆將會改變。</small>
@@ -283,21 +238,6 @@
         </div>
 
 
-        <div id="skills-modal" class="skills-modal-overlay">
-            <div class="skills-modal-content">
-                <div class="skills-modal-header">
-                    <button id="open-cultivation-btn" class="skills-header-btn" title="閉關修練">
-                        <i class="fas fa-door-closed"></i>
-                    </button>
-                    <h3>武學總覽</h3>
-                    <button id="close-skills-btn" class="skills-modal-close"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="skills-modal-tabs" id="skills-tabs-container">
-                    </div>
-                <div class="skills-modal-body" id="skills-body-container">
-                    </div>
-            </div>
-        </div>
         
         <div id="location-details-modal" class="location-modal-overlay">
             <div class="location-modal-content">
@@ -418,40 +358,26 @@
         </div>
 
 
-        <div id="cultivation-modal" class="skills-modal-overlay">
-            <div class="skills-modal-content" style="max-width: 500px; height: auto;">
-                <div class="skills-modal-header">
-                    <h3 style="grid-column: 1 / span 3;">閉關修練</h3>
-                    <button id="close-cultivation-btn" class="skills-modal-close"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="skills-modal-body" id="cultivation-modal-body">
-                    <div class="cultivation-form-group">
-                        <label for="cultivation-skill-select">選擇武學</label>
-                        <select id="cultivation-skill-select" class="cultivation-select"></select>
-                    </div>
-                    <div class="cultivation-form-group">
-                        <div class="day-selector-header">
-                            <label for="cultivation-days-input">閉關天數</label>
-                            <span id="cultivation-days-display" class="day-display">1 天</span>
-                        </div>
-                        <input type="range" id="cultivation-days-input" class="day-slider" min="1" max="60" value="1">
-                    </div>
-                    <div class="cultivation-requirements">
-                        <h4>閉關條件：</h4>
-                        <ul>
-                            <li id="req-location"><i class="fas fa-times-circle"></i> 需身處私密地點</li>
-                            <li id="req-stamina"><i class="fas fa-times-circle"></i> 精力需高於80%</li>
-                            <li id="req-food"><i class="fas fa-times-circle"></i> 需備足糧食飲水</li>
-                        </ul>
-                    </div>
-                    <button id="start-cultivation-btn" class="cultivation-start-btn" disabled>
-                        <i class="fas fa-bed"></i> 開始閉關
-                    </button>
-                </div>
-            </div>
-        </div>
 
     </div>
+
+        <div id="apikey-modal" class="apikey-modal-overlay">
+            <div class="apikey-modal-content">
+                <h3 id="apikey-modal-title">設定 API Key</h3>
+                <p id="apikey-modal-desc">請輸入您的 API Key 以啟用此 AI 模型。</p>
+                <div class="apikey-input-wrapper">
+                    <input type="password" id="apikey-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+                    <button id="apikey-toggle-visibility" class="apikey-toggle-btn" type="button" title="顯示/隱藏">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="apikey-modal-actions">
+                    <button id="apikey-cancel-btn" class="apikey-btn cancel">取消</button>
+                    <button id="apikey-save-btn" class="apikey-btn save">儲存並啟用</button>
+                </div>
+                <small class="apikey-note">API Key 僅儲存在您的瀏覽器本機，不會上傳至任何伺服器。</small>
+            </div>
+        </div>
 
     <script type="module" src="scripts/main.js"></script>
 </body>

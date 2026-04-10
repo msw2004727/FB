@@ -32,6 +32,15 @@ export function initializeDOM() {
     dom.gmMenu = document.getElementById('gm-menu');
     dom.gmContent = document.getElementById('gm-content');
 
+    // API Key 設定彈窗
+    dom.apikeyModal = document.getElementById('apikey-modal');
+    dom.apikeyModalTitle = document.getElementById('apikey-modal-title');
+    dom.apikeyModalDesc = document.getElementById('apikey-modal-desc');
+    dom.apikeyInput = document.getElementById('apikey-input');
+    dom.apikeyToggleBtn = document.getElementById('apikey-toggle-visibility');
+    dom.apikeySaveBtn = document.getElementById('apikey-save-btn');
+    dom.apikeyCancelBtn = document.getElementById('apikey-cancel-btn');
+
     // 【核心新增】地點詳情彈窗的DOM元素
     dom.locationDetailsModal = document.getElementById('location-details-modal');
     dom.locationModalTitle = document.getElementById('location-modal-title');

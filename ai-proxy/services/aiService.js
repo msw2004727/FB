@@ -5,36 +5,29 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 const Anthropic = require("@anthropic-ai/sdk");
 
-// 1. Google Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-3.1"});
-
-// 2. OpenAI
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// 3. DeepSeek
-const deepseek = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: "https://api.deepseek.com/v1",
-});
-
-// 4. Grok
-const grok = new OpenAI({
-    apiKey: process.env.GROK_API_KEY,
-    baseURL: "https://api.x.ai/v1",
-    timeout: 30 * 1000,
-});
-
-// 5. Anthropic Claude
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-// 6. MiniMax M2.7（OpenAI 相容 API）
+// 僅初始化擁有伺服器端金鑰的模型（MiniMax）
 const minimax = new OpenAI({
     apiKey: process.env.MINIMAX_API_KEY,
     baseURL: "https://api.minimaxi.chat/v1",
 });
+
+// --- 動態建立 AI 客戶端（使用用戶提供的 API Key）---
+function createOpenAIClient(apiKey) {
+    return new OpenAI({ apiKey });
+}
+function createDeepSeekClient(apiKey) {
+    return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
+}
+function createGrokClient(apiKey) {
+    return new OpenAI({ apiKey, baseURL: "https://api.x.ai/v1", timeout: 30 * 1000 });
+}
+function createAnthropicClient(apiKey) {
+    return new Anthropic({ apiKey });
+}
+function createGeminiModel(apiKey) {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({ model: "gemini-3.1" });
+}
 
 
 const { aiConfig } = require('../aiConfig.js');
@@ -71,12 +64,12 @@ const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 // 統一的AI調度中心
 function canRetryWithDefaultModel(modelName) {
     const normalized = String(modelName || '').trim().toLowerCase();
-    return normalized !== 'openai' && normalized !== 'gpt5.2';
+    return normalized !== 'minimax';
 }
 
-async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {}) {
+async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {}, userApiKey = null) {
     const allowDefaultFallback = retryConfig.allowDefaultFallback !== false;
-    console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}`);
+    console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}, 用戶金鑰: ${userApiKey ? '有' : '無'}`);
     try {
         let textResponse = "";
         let options = {
@@ -86,60 +79,71 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
 
         switch (modelName) {
             case 'openai':
-                // OpenAI default route (upgraded to GPT-5.2)
+            case 'gpt5.2': {
+                const key = userApiKey || process.env.OPENAI_API_KEY;
+                if (!key) throw new Error('缺少 OpenAI API Key，請在前端設定頁面填寫。');
+                const client = createOpenAIClient(key);
                 options.model = "gpt-5.2";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                const openaiResult = await openai.chat.completions.create(options);
-                textResponse = openaiResult.choices[0].message.content;
+                const result = await client.chat.completions.create(options);
+                textResponse = result.choices[0].message.content;
                 break;
-            case 'gpt5.2':
-                // OpenAI 高品質模型（常用於需要更穩定建議/推理的任務）
-                options.model = "gpt-5.2";
-                if (isJsonExpected) {
-                    options.response_format = { type: "json_object" };
-                }
-                const gpt52Result = await openai.chat.completions.create(options);
-                textResponse = gpt52Result.choices[0].message.content;
-                break;
-            case 'deepseek':
+            }
+            case 'deepseek': {
+                const key = userApiKey || process.env.DEEPSEEK_API_KEY;
+                if (!key) throw new Error('缺少 DeepSeek API Key，請在前端設定頁面填寫。');
+                const client = createDeepSeekClient(key);
                 options.model = "deepseek-v3.2";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                const deepseekResult = await deepseek.chat.completions.create(options);
-                textResponse = deepseekResult.choices[0].message.content;
+                const result = await client.chat.completions.create(options);
+                textResponse = result.choices[0].message.content;
                 break;
-            case 'grok':
+            }
+            case 'grok': {
+                const key = userApiKey || process.env.GROK_API_KEY;
+                if (!key) throw new Error('缺少 Grok API Key，請在前端設定頁面填寫。');
+                const client = createGrokClient(key);
                 options.model = "grok-4.20";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                const grokResult = await grok.chat.completions.create(options);
-                textResponse = grokResult.choices[0].message.content;
+                const result = await client.chat.completions.create(options);
+                textResponse = result.choices[0].message.content;
                 break;
-            case 'gemini':
+            }
+            case 'gemini': {
+                const key = userApiKey || process.env.GOOGLE_API_KEY;
+                if (!key) throw new Error('缺少 Google Gemini API Key，請在前端設定頁面填寫。');
+                const model = createGeminiModel(key);
                 const generationConfig = {};
                 if (isJsonExpected) {
                     generationConfig.response_mime_type = "application/json";
                 }
-                const geminiResult = await geminiModel.generateContent(prompt, generationConfig);
+                const geminiResult = await model.generateContent(prompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
                 break;
+            }
             case 'cluade':
-            case 'claude':
+            case 'claude': {
+                const key = userApiKey || process.env.ANTHROPIC_API_KEY;
+                if (!key) throw new Error('缺少 Anthropic Claude API Key，請在前端設定頁面填寫。');
+                const client = createAnthropicClient(key);
                 const claudeOptions = {
-                    model: "claude-sonnet-4.6", 
+                    model: "claude-sonnet-4.6",
                     max_tokens: 4096,
                     messages: [{ role: "user", content: prompt }],
                 };
                 if (isJsonExpected) {
                     claudeOptions.system = "Your response must be a single, valid JSON object and nothing else. Do not include any explanatory text or markdown formatting like ```json.";
                 }
-                const claudeResult = await anthropic.messages.create(claudeOptions);
+                const claudeResult = await client.messages.create(claudeOptions);
                 textResponse = claudeResult.content[0].text;
                 break;
+            }
             case 'minimax':
                 options.model = "MiniMax-M2.7";
                 if (isJsonExpected) {
@@ -151,22 +155,23 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
                 break;
             default:
-                console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
-                options.model = "gpt-5.2";
+                console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'minimax'。`);
+                options.model = "MiniMax-M2.7";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
-                const defaultResult = await openai.chat.completions.create(options);
+                const defaultResult = await minimax.chat.completions.create(options);
                 textResponse = defaultResult.choices[0].message.content;
+                textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         }
         return textResponse;
     } catch (error) {
         if (allowDefaultFallback && canRetryWithDefaultModel(modelName)) {
-            console.warn(`[AI Fallback] ${modelName} failed. Retrying with default GPT route (openai/gpt-5.2).`);
+            console.warn(`[AI Fallback] ${modelName} failed. Retrying with default minimax.`);
             try {
-                return await callAI('openai', prompt, isJsonExpected, { allowDefaultFallback: false });
+                return await callAI('minimax', prompt, isJsonExpected, { allowDefaultFallback: false });
             } catch (fallbackError) {
-                console.error(`[AI Fallback] openai retry failed after ${modelName}:`, fallbackError);
+                console.error(`[AI Fallback] minimax retry failed after ${modelName}:`, fallbackError);
             }
         }
         console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, error);
@@ -217,7 +222,7 @@ async function getAICultivationResult(username, playerProfile, skillToPractice, 
     const profileForPrompt = { ...playerProfile, username: username };
     const prompt = getCultivationPrompt(profileForPrompt, skillToPractice, days, outcome, storyHint);
     try {
-        const modelToUse = aiConfig.narrative || 'openai';
+        const modelToUse = aiConfig.narrative || 'minimax';
         const story = await callAI(modelToUse, prompt, false);
         return story;
     } catch (error) {
@@ -229,7 +234,7 @@ async function getAICultivationResult(username, playerProfile, skillToPractice, 
 async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName) {
     const prompt = getForgetSkillPrompt(playerProfile, skillName);
     try {
-        const modelToUse = playerModelChoice || aiConfig.narrative || 'openai';
+        const modelToUse = playerModelChoice || aiConfig.narrative || 'minimax';
         const story = await callAI(modelToUse, prompt, false);
         return story;
     } catch (error) {
@@ -241,7 +246,7 @@ async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName
 async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, interactionData) {
     const prompt = getNpcMemoryPrompt(npcName, oldSummary, interactionData);
     try {
-        const modelToUse = playerModelChoice || aiConfig.npcMemory || 'openai';
+        const modelToUse = playerModelChoice || aiConfig.npcMemory || 'minimax';
         const text = await callAI(modelToUse, prompt, true);
         const parsedJson = parseJsonResponse(text);
         return parsedJson.newSummary || oldSummary;
@@ -255,11 +260,11 @@ async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, intera
 async function getAIAnachronismResponse(playerModelChoice, playerAction, anachronisticItem) {
     const prompt = getAnachronismPrompt(playerAction, anachronisticItem);
     try {
-        const modelToUse = playerModelChoice || aiConfig.narrative || 'openai';
+        const modelToUse = playerModelChoice || aiConfig.narrative || 'minimax';
         const response = await callAI(modelToUse, prompt, false);
-        return response.replace(/["“”]/g, '');
+        return response.replace(/[“””]/g, '');
     } catch (error) {
-        console.error("[AI 任務失敗] 時空守序者任務:", error);
+        console.error(“[AI 任務失敗] 時空守序者任務:”, error);
         return "你腦中閃過一個不屬於這個時代的念頭，但很快便將其甩開，專注於眼前的江湖事。";
     }
 }
@@ -313,7 +318,7 @@ async function getAIPrequel(playerModelChoice, recentHistory) {
 async function getAISuggestion(roundData, playerModelChoice = null) {
     const prompt = getSuggestionPrompt(roundData);
     try {
-        const modelToUse = playerModelChoice || aiConfig.suggestion || 'openai';
+        const modelToUse = playerModelChoice || aiConfig.suggestion || 'minimax';
         const text = await callAI(modelToUse, prompt, false);
         return text.replace(/["“”]/g, '');
     } catch (error) {
@@ -386,7 +391,7 @@ async function getAITradeSummary(playerModelChoice, username, npcName, tradeDeta
     }
     const prompt = getTradeSummaryPrompt(username, npcName, tradeDetails, longTermSummary);
     try {
-        const modelToUse = playerModelChoice || aiConfig.npcChatSummary || 'openai';
+        const modelToUse = playerModelChoice || aiConfig.npcChatSummary || 'minimax';
         const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
@@ -416,7 +421,7 @@ async function getAICombatAction(playerModelChoice, playerProfile, combatState, 
 async function getAICombatSetup(playerAction, lastRoundData) {
     const prompt = getCombatSetupPrompt(playerAction, lastRoundData);
     try {
-        const modelToUse = aiConfig.combatSetup || 'openai';
+        const modelToUse = aiConfig.combatSetup || 'minimax';
         const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {
@@ -483,7 +488,7 @@ async function getAIRomanceEvent(playerProfile, npcProfile, eventType) {
 async function getAIEpilogue(playerData) {
     const prompt = getEpiloguePrompt(playerData);
     try {
-        const modelToUse = aiConfig.epilogue || 'openai';
+        const modelToUse = aiConfig.epilogue || 'minimax';
         const story = await callAI(modelToUse, prompt, false);
         return story;
     } catch (error) {
@@ -549,7 +554,7 @@ async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
 async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog, killerName) {
     const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog, killerName);
     try {
-        const modelToUse = playerModelChoice || aiConfig.postCombat || 'openai';
+        const modelToUse = playerModelChoice || aiConfig.postCombat || 'minimax';
         const text = await callAI(modelToUse, prompt, true);
         return parseJsonResponse(text);
     } catch (error) {

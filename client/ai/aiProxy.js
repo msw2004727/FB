@@ -2,6 +2,7 @@
 // AI Proxy 客戶端 — 負責與 AI Proxy 伺服器通訊
 
 const PROXY_URL_KEY = 'wenjiang_ai_proxy_url';
+const API_KEY_PREFIX = 'fb_ai_apikey_';
 
 // 自動偵測：如果在 localhost 開發，預設連本機 AI Proxy；否則連線上版
 function detectDefaultProxyUrl() {
@@ -16,6 +17,15 @@ function getProxyUrl() {
     return localStorage.getItem(PROXY_URL_KEY) || detectDefaultProxyUrl();
 }
 
+/** 從 localStorage 取得用戶為指定模型儲存的 API Key */
+function getUserApiKey(model) {
+    try {
+        return localStorage.getItem(API_KEY_PREFIX + (model || '').trim().toLowerCase()) || null;
+    } catch {
+        return null;
+    }
+}
+
 export function setProxyUrl(url) {
     localStorage.setItem(PROXY_URL_KEY, url);
 }
@@ -28,11 +38,16 @@ export function setProxyUrl(url) {
  * @returns {Promise<object>} AI 回應
  */
 export async function generate(task, model, context) {
+    const resolvedModel = model || 'minimax';
+    const apiKey = getUserApiKey(resolvedModel);
     const url = `${getProxyUrl()}/ai/generate`;
+    const body = { task, model: resolvedModel, context };
+    if (apiKey) body.apiKey = apiKey;
+
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task, model: model || 'openai', context })
+        body: JSON.stringify(body)
     });
 
     if (!response.ok) {

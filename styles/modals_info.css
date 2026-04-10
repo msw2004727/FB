@@ -237,3 +237,189 @@ body.dark-theme .exp-bar-fill {
     min-width: 80px;
     text-align: right;
 }
+
+/* --- API Key 設定彈窗 --- */
+.apikey-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 1020;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    backdrop-filter: blur(4px);
+}
+
+.apikey-modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.apikey-modal-content {
+    background-color: var(--light-surface-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 420px;
+    padding: 2rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    transform: scale(0.95);
+    transition: transform 0.4s ease;
+    border: 1px solid var(--light-border);
+    text-align: center;
+}
+
+.apikey-modal-overlay.visible .apikey-modal-content {
+    transform: scale(1);
+}
+
+body.dark-theme .apikey-modal-content {
+    background-color: var(--dark-surface-bg);
+    border-color: var(--dark-border);
+}
+
+.apikey-modal-content h3 {
+    margin: 0 0 0.5rem 0;
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    color: var(--light-accent);
+}
+
+body.dark-theme .apikey-modal-content h3 {
+    color: var(--dark-accent);
+}
+
+.apikey-modal-content p {
+    margin: 0 0 1.2rem 0;
+    font-size: 0.9rem;
+    color: var(--light-text-secondary);
+}
+
+body.dark-theme .apikey-modal-content p {
+    color: var(--dark-text-secondary);
+}
+
+.apikey-input-wrapper {
+    position: relative;
+    margin-bottom: 1.2rem;
+}
+
+.apikey-input-wrapper input {
+    width: 100%;
+    padding: 0.75rem 2.8rem 0.75rem 0.75rem;
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: monospace;
+    background-color: var(--light-bg);
+    color: var(--light-text-primary);
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.apikey-input-wrapper input:focus {
+    outline: none;
+    border-color: var(--light-accent);
+}
+
+body.dark-theme .apikey-input-wrapper input {
+    background-color: var(--dark-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text-primary);
+}
+
+body.dark-theme .apikey-input-wrapper input:focus {
+    border-color: var(--dark-accent);
+}
+
+.apikey-toggle-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--light-text-secondary);
+    font-size: 1rem;
+    padding: 0.4rem;
+}
+
+body.dark-theme .apikey-toggle-btn {
+    color: var(--dark-text-secondary);
+}
+
+.apikey-modal-actions {
+    display: flex;
+    gap: 0.8rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.apikey-btn {
+    padding: 0.6rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.apikey-btn:active {
+    transform: scale(0.97);
+}
+
+.apikey-btn.cancel {
+    background-color: var(--light-border);
+    color: var(--light-text-primary);
+}
+
+body.dark-theme .apikey-btn.cancel {
+    background-color: var(--dark-border);
+    color: var(--dark-text-primary);
+}
+
+.apikey-btn.save {
+    background-color: var(--light-accent);
+    color: #fff;
+    font-weight: bold;
+}
+
+.apikey-btn.save:hover {
+    filter: brightness(1.1);
+}
+
+body.dark-theme .apikey-btn.save {
+    background-color: var(--dark-accent);
+}
+
+.apikey-note {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--light-text-secondary);
+    opacity: 0.7;
+}
+
+body.dark-theme .apikey-note {
+    color: var(--dark-text-secondary);
+}
+
+/* 輸入錯誤抖動動畫 */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-6px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(4px); }
+}
+
+.apikey-input-wrapper input.shake {
+    animation: shake 0.4s ease;
+    border-color: #e74c3c !important;
+}

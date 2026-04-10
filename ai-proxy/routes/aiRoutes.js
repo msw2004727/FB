@@ -321,7 +321,7 @@ const TASK_HANDLERS = {
 // =============================================================================
 router.post('/generate', async (req, res, next) => {
     try {
-        const { task, model, context } = req.body;
+        const { task, model, context, apiKey } = req.body;
 
         if (!task) {
             return res.status(400).json({ success: false, error: 'Missing required field: task' });
@@ -341,13 +341,13 @@ router.post('/generate', async (req, res, next) => {
         // Build prompt from context
         const { prompt, json: isJsonExpected, configKey } = handler(context);
 
-        // Determine which model to use: explicit request > aiConfig default > openai
-        const modelToUse = model || aiConfig[configKey] || 'openai';
+        // Determine which model to use: explicit request > aiConfig default > minimax
+        const modelToUse = model || aiConfig[configKey] || 'minimax';
 
-        console.log(`[AI Proxy] task="${task}" model="${modelToUse}" json=${isJsonExpected}`);
+        console.log(`[AI Proxy] task="${task}" model="${modelToUse}" json=${isJsonExpected} hasUserKey=${!!apiKey}`);
 
-        // Call the AI
-        const rawText = await callAI(modelToUse, prompt, isJsonExpected);
+        // Call the AI (pass user-provided API key if present)
+        const rawText = await callAI(modelToUse, prompt, isJsonExpected, {}, apiKey || null);
 
         // Try to parse JSON if expected; otherwise return raw text
         let data;

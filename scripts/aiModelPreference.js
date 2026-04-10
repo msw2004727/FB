@@ -1,5 +1,6 @@
-export const DEFAULT_AI_MODEL = 'openai';
+export const DEFAULT_AI_MODEL = 'minimax';
 export const AI_MODEL_STORAGE_KEY = 'fb_ai_model_core_selection';
+const API_KEY_PREFIX = 'fb_ai_apikey_';
 
 const VALID_AI_MODELS = new Set([
     'openai',
@@ -10,6 +11,19 @@ const VALID_AI_MODELS = new Set([
     'minimax'
 ]);
 
+// 擁有伺服器端金鑰的模型（用戶無需手動輸入）
+const SERVER_KEY_MODELS = new Set(['minimax']);
+
+// 各模型的顯示名稱與 Key 提示
+export const AI_MODEL_INFO = {
+    openai:   { name: 'GPT-5.2',            hint: '格式通常為 sk-...' },
+    gemini:   { name: 'Gemini 3.1',          hint: '前往 Google AI Studio 取得' },
+    deepseek: { name: 'DeepSeek-V3.2',       hint: '前往 DeepSeek 平台取得' },
+    grok:     { name: 'Grok-4.20',           hint: '前往 xAI 平台取得' },
+    claude:   { name: 'Claude-Sonnet-4.6',   hint: '格式通常為 sk-ant-...' },
+    minimax:  { name: 'MiniMax-M2.7',        hint: '' },
+};
+
 function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
@@ -18,6 +32,36 @@ export function normalizeAiModelValue(value, fallback = DEFAULT_AI_MODEL) {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'cluade') return 'claude';
     return VALID_AI_MODELS.has(normalized) ? normalized : fallback;
+}
+
+/** 此模型是否需要用戶手動提供 API Key */
+export function needsUserApiKey(model) {
+    return !SERVER_KEY_MODELS.has(normalizeAiModelValue(model));
+}
+
+/** 取得用戶為某模型儲存的 API Key */
+export function getStoredApiKey(model) {
+    if (!canUseBrowserStorage()) return null;
+    try {
+        return localStorage.getItem(API_KEY_PREFIX + normalizeAiModelValue(model)) || null;
+    } catch {
+        return null;
+    }
+}
+
+/** 儲存用戶的 API Key */
+export function setStoredApiKey(model, apiKey) {
+    if (!canUseBrowserStorage()) return;
+    try {
+        const key = API_KEY_PREFIX + normalizeAiModelValue(model);
+        if (apiKey) {
+            localStorage.setItem(key, apiKey.trim());
+        } else {
+            localStorage.removeItem(key);
+        }
+    } catch {
+        // Ignore storage errors.
+    }
 }
 
 export function getStoredAiModel() {

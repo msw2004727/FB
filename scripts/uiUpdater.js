@@ -7,17 +7,8 @@ const storyPanelWrapper = document.querySelector('.story-panel');
 const storyTextContainer = document.getElementById('story-text-wrapper');
 const statusBarEl = document.getElementById('status-bar');
 const pcContent = document.getElementById('pc-content');
-const internalPowerBar = document.getElementById('internal-power-bar');
-const internalPowerValue = document.getElementById('internal-power-value');
-const externalPowerBar = document.getElementById('external-power-bar');
-const externalPowerValue = document.getElementById('external-power-value');
-const lightnessPowerBar = document.getElementById('lightness-power-bar');
-const lightnessPowerValue = document.getElementById('lightness-power-value');
-const staminaBar = document.getElementById('stamina-bar');
-const staminaValue = document.getElementById('stamina-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
-const locationInfo = document.getElementById('location-info'); 
-const npcContent = document.getElementById('npc-content');
+const locationInfo = document.getElementById('location-info');
 const actionSuggestion = document.getElementById('action-suggestion');
 
 // --- UI 更新核心函式 ---
@@ -40,12 +31,13 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (!roundData) return;
 
     updateStatusBar(roundData);
-    pcContent.textContent = roundData.PC || '狀態穩定';
+    // 角色狀態：14字上限
+    const pcText = String(roundData.PC || '狀態穩定');
+    pcContent.textContent = pcText.length > 14 ? pcText.slice(0, 14) + '…' : pcText;
+    pcContent.title = pcText;
     updateDeathCountdownUI(roundData.deathCountdown);
-    updatePowerBars(roundData);
     updateMoralityBar(roundData.morality);
     updateLocationInfo(locationData);
-    updateNpcList(roundData.NPC);
 
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
 }
@@ -269,7 +261,7 @@ export function handleApiError(error) {
         const previousModel = aiSelector?.value || '';
         const resetModel = resetAiModelSelectionToDefault(aiSelector);
         if (previousModel && previousModel !== resetModel) {
-            appendMessageToStory(`AI core failed and was reset to default GPT (${DEFAULT_AI_MODEL}/gpt-5.2).`, 'system-message');
+            appendMessageToStory(`AI 核心呼叫失敗，已自動切換回預設模型 (${DEFAULT_AI_MODEL})。`, 'system-message');
         }
     }
 

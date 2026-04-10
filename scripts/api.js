@@ -100,19 +100,9 @@ export const api = {
     getLatestGame: () => safeCall(() => gameEngine.getLatestGame()),
     startNewGame: () => safeCall(() => gameEngine.startNewGame()),
     forceSuicide: (body) => safeCall(() => gameEngine.forceSuicide({ model: body?.model })),
-    getRelations: () => safeCall(() => gameEngine.getRelations()),
-    getNovel: () => safeCall(() => gameEngine.getNovel()),
-    getSkills: () => safeCall(() => gameEngine.getSkills()),
-    forgetSkill: (body) => safeCall(() => gameEngine.forgetSkill({
-        skillName: body.skillName,
-        model: body.model
-    })),
 
     // ── Epilogue Route ──────────────────────
     getEpilogue: () => safeCall(() => gameEngine.getEpilogue()),
-
-    // ── Map Route ───────────────────────────
-    getMap: () => safeCall(() => gameEngine.getMap()),
 
     // ── Image Route ─────────────────────────
     generateNpcAvatar: (npcName) => safeCall(() => gameEngine.generateNpcAvatar(npcName)),
