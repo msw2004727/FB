@@ -5,6 +5,7 @@ const API_KEY_PREFIX = 'fb_ai_apikey_';
 const VALID_AI_MODELS = new Set([
     'openai',
     'gemini',
+    'gemma',
     'deepseek',
     'grok',
     'claude',
@@ -18,6 +19,7 @@ const SERVER_KEY_MODELS = new Set(['minimax']);
 export const AI_MODEL_INFO = {
     openai:   { name: 'GPT-5.4',             hint: '格式通常為 sk-...' },
     gemini:   { name: 'Gemini 3.1 Pro',       hint: '前往 Google AI Studio 取得' },
+    gemma:    { name: 'Gemma 4 27B',          hint: '使用 Google AI Studio API Key' },
     deepseek: { name: 'DeepSeek-V4',          hint: '前往 DeepSeek 平台取得' },
     grok:     { name: 'Grok-4.20',            hint: '前往 xAI 平台取得' },
     claude:   { name: 'Claude Opus 4.6',      hint: '格式通常為 sk-ant-...' },

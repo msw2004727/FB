@@ -84,6 +84,17 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 textResponse = (await geminiResult.response).text();
                 break;
             }
+            case 'gemma': {
+                const key = userApiKey || process.env.GOOGLE_API_KEY;
+                if (!key) throw new Error('缺少 Google API Key，請在前端設定頁面填寫。');
+                const genAI = new GoogleGenerativeAI(key);
+                const gemmaModel = genAI.getGenerativeModel({ model: "gemma-4-31b-it" });
+                const gemmaConfig = {};
+                if (isJsonExpected) gemmaConfig.response_mime_type = "application/json";
+                const gemmaResult = await gemmaModel.generateContent(prompt, gemmaConfig);
+                textResponse = (await gemmaResult.response).text();
+                break;
+            }
             case 'cluade':
             case 'claude': {
                 const key = userApiKey || process.env.ANTHROPIC_API_KEY;

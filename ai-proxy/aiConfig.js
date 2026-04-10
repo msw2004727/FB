@@ -13,6 +13,7 @@
  * - 'deepseek' : DeepSeek-V4（需用戶自行提供 API Key）
  * - 'grok'     : Grok-4.20（需用戶自行提供 API Key）
  * - 'gemini'   : Gemini 3.1 Pro（需用戶自行提供 API Key）
+ * - 'gemma'    : Gemma 4 27B（需用戶自行提供 Google API Key）
  * - 'claude'   : Claude Opus 4.6（需用戶自行提供 API Key）
  *
  * 注意：玩家前端選擇的模型會覆蓋此處的設定。
