@@ -23,7 +23,8 @@
 `4. target 是玩家本回合優先作用目標；敘事與 updatedState 應反映此目標受影響。\n` +
 `5. HP/MP 不能低於 0；HP 不可高於 maxHp；MP 不可高於 maxMp。\n` +
 `6. 若 updatedState.enemies / allies 有任何角色數值變動，該陣列元素必須包含 name（名稱要與當前戰況完全一致）。\n` +
-`7. 若任一方全滅，status 回傳 COMBAT_END，否則 COMBAT_ONGOING。\n\n` +
+`7. 若任一方全滅，status 回傳 COMBAT_END，否則 COMBAT_ONGOING。\n` +
+`8. 【語言鐵律】narrative 及所有文字欄位必須全程使用「繁體中文」，嚴禁簡體中文。\n\n` +
 `[輸出格式]\n` +
 `請輸出 JSON，包含：\n` +
 `- narrative: string（本回合戰鬥敘事，請描述目標互動與結果）\n` +

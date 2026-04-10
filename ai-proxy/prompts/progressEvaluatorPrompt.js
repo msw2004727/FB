@@ -81,6 +81,7 @@ function getProgressEvaluatorPrompt(story, achievedMilestones = [], cluesSummary
 3. 因此你只需要判斷「下一個里程碑」是否被觸發
 4. 判斷標準必須嚴格 — 故事中必須有明確的描述符合觸發條件，不能靠推測
 5. 回覆必須是純 JSON
+6. 【語言鐵律】所有文字欄位（reason、questJournal）必須使用「繁體中文」，嚴禁簡體中文
 
 ## 下一個待觸發的里程碑
 ID: ${nextMilestone.id}

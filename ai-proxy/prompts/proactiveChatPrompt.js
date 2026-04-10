@@ -39,6 +39,8 @@ const getProactiveChatPrompt = (playerProfile, npcProfile, triggerEvent) => {
 
 ## 核心準則：
 
+0.  **【語言鐵律 — 最高優先級】**: 你的所有回應文字（包括 JSON 欄位中的 openingLine、description 等所有文字欄位）必須全程使用「繁體中文」。嚴格禁止：簡體中文、英文單字、日文、emoji 表情符號、任何非繁體中文字元。
+
 1.  **情境感知**：你必須完全基於我提供的「觸發事件」，來決定NPC的行為和動機。
 2.  **人設（檔案）第一**：NPC的口氣、用詞、行為，都必須100%符合他的詳細檔案，特別是「個性(personality)」和「聲音(voice)」。
 3.  **贈禮邏輯**：

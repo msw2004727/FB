@@ -67,6 +67,9 @@ const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
 const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
+// 全域繁體中文語言規則 — 所有 AI 呼叫統一注入
+const LANG_SYSTEM_RULE = '【語言鐵律】你的所有回應文字（包括 JSON 欄位值）必須全程使用「繁體中文」。嚴格禁止簡體中文字元。';
+
 // 統一的AI調度中心
 function canRetryWithDefaultModel(modelName) {
     const normalized = String(modelName || '').trim().toLowerCase();
@@ -80,7 +83,10 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
         let textResponse = "";
         let options = {
             model: "default",
-            messages: [{ role: "user", content: prompt }],
+            messages: [
+                { role: "system", content: LANG_SYSTEM_RULE },
+                { role: "user", content: prompt }
+            ],
         };
 
         switch (modelName) {
@@ -129,7 +135,8 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (isJsonExpected) {
                     generationConfig.response_mime_type = "application/json";
                 }
-                const geminiResult = await model.generateContent(prompt, generationConfig);
+                const geminiPrompt = `${LANG_SYSTEM_RULE}\n\n${prompt}`;
+                const geminiResult = await model.generateContent(geminiPrompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
                 break;
             }
@@ -141,10 +148,11 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 const claudeOptions = {
                     model: "claude-opus-4-6",
                     max_tokens: 4096,
+                    system: LANG_SYSTEM_RULE,
                     messages: [{ role: "user", content: prompt }],
                 };
                 if (isJsonExpected) {
-                    claudeOptions.system = "Your response must be a single, valid JSON object and nothing else. Do not include any explanatory text or markdown formatting like ```json.";
+                    claudeOptions.system += "\n\nYour response must be a single, valid JSON object and nothing else. Do not include any explanatory text or markdown formatting like ```json.";
                 }
                 const claudeResult = await client.messages.create(claudeOptions);
                 textResponse = claudeResult.content[0].text;
