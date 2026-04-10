@@ -2,7 +2,8 @@
   "name": "AI 文江 — 武俠文字冒險",
   "short_name": "AI 文江",
   "description": "AI 驅動的互動武俠文字冒險遊戲",
-  "start_url": "/index.html",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#1a1a2e",
@@ -11,13 +12,13 @@
   "categories": ["games", "entertainment"],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

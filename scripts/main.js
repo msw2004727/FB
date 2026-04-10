@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 註冊 Service Worker (PWA)
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
             console.warn('[SW] Service Worker 註冊失敗:', err);
         });
     }
