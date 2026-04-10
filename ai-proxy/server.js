@@ -20,10 +20,14 @@ app.use(express.json({ limit: '200kb' }));
 
 // --- Health check ---
 app.get('/health', (_req, res) => {
+    const mmKey = process.env.MINIMAX_API_KEY || '';
     res.json({
         status: 'ok',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
+        minimax_key_set: mmKey.length > 0,
+        minimax_key_prefix: mmKey.slice(0, 8) + '...',
+        node_env: process.env.NODE_ENV || 'unset',
     });
 });
 
