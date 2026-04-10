@@ -8,7 +8,19 @@ const { getSystemInteractionRule } = require('./story_components/systemInteracti
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 const { getNarrativeStyleRule } = require('./story_components/narrativeStyleRule.js'); // 【核心新增】
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', _playerPower = null, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, _playerBulkScore = 0, actorCandidates = [], blackShadowEvent = null) => {
+// 將 recentHistory 陣列格式化為精簡文字（修復 [object Object] 亂碼）
+function formatRecentHistory(saves) {
+    if (!saves || !Array.isArray(saves) || saves.length === 0) return '（無近期記錄）';
+    return saves.map(s => {
+        const loc = Array.isArray(s.LOC) ? s.LOC.join('/') : (s.LOC || '');
+        const npcs = (s.NPC || []).map(n => `${n.name}(${n.friendliness || '?'})`).join(', ');
+        const time = s.timeOfDay || '';
+        const story = s.story ? s.story.slice(0, 150) + (s.story.length > 150 ? '...' : '') : '';
+        return `【R${s.R || '?'} ${time} ${loc}】${s.EVT || ''}\nPC: ${s.PC || ''}\nNPC: ${npcs || '無'}\n${story}`;
+    }).join('\n---\n');
+}
+
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', _unused1 = null, playerMorality = 0, _unused2 = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, _unused3 = 0, _unused4 = [], blackShadowEvent = null) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -116,7 +128,7 @@ ${outputStructureRules}
 ${longTermSummary}
 
 ## 最近發生的事件 (短期記憶):
-${recentHistory}
+${formatRecentHistory(recentHistory)}
 
 ## 這是玩家的最新行動:
 "${playerAction}"

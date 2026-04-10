@@ -4,6 +4,7 @@
 
 import clientDB from '../db/clientDB.js';
 import { clamp, toFiniteNumber, advanceDate } from '../utils/gameUtils.js';
+import { runCleanup } from '../db/storageManager.js';
 
 /**
  * 將 AI 回傳的 roundData 完整應用到本機資料庫
@@ -59,6 +60,9 @@ export async function applyAllChanges(profileId, roundData) {
     if (roundData.story) {
         await clientDB.novel.addChapter(profileId, roundData.R, roundData.story);
     }
+
+    // Phase 2: 定期清理舊資料（每 10 回合，fire-and-forget）
+    runCleanup(profileId, roundData.R).catch(() => {});
 
     return {
         profile: await clientDB.profiles.get(profileId)

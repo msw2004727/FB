@@ -9,13 +9,19 @@ import { toSafeNumber, deepMergeObjects } from '../utils/gameUtils.js';
  * 組裝完整的遊戲上下文，供 AI Proxy 使用
  */
 export async function buildContext(profileId) {
-    const [profile, recentSaves, summaryData] = await Promise.all([
+    // 先取 profile 和 summary，再根據回合數決定 recentHistory 數量
+    const [profile, summaryData] = await Promise.all([
         clientDB.profiles.get(profileId),
-        clientDB.saves.getRecent(profileId, 3),
         clientDB.state.get(profileId, 'summary'),
     ]);
 
     if (!profile) throw new Error(`找不到玩家檔案: ${profileId}`);
+
+    // 動態回合數：前期多看、後期靠摘要+MemPalace
+    const latestSave = await clientDB.saves.getLatest(profileId);
+    const currentRound = latestSave?.R || 0;
+    const recentCount = currentRound <= 5 ? Math.max(currentRound, 1) : (currentRound <= 20 ? 5 : 3);
+    const recentSaves = await clientDB.saves.getRecent(profileId, recentCount);
 
     const lastSave = recentSaves.length > 0 ? recentSaves[recentSaves.length - 1] : null;
 

@@ -9,11 +9,13 @@ import { handleApiError } from './uiUpdater.js';
 import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
-import { exportSave, importSave, shouldRemindBackup, markBackupReminded, isIOSSafari } from '../client/utils/exportImport.js';
+import { exportSave, importSave, shouldRemindBackup, markBackupReminded } from '../client/utils/exportImport.js';
+import { initStorageManager } from '../client/db/storageManager.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 初始化 IndexedDB
+    // 初始化 IndexedDB + 請求持久化儲存
     await clientDB.init();
+    initStorageManager().catch(() => {});
 
     // 註冊 Service Worker (PWA)
     if ('serviceWorker' in navigator) {

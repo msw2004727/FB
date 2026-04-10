@@ -146,6 +146,25 @@ export async function interact({ action, model, optionMorality = 0 }) {
 
     const result = await applyAllChanges(profileId, roundData);
 
+    // Phase 0b: 接回摘要寫入管線（fire-and-forget，不阻塞玩家）
+    (async () => {
+        try {
+            const oldSummary = await clientDB.state.get(profileId, 'summary');
+            const oldText = typeof oldSummary === 'string' ? oldSummary : (oldSummary?.text || '遊戲剛剛開始...');
+            const summaryResult = await aiProxy.generate('summary', null, {
+                oldSummary: oldText,
+                newRoundData: roundData
+            });
+            if (summaryResult && typeof summaryResult === 'object' && summaryResult.summary) {
+                await clientDB.state.set(profileId, 'summary', summaryResult.summary);
+            } else if (typeof summaryResult === 'string') {
+                await clientDB.state.set(profileId, 'summary', summaryResult);
+            }
+        } catch (e) {
+            console.warn('[Summary] 摘要更新失敗（非阻塞）:', e.message);
+        }
+    })();
+
     return {
         story: roundData.story,
         roundData: {

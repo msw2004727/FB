@@ -1,11 +1,11 @@
 // services/aiService.js
+// AI 調度中心 — 僅保留 callAI + getAIGeneratedImage
 
-// --- AI SDK 初始化 ---
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 const Anthropic = require("@anthropic-ai/sdk");
 
-// MiniMax 延遲初始化（確保 Vercel env var 已載入）
+// MiniMax 延遲初始化
 let _minimaxClient = null;
 function getMinimax() {
     if (!_minimaxClient) {
@@ -17,68 +17,21 @@ function getMinimax() {
     return _minimaxClient;
 }
 
-// --- 動態建立 AI 客戶端（使用用戶提供的 API Key）---
-function createOpenAIClient(apiKey) {
-    return new OpenAI({ apiKey });
-}
-function createDeepSeekClient(apiKey) {
-    return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-}
-function createGrokClient(apiKey) {
-    return new OpenAI({ apiKey, baseURL: "https://api.x.ai/v1", timeout: 30 * 1000 });
-}
-function createAnthropicClient(apiKey) {
-    return new Anthropic({ apiKey });
-}
+// 動態建立 AI 客戶端
+function createOpenAIClient(apiKey) { return new OpenAI({ apiKey }); }
+function createDeepSeekClient(apiKey) { return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" }); }
+function createGrokClient(apiKey) { return new OpenAI({ apiKey, baseURL: "https://api.x.ai/v1", timeout: 30000 }); }
+function createAnthropicClient(apiKey) { return new Anthropic({ apiKey }); }
 function createGeminiModel(apiKey) {
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: "gemini-3.1-pro" });
 }
 
-
-const { aiConfig } = require('../aiConfig.js');
-
-// --- 從 prompts 資料夾導入腳本 ---
-const { getStoryPrompt } = require('../prompts/storyPrompt.js');
-
-const { getSummaryPrompt } = require('../prompts/summaryPrompt.js');
-const { getPrequelPrompt } = require('../prompts/prequelPrompt.js');
-const { getSuggestionPrompt } = require('../prompts/suggestionPrompt.js');
-const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
-const { getCombatPrompt } = require('../prompts/combatPrompt.js');
-
-const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
-const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
-const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
-const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
-const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
-
-const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
-const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
-
-const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
-
-const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
-const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
-const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
-const { getNpcMemoryPrompt } = require('../prompts/npcMemoryPrompt.js');
-const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt.js');
-const { getCultivationPrompt } = require('../prompts/cultivationPrompt.js');
-const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
-
-
-// 全域繁體中文語言規則 — 所有 AI 呼叫統一注入
+// 全域繁體中文語言規則
 const LANG_SYSTEM_RULE = '【語言鐵律】你的所有回應文字（包括 JSON 欄位值）必須全程使用「繁體中文」。嚴格禁止簡體中文字元。允許少量 emoji 來增強氣氛與情緒。';
 
-// 統一的AI調度中心
-function canRetryWithDefaultModel(modelName) {
-    const normalized = String(modelName || '').trim().toLowerCase();
-    return normalized !== 'minimax';
-}
-
 async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {}, userApiKey = null) {
-    const allowDefaultFallback = retryConfig.allowDefaultFallback !== false;
-    console.log(`[AI 調度中心] 正在使用模型: ${modelName}, 是否期望JSON: ${isJsonExpected}, 用戶金鑰: ${userApiKey ? '有' : '無'}`);
+    console.log(`[AI 調度中心] model=${modelName} json=${isJsonExpected} userKey=${userApiKey ? '有' : '無'}`);
     try {
         let textResponse = "";
         let options = {
@@ -96,9 +49,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (!key) throw new Error('缺少 OpenAI API Key，請在前端設定頁面填寫。');
                 const client = createOpenAIClient(key);
                 options.model = "gpt-5.4";
-                if (isJsonExpected) {
-                    options.response_format = { type: "json_object" };
-                }
+                if (isJsonExpected) options.response_format = { type: "json_object" };
                 const result = await client.chat.completions.create(options);
                 textResponse = result.choices[0].message.content;
                 break;
@@ -108,9 +59,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (!key) throw new Error('缺少 DeepSeek API Key，請在前端設定頁面填寫。');
                 const client = createDeepSeekClient(key);
                 options.model = "deepseek-chat";
-                if (isJsonExpected) {
-                    options.response_format = { type: "json_object" };
-                }
+                if (isJsonExpected) options.response_format = { type: "json_object" };
                 const result = await client.chat.completions.create(options);
                 textResponse = result.choices[0].message.content;
                 break;
@@ -120,9 +69,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (!key) throw new Error('缺少 Grok API Key，請在前端設定頁面填寫。');
                 const client = createGrokClient(key);
                 options.model = "grok-4.20";
-                if (isJsonExpected) {
-                    options.response_format = { type: "json_object" };
-                }
+                if (isJsonExpected) options.response_format = { type: "json_object" };
                 const result = await client.chat.completions.create(options);
                 textResponse = result.choices[0].message.content;
                 break;
@@ -132,11 +79,8 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (!key) throw new Error('缺少 Google Gemini API Key，請在前端設定頁面填寫。');
                 const model = createGeminiModel(key);
                 const generationConfig = {};
-                if (isJsonExpected) {
-                    generationConfig.response_mime_type = "application/json";
-                }
-                const geminiPrompt = `${LANG_SYSTEM_RULE}\n\n${prompt}`;
-                const geminiResult = await model.generateContent(geminiPrompt, generationConfig);
+                if (isJsonExpected) generationConfig.response_mime_type = "application/json";
+                const geminiResult = await model.generateContent(prompt, generationConfig);
                 textResponse = (await geminiResult.response).text();
                 break;
             }
@@ -148,409 +92,61 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 const claudeOptions = {
                     model: "claude-opus-4-6",
                     max_tokens: 4096,
-                    system: LANG_SYSTEM_RULE,
                     messages: [{ role: "user", content: prompt }],
                 };
                 if (isJsonExpected) {
-                    claudeOptions.system += "\n\nYour response must be a single, valid JSON object and nothing else. Do not include any explanatory text or markdown formatting like ```json.";
+                    claudeOptions.system = LANG_SYSTEM_RULE + "\n\nYour response must be a single, valid JSON object and nothing else.";
                 }
                 const claudeResult = await client.messages.create(claudeOptions);
                 textResponse = claudeResult.content[0].text;
                 break;
             }
             case 'minimax':
+            default:
+                if (modelName !== 'minimax') {
+                    console.log(`[AI 調度中心] 未知模型 '${modelName}'，使用 minimax`);
+                }
                 options.model = "MiniMax-M2.7";
                 options.max_tokens = 2048;
-                if (isJsonExpected) {
-                    options.response_format = { type: "json_object" };
-                }
+                if (isJsonExpected) options.response_format = { type: "json_object" };
                 const minimaxResult = await getMinimax().chat.completions.create(options);
                 textResponse = minimaxResult.choices[0].message.content;
-                // 清理 MiniMax 的 <think> 標籤
-                textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-                break;
-            default:
-                console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'minimax'。`);
-                options.model = "MiniMax-M2.7";
-                if (isJsonExpected) {
-                    options.response_format = { type: "json_object" };
-                }
-                const defaultResult = await getMinimax().chat.completions.create(options);
-                textResponse = defaultResult.choices[0].message.content;
                 textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         }
         return textResponse;
     } catch (error) {
         const detail = error?.message || String(error);
-        console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, detail);
+        console.error(`[AI 調度中心] ${modelName} 出錯:`, detail);
         throw new Error(`AI模型 ${modelName} 呼叫失敗: ${detail}`);
     }
 }
 
-/**
- * 使用 DALL-E 3 生成圖片 (已升級為 HD 畫質)
- * @param {string} prompt - 描述圖片內容的提示詞
- * @returns {Promise<string|null>} - 成功時返回圖片的 URL，失敗時返回 null
- */
 async function getAIGeneratedImage(prompt) {
-    console.log(`[AI 畫師] 收到圖片生成請求 (HD模式)，描述: "${prompt}"`);
     try {
-        const response = await openai.images.generate({
-            model: "dall-e-3", // 保持 DALL-E 3，它是目前最穩定的圖像接口
-            prompt: prompt,
+        const key = process.env.OPENAI_API_KEY;
+        if (!key) return null;
+        const client = createOpenAIClient(key);
+        const response = await client.images.generate({
+            model: "dall-e-3",
+            prompt,
             n: 1,
             size: "1024x1024",
-            quality: "hd",    // 【核心升級】開啟 HD 畫質，細節更豐富
-            style: "vivid",   // 【核心升級】使用鮮明風格，適合遊戲立繪
+            quality: "hd",
+            style: "vivid",
         });
-
-        const imageUrl = response.data[0].url;
-        console.log(`[AI 畫師] 圖片生成成功，URL: ${imageUrl}`);
-        return imageUrl;
-
+        return response.data[0].url;
     } catch (error) {
-        console.error(`[AI 畫師] DALL-E 3 圖片生成失敗:`, error);
+        console.error('[AI 畫師] 圖片生成失敗:', error.message);
         return null;
     }
 }
 
-// 清理並解析JSON的輔助函式
 function parseJsonResponse(text) {
     let cleaned = text;
-    // 移除 MiniMax M2.7 的 <think>...</think> 思考標籤
     cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/g, '');
-    // 移除 markdown JSON 標記
     cleaned = cleaned.replace(/^```json\s*|```\s*$/g, '');
-    // 去除前後空白
     cleaned = cleaned.trim();
     return JSON.parse(cleaned);
 }
 
-async function getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint) {
-    const profileForPrompt = { ...playerProfile, username: username };
-    const prompt = getCultivationPrompt(profileForPrompt, skillToPractice, days, outcome, storyHint);
-    try {
-        const modelToUse = aiConfig.narrative || 'minimax';
-        const story = await callAI(modelToUse, prompt, false);
-        return story;
-    } catch (error) {
-        console.error(`[AI 任務失敗] 為 ${username} 生成閉關故事時出錯:`, error);
-        return `經過 ${days} 天的閉關，你感覺到體內氣息流轉，似乎有所感悟，但具體進境如何，卻又難以言說。`;
-    }
-}
-
-async function getAIForgetSkillStory(playerModelChoice, playerProfile, skillName) {
-    const prompt = getForgetSkillPrompt(playerProfile, skillName);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.narrative || 'minimax';
-        const story = await callAI(modelToUse, prompt, false);
-        return story;
-    } catch (error) {
-        console.error(`[AI 任務失敗] 為 ${playerProfile.username} 生成自廢武功故事時出錯:`, error);
-        return `你下定決心，逆運內力。一時間，經脈中真氣如脫韁野馬般肆虐衝撞，你感到一陣撕心裂肺的劇痛，眼前一黑，險些暈厥過去。待你回過神來，體內關於「${skillName}」的感悟已蕩然無存，只剩下無盡的空虛。`;
-    }
-}
-
-async function getAIPerNpcSummary(playerModelChoice, npcName, oldSummary, interactionData) {
-    const prompt = getNpcMemoryPrompt(npcName, oldSummary, interactionData);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.npcMemory || 'minimax';
-        const text = await callAI(modelToUse, prompt, true);
-        const parsedJson = parseJsonResponse(text);
-        return parsedJson.newSummary || oldSummary;
-    } catch (error) {
-        console.error(`[AI 任務失敗] 為 ${npcName} 更新個人記憶時出錯:`, error);
-        return oldSummary;
-    }
-}
-
-
-async function getAIAnachronismResponse(playerModelChoice, playerAction, anachronisticItem) {
-    const prompt = getAnachronismPrompt(playerAction, anachronisticItem);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.narrative || 'minimax';
-        const response = await callAI(modelToUse, prompt, false);
-        return response.replace(/["""]/g, '');
-    } catch (error) {
-        console.error("[AI 任務失敗] 時空守序者任務:", error);
-        return "你腦中閃過一個不屬於這個時代的念頭，但很快便將其甩開，專注於眼前的江湖事。";
-    }
-}
-
-
-
-async function getAISummary(oldSummary, newRoundData) {
-    const prompt = getSummaryPrompt(oldSummary, newRoundData);
-    try {
-        const text = await callAI(aiConfig.summary, prompt, true);
-        return parseJsonResponse(text).summary;
-    } catch (error) {
-        console.error("[AI 任務失敗] 檔案管理員任務:", error);
-        return oldSummary;
-    }
-}
-
-async function getAIStory(playerModelChoice, longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, worldEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates) {
-    const prompt = getStoryPrompt(longTermSummary, recentHistory, playerAction, userProfile, username, currentTimeOfDay, playerPower, playerMorality, levelUpEvents, romanceEventToWeave, worldEventToWeave, locationContext, npcContext, playerBulkScore, actorCandidates);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.story;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 故事大師任務:", error);
-        return null;
-    }
-}
-
-async function getAIPrequel(playerModelChoice, recentHistory) {
-    const prompt = getPrequelPrompt(recentHistory);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.prequel;
-        const text = await callAI(modelToUse, prompt, false);
-        return text;
-    } catch (error) {
-        console.error("[AI 任務失敗] 江湖說書人任務:", error);
-        return "江湖說書人今日嗓子不適，未能道出前情提要...";
-    }
-}
-
-async function getAISuggestion(roundData, playerModelChoice = null) {
-    const prompt = getSuggestionPrompt(roundData);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.suggestion || 'minimax';
-        const text = await callAI(modelToUse, prompt, false);
-        return text.replace(/["""]/g, '');
-    } catch (error) {
-        console.error("[AI 任務失敗] 機靈書僮任務:", error);
-        return "江湖之大，何處不可去得？";
-    }
-}
-
-async function getAIEncyclopedia(longTermSummary, username, npcDetails) {
-    const prompt = getEncyclopediaPrompt(longTermSummary, username, npcDetails);
-    try {
-        const text = await callAI(aiConfig.encyclopedia, prompt, true);
-        return parseJsonResponse(text).encyclopediaHtml;
-    } catch (error) {
-        console.error("[AI 任務失敗] 江湖史官任務:", error);
-        return `<div class="chapter"><h2 class="chapter-title">錯誤</h2><p class="entry-content">史官在翻閱你的記憶時遇到了困難，暫時無法完成編撰。</p></div>`;
-    }
-}
-
-
-async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext) {
-    const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.npcChat;
-        const reply = await callAI(modelToUse, prompt, true);
-        return reply;
-    } catch (error) {
-        console.error("[AI 任務失敗] 聊天大師任務:", error);
-        return JSON.stringify({
-            response: "（他似乎心事重重，沒有回答你。）",
-            friendlinessChange: 0,
-            romanceChange: 0,
-            itemChanges: []
-        });
-    }
-}
-
-async function getAIChatSummary(playerModelChoice, username, npcName, fullChatHistory, longTermSummary) {
-    const prompt = getChatSummaryPrompt(username, npcName, fullChatHistory, longTermSummary);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.npcChatSummary;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 摘要師任務:", error);
-        return {
-            story: `你與${npcName}進行了一番交談，但其中的細節已隨風而逝，只留下模糊的印象。`,
-            evt: `與${npcName}的一席話`
-        };
-    }
-}
-
-async function getAITradeSummary(playerModelChoice, username, npcName, tradeDetails, longTermSummary) {
-    if (!tradeDetails) {
-        console.error("[AI 任務失敗] 呼叫交易摘要師時缺少 tradeDetails。");
-        return {
-            story: `你與${npcName}完成了一筆交易，雙方各取所需，皆大歡喜。`,
-            evt: `與${npcName}的交易`
-        };
-    }
-    const prompt = getTradeSummaryPrompt(username, npcName, tradeDetails, longTermSummary);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.npcChatSummary || 'minimax';
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error(`[AI 任務失敗] 交易摘要師任務 (for ${npcName}):`, error);
-        return {
-            story: `你與${npcName}完成了一筆交易，雙方各取所需，皆大歡喜。`,
-            evt: `與${npcName}的交易`
-        };
-    }
-}
-
-async function getAICombatAction(playerModelChoice, playerProfile, combatState, playerAction) {
-    const prompt = getCombatPrompt(playerProfile, combatState, playerAction);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.combat;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 戰鬥裁判任務:", error);
-        return {
-            narrative: "[系統] 戰鬥發生混亂，裁判一時無法看清場上局勢，請你重新下達指令。",
-            combatOver: false
-        };
-    }
-}
-
-async function getAICombatSetup(playerAction, lastRoundData) {
-    const prompt = getCombatSetupPrompt(playerAction, lastRoundData);
-    try {
-        const modelToUse = aiConfig.combatSetup || 'minimax';
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 戰鬥導演任務:", error);
-        return {
-            combatants: [{ name: "未知敵人", status: "怒不可遏！" }],
-            allies: [],
-            bystanders: [],
-            combatIntro: "一場混亂的戰鬥爆發了，但場上局勢無人能看清！"
-        };
-    }
-}
-
-
-async function getAIGiveItemResponse(playerModelChoice, playerProfile, npcProfile, itemInfo) {
-    const prompt = getGiveItemPrompt(playerProfile, npcProfile, itemInfo);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.giveItem;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 江湖交際大師任務:", error);
-        return {
-            npc_response: "（他看著你送出的東西，一時語塞，不知該如何是好。）",
-            friendlinessChange: 0,
-            itemChanges: []
-        };
-    }
-}
-
-async function getAINarrativeForGive(lastRoundData, playerName, npcName, itemName, npcResponse) {
-    const prompt = getGiveNarrativePrompt(lastRoundData, playerName, npcName, itemName, npcResponse);
-    try {
-        return await callAI(aiConfig.giveNarrative, prompt, false);
-    } catch (error) {
-        console.error("[AI 任務失敗] 贈予事件小說家任務:", error);
-        return `你將${itemName}給了${npcName}。`;
-    }
-}
-
-async function getRelationGraph(longTermSummary, username, npcDetails) {
-    const prompt = getRelationGraphPrompt(longTermSummary, username, npcDetails);
-    try {
-        const text = await callAI(aiConfig.relationGraph, prompt, true);
-        return parseJsonResponse(text).mermaidSyntax;
-    } catch (error) {
-        console.error("[AI 任務失敗] 關係圖百曉生任務:", error);
-        return "graph TD;\nA[錯誤]; A-->B[無法生成關係圖];";
-    }
-}
-
-
-async function getAIEpilogue(playerData) {
-    const prompt = getEpiloguePrompt(playerData);
-    try {
-        const modelToUse = aiConfig.epilogue || 'minimax';
-        const story = await callAI(modelToUse, prompt, false);
-        return story;
-    } catch (error) {
-        console.error(`[AI 任務失敗] 史官司馬遷任務 for ${playerData.username}:`, error);
-        return `江湖路遠，${playerData.username}的身影就此消逝在歷史的長河中。關於${playerData.deathInfo.cause}的傳聞眾說紛紜，但終究無人能窺其全貌。${playerData.finalStats.gender === 'female' ? '她' : '他'}的親友與仇敵，也隨著時間的流逝，各自走向了不同的命運。斯人已逝，徒留傳說，供後人茶餘飯後，偶爾談說。`;
-    }
-}
-
-async function getAIDeathCause(playerModelChoice, username, lastRoundData) {
-    const prompt = getDeathCausePrompt(username, lastRoundData);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.deathCause;
-        const cause = await callAI(modelToUse, prompt, false);
-        return cause.replace(/["""]/g, '');
-    } catch (error) {
-        console.error(`[AI 任務失敗] 司命星君任務 for ${username}:`, error);
-        return "似乎是積勞成疾，舊傷復發，在睡夢中安然離世。";
-    }
-}
-
-
-async function getAISurrenderResult(playerModelChoice, playerProfile, combatState) {
-    const prompt = getSurrenderPrompt(playerProfile, combatState);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.surrender;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 談判專家任務:", error);
-        return {
-            accepted: false,
-            narrative: "你試圖認輸，但對方殺氣騰騰，似乎沒有任何商量的餘地，系統暫時無法判斷其意圖，請你繼續戰鬥。",
-            outcome: null
-        };
-    }
-}
-
-
-async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog, killerName) {
-    const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog, killerName);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.postCombat || 'minimax';
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 戰場清掃者任務:", error);
-        const playerWon = finalCombatState.enemies.every(e => e.hp <= 0);
-        return {
-            narrative: playerWon ? "你擊敗了對手，但四周一片狼藉，空氣中瀰漫著血腥味，讓你一時無法回神。" : "你眼前一黑，重重地倒在地上，失去了知覺。",
-            outcome: {
-                summary: playerWon ? "你贏得了戰鬥。" : "你被擊敗了。",
-                playerChanges: {
-                    PC: playerWon ? "你雖然獲勝，但也消耗了大量體力，感到有些疲憊。" : "你身受重傷，氣息奄奄。",
-                },
-                itemChanges: [],
-                npcUpdates: []
-            }
-        };
-    }
-}
-
-module.exports = {
-    callAI,
-    aiConfig,
-    getAIGeneratedImage,
-    getAIAnachronismResponse,
-    getAIForgetSkillStory,
-    getAICultivationResult,
-    getAIPerNpcSummary,
-    getAISummary,
-    getAIStory,
-    getAIPrequel,
-    getAISuggestion,
-    getAIEncyclopedia,
-    getAICombatAction,
-    getAICombatSetup,
-    getAIChatResponse,
-    getAIChatSummary,
-    getAITradeSummary,
-    getAIGiveItemResponse,
-    getAINarrativeForGive,
-    getRelationGraph,
-    getAIEpilogue,
-    getAIDeathCause,
-    getAISurrenderResult,
-    getAIPostCombatResult,
-};
+module.exports = { callAI, getAIGeneratedImage, parseJsonResponse };

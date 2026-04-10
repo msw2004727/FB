@@ -78,6 +78,12 @@ export function appendMessageToStory(htmlContent, className, options = {}) {
     }
 
     storyTextContainer.appendChild(p);
+
+    // DOM 回收：超過 60 個子元素時移除最舊的
+    const MAX_STORY_ELEMENTS = 60;
+    while (storyTextContainer.children.length > MAX_STORY_ELEMENTS) {
+        storyTextContainer.removeChild(storyTextContainer.firstChild);
+    }
 }
 
 export function addRoundTitleToStory(titleText) {

@@ -10,11 +10,7 @@ router.use(rateLimit(30, 60 * 1000));
 const { callAI, getAIGeneratedImage } = require('../services/aiService');
 const { aiConfig } = require('../aiConfig');
 
-// --- JSON parse helper (mirrors the one in aiService.js) ---
-function parseJsonResponse(text) {
-    const clean = text.replace(/^```json\s*|```\s*$/g, '');
-    return JSON.parse(clean);
-}
+const { parseJsonResponse } = require('../services/aiService');
 
 // =============================================================================
 // TASK HANDLERS
@@ -243,112 +239,10 @@ const TASK_HANDLERS = {
         return { prompt, json: true, configKey: 'proactiveChat' };
     },
 
-    'trade-summary': (ctx) => {
-        const { getTradeSummaryPrompt } = require('../prompts/tradeSummaryPrompt');
-        const prompt = getTradeSummaryPrompt(
-            ctx.username,
-            ctx.npcName,
-            ctx.tradeDetails,
-            ctx.longTermSummary
-        );
-        return { prompt, json: true, configKey: 'npcChatSummary' };
-    },
-
-    // -------------------------------------------------------------------------
-    // World & Generators
-    // -------------------------------------------------------------------------
-
-    'encyclopedia': (ctx) => {
-        const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt');
-        const prompt = getEncyclopediaPrompt(ctx.longTermSummary, ctx.username, ctx.npcDetails);
-        return { prompt, json: true, configKey: 'encyclopedia' };
-    },
-
-    'relation-graph': (ctx) => {
-        const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt');
-        const prompt = getRelationGraphPrompt(ctx.longTermSummary, ctx.username, ctx.npcDetails);
-        return { prompt, json: true, configKey: 'relationGraph' };
-    },
-
-    'romance-event': (ctx) => {
-        const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt');
-        const prompt = getRomanceEventPrompt(ctx.playerProfile, ctx.npcProfile, ctx.eventType);
-        return { prompt, json: true, configKey: 'romanceEvent' };
-    },
-
-    'bounty-generator': (ctx) => {
-        const { getBountyGeneratorPrompt } = require('../prompts/bountyGeneratorPrompt');
-        const prompt = getBountyGeneratorPrompt(ctx.playerContext);
-        return { prompt, json: true, configKey: 'bounty' };
-    },
-
-    'item-generator': (ctx) => {
-        const { getItemGeneratorPrompt } = require('../prompts/itemGeneratorPrompt');
-        const prompt = getItemGeneratorPrompt(ctx.itemName, ctx.context);
-        return { prompt, json: true, configKey: 'itemTemplate' };
-    },
-
     'location-generator': (ctx) => {
         const { getLocationGeneratorPrompt } = require('../prompts/locationGeneratorPrompt');
         const prompt = getLocationGeneratorPrompt(ctx.locationName, ctx.locationType, ctx.worldSummary);
         return { prompt, json: true, configKey: 'location' };
-    },
-
-    'reward-generator': (ctx) => {
-        const { getRewardGeneratorPrompt } = require('../prompts/rewardGeneratorPrompt');
-        const prompt = getRewardGeneratorPrompt(ctx.bounty, ctx.playerProfile);
-        return { prompt, json: true, configKey: 'reward' };
-    },
-
-    'skill-generator': (ctx) => {
-        const { getSkillGeneratorPrompt } = require('../prompts/skillGeneratorPrompt');
-        const prompt = getSkillGeneratorPrompt(ctx.skillName);
-        return { prompt, json: true, configKey: 'skillTemplate' };
-    },
-
-    // -------------------------------------------------------------------------
-    // Cultivation & Skill
-    // -------------------------------------------------------------------------
-
-    'cultivation': (ctx) => {
-        const { getCultivationPrompt } = require('../prompts/cultivationPrompt');
-        const profileForPrompt = { ...ctx.playerProfile, username: ctx.username };
-        const prompt = getCultivationPrompt(
-            profileForPrompt,
-            ctx.skillToPractice,
-            ctx.days,
-            ctx.outcome,
-            ctx.storyHint
-        );
-        return { prompt, json: false, configKey: 'narrative' };
-    },
-
-    'forget-skill': (ctx) => {
-        const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt');
-        const prompt = getForgetSkillPrompt(ctx.playerProfile, ctx.skillName);
-        return { prompt, json: false, configKey: 'narrative' };
-    },
-
-    // -------------------------------------------------------------------------
-    // Misc
-    // -------------------------------------------------------------------------
-
-    'random-event': (ctx) => {
-        const { getRandomEventPrompt } = require('../prompts/randomEventPrompt');
-        const prompt = getRandomEventPrompt(ctx.eventType, ctx.playerProfile);
-        return { prompt, json: true, configKey: 'story' };
-    },
-
-    'beggar-inquiry': (ctx) => {
-        const { getBeggarInquiryPrompt } = require('../prompts/beggarInquiryPrompt');
-        const prompt = getBeggarInquiryPrompt(ctx.playerProfile, ctx.targetNpcProfile, ctx.userQuery);
-        return { prompt, json: true, configKey: 'npcChat' };
-    },
-
-    'relationship-fix': (ctx) => {
-        const { getRelationshipFixPrompt } = require('../prompts/relationshipFixPrompt');
-        const prompt = getRelationshipFixPrompt(ctx.playerProfile, ctx.orphanNpcProfile);
-        return { prompt, json: true, configKey: 'npcProfile' };
     },
 };
 
