@@ -408,33 +408,27 @@ router.post('/generate', async (req, res, next) => {
             }
         }
 
-        // Phase: 主線進度評估（story 任務後自動執行，fire-and-forget 注入結果）
+        // Phase: 主線進度評估（fire-and-forget，不阻塞回應）
         if (task === 'story' && data && typeof data === 'object') {
-            try {
-                const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
-                const story = data.story || (data.roundData && data.roundData.story) || '';
-                const achieved = context.achievedMilestones || [];
-                const clues = context.cluesSummary || '';
-                const evalPrompt = getProgressEvaluatorPrompt(story, achieved, clues);
-
-                if (evalPrompt) {
+            const storyForEval = data.story || (data.roundData && data.roundData.story) || '';
+            const achieved = context.achievedMilestones || [];
+            const clues = context.cluesSummary || '';
+            // 非同步執行，不 await
+            (async () => {
+                try {
+                    const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
+                    const evalPrompt = getProgressEvaluatorPrompt(storyForEval, achieved, clues);
+                    if (!evalPrompt) return;
                     const evalRaw = await callAI('minimax', evalPrompt, true, {});
-                    try {
-                        const evalResult = parseJsonResponse(evalRaw);
-                        // 注入評估結果到回應中
-                        if (!data.roundData) data.roundData = {};
-                        data.roundData.progressEval = evalResult;
-                        if (evalResult.questJournal) {
-                            data.roundData.questJournal = evalResult.questJournal;
-                        }
-                        if (evalResult.triggered) {
-                            console.log(`[Progress] Milestone triggered! Reason: ${evalResult.reason}`);
-                        }
-                    } catch (_) {}
+                    const evalResult = parseJsonResponse(evalRaw);
+                    if (evalResult.triggered) {
+                        console.log(`[Progress] Milestone triggered! Reason: ${evalResult.reason}`);
+                    }
+                    // 結果會在下一回合透過 context 帶入
+                } catch (e) {
+                    console.warn('[Progress] Evaluation failed (non-blocking):', e.message);
                 }
-            } catch (progErr) {
-                console.warn('[Progress] Evaluation failed (non-blocking):', progErr.message);
-            }
+            })();
         }
 
         return res.json({
