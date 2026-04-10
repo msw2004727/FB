@@ -2,8 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies
-RUN pip install --no-cache-dir chromadb pyyaml
+# Install dependencies (sentence-transformers for Chinese embedding model)
+RUN pip install --no-cache-dir chromadb sentence-transformers
+
+# Pre-download bge-small-zh-v1.5 model at build time (avoids cold-start delay)
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
 
 # Copy server
 COPY mempalace_server.py .

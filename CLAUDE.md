@@ -120,7 +120,8 @@ fb/
 ├── CHANGELOG.md             # 更新日誌
 ├── claude-memory.md         # Claude 記憶日誌
 ├── PWA_MIGRATION_PLAN.md    # 遷移計劃書
-├── MEMPALACE_INTEGRATION_PLAN.md # MemPalace 計劃書
+├── MEMPALACE_INTEGRATION_PLAN.md # MemPalace 整合計劃書
+├── MEMPALACE_OPTIMIZATION_PLAN.md # MemPalace 優化計畫書（5 項優化 + 實施時程）
 └── AI模型型號.md             # AI 模型設定文件
 ```
 
@@ -264,3 +265,48 @@ Fallback 機制：非預設模型失敗時自動切換回 MiniMax。
 6. **GM 面板**：輸入 `/*GM` 可開啟上帝模式面板
 7. **MemPalace 為可選**：記憶系統不可用時遊戲正常運作（降級機制）
 8. **AI Proxy URL 可配置**：localStorage `wenjiang_ai_proxy_url` 可覆蓋預設
+9. **繁體中文雙層防護**：`aiService.js` 全域注入 `LANG_SYSTEM_RULE`（system message），且每個 prompt 檔案都有「語言鐵律」
+
+---
+
+## MemPalace 記憶系統
+
+### 技術來源
+- **官方 GitHub**：https://github.com/milla-jovovich/mempalace
+- **第三方分析**：https://github.com/lhl/agentic-memory/blob/main/ANALYSIS-mempalace.md
+- **架構**：Python + ChromaDB（向量記憶）+ SQLite（知識圖譜），MCP Server 19 工具
+
+### 本專案實作（自建 HTTP Server，非官方 MCP）
+
+```
+ai-proxy/mempalace_server.py    # Python HTTP server (port 8200)
+ai-proxy/services/mempalaceClient.js  # Node.js 客戶端
+ai-proxy/mempalace/Dockerfile   # 容器化部署
+```
+
+- **寫入**：每回合 fire-and-forget 寫入 3 類記憶（main_story / npc_interactions / events）+ KG 事實
+- **讀取**：故事生成前呼叫 `buildDeepMemoryContext()`，語義搜索 + KG 查詢，注入 prompt
+- **降級**：2 秒 timeout，不可用時回傳空字串，遊戲正常運作
+- **部署**：Google Cloud Run (asia-east2)
+
+### 目前使用率 vs 官方功能
+
+| 功能 | 官方有 | 本專案 | 狀態 |
+|------|--------|--------|------|
+| ChromaDB 向量搜索 | ✅ | ✅ | 已用 |
+| Wing 分隔 | ✅ | ✅ | 已用 |
+| Room 分類 | ✅ | ✅（3 個）| 已用 |
+| KG 時序三元組 | ✅ | ✅ | 已用 |
+| 4 層漸進式載入 | ✅ | ❌ | 待優化 |
+| Hall 記憶分類 | ✅ | ❌ | 待優化 |
+| KG timeline / as_of | ✅ | ❌ | 待優化 |
+| 去重機制 | ✅ | ❌ | 待優化 |
+| 記憶衰減 | ❌ | ❌ | 雙方皆缺 |
+| 中文 embedding | ❌ | ❌ | 需自行換模型 |
+
+### 已知瓶頸（100 回合壓力測試）
+
+- 記憶無上限累積，搜索品質隨回合下降
+- 預設 embedding (`all-MiniLM-L6-v2`) 對中文語義搜索不友好
+- 搜索固定 limit（行動 3 筆 / NPC 2 筆），無 recency 加權
+- longTermSummary 無長度上限，第 100 回合估計 80-150 KB（~27K-50K tokens）

@@ -50,9 +50,16 @@ const TASK_HANDLERS = {
             ctx.actorCandidates,
             ctx.blackShadowEvent
         );
-        // Phase 2: 注入深度記憶上下文
+        // v3.0: 注入深度記憶上下文（在生成指令之前，讓 LLM 更好地注意到）
         if (ctx.deepMemoryContext) {
-            prompt += `\n\n## 【深度記憶 — AI 長期記憶系統提供的相關歷史資訊】\n以下是與當前行動相關的過往記憶。請自然地將這些記憶融入你的故事敘述中（例如角色提起過去的事、呼應之前的伏筆），但不要生硬地逐條列出。如果記憶與當前場景無關，可以忽略。\n${ctx.deepMemoryContext}\n`;
+            // 找到最後一行「現在，請根據...」並在其前面插入
+            const finalInstructionIndex = prompt.lastIndexOf('現在，請根據');
+            if (finalInstructionIndex > 0) {
+                const deepMemSection = `\n\n## 【深度記憶 — AI 長期記憶系統提供的相關歷史資訊】\n以下是與當前行動相關的過往記憶。請自然地將這些記憶融入你的故事敘述中（例如角色提起過去的事、呼應之前的伏筆），但不要生硬地逐條列出。如果記憶與當前場景無關，可以忽略。\n${ctx.deepMemoryContext}\n\n`;
+                prompt = prompt.slice(0, finalInstructionIndex) + deepMemSection + prompt.slice(finalInstructionIndex);
+            } else {
+                prompt += `\n\n## 【深度記憶】\n${ctx.deepMemoryContext}\n`;
+            }
         }
         return { prompt, json: true, configKey: 'story' };
     },
@@ -361,13 +368,14 @@ router.post('/generate', async (req, res, next) => {
                 const playerId = context.player?.id || context.profileId || 'unknown';
                 const playerAction = context.playerAction || '';
                 const npcNames = context.actorCandidates || Object.keys(context.npcContext || {});
-                const deepMemory = await mempalace.buildDeepMemoryContext(playerId, playerAction, npcNames);
+                const currentRound = context.currentRound || context.round || 0;
+                const deepMemory = await mempalace.buildDeepMemoryContext(playerId, playerAction, npcNames, currentRound);
                 if (deepMemory) {
                     context.deepMemoryContext = deepMemory;
-                    console.log(`[MemPalace Phase 2] Injected ${deepMemory.length} chars of memory context`);
+                    console.log(`[MemPalace v3] Injected ${deepMemory.length} chars (R${currentRound})`);
                 }
             } catch (memErr) {
-                console.warn('[MemPalace Phase 2] Search failed (non-blocking):', memErr.message);
+                console.warn('[MemPalace v3] Search failed (non-blocking):', memErr.message);
             }
         }
 
