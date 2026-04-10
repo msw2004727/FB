@@ -19,26 +19,11 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '200kb' }));
 
 // --- Health check ---
-app.get('/health', async (_req, res) => {
-    const mmKey = process.env.MINIMAX_API_KEY || '';
-    let apiTest = 'skipped';
-    try {
-        const { OpenAI } = require('openai');
-        const mm = new OpenAI({ apiKey: mmKey, baseURL: 'https://api.minimaxi.chat/v1' });
-        const r = await mm.chat.completions.create({
-            model: 'MiniMax-M2.7',
-            messages: [{ role: 'user', content: '說一個字' }],
-        });
-        let t = r.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-        apiTest = 'OK: ' + t.slice(0, 20);
-    } catch (e) {
-        apiTest = 'FAIL: ' + (e.status || '') + ' ' + e.message.slice(0, 100);
-    }
+app.get('/health', (_req, res) => {
     res.json({
         status: 'ok',
         uptime: process.uptime(),
-        minimax_key_set: mmKey.length > 0,
-        apiTest,
+        timestamp: new Date().toISOString(),
     });
 });
 
