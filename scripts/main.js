@@ -297,32 +297,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
 
-        document.addEventListener('click', (e) => {
-            const locationBtn = e.target.closest('#view-location-details-btn');
-            if (locationBtn) {
-                if (gameState.currentLocationData) {
-                    modal.openLocationDetailsModal(gameState.currentLocationData);
-                } else {
-                    alert("當前地區的詳細情報尚未載入。");
-                }
-            }
-        });
-
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
         if (dom.submitButton) dom.submitButton.addEventListener('click', gameLoop.handlePlayerAction);
         if (dom.playerInput) dom.playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); gameLoop.handlePlayerAction(); } });
-        
-        if (dom.closeLocationDetailsBtn) {
-            dom.closeLocationDetailsBtn.addEventListener('click', modal.closeLocationDetailsModal);
-        }
-        if (dom.locationDetailsModal) {
-            dom.locationDetailsModal.addEventListener('click', (e) => {
-                if (e.target === dom.locationDetailsModal) {
-                    modal.closeLocationDetailsModal();
-                }
-            });
-        }
 
 
         setGameContainerHeight();
