@@ -368,7 +368,7 @@ router.post('/generate', async (req, res, next) => {
                 const playerId = context.player?.id || context.profileId || 'unknown';
                 const playerAction = context.playerAction || '';
                 const npcNames = context.actorCandidates || Object.keys(context.npcContext || {});
-                const currentRound = context.currentRound || context.round || 0;
+                const currentRound = context.currentRound ?? context.round ?? 0;
                 const deepMemory = await mempalace.buildDeepMemoryContext(playerId, playerAction, npcNames, currentRound);
                 if (deepMemory) {
                     context.deepMemoryContext = deepMemory;
@@ -380,63 +380,79 @@ router.post('/generate', async (req, res, next) => {
         }
 
         // Build prompt from context
-        const { prompt, json: isJsonExpected, configKey } = handler(context);
+        let { prompt, json: isJsonExpected, configKey } = handler(context);
 
         // Determine which model to use: explicit request > aiConfig default > minimax
         const modelToUse = model || aiConfig[configKey] || 'minimax';
 
         console.log(`[AI Proxy] task="${task}" model="${modelToUse}" json=${isJsonExpected} hasUserKey=${!!apiKey}`);
 
-        // Call the AI (pass user-provided API key if present)
+        // === story 任務：主故事 + 選項並行 ===
+        if (task === 'story') {
+            const { getOptionsPrompt } = require('../prompts/optionsPrompt');
+            const t0 = Date.now();
+
+            // 並行發出兩個 AI 呼叫
+            const [storyRaw, optionsRaw] = await Promise.all([
+                callAI(modelToUse, prompt, true, {}, apiKey || null),
+                // 選項 prompt 極短，用同一個模型但獨立呼叫
+                callAI('minimax', getOptionsPrompt(
+                    context.playerAction || '',
+                    context.recentHistory?.[context.recentHistory.length - 1]?.EVT || '',
+                    context.player?.PC || ''
+                ), true, {}),
+            ]);
+
+            console.log(`[AI Proxy] Parallel calls done in ${Date.now() - t0}ms`);
+
+            let data;
+            try { data = parseJsonResponse(storyRaw); } catch (_) { data = storyRaw; }
+
+            // 合併選項結果
+            if (data && typeof data === 'object') {
+                try {
+                    const opts = parseJsonResponse(optionsRaw);
+                    if (!data.roundData) data.roundData = {};
+                    if (opts.actionOptions) data.roundData.actionOptions = opts.actionOptions;
+                    if (opts.actionMorality) data.roundData.actionMorality = opts.actionMorality;
+                    if (opts.suggestion) data.roundData.suggestion = opts.suggestion;
+                } catch (_) {
+                    console.warn('[AI Proxy] Options parse failed, using fallback');
+                }
+
+                // MemPalace: fire-and-forget
+                try {
+                    const mempalace = require('../services/mempalaceClient');
+                    const playerId = context.player?.id || context.profileId || 'unknown';
+                    const story = data.story || (data.roundData && data.roundData.story) || '';
+                    mempalace.saveRoundMemory(playerId, data.roundData || data, story);
+                } catch (_) {}
+
+                // 進度評估: fire-and-forget
+                const storyForEval = data.story || (data.roundData && data.roundData.story) || '';
+                (async () => {
+                    try {
+                        const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
+                        const evalPrompt = getProgressEvaluatorPrompt(storyForEval, context.achievedMilestones || [], context.cluesSummary || '');
+                        if (!evalPrompt) return;
+                        const evalRaw = await callAI('minimax', evalPrompt, true, {});
+                        const evalResult = parseJsonResponse(evalRaw);
+                        if (evalResult.triggered) console.log(`[Progress] Milestone triggered! ${evalResult.reason}`);
+                    } catch (_) {}
+                })();
+            }
+
+            return res.json({ success: true, data, model_used: modelToUse });
+        }
+
+        // === 非 story 任務：原始流程 ===
         const rawText = await callAI(modelToUse, prompt, isJsonExpected, {}, apiKey || null);
 
-        // Try to parse JSON if expected; otherwise return raw text
         let data;
         if (isJsonExpected) {
-            try {
-                data = parseJsonResponse(rawText);
-            } catch (_parseErr) {
-                // Return raw text if JSON parsing fails -- let the client handle it
-                data = rawText;
-            }
+            try { data = parseJsonResponse(rawText); } catch (_) { data = rawText; }
         } else {
             data = rawText;
-        }
-
-        // MemPalace: 自動寫入記憶（fire-and-forget，不阻塞回應）
-        if (task === 'story' && data && typeof data === 'object') {
-            try {
-                const mempalace = require('../services/mempalaceClient');
-                const playerId = context.player?.id || context.profileId || 'unknown';
-                const story = data.story || (data.roundData && data.roundData.story) || '';
-                const roundData = data.roundData || data;
-                mempalace.saveRoundMemory(playerId, roundData, story);
-            } catch (memErr) {
-                console.warn('[MemPalace] Write failed (non-blocking):', memErr.message);
-            }
-        }
-
-        // Phase: 主線進度評估（fire-and-forget，不阻塞回應）
-        if (task === 'story' && data && typeof data === 'object') {
-            const storyForEval = data.story || (data.roundData && data.roundData.story) || '';
-            const achieved = context.achievedMilestones || [];
-            const clues = context.cluesSummary || '';
-            // 非同步執行，不 await
-            (async () => {
-                try {
-                    const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
-                    const evalPrompt = getProgressEvaluatorPrompt(storyForEval, achieved, clues);
-                    if (!evalPrompt) return;
-                    const evalRaw = await callAI('minimax', evalPrompt, true, {});
-                    const evalResult = parseJsonResponse(evalRaw);
-                    if (evalResult.triggered) {
-                        console.log(`[Progress] Milestone triggered! Reason: ${evalResult.reason}`);
-                    }
-                    // 結果會在下一回合透過 context 帶入
-                } catch (e) {
-                    console.warn('[Progress] Evaluation failed (non-blocking):', e.message);
-                }
-            })();
         }
 
         return res.json({
