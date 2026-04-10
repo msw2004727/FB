@@ -22,6 +22,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // --- PWA 安裝提示 ---
+    let _deferredInstallPrompt = null;
+    const pwaBanner = document.getElementById('pwa-install-banner');
+    const pwaBtn = document.getElementById('pwa-install-btn');
+    const pwaIosHelpBtn = document.getElementById('pwa-ios-help-btn');
+    const pwaIosTooltip = document.getElementById('pwa-ios-tooltip');
+
+    // iOS / 非支援瀏覽器：顯示橫幅 + 問號說明
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        _deferredInstallPrompt = e;
+        if (pwaBanner) pwaBanner.style.display = '';
+    });
+
+    // iOS 無 beforeinstallprompt，手動顯示橫幅
+    if (isIos && !isStandalone && pwaBanner) {
+        pwaBanner.style.display = '';
+    }
+
+    if (pwaBtn) {
+        pwaBtn.addEventListener('click', async () => {
+            if (_deferredInstallPrompt) {
+                _deferredInstallPrompt.prompt();
+                const result = await _deferredInstallPrompt.userChoice;
+                if (result.outcome === 'accepted') {
+                    if (pwaBanner) pwaBanner.style.display = 'none';
+                }
+                _deferredInstallPrompt = null;
+            } else if (isIos) {
+                // iOS 沒有原生安裝提示，展開說明
+                if (pwaIosTooltip) pwaIosTooltip.classList.toggle('visible');
+            }
+        });
+    }
+
+    // 問號按鈕：toggle iOS 說明
+    if (pwaIosHelpBtn && pwaIosTooltip) {
+        pwaIosHelpBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pwaIosTooltip.classList.toggle('visible');
+        });
+    }
+
+    // 已安裝後隱藏
+    window.addEventListener('appinstalled', () => {
+        if (pwaBanner) pwaBanner.style.display = 'none';
+        _deferredInstallPrompt = null;
+    });
+
     // 檢查是否有活躍檔案
     const savedProfileId = localStorage.getItem('wenjiang_active_profile');
     let activeProfile = null;

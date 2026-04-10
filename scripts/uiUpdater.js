@@ -30,9 +30,9 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     if (!roundData) return;
 
     updateStatusBar(roundData);
-    // 角色狀態：14字上限
+    // 角色狀態：30字上限，可換行
     const pcText = String(roundData.PC || '狀態穩定');
-    pcContent.textContent = pcText.length > 14 ? pcText.slice(0, 14) + '…' : pcText;
+    pcContent.textContent = pcText.length > 30 ? pcText.slice(0, 30) + '…' : pcText;
     pcContent.title = pcText;
     updateDeathCountdownUI(roundData.deathCountdown);
     updateMoralityBar(roundData.morality);

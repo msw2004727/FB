@@ -101,16 +101,9 @@
                 </div>
             </div>
             <div class="dashboard-content">
-                <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;">
-                    <button id="pwa-install-btn" class="pwa-install-btn" title="安裝到桌面">
-                        <span class="pwa-install-text">安裝遊戲到桌面</span>
-                        <i class="fas fa-download pwa-install-icon"></i>
-                    </button>
-                </div>
-
                 <div class="info-card">
                     <h4><i class="fas fa-user"></i> 角色狀態 (PC)</h4>
-                    <div id="pc-content" class="status-text-field" style="max-width:14em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">--</div>
+                    <div id="pc-content" class="status-text-field">--</div>
                 </div>
 
                 <div class="info-card">
@@ -147,6 +140,28 @@
                         </button>
                     </div>
                     <small class="ai-switcher-note">注意：更換核心後，故事風格與文筆將會改變。</small>
+                </div>
+
+                <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;">
+                    <div class="pwa-install-wrapper">
+                        <button id="pwa-install-btn" class="pwa-install-btn" title="安裝到桌面">
+                            <img src="icons/icon01.png" alt="" class="pwa-install-bg" />
+                            <div class="pwa-install-glare"></div>
+                            <div class="pwa-install-overlay">
+                                <span class="pwa-install-text">安裝遊戲到桌面</span>
+                                <i class="fas fa-download pwa-install-icon"></i>
+                            </div>
+                        </button>
+                        <button id="pwa-ios-help-btn" class="pwa-ios-help-btn" title="iOS 安裝說明" aria-label="iOS安裝說明">
+                            <i class="fas fa-question"></i>
+                        </button>
+                    </div>
+                    <div id="pwa-ios-tooltip" class="pwa-ios-tooltip">
+                        <div class="pwa-ios-tooltip-arrow"></div>
+                        <div class="pwa-ios-step"><span class="pwa-ios-step-num">1</span>點擊 Safari 底部的 <i class="fas fa-arrow-up-from-bracket"></i> 分享按鈕</div>
+                        <div class="pwa-ios-step"><span class="pwa-ios-step-num">2</span>向下滑動，點擊「<strong>加入主畫面</strong>」</div>
+                        <div class="pwa-ios-step"><span class="pwa-ios-step-num">3</span>點擊右上角「<strong>新增</strong>」即可完成</div>
+                    </div>
                 </div>
             </div>
         </aside>

@@ -262,9 +262,9 @@ async function getAIAnachronismResponse(playerModelChoice, playerAction, anachro
     try {
         const modelToUse = playerModelChoice || aiConfig.narrative || 'minimax';
         const response = await callAI(modelToUse, prompt, false);
-        return response.replace(/[“””]/g, '');
+        return response.replace(/["""]/g, '');
     } catch (error) {
-        console.error(“[AI 任務失敗] 時空守序者任務:”, error);
+        console.error("[AI 任務失敗] 時空守序者任務:", error);
         return "你腦中閃過一個不屬於這個時代的念頭，但很快便將其甩開，專注於眼前的江湖事。";
     }
 }
@@ -311,7 +311,7 @@ async function getAISuggestion(roundData, playerModelChoice = null) {
     try {
         const modelToUse = playerModelChoice || aiConfig.suggestion || 'minimax';
         const text = await callAI(modelToUse, prompt, false);
-        return text.replace(/["“”]/g, '');
+        return text.replace(/["""]/g, '');
     } catch (error) {
         console.error("[AI 任務失敗] 機靈書僮任務:", error);
         return "江湖之大，何處不可去得？";
@@ -472,7 +472,7 @@ async function getAIDeathCause(playerModelChoice, username, lastRoundData) {
     try {
         const modelToUse = playerModelChoice || aiConfig.deathCause;
         const cause = await callAI(modelToUse, prompt, false);
-        return cause.replace(/["“”]/g, '');
+        return cause.replace(/["""]/g, '');
     } catch (error) {
         console.error(`[AI 任務失敗] 司命星君任務 for ${username}:`, error);
         return "似乎是積勞成疾，舊傷復發，在睡夢中安然離世。";

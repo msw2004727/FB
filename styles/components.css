@@ -37,60 +37,134 @@ body.dark-theme .prequel-summary h3 {
 }
 
 .pwa-install-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
+    display: block;
     width: 100%;
-    aspect-ratio: 2.8 / 1;
+    aspect-ratio: 3.7 / 1;
     border: 1px solid var(--light-border);
     border-radius: 12px;
     cursor: pointer;
-    font-family: var(--font-serif);
-    font-size: 1rem;
-    font-weight: bold;
-    color: #fff;
-    background-color: var(--light-accent);
-    background-image: var(--pwa-bg-image, none);
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    box-shadow:
-        0 6px 18px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
     position: relative;
     overflow: hidden;
+    padding: 0;
+    background: #2a1f14;
+    box-shadow:
+        0 6px 18px rgba(0, 0, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
-/* 背景圖存在時加暗底以確保文字可讀 */
-.pwa-install-btn::before {
-    content: '';
+/* 底圖：放大 115% 填滿無留邊，往左移 25% */
+.pwa-install-bg {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.15),
-        rgba(0, 0, 0, 0.45)
-    );
-    border-radius: inherit;
+    top: 50%;
+    left: 50%;
+    width: 140%;
+    height: 140%;
+    object-fit: cover;
+    transform: translate(-50%, -50%) translateX(1%);
     pointer-events: none;
     z-index: 0;
 }
 
-.pwa-install-text,
-.pwa-install-icon {
-    position: relative;
+/* 對角線反光效果 */
+.pwa-install-glare {
+    position: absolute;
+    inset: 0;
     z-index: 1;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.45) 0%,
+            rgba(255, 255, 255, 0.18) 20%,
+            rgba(255, 255, 255, 0) 45%,
+            rgba(255, 255, 255, 0) 55%,
+            rgba(255, 255, 255, 0.06) 80%,
+            rgba(255, 255, 255, 0.15) 100%
+        );
+}
+
+/* 對角線光帶動畫 */
+.pwa-install-glare::after {
+    content: '';
+    position: absolute;
+    top: -60%;
+    left: -60%;
+    width: 50%;
+    height: 200%;
+    background: linear-gradient(
+        105deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.12) 40%,
+        rgba(255, 255, 255, 0.35) 50%,
+        rgba(255, 255, 255, 0.12) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: rotate(25deg);
+    pointer-events: none;
+}
+
+/* 文字層：底部透明底色條 */
+.pwa-install-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(245, 240, 230, 0.65);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    border-radius: 0 0 11px 11px;
+}
+
+body.dark-theme .pwa-install-overlay {
+    background: rgba(25, 22, 18, 0.7);
+}
+
+.pwa-install-text {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #3a2510;
+    letter-spacing: 0.05em;
+}
+
+body.dark-theme .pwa-install-text {
+    color: var(--dark-accent, #c3a98a);
+}
+
+.pwa-install-icon {
+    color: #3a2510;
+    font-size: 0.8rem;
+}
+
+body.dark-theme .pwa-install-icon {
+    color: var(--dark-accent, #c3a98a);
 }
 
 .pwa-install-btn:hover {
     transform: translateY(-1px);
     box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.15),
-        inset 0 1px 0 rgba(255, 255, 255, 0.25);
-    filter: brightness(1.08);
+        0 10px 28px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.pwa-install-btn:hover .pwa-install-glare {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.45) 0%,
+            rgba(255, 255, 255, 0.12) 30%,
+            rgba(255, 255, 255, 0) 50%,
+            rgba(0, 0, 0, 0.03) 70%,
+            rgba(0, 0, 0, 0.1) 100%
+        );
 }
 
 .pwa-install-btn:active {
@@ -98,11 +172,132 @@ body.dark-theme .prequel-summary h3 {
 }
 
 body.dark-theme .pwa-install-btn {
-    background-color: var(--dark-accent);
     border-color: var(--dark-border);
     box-shadow:
-        0 6px 18px rgba(0, 0, 0, 0.25),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        0 6px 18px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* 按鈕 + 問號的容器 */
+.pwa-install-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+/* 右上角 iOS 說明按鈕 */
+.pwa-ios-help-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: var(--light-accent, #6b4c2a);
+    font-size: 0.65rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    transition: transform 0.15s, background 0.15s;
+    padding: 0;
+}
+
+.pwa-ios-help-btn:hover {
+    transform: scale(1.15);
+    background: #fff;
+}
+
+body.dark-theme .pwa-ios-help-btn {
+    background: rgba(50, 50, 60, 0.85);
+    color: var(--dark-accent, #c3a98a);
+}
+
+/* iOS 安裝步驟提示氣泡 */
+.pwa-ios-tooltip {
+    display: none;
+    position: relative;
+    margin-top: 6px;
+    padding: 0.7rem 0.85rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.88);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+    border: 1px solid var(--light-border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--light-text-primary);
+}
+
+.pwa-ios-tooltip.visible {
+    display: block;
+}
+
+body.dark-theme .pwa-ios-tooltip {
+    background: rgba(35, 35, 45, 0.88);
+    border-color: var(--dark-border);
+    color: var(--dark-text-primary);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* 上方小箭頭 */
+.pwa-ios-tooltip-arrow {
+    position: absolute;
+    top: -6px;
+    right: 14px;
+    width: 12px;
+    height: 12px;
+    background: inherit;
+    border: inherit;
+    border-bottom: none;
+    border-right: none;
+    transform: rotate(45deg);
+    border-radius: 2px 0 0 0;
+}
+
+/* 步驟項 */
+.pwa-ios-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+}
+
+.pwa-ios-step i {
+    font-size: 0.85rem;
+    color: var(--light-accent);
+    width: 1em;
+    text-align: center;
+}
+
+body.dark-theme .pwa-ios-step i {
+    color: var(--dark-accent);
+}
+
+.pwa-ios-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--light-accent);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+body.dark-theme .pwa-ios-step-num {
+    background: var(--dark-accent);
 }
 
 .info-card {
