@@ -18,7 +18,7 @@ const SERVER_KEY_MODELS = new Set(['minimax']);
 // 各模型的顯示名稱與 Key 提示
 export const AI_MODEL_INFO = {
     openai:   { name: 'GPT-5.4',             hint: '格式通常為 sk-...' },
-    gemini:   { name: 'Gemini 3.1 Pro',       hint: '前往 Google AI Studio 取得' },
+    gemini:   { name: 'Gemini 2.5 Flash',      hint: '前往 Google AI Studio 取得' },
     gemma:    { name: 'Gemma 4 31B',          hint: '使用 Google AI Studio API Key' },
     deepseek: { name: 'DeepSeek-V4',          hint: '前往 DeepSeek 平台取得' },
     grok:     { name: 'Grok-4.20',            hint: '前往 xAI 平台取得' },
