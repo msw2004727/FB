@@ -908,6 +908,45 @@ body.dark-theme .action-option-btn:active {
     background: rgba(195, 169, 138, 0.18);
 }
 
+/* --- 善惡徽章 --- */
+.morality-badge {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.4rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.6rem;
+    font-weight: 800;
+    font-family: var(--font-serif);
+    line-height: 1;
+    z-index: 2;
+    border: 2px solid var(--light-surface-bg, #faf8f5);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+body.dark-theme .morality-badge {
+    border-color: var(--dark-surface-bg, #1a1a1e);
+}
+.morality-good {
+    background: #22c55e;
+    color: #fff;
+}
+.morality-evil {
+    background: #ef4444;
+    color: #fff;
+}
+.morality-neutral {
+    background: var(--light-border, #e0d8cd);
+    color: var(--light-text-secondary, #888);
+}
+body.dark-theme .morality-neutral {
+    background: var(--dark-border, #444);
+    color: var(--dark-text-secondary, #999);
+}
+
 /* --- 字數計數器 --- */
 .text-input-container {
     position: relative;

@@ -145,7 +145,7 @@ export async function processNewRoundData(data) {
     } else {
         const options = data.roundData.actionOptions;
         if (options && Array.isArray(options) && options.length >= 3) {
-            switchToOptionsMode(options);
+            switchToOptionsMode(options, data.roundData.actionMorality);
         } else {
             switchToTextInputMode();
         }
@@ -213,15 +213,27 @@ export async function handlePlayerAction(actionOverride) {
 
 // ??????獢??????????????獢?????????
 // --- 輸入模式切換 ---
-export function switchToOptionsMode(options) {
+export function switchToOptionsMode(options, morality) {
     gameState.inputMode = 'options';
     gameState.currentActionOptions = options.slice(0, 3);
+    gameState.currentActionMorality = (morality || [0, 0, 0]).slice(0, 3);
     if (dom.actionOptionButtons) {
         dom.actionOptionButtons.forEach((btn, i) => {
             const textEl = btn.querySelector('.option-text');
             if (textEl) textEl.textContent = options[i] || '';
             else btn.textContent = options[i] || '';
             btn.disabled = false;
+            // 善惡徽章
+            const m = gameState.currentActionMorality[i] || 0;
+            let badge = btn.querySelector('.morality-badge');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'morality-badge';
+                btn.appendChild(badge);
+            }
+            if (m > 0) { badge.textContent = '善'; badge.className = 'morality-badge morality-good'; }
+            else if (m < 0) { badge.textContent = '惡'; badge.className = 'morality-badge morality-evil'; }
+            else { badge.textContent = '中'; badge.className = 'morality-badge morality-neutral'; }
         });
     }
     if (dom.optionsMode) dom.optionsMode.style.display = '';
@@ -272,7 +284,7 @@ export async function loadInitialGame() {
             if (isTextTurn || !cachedOptions || cachedOptions.length < 3) {
                 switchToTextInputMode();
             } else {
-                switchToOptionsMode(cachedOptions);
+                switchToOptionsMode(cachedOptions, data.roundData.actionMorality);
             }
         }
     } catch (error) {
