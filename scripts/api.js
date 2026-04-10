@@ -49,53 +49,6 @@ export const api = {
         model: body.model
     })),
 
-    // ── Combat Routes ───────────────────────
-    initiateCombat: (body) => safeCall(() => gameEngine.initiateCombat({
-        targetNpcName: body.targetNpcName,
-        intention: body.intention,
-        model: body.model
-    })),
-
-    combatAction: (body) => safeCall(() => gameEngine.combatAction({
-        strategy: body.strategy,
-        skill: body.skill,
-        powerLevel: body.powerLevel,
-        target: body.target,
-        model: body.model
-    })),
-
-    combatSurrender: (body) => safeCall(() => gameEngine.combatSurrender({
-        model: body.model
-    })),
-
-    finalizeCombat: (body) => safeCall(() => gameEngine.finalizeCombat({
-        model: body.model
-    })),
-
-    // ── NPC Routes ──────────────────────────
-    getNpcProfile: (npcName) => safeCall(() => gameEngine.getNpcProfile(npcName)),
-
-    startTrade: (npcName) => safeCall(() => gameEngine.startTrade(npcName)),
-
-    confirmTrade: (body) => safeCall(() => gameEngine.confirmTrade({
-        npcName: body.npcName,
-        tradeDetails: body.tradeDetails || body.tradeState,
-        model: body.model
-    })),
-
-    npcChat: (body) => safeCall(() => gameEngine.npcChat({
-        npcName: body.npcName,
-        chatHistory: body.chatHistory,
-        playerMessage: body.playerMessage,
-        model: body.model
-    })),
-
-    endChat: (body) => safeCall(() => gameEngine.endChat({
-        npcName: body.npcName,
-        fullChatHistory: body.fullChatHistory || body.chatHistory,
-        model: body.model
-    })),
-
     // ── State Routes ────────────────────────
     getLatestGame: () => safeCall(() => gameEngine.getLatestGame()),
     startNewGame: () => safeCall(() => gameEngine.startNewGame()),
@@ -103,9 +56,6 @@ export const api = {
 
     // ── Epilogue Route ──────────────────────
     getEpilogue: () => safeCall(() => gameEngine.getEpilogue()),
-
-    // ── Image Route ─────────────────────────
-    generateNpcAvatar: (npcName) => safeCall(() => gameEngine.generateNpcAvatar(npcName)),
 
     // ── GM Panel Routes ─────────────────────
     getNpcsForGM: () => safeCall(async () => {

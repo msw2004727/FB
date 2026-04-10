@@ -1,20 +1,15 @@
 // scripts/main.js
 
 import * as gameLoop from './gameLoop.js';
-import * as interaction from './interactionHandlers.js';
-import * as modal from './modalManager.js';
 import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
-import { handleApiError, appendMessageToStory } from './uiUpdater.js';
+import { handleApiError } from './uiUpdater.js';
 import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
 import { exportSave, importSave, shouldRemindBackup, markBackupReminded, isIOSSafari } from '../client/utils/exportImport.js';
-
-
-interaction.setGameLoop(gameLoop);
 
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始化 IndexedDB
@@ -63,7 +58,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function openApiKeyModal(model) {
         const info = AI_MODEL_INFO[model] || { name: model, hint: '' };
-        dom.apikeyModalTitle.textContent = `設定 ${info.name} API Key`;
+        dom.apikeyModalTitle.textContent = '設定 AI 模型';
+        const modelNameEl = document.getElementById('apikey-modal-model-name');
+        if (modelNameEl) modelNameEl.textContent = info.name;
         dom.apikeyModalDesc.textContent = info.hint || '請輸入您的 API Key 以啟用此 AI 模型。';
         dom.apikeyInput.value = getStoredApiKey(model) || '';
         dom.apikeyInput.type = 'password';
@@ -132,6 +129,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // 點擊毛玻璃背景關閉彈窗
+    if (dom.apikeyModal) {
+        dom.apikeyModal.addEventListener('click', (e) => {
+            if (e.target === dom.apikeyModal) {
+                if (_previousModel && dom.aiModelSelector) {
+                    dom.aiModelSelector.value = _previousModel;
+                }
+                closeApiKeyModal();
+            }
+        });
+    }
+
+    // 變更 API Key 按鈕
+    const editApikeyBtn = document.getElementById('edit-apikey-btn');
+    if (editApikeyBtn && dom.aiModelSelector) {
+        editApikeyBtn.addEventListener('click', () => {
+            const current = dom.aiModelSelector.value;
+            if (needsUserApiKey(current)) {
+                openApiKeyModal(current);
+            } else {
+                alert('此模型使用內建金鑰，無需手動設定。');
+            }
+        });
+    }
+
     const username = activeProfile.username;
     if (dom.playerInput && username) {
         dom.playerInput.placeholder = `${username}接下來...`;
@@ -159,29 +181,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function initialize() {
-        // ... (initialize 函式中的其他事件綁定保持不變) ...
         let currentTheme = localStorage.getItem('game_theme') || 'light';
-        const themeIcon = dom.themeSwitcher.querySelector('i');
         document.body.className = `${currentTheme}-theme`;
-        themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
 
-        dom.themeSwitcher.addEventListener('click', () => {
-            currentTheme = (document.body.classList.contains('light-theme')) ? 'dark' : 'light';
-            localStorage.setItem('game_theme', currentTheme);
-            document.body.className = `${currentTheme}-theme`;
-            themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        });
+        if (dom.themeSwitcher) {
+            const themeIcon = dom.themeSwitcher.querySelector('i');
+            if (themeIcon) themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            dom.themeSwitcher.addEventListener('click', () => {
+                currentTheme = (document.body.classList.contains('light-theme')) ? 'dark' : 'light';
+                localStorage.setItem('game_theme', currentTheme);
+                document.body.className = `${currentTheme}-theme`;
+                if (themeIcon) themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            });
+        }
 
-        dom.headerToggleButton.addEventListener('click', () => {
-            const isCollapsed = dom.storyHeader.classList.toggle('collapsed');
-            dom.headerToggleButton.setAttribute('aria-expanded', String(!isCollapsed));
-            dom.headerToggleButton.title = isCollapsed ? '展開資訊欄' : '收起資訊欄';
-            dom.headerToggleButton.setAttribute('aria-label', isCollapsed ? '展開日期與時辰資訊欄' : '收起日期與時辰資訊欄');
-        });
+        if (dom.headerToggleButton) {
+            dom.headerToggleButton.addEventListener('click', () => {
+                const isCollapsed = dom.storyHeader.classList.toggle('collapsed');
+                dom.headerToggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+                dom.headerToggleButton.title = isCollapsed ? '展開資訊欄' : '收起資訊欄';
+                dom.headerToggleButton.setAttribute('aria-label', isCollapsed ? '展開日期與時辰資訊欄' : '收起日期與時辰資訊欄');
+            });
+        }
 
         const menuToggleIcon = dom.menuToggle?.querySelector('i');
         const setSidebarOpenState = (isOpen) => {
-            dom.gameContainer.classList.toggle('sidebar-open', isOpen);
+            if (dom.gameContainer) dom.gameContainer.classList.toggle('sidebar-open', isOpen);
             if (dom.menuToggle) {
                 dom.menuToggle.setAttribute('aria-expanded', String(isOpen));
                 dom.menuToggle.title = isOpen ? '收起右側欄' : '展開右側欄';
@@ -192,19 +217,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 menuToggleIcon.classList.toggle('fa-xmark', isOpen);
             }
         };
-        setSidebarOpenState(dom.gameContainer.classList.contains('sidebar-open'));
+        if (dom.gameContainer) setSidebarOpenState(dom.gameContainer.classList.contains('sidebar-open'));
 
-        dom.menuToggle.addEventListener('click', () => {
-            const willOpen = !dom.gameContainer.classList.contains('sidebar-open');
-            setSidebarOpenState(willOpen);
-        });
+        if (dom.menuToggle) {
+            dom.menuToggle.addEventListener('click', () => {
+                const willOpen = !dom.gameContainer?.classList.contains('sidebar-open');
+                setSidebarOpenState(willOpen);
+            });
+        }
 
-        dom.mainContent.addEventListener('click', (e) => {
-            if (e.target !== dom.mainContent) return;
-            if (window.innerWidth <= 1024 && dom.gameContainer.classList.contains('sidebar-open')) {
-                setSidebarOpenState(false);
-            }
-        });
+        if (dom.mainContent) {
+            dom.mainContent.addEventListener('click', (e) => {
+                if (e.target !== dom.mainContent) return;
+                if (window.innerWidth <= 1024 && dom.gameContainer?.classList.contains('sidebar-open')) {
+                    setSidebarOpenState(false);
+                }
+            });
+        }
 
         // 說明彈窗
         const helpBtn = document.getElementById('help-btn');
@@ -252,8 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        dom.suicideButton.addEventListener('click', async () => {
-            interaction.hideNpcInteractionMenu();
+        if (dom.suicideButton) dom.suicideButton.addEventListener('click', async () => {
             if (gameState.isRequesting) return;
             if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) {
                 gameLoop.setLoading(true, '英雄末路，傳奇落幕...');
@@ -282,29 +310,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
-        dom.submitButton.addEventListener('click', gameLoop.handlePlayerAction);
-        dom.playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); gameLoop.handlePlayerAction(); } });
+        if (dom.submitButton) dom.submitButton.addEventListener('click', gameLoop.handlePlayerAction);
+        if (dom.playerInput) dom.playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); gameLoop.handlePlayerAction(); } });
         
-        document.addEventListener('click', (e) => {
-            if (e.target && e.target.id === 'combat-confirm-btn') {
-                interaction.handleConfirmCombatAction();
-            }
-        });
-
-        dom.storyPanel.addEventListener('click', interaction.handleNpcClick);
-
-        dom.chatActionBtn.addEventListener('click', interaction.sendChatMessage);
-        dom.chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); interaction.sendChatMessage(); } });
-        
-        dom.closeChatBtn.addEventListener('click', () => {
-             gameState.isInChat = false;
-             gameState.currentChatNpc = null;
-             gameState.chatHistory = [];
-             modal.closeChatModal();
-             gameLoop.setLoading(false); 
-        });
-        dom.endChatBtn.addEventListener('click', interaction.endChatSession);
-
         if (dom.closeLocationDetailsBtn) {
             dom.closeLocationDetailsBtn.addEventListener('click', modal.closeLocationDetailsModal);
         }

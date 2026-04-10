@@ -26,7 +26,7 @@ function createAnthropicClient(apiKey) {
 }
 function createGeminiModel(apiKey) {
     const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: "gemini-3.1" });
+    return genAI.getGenerativeModel({ model: "gemini-3.1-pro" });
 }
 
 
@@ -79,11 +79,11 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
 
         switch (modelName) {
             case 'openai':
-            case 'gpt5.2': {
+            case 'gpt5.4': {
                 const key = userApiKey || process.env.OPENAI_API_KEY;
                 if (!key) throw new Error('缺少 OpenAI API Key，請在前端設定頁面填寫。');
                 const client = createOpenAIClient(key);
-                options.model = "gpt-5.2";
+                options.model = "gpt-5.4";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -95,7 +95,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 const key = userApiKey || process.env.DEEPSEEK_API_KEY;
                 if (!key) throw new Error('缺少 DeepSeek API Key，請在前端設定頁面填寫。');
                 const client = createDeepSeekClient(key);
-                options.model = "deepseek-v3.2";
+                options.model = "deepseek-v4";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
@@ -133,7 +133,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 if (!key) throw new Error('缺少 Anthropic Claude API Key，請在前端設定頁面填寫。');
                 const client = createAnthropicClient(key);
                 const claudeOptions = {
-                    model: "claude-sonnet-4.6",
+                    model: "claude-opus-4-6",
                     max_tokens: 4096,
                     messages: [{ role: "user", content: prompt }],
                 };

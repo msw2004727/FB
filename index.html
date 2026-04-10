@@ -67,7 +67,6 @@
                 <div id="story-text-wrapper">
                      <p class="system-message">正在連接你的世界，讀取記憶中...</p>
                 </div>
-                 <div id="npc-interaction-menu" class="npc-interaction-menu"></div>
             </div>
             <footer class="story-footer">
                 <div id="action-suggestion" class="action-suggestion"></div>
@@ -129,11 +128,11 @@
                         <div class="select-wrapper">
                             <select id="ai-model-selector">
                                 <option value="minimax" selected>MiniMax-M2.7</option>
-                                <option value="openai">GPT-5.2</option>
-                                <option value="gemini">Gemini 3.1</option>
-                                <option value="deepseek">DeepSeek-V3.2</option>
+                                <option value="openai">GPT-5.4</option>
+                                <option value="gemini">Gemini 3.1 Pro</option>
+                                <option value="deepseek">DeepSeek-V4</option>
                                 <option value="grok">Grok-4.20</option>
-                                <option value="claude">Claude-Sonnet-4.6</option>
+                                <option value="claude">Claude Opus 4.6</option>
                             </select>
                         </div>
                         <button id="edit-apikey-btn" class="edit-apikey-btn" title="設定 API Key">
@@ -255,68 +254,6 @@
             </div>
         </div>
         
-        <div id="combat-modal" class="combat-modal-overlay">
-            <div class="combat-modal-content">
-                <button id="close-combat-btn" class="combat-close-btn" title="取消戰鬥"><i class="fas fa-times"></i></button>
-                <div class="combat-dashboard">
-                    <div id="allies-roster" class="roster-panel"></div>
-                    <div id="enemies-roster" class="roster-panel"></div>
-                </div>
-                <div class="combat-main-panel">
-                    <div id="combat-log" class="combat-log-area"></div>
-                    <div class="combat-actions-container">
-                        <div id="combat-turn-counter" class="combat-turn-counter"></div>
-                        <div class="combat-actions-panel" class="combat-actions-panel">
-                            <div id="strategy-buttons" class="strategy-buttons">
-                                <button class="strategy-btn" data-strategy="attack"><i class="fas fa-gavel"></i> 攻擊</button>
-                                <button class="strategy-btn" data-strategy="defend"><i class="fas fa-shield-alt"></i> 防禦</button>
-                                <button class="strategy-btn" data-strategy="evade"><i class="fas fa-running"></i> 迴避</button>
-                                <button class="strategy-btn" data-strategy="support"><i class="fas fa-hands-helping"></i> 輔助</button>
-                                <button class="strategy-btn" data-strategy="heal"><i class="fas fa-briefcase-medical"></i> 治癒</button>
-                            </div>
-                            <div id="skill-selection" class="skill-selection"></div>
-                            <div id="confirm-action" class="confirm-action"></div>
-                        </div>
-                    </div>
-                </div>
-                 <div id="combat-loader" class="combat-loader-overlay">
-                    <div class="loader-dots">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="chat-modal" class="chat-modal-overlay">
-            <div class="chat-modal-content">
-                <div class="chat-header">
-                    <h3 id="chat-npc-name">與...交談</h3>
-                    <div id="chat-npc-info" class="chat-npc-info-list"></div>
-                    <div class="chat-close-container">
-                        <small class="chat-close-tip">(取消對話)</small>
-                        <button id="close-chat-btn" class="chat-close-btn" title="關閉視窗"><i class="fas fa-times"></i></button>
-                    </div>
-                </div>
-                <div id="chat-log" class="chat-log-area">
-                </div>
-                <div class="chat-input-area">
-                    <input type="text" id="chat-input" placeholder="你說..." autocomplete="off">
-                    <button id="chat-action-btn">發送</button>
-                </div>
-                <div class="chat-footer">
-                    <button id="end-chat-btn" class="end-chat-btn">結束交談</button>
-                </div>
-                 <div id="chat-loader" class="chat-loader-overlay">
-                    <div class="loader-dots">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                </div>
-            </div>
-        </div>
 
 
         
@@ -360,83 +297,6 @@
             </div>
         </div>
         
-        <div id="trade-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex-col items-center justify-center p-2 hidden">
-            <div class="bg-transparent w-full max-w-6xl h-[95vh] max-h-[800px] flex flex-col">
-                <header class="p-2 flex-shrink-0 relative">
-                    <h2 class="text-2xl md:text-3xl font-serif text-center text-amber-100/90 [text-shadow:_0_2px_2px_rgb(0_0_0_/_50%)]">
-                        <i class="fas fa-balance-scale-right mr-2"></i>貨物交割
-                    </h2>
-                     <button id="close-trade-btn" class="absolute top-2 right-2 text-amber-100/70 hover:text-white text-3xl">&times;</button>
-                </header>
-                <main class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden p-2">
-                    <div id="trade-player-panel" class="w-full md:w-1/3 flex flex-col gap-3 p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
-                        <div class="text-center flex-shrink-0">
-                            <h3 class="font-serif text-xl text-black">你</h3>
-                            <div class="text-sm text-gray-600 flex items-center justify-center gap-1">
-                                <i class="fas fa-coins text-yellow-600"></i>
-                                <span id="trade-player-money">0</span>
-                            </div>
-                        </div>
-                        <div class="flex-grow border-2 border-dashed border-[#d4cba7] rounded p-2 overflow-y-auto custom-scrollbar">
-                            <p class="text-xs text-center text-gray-500 mb-2">你的行囊</p>
-                            <ul id="trade-player-inventory" class="space-y-2"></ul>
-                        </div>
-                    </div>
-                    <div class="w-full md:w-1/3 flex flex-col gap-3 order-first md:order-none">
-                        <div id="trade-npc-offer-panel" class="h-1/2 flex flex-col p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
-                            <h4 id="trade-npc-name" class="font-serif text-center text-lg text-black border-b-2 border-dashed border-[#d4cba7] pb-2 mb-2"></h4>
-                            <ul id="trade-npc-offer" class="flex-grow space-y-2 overflow-y-auto pr-1 custom-scrollbar"></ul>
-                            <div class="mt-2 pt-2 border-t border-dashed border-[#d4cba7] flex items-center gap-2">
-                                <i class="fas fa-coins text-yellow-600"></i>
-                                <input type="number" id="trade-npc-money-input" value="0" min="0" class="w-full bg-transparent text-right font-bold text-black focus:outline-none" readonly>
-                            </div>
-                        </div>
-                        <div class="flex-shrink-0 bg-black/30 p-3 rounded-lg flex flex-col items-center justify-center gap-2 text-center">
-                            <div class="font-serif text-amber-100 text-lg">價值差</div>
-                            <div id="trade-value-diff" class="text-2xl font-bold text-white">0</div>
-                            <button id="confirm-trade-btn" class="bg-amber-600 text-white font-serif font-bold text-lg py-2 px-10 rounded-md shadow-md hover:bg-amber-500 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>成交</button>
-                        </div>
-                        <div id="trade-player-offer-panel" class="h-1/2 flex flex-col p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
-                            <h4 class="font-serif text-center text-lg text-black border-b-2 border-dashed border-[#d4cba7] pb-2 mb-2">你的出價</h4>
-                            <ul id="trade-player-offer" class="flex-grow space-y-2 overflow-y-auto pr-1 custom-scrollbar"></ul>
-                            <div class="mt-2 pt-2 border-t border-dashed border-[#d4cba7] flex items-center gap-2">
-                                <i class="fas fa-coins text-yellow-600"></i>
-                                <input type="number" id="trade-player-money-input" value="0" min="0" class="w-full bg-transparent text-right font-bold text-black focus:outline-none">
-                            </div>
-                        </div>
-                    </div>
-                    <div id="trade-npc-panel" class="w-full md:w-1/3 flex flex-col gap-3 p-3 rounded-lg transition-shadow duration-500" style="background-color: #f5eeda;">
-                        <div class="text-center flex-shrink-0">
-                            <h3 id="trade-npc-header-name" class="font-serif text-xl text-black"></h3>
-                            <div class="text-sm text-gray-600 flex items-center justify-center gap-1">
-                                <i class="fas fa-coins text-yellow-600"></i>
-                                <span id="trade-npc-money">0</span>
-                            </div>
-                        </div>
-                        <div class="flex-grow border-2 border-dashed border-[#d4cba7] rounded p-2 overflow-y-auto custom-scrollbar">
-                            <p class="text-xs text-center text-gray-500 mb-2">對方的貨物</p>
-                            <ul id="trade-npc-inventory" class="space-y-2"></ul>
-                        </div>
-                    </div>
-                </main>
-            </div>
-        </div>
-
-        <div id="beggar-inquiry-modal" class="beggar-inquiry-modal">
-            <h3 class="beggar-inquiry-title">探聽江湖秘聞</h3>
-            <p class="beggar-inquiry-cost">
-                <i class="fas fa-coins"></i>
-                將花費 100 文錢
-            </p>
-            <div class="beggar-inquiry-actions">
-                <button id="beggar-inquiry-cancel" class="beggar-inquiry-btn cancel" title="取消">
-                    <i class="fas fa-times"></i>
-                </button>
-                <button id="beggar-inquiry-confirm" class="beggar-inquiry-btn confirm" title="確認付錢">
-                    <i class="fas fa-check"></i>
-                </button>
-            </div>
-        </div>
 
 
 
@@ -444,8 +304,9 @@
 
         <div id="apikey-modal" class="apikey-modal-overlay">
             <div class="apikey-modal-content">
-                <h3 id="apikey-modal-title">設定 API Key</h3>
-                <p id="apikey-modal-desc">請輸入您的 API Key 以啟用此 AI 模型。</p>
+                <h3 id="apikey-modal-title">設定 AI 模型</h3>
+                <p id="apikey-modal-model-name" class="apikey-model-name"></p>
+                <p id="apikey-modal-desc" class="apikey-hint"></p>
                 <div class="apikey-input-wrapper">
                     <input type="password" id="apikey-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
                     <button id="apikey-toggle-visibility" class="apikey-toggle-btn" type="button" title="顯示/隱藏">

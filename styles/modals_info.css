@@ -292,20 +292,41 @@ body.dark-theme .apikey-modal-content {
 }
 
 .apikey-modal-content h3 {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.3rem 0;
     font-family: var(--font-serif);
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     color: var(--light-accent);
+    white-space: nowrap;
 }
 
 body.dark-theme .apikey-modal-content h3 {
     color: var(--dark-accent);
 }
 
+.apikey-model-name {
+    margin: 0 0 0.4rem 0;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--light-text-primary);
+    white-space: nowrap;
+}
+
+body.dark-theme .apikey-model-name {
+    color: var(--dark-text-primary);
+}
+
+.apikey-hint {
+    margin: 0 0 1.2rem 0;
+    font-size: 0.85rem;
+    color: var(--light-text-secondary);
+    white-space: nowrap;
+}
+
 .apikey-modal-content p {
     margin: 0 0 1.2rem 0;
     font-size: 0.9rem;
     color: var(--light-text-secondary);
+    white-space: nowrap;
 }
 
 body.dark-theme .apikey-modal-content p {
@@ -447,4 +468,52 @@ body.dark-theme .apikey-note {
 .apikey-input-wrapper input.shake {
     animation: shake 0.4s ease;
     border-color: #e74c3c !important;
+}
+
+/* --- AI 模型選擇列（下拉 + 鑰匙按鈕）--- */
+.ai-model-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ai-model-row .select-wrapper {
+    flex: 1;
+    min-width: 0;
+}
+
+.edit-apikey-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--light-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.5);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: var(--light-text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.edit-apikey-btn:hover {
+    background: var(--light-accent);
+    color: #fff;
+    border-color: var(--light-accent);
+}
+
+body.dark-theme .edit-apikey-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--dark-border);
+    color: var(--dark-text-secondary);
+}
+
+body.dark-theme .edit-apikey-btn:hover {
+    background: var(--dark-accent);
+    color: #fff;
+    border-color: var(--dark-accent);
 }

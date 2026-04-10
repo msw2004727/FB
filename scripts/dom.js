@@ -17,14 +17,6 @@ export function initializeDOM() {
     dom.themeSwitcher = document.getElementById('theme-switcher');
     dom.suicideButton = document.getElementById('suicide-btn');
     dom.aiModelSelector = document.getElementById('ai-model-selector');
-    dom.npcInteractionMenu = document.getElementById('npc-interaction-menu');
-
-    dom.chatModal = document.getElementById('chat-modal'); 
-    dom.chatInput = document.getElementById('chat-input');
-    dom.chatActionBtn = document.getElementById('chat-action-btn');
-    dom.closeChatBtn = document.getElementById('close-chat-btn');
-    dom.endChatBtn = document.getElementById('end-chat-btn');
-    dom.closeSkillsBtn = document.getElementById('close-skills-btn');
     dom.gmPanel = document.getElementById('gm-panel');
     dom.gmCloseBtn = document.getElementById('gm-close-btn');
     dom.gmMenu = document.getElementById('gm-menu');

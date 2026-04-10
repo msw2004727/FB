@@ -25,8 +25,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     }
 
     if (storyText) {
-        const processedStory = highlightNpcNames(storyText, roundData.NPC);
-        appendMessageToStory(processedStory, 'story-text', { allowHtml: true });
+        appendMessageToStory(storyText, 'story-text', { allowHtml: true });
     }
     if (!roundData) return;
 

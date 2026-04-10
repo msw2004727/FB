@@ -16,12 +16,12 @@ const SERVER_KEY_MODELS = new Set(['minimax']);
 
 // 各模型的顯示名稱與 Key 提示
 export const AI_MODEL_INFO = {
-    openai:   { name: 'GPT-5.2',            hint: '格式通常為 sk-...' },
-    gemini:   { name: 'Gemini 3.1',          hint: '前往 Google AI Studio 取得' },
-    deepseek: { name: 'DeepSeek-V3.2',       hint: '前往 DeepSeek 平台取得' },
-    grok:     { name: 'Grok-4.20',           hint: '前往 xAI 平台取得' },
-    claude:   { name: 'Claude-Sonnet-4.6',   hint: '格式通常為 sk-ant-...' },
-    minimax:  { name: 'MiniMax-M2.7',        hint: '' },
+    openai:   { name: 'GPT-5.4',             hint: '格式通常為 sk-...' },
+    gemini:   { name: 'Gemini 3.1 Pro',       hint: '前往 Google AI Studio 取得' },
+    deepseek: { name: 'DeepSeek-V4',          hint: '前往 DeepSeek 平台取得' },
+    grok:     { name: 'Grok-4.20',            hint: '前往 xAI 平台取得' },
+    claude:   { name: 'Claude Opus 4.6',      hint: '格式通常為 sk-ant-...' },
+    minimax:  { name: 'MiniMax-M2.7',         hint: '' },
 };
 
 function canUseBrowserStorage() {
