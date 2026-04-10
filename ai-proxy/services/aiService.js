@@ -24,7 +24,7 @@ function createGrokClient(apiKey) { return new OpenAI({ apiKey, baseURL: "https:
 function createAnthropicClient(apiKey) { return new Anthropic({ apiKey }); }
 function createGeminiModel(apiKey) {
     const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    return genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
 }
 
 // 全域繁體中文語言規則
