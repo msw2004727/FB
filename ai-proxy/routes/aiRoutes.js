@@ -50,6 +50,19 @@ const TASK_HANDLERS = {
             ctx.actorCandidates,
             ctx.blackShadowEvent
         );
+        // 注入里程碑進度（引導 AI 自然融入回家線索）
+        const achieved = ctx.achievedMilestones || [];
+        const clues = ctx.cluesSummary || '';
+        if (achieved.length > 0 || clues) {
+            const milestoneNames = ['異世界認知','第一條線索','關鍵人物','古老知識','重大阻礙','關鍵突破','最終準備','歸途'];
+            const progress = `已達成 ${achieved.length}/8 個歸途印記。`;
+            const next = achieved.length < 8 ? `下一個線索方向：${milestoneNames[achieved.length]}。` : '所有印記已集齊，可以嘗試回家了。';
+            const milestoneSection = `\n## 【主線進度 — 歸途印記】\n${progress}${next}\n已知線索：${clues || '尚無'}\n請在故事中偶爾自然地融入與「穿越」或「回家」相關的線索、NPC暗示或神秘事件，但不要強迫出現。讓玩家感覺到這個世界藏著穿越的秘密。\n`;
+            const idx = prompt.lastIndexOf('現在，請根據');
+            if (idx > 0) prompt = prompt.slice(0, idx) + milestoneSection + prompt.slice(idx);
+            else prompt += milestoneSection;
+        }
+
         // v3.0: 注入深度記憶上下文（在生成指令之前，讓 LLM 更好地注意到）
         if (ctx.deepMemoryContext) {
             // 找到最後一行「現在，請根據...」並在其前面插入
@@ -390,9 +403,10 @@ router.post('/generate', async (req, res, next) => {
         // === story 任務：主故事 + 選項並行 ===
         if (task === 'story') {
             const { getOptionsPrompt } = require('../prompts/optionsPrompt');
+            const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
             const t0 = Date.now();
 
-            // 並行發出兩個 AI 呼叫（選項也用玩家選的模型）
+            // 第一波並行：故事 + 選項
             const [storyRaw, optionsRaw] = await Promise.all([
                 callAI(modelToUse, prompt, true, {}, apiKey || null),
                 callAI(modelToUse, getOptionsPrompt(
@@ -402,45 +416,45 @@ router.post('/generate', async (req, res, next) => {
                 ), true, {}, apiKey || null),
             ]);
 
-            console.log(`[AI Proxy] Parallel calls done in ${Date.now() - t0}ms`);
-
             let data;
             try { data = parseJsonResponse(storyRaw); } catch (_) { data = storyRaw; }
 
             // 合併選項結果
             if (data && typeof data === 'object') {
+                if (!data.roundData) data.roundData = {};
                 try {
                     const opts = parseJsonResponse(optionsRaw);
-                    if (!data.roundData) data.roundData = {};
                     if (opts.actionOptions) data.roundData.actionOptions = opts.actionOptions;
                     if (opts.actionMorality) data.roundData.actionMorality = opts.actionMorality;
                     if (opts.suggestion) data.roundData.suggestion = opts.suggestion;
                 } catch (_) {
-                    console.warn('[AI Proxy] Options parse failed, using fallback');
+                    console.warn('[AI Proxy] Options parse failed');
+                }
+
+                // 第二波：進度評估（await 等結果，但 prompt 很短所以快）
+                const storyText = data.story || data.roundData.story || '';
+                const evalPrompt = getProgressEvaluatorPrompt(storyText, context.achievedMilestones || [], context.cluesSummary || '');
+                if (evalPrompt) {
+                    try {
+                        const evalRaw = await callAI('minimax', evalPrompt, true, {});
+                        const evalResult = parseJsonResponse(evalRaw);
+                        data.roundData.progressEval = evalResult;
+                        if (evalResult.questJournal) data.roundData.questJournal = evalResult.questJournal;
+                        if (evalResult.triggered) console.log(`[Progress] Milestone triggered! ${evalResult.reason}`);
+                    } catch (e) {
+                        console.warn('[Progress] Eval failed:', e.message);
+                    }
                 }
 
                 // MemPalace: fire-and-forget
                 try {
                     const mempalace = require('../services/mempalaceClient');
                     const playerId = context.player?.id || context.profileId || 'unknown';
-                    const story = data.story || (data.roundData && data.roundData.story) || '';
-                    mempalace.saveRoundMemory(playerId, data.roundData || data, story);
+                    mempalace.saveRoundMemory(playerId, data.roundData, storyText);
                 } catch (_) {}
-
-                // 進度評估: fire-and-forget
-                const storyForEval = data.story || (data.roundData && data.roundData.story) || '';
-                (async () => {
-                    try {
-                        const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
-                        const evalPrompt = getProgressEvaluatorPrompt(storyForEval, context.achievedMilestones || [], context.cluesSummary || '');
-                        if (!evalPrompt) return;
-                        const evalRaw = await callAI('minimax', evalPrompt, true, {});
-                        const evalResult = parseJsonResponse(evalRaw);
-                        if (evalResult.triggered) console.log(`[Progress] Milestone triggered! ${evalResult.reason}`);
-                    } catch (_) {}
-                })();
             }
 
+            console.log(`[AI Proxy] Total: ${Date.now() - t0}ms`);
             return res.json({ success: true, data, model_used: modelToUse });
         }
 
