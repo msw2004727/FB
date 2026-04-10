@@ -198,7 +198,30 @@ export async function getEpilogue() {
 
 export async function startNewGame() {
     const profileId = getActiveProfileId();
-    await clientDB.resetProfile(profileId);
     const profile = await clientDB.profiles.get(profileId);
-    return createNewGame(profile.username, profile.gender);
+    const username = profile.username;
+    const gender = profile.gender;
+
+    // 重置所有遊戲資料
+    await clientDB.resetProfile(profileId);
+
+    // 寫入新的 R0 存檔（不建立新 profile，避免 username 唯一索引衝突）
+    const initialRound = {
+        R: 0,
+        EVT: '莫名其妙的穿越',
+        story: `你睜開眼睛。\n\n頭頂是一片刺眼的藍天，身下是一堆扎人的乾草。空氣裡飄著一股你完全無法辨認的味道——像是有人把中藥房和燒烤攤強行混在一起。\n\n你猛地坐起來，四周是一條塵土飛揚的泥巴路，兩旁是低矮的土牆和掛著褪色布簾的店鋪。\n\n你完全不記得自己是怎麼到這裡的，腦子裡一片空白。\n\n然後你發現右手緊緊攥著一張皺巴巴的紙條：「任務：尋找回家的方法。」\n\n紙條背面：「附註：別死了，死了就真回不去了。」\n\n一個挑著扁擔的老大爺正好路過，用一種看傻子的眼神瞟了你一眼。`,
+        WRD: '大晴天',
+        LOC: ['梁國', '東境', '臨川', '無名村'],
+        PC: `${username}剛穿越，一臉懵。`,
+        NPC: [],
+        timeOfDay: '上午',
+        morality: 0,
+        yearName: '元祐', year: 1, month: 1, day: 1,
+        playerState: 'alive',
+        moralityChange: 0,
+        suggestion: '先搞清楚這是哪裡。'
+    };
+
+    await clientDB.saves.add(profileId, initialRound);
+    return { profile, roundData: initialRound };
 }

@@ -285,7 +285,7 @@
                     </div>
                 </div>
                 <footer class="epilogue-modal-footer">
-                    <button class="epilogue-btn" onclick="(async()=>{const{createNewGame,setActiveProfile,getActiveProfileId}=await import('./client/engine/gameEngine.js');const clientDB=(await import('./client/db/clientDB.js')).default;const pid=getActiveProfileId();await clientDB.resetProfile(pid);const p=await clientDB.profiles.get(pid);const r=await createNewGame(p.username,p.gender);setActiveProfile(r.profile.id);localStorage.setItem('wenjiang_active_profile',r.profile.id);window.location.reload();})()">
+                    <button class="epilogue-btn" onclick="(async()=>{const{startNewGame}=await import('./client/engine/gameEngine.js');await startNewGame();window.location.reload();})()">
                         <i class="fas fa-redo"></i> 重新開始
                     </button>
                 </footer>
