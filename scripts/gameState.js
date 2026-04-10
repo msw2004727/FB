@@ -4,6 +4,8 @@
 export const gameState = {
     currentRound: 0,
     isRequesting: false,
+    inputMode: 'text',              // 'text' 或 'options'
+    currentActionOptions: [],       // AI 生成的 3 個選項
     isInCombat: false,
     isInChat: false,
     currentChatNpc: null,

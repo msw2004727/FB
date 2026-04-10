@@ -722,6 +722,128 @@ body.dark-theme .action-suggestion {
     color: var(--dark-text-secondary);
 }
 
+/* --- 行動選項按鈕（一般回合）--- */
+.action-options-wrapper {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+}
+
+.action-option-btn {
+    flex: 1;
+    padding: 0.85rem 0.6rem;
+    font-size: 0.9rem;
+    font-family: var(--font-sans);
+    line-height: 1.4;
+    border: none;
+    border-left: 1px solid var(--light-border);
+    background: transparent;
+    color: var(--light-text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.action-option-btn:first-child {
+    border-left: none;
+}
+
+.action-option-btn:hover {
+    background-color: rgba(140, 111, 84, 0.1);
+    color: var(--light-accent);
+}
+
+.action-option-btn:active {
+    background-color: rgba(140, 111, 84, 0.18);
+}
+
+.action-option-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+body.dark-theme .action-option-btn {
+    border-left-color: var(--dark-border);
+    color: var(--dark-text-primary);
+}
+
+body.dark-theme .action-option-btn:hover {
+    background-color: rgba(195, 169, 138, 0.12);
+    color: var(--dark-accent);
+}
+
+body.dark-theme .action-option-btn:active {
+    background-color: rgba(195, 169, 138, 0.2);
+}
+
+/* --- 字數計數器 --- */
+.text-input-container {
+    position: relative;
+    flex-grow: 1;
+    display: flex;
+    align-items: stretch;
+}
+
+.text-input-container input {
+    width: 100%;
+    padding-right: 3.2rem;
+}
+
+.char-counter {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+    color: var(--light-text-secondary);
+    pointer-events: none;
+    font-family: var(--font-sans);
+    opacity: 0.6;
+}
+
+.char-counter-warning {
+    color: #d4a017;
+    opacity: 1;
+}
+
+.char-counter-full {
+    color: #dc3545;
+    opacity: 1;
+    font-weight: bold;
+}
+
+body.dark-theme .char-counter {
+    color: var(--dark-text-secondary);
+}
+
+body.dark-theme .char-counter-warning {
+    color: #fcc419;
+}
+
+body.dark-theme .char-counter-full {
+    color: #ff5263;
+}
+
+/* --- 輸入模式切換動畫 --- */
+.input-mode {
+    animation: fadeInMode 0.25s ease;
+}
+
+@keyframes fadeInMode {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+    .action-option-btn {
+        padding: 0.75rem 0.4rem;
+        font-size: 0.8rem;
+    }
+}
+
 /* --- NPC 姓名高亮樣式 --- */
 .npc-name {
     font-weight: bold;

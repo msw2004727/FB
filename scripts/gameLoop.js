@@ -22,7 +22,10 @@ export function setLoading(isLoading, text = '') {
     if (dom.playerInput) dom.playerInput.disabled = isLoading;
     if (dom.submitButton) {
         dom.submitButton.disabled = isLoading;
-        dom.submitButton.textContent = isLoading ? '送出中...' : '送出';
+        dom.submitButton.textContent = isLoading ? '送出中...' : '動作';
+    }
+    if (dom.actionOptionButtons) {
+        dom.actionOptionButtons.forEach(btn => btn.disabled = isLoading);
     }
 
     if (dom.aiThinkingLoader) {
@@ -154,20 +157,40 @@ export async function processNewRoundData(data) {
         return;
     }
 
+    // 根據下一回合決定輸入模式
+    const nextRound = (data.roundData.R || 0) + 1;
+    const isTextTurn = (nextRound === 1 || nextRound % 5 === 0);
+    if (isTextTurn) {
+        switchToTextInputMode();
+    } else {
+        const options = data.roundData.actionOptions;
+        if (options && Array.isArray(options) && options.length >= 3) {
+            switchToOptionsMode(options);
+        } else {
+            switchToTextInputMode();
+        }
+    }
 }
 
 
-export async function handlePlayerAction() {
-    const actionText = dom.playerInput.value.trim();
-    if (!actionText || gameState.isRequesting) return;
+export async function handlePlayerAction(actionOverride) {
+    let actionText;
+    if (actionOverride) {
+        actionText = actionOverride;
+    } else {
+        actionText = (dom.playerInput ? dom.playerInput.value.trim() : '');
+        if (!actionText) return;
+    }
+    if (gameState.isRequesting) return;
 
     if (actionText.toUpperCase() === '/*GM') {
-        dom.playerInput.value = '';
-        dom.gmPanel.classList.add('visible');
+        if (dom.playerInput) dom.playerInput.value = '';
+        if (dom.gmPanel) dom.gmPanel.classList.add('visible');
         return;
     }
 
-    dom.playerInput.value = '';
+    if (dom.playerInput) dom.playerInput.value = '';
+    if (dom.charCounter) dom.charCounter.textContent = '0/10';
 
     const prequelElement = dom.storyTextContainer.querySelector('.prequel-summary');
     if (prequelElement) {
@@ -209,6 +232,33 @@ export async function handlePlayerAction() {
 
 
 // ??????獢??????????????獢?????????
+// --- 輸入模式切換 ---
+export function switchToOptionsMode(options) {
+    gameState.inputMode = 'options';
+    gameState.currentActionOptions = options.slice(0, 3);
+    if (dom.actionOptionButtons) {
+        dom.actionOptionButtons.forEach((btn, i) => {
+            btn.textContent = options[i] || '';
+            btn.disabled = false;
+        });
+    }
+    if (dom.optionsMode) dom.optionsMode.style.display = '';
+    if (dom.textInputMode) dom.textInputMode.style.display = 'none';
+}
+
+export function switchToTextInputMode() {
+    gameState.inputMode = 'text';
+    gameState.currentActionOptions = [];
+    if (dom.optionsMode) dom.optionsMode.style.display = 'none';
+    if (dom.textInputMode) dom.textInputMode.style.display = '';
+    if (dom.playerInput) {
+        dom.playerInput.value = '';
+        dom.playerInput.disabled = false;
+    }
+    if (dom.charCounter) dom.charCounter.textContent = '0/10';
+}
+
+// --- 初始載入 ---
 export async function loadInitialGame() {
     setLoading(true, '正在連接你的世界，讀取記憶中...');
     try {
@@ -231,8 +281,17 @@ export async function loadInitialGame() {
             gameState.roundData = data.roundData;
             gameState.currentLocationData = data.locationData;
             gameState.currentRound = data.roundData.R;
-            // ?????????????????UI
             updateUI(data.story, data.roundData, null, data.locationData);
+
+            // 初始化輸入模式
+            const nextRound = (data.roundData.R || 0) + 1;
+            const isTextTurn = (nextRound === 1 || nextRound % 5 === 0);
+            const cachedOptions = data.roundData.actionOptions;
+            if (isTextTurn || !cachedOptions || cachedOptions.length < 3) {
+                switchToTextInputMode();
+            } else {
+                switchToOptionsMode(cachedOptions);
+            }
         }
     } catch (error) {
         handleApiError(error);

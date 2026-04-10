@@ -208,9 +208,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const username = activeProfile.username;
     if (dom.playerInput && username) {
-        dom.playerInput.placeholder = `${username}接下來...`;
+        dom.playerInput.placeholder = '在此輸入文字即可';
     } else if (dom.playerInput) {
-        dom.playerInput.placeholder = '接下來...';
+        dom.playerInput.placeholder = '在此輸入文字即可';
     }
 
     // 備份提醒
@@ -351,8 +351,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 
-        if (dom.submitButton) dom.submitButton.addEventListener('click', gameLoop.handlePlayerAction);
+        if (dom.submitButton) dom.submitButton.addEventListener('click', () => gameLoop.handlePlayerAction());
         if (dom.playerInput) dom.playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); gameLoop.handlePlayerAction(); } });
+
+        // 選項按鈕點擊 → 直接送出
+        if (dom.actionOptionButtons) {
+            dom.actionOptionButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const text = btn.textContent;
+                    if (text && !gameState.isRequesting) {
+                        gameLoop.handlePlayerAction(text);
+                    }
+                });
+            });
+        }
+
+        // 字數計數器
+        if (dom.playerInput && dom.charCounter) {
+            dom.playerInput.addEventListener('input', () => {
+                const len = dom.playerInput.value.length;
+                dom.charCounter.textContent = `${len}/10`;
+                dom.charCounter.classList.toggle('char-counter-warning', len >= 9);
+                dom.charCounter.classList.toggle('char-counter-full', len >= 10);
+            });
+        }
 
 
         setGameContainerHeight();

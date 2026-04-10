@@ -13,6 +13,10 @@ export function initializeDOM() {
     dom.headerToggleButton = document.getElementById('header-toggle-btn');
     dom.playerInput = document.getElementById('player-input');
     dom.submitButton = document.getElementById('submit-button');
+    dom.optionsMode = document.getElementById('options-mode');
+    dom.textInputMode = document.getElementById('text-input-mode');
+    dom.actionOptionButtons = document.querySelectorAll('.action-option-btn');
+    dom.charCounter = document.getElementById('char-counter');
     dom.menuToggle = document.getElementById('menu-toggle');
     dom.themeSwitcher = document.getElementById('theme-switcher');
     dom.suicideButton = document.getElementById('suicide-btn');

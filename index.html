@@ -70,9 +70,23 @@
             </div>
             <footer class="story-footer">
                 <div id="action-suggestion" class="action-suggestion"></div>
-                <div class="input-action-wrapper">
-                    <input type="text" id="player-input" placeholder="" autocomplete="off">
-                    <button id="submit-button">動作</button>
+
+                <div id="options-mode" class="input-mode" style="display:none;">
+                    <div class="action-options-wrapper">
+                        <button class="action-option-btn" data-option-index="0"></button>
+                        <button class="action-option-btn" data-option-index="1"></button>
+                        <button class="action-option-btn" data-option-index="2"></button>
+                    </div>
+                </div>
+
+                <div id="text-input-mode" class="input-mode">
+                    <div class="input-action-wrapper">
+                        <div class="text-input-container">
+                            <input type="text" id="player-input" placeholder="" autocomplete="off" maxlength="10">
+                            <span id="char-counter" class="char-counter">0/10</span>
+                        </div>
+                        <button id="submit-button">動作</button>
+                    </div>
                 </div>
             </footer>
         </main>
