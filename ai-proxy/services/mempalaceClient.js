@@ -1,7 +1,7 @@
 // ai-proxy/services/mempalaceClient.js
 // MemPalace Client v2.0 — Phase 1 (write) + Phase 2 (read) + Phase 3 (knowledge graph)
 
-const MEMPALACE_URL = process.env.MEMPALACE_URL || 'http://localhost:8200';
+const MEMPALACE_URL = process.env.MEMPALACE_URL || 'https://mempalace-server-322557520154.asia-east2.run.app';
 const TIMEOUT_MS = 2000;
 
 async function request(path, body) {
