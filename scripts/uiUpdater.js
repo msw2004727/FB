@@ -294,7 +294,7 @@ function updateMoralityBar(morality) {
         moralityBarIndicator.style.backgroundColor = colorVar;
     }
     const valueEl = document.getElementById('morality-value');
-    if (valueEl) valueEl.textContent = safeMorality > 0 ? `+${safeMorality}` : String(safeMorality);
+    if (valueEl) valueEl.textContent = safeMorality > 0 ? `(+${safeMorality})` : `(${safeMorality})`;
 }
 
 function updateDeathCountdownUI(countdownValue) {
