@@ -141,12 +141,14 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 textResponse = claudeResult.content[0].text;
                 break;
             case 'minimax':
-                options.model = "MiniMax-M1";
+                options.model = "MiniMax-M2.7";
                 if (isJsonExpected) {
                     options.response_format = { type: "json_object" };
                 }
                 const minimaxResult = await minimax.chat.completions.create(options);
                 textResponse = minimaxResult.choices[0].message.content;
+                // 清理 MiniMax 的 <think> 標籤
+                textResponse = textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
                 break;
             default:
                 console.log(`[AI 調度中心] 未知模型名稱 '${modelName}'，已自動切換至 'openai'。`);
@@ -201,8 +203,14 @@ async function getAIGeneratedImage(prompt) {
 
 // 清理並解析JSON的輔助函式
 function parseJsonResponse(text) {
-    const cleanJsonText = text.replace(/^```json\s*|```\s*$/g, '');
-    return JSON.parse(cleanJsonText);
+    let cleaned = text;
+    // 移除 MiniMax M2.7 的 <think>...</think> 思考標籤
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/g, '');
+    // 移除 markdown JSON 標記
+    cleaned = cleaned.replace(/^```json\s*|```\s*$/g, '');
+    // 去除前後空白
+    cleaned = cleaned.trim();
+    return JSON.parse(cleaned);
 }
 
 async function getAICultivationResult(username, playerProfile, skillToPractice, days, outcome, storyHint) {

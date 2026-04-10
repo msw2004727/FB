@@ -13,7 +13,7 @@
 | `deepseek` | DeepSeek-V3.2 | `deepseek-v3.2` | DeepSeek |
 | `grok` | Grok-4.20 | `grok-4.20` | xAI |
 | `claude` | Claude-Sonnet-4.6 | `claude-sonnet-4.6` | Anthropic |
-| `minimax` | MiniMax-M2.7 | `MiniMax-M1` | MiniMax |
+| `minimax` | MiniMax-M2.7 | `MiniMax-M2.7` | MiniMax |
 
 ## 相容別名（非UI選單）
 

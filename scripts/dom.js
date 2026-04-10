@@ -18,7 +18,6 @@ export function initializeDOM() {
     dom.logoutButton = document.getElementById('logout-btn');
     dom.suicideButton = document.getElementById('suicide-btn');
     dom.skillsBtn = document.getElementById('skills-btn');
-    dom.bountiesBtn = document.getElementById('bounties-btn');
     dom.aiModelSelector = document.getElementById('ai-model-selector');
     dom.npcInteractionMenu = document.getElementById('npc-interaction-menu');
 
@@ -27,8 +26,6 @@ export function initializeDOM() {
     dom.chatActionBtn = document.getElementById('chat-action-btn');
     dom.closeChatBtn = document.getElementById('close-chat-btn');
     dom.endChatBtn = document.getElementById('end-chat-btn');
-    dom.giveItemBtn = document.getElementById('give-item-btn');
-    dom.cancelGiveBtn = document.getElementById('cancel-give-btn');
     dom.closeSkillsBtn = document.getElementById('close-skills-btn');
     dom.gmPanel = document.getElementById('gm-panel');
     dom.gmCloseBtn = document.getElementById('gm-close-btn');

@@ -90,18 +90,6 @@ export const api = {
         model: body.model
     })),
 
-    giveItemToNpc: (body) => safeCall(() => {
-        // interactionHandlers 包裝在 body.giveData 內，需要解構
-        const giveData = body.giveData || body;
-        return gameEngine.giveItemToNpc({
-            targetNpcName: giveData.target || giveData.targetNpcName || body.targetNpcName,
-            itemName: giveData.itemName || body.itemName,
-            amount: giveData.amount || giveData.quantity || body.amount || 1,
-            itemType: giveData.itemType || body.itemType,
-            model: body.model
-        });
-    }),
-
     endChat: (body) => safeCall(() => gameEngine.endChat({
         npcName: body.npcName,
         fullChatHistory: body.fullChatHistory || body.chatHistory,
@@ -112,51 +100,19 @@ export const api = {
     getLatestGame: () => safeCall(() => gameEngine.getLatestGame()),
     startNewGame: () => safeCall(() => gameEngine.startNewGame()),
     forceSuicide: (body) => safeCall(() => gameEngine.forceSuicide({ model: body?.model })),
-    getInventory: () => safeCall(() => gameEngine.getInventory()),
     getRelations: () => safeCall(() => gameEngine.getRelations()),
     getNovel: () => safeCall(() => gameEngine.getNovel()),
-    getEncyclopedia: () => safeCall(() => gameEngine.getEncyclopedia()),
     getSkills: () => safeCall(() => gameEngine.getSkills()),
-    dropItem: (body) => safeCall(() => gameEngine.dropItem({ itemId: body.itemId })),
     forgetSkill: (body) => safeCall(() => gameEngine.forgetSkill({
         skillName: body.skillName,
         model: body.model
     })),
-
-    // ── Inventory Routes ────────────────────
-    equipItem: (instanceId) => safeCall(() => gameEngine.equipItem(instanceId)),
-    unequipItem: (instanceId) => safeCall(() => gameEngine.unequipItem(instanceId)),
-
-    // ── Bounty Route ────────────────────────
-    getBounties: () => safeCall(() => gameEngine.getBounties()),
 
     // ── Epilogue Route ──────────────────────
     getEpilogue: () => safeCall(() => gameEngine.getEpilogue()),
 
     // ── Map Route ───────────────────────────
     getMap: () => safeCall(() => gameEngine.getMap()),
-
-    // ── Beggar Routes ───────────────────────
-    summonBeggar: (body) => safeCall(async () => ({ success: true })),
-    startBeggarInquiry: (body) => safeCall(async () => {
-        const profileId = gameEngine.getActiveProfileId();
-        const inv = await clientDB.inventory.list(profileId);
-        const silver = inv.find(i => i.itemName === '銀兩' || i.templateId === '銀兩');
-        if (!silver || silver.quantity < 100) throw new Error('銀兩不足，需要至少 100 兩。');
-        const newBalance = silver.quantity - 100;
-        await clientDB.inventory.update(profileId, silver.instanceId, { quantity: newBalance });
-        return { success: true, newBalance };
-    }),
-    askBeggarQuestion: (body) => safeCall(async () => {
-        const { default: aiProxy } = await import('../client/ai/aiProxy.js');
-        const { buildLightContext } = await import('../client/engine/contextBuilder.js');
-        const profileId = gameEngine.getActiveProfileId();
-        const context = await buildLightContext(profileId);
-        return aiProxy.generate('beggar-inquiry', body.model, {
-            ...context,
-            userQuery: body.userQuery || body.question
-        });
-    }),
 
     // ── Image Route ─────────────────────────
     generateNpcAvatar: (npcName) => safeCall(() => gameEngine.generateNpcAvatar(npcName)),

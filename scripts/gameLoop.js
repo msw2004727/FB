@@ -2,7 +2,7 @@
 
 import { api } from './api.js';
 import { gameState } from './gameState.js';
-import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory, renderInventory, updateBulkStatus } from './uiUpdater.js';
+import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
 import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
 import * as interaction from './interactionHandlers.js';
@@ -18,12 +18,6 @@ const loadingDisclaimers = [
 ];
 let tipInterval = null;
 let disclaimerInterval = null;
-
-function updateBountyButton(hasNew) {
-    if (dom.bountiesBtn) {
-        dom.bountiesBtn.classList.toggle('has-new-bounty', hasNew);
-    }
-}
 
 export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
@@ -49,30 +43,16 @@ export function setLoading(isLoading, text = '') {
         const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
-            // ???????????????????????????????????????????????????
-            if (gameState.roundData && gameState.roundData.PSY) {
-                if (loaderDisclaimerElement) {
-                    // ???????<pre> ??????獢豱??????????????????????????????em>???偃??????????
-                    loaderDisclaimerElement.innerHTML = `你此刻心境：<em>${gameState.roundData.PSY}</em>`;
-                }
-                // ?????????????????????????????????????????????
-                if (disclaimerInterval) {
-                    clearInterval(disclaimerInterval);
-                    disclaimerInterval = null;
-                }
-            } else {
-                // ????????PSY???????????????????????????????????
-                const rotateDisclaimer = () => {
-                    if (loadingDisclaimers.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * loadingDisclaimers.length);
-                        if(loaderDisclaimerElement) {
-                            loaderDisclaimerElement.innerHTML = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
-                        }
+            const rotateDisclaimer = () => {
+                if (loadingDisclaimers.length > 0) {
+                    if(loaderDisclaimerElement) {
+                        loaderDisclaimerElement.innerHTML = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
                     }
-                };
-                rotateDisclaimer();
-                disclaimerInterval = setInterval(rotateDisclaimer, 10000);
-            }
+                }
+            };
+            rotateDisclaimer();
+            disclaimerInterval = setInterval(rotateDisclaimer, 10000);
+
 
             const rotateTip = () => {
                 if (gameTips.length > 0) {
@@ -209,8 +189,6 @@ export async function processNewRoundData(data) {
     // ?????????????????????? gameState.roundData ???????????
     updateUI(data.story, gameState.roundData, data.randomEvent, gameState.currentLocationData);
 
-    updateBountyButton(data.hasNewBounties);
-
     if (data.roundData.playerState === 'dead') {
         setLoading(false);
         handlePlayerDeath();
@@ -251,10 +229,7 @@ export async function handlePlayerAction() {
             model: dom.aiModelSelector.value
         });
         
-        // ????????????????????????????????????????????????????????
         if (data && data.roundData) {
-            // ????????????瞏剜????????????????? await api.getInventory(); ???????????
-            // ????????????????????????????蹓??????桀?????processNewRoundData
             processNewRoundData(data);
         } else {
             throw new Error('API 未回傳有效的 roundData。');
@@ -307,7 +282,6 @@ export async function loadInitialGame() {
             gameState.currentRound = data.roundData.R;
             // ?????????????????UI
             updateUI(data.story, data.roundData, null, data.locationData);
-            updateBountyButton(data.hasNewBounties);
         }
     } catch (error) {
         handleApiError(error);

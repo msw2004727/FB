@@ -1,7 +1,5 @@
 // scripts/uiUpdater.js
 import { MAX_POWER } from './config.js';
-import { api } from './api.js';
-import { gameState } from './gameState.js';
 import { DEFAULT_AI_MODEL, resetAiModelSelectionToDefault } from './aiModelPreference.js';
 
 // --- DOM元素獲取 ---
@@ -20,45 +18,7 @@ const staminaValue = document.getElementById('stamina-value');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const locationInfo = document.getElementById('location-info'); 
 const npcContent = document.getElementById('npc-content');
-const itmContent = document.getElementById('itm-content');
-const bulkStatus = document.getElementById('bulk-status');
-const qstContent = document.getElementById('qst-content');
-const psyContent = document.getElementById('psy-content');
-const clsContent = document.getElementById('cls-content');
 const actionSuggestion = document.getElementById('action-suggestion');
-const moneyContent = document.getElementById('money-content');
-
-// --- 圖示對照表 ---
-const slotConfig = {
-    head: { icon: 'fa-user-ninja' },
-    body: { icon: 'fa-user-shield' },
-    hands: { icon: 'fa-hand-rock' },
-    feet: { icon: 'fa-shoe-prints' },
-    accessory1: { icon: 'fa-ring' },
-    accessory2: { icon: 'fa-ring' },
-    manuscript: { icon: 'fa-book' },
-    weapon_right: { icon: 'fa-gavel' },
-    weapon_left: { icon: 'fa-gavel' },
-    weapon_back: { icon: 'fa-archive' },
-};
-
-const itemTypeConfig = {
-    '武器': { icon: 'fa-gavel' },
-    '裝備': { icon: 'fa-user-shield' },
-    '秘笈': { icon: 'fa-book-reader' },
-    '書籍': { icon: 'fa-book' },
-    '道具': { icon: 'fa-flask-potion' },
-    '材料': { icon: 'fa-gem' },
-    '財寶': { icon: 'fa-coins' },
-    '其他': { icon: 'fa-box' }
-};
-const CURRENCY_NAME_PRIORITY = ['\u9ec3\u91d1', '\u91d1\u689d', '\u91d1\u5e63', '\u9280\u7968', '\u9280\u5169', '\u788e\u9280', '\u9280\u5e63', '\u9285\u9322', '\u9285\u5e63'];
-const CURRENCY_NAME_KEYWORDS = ['\u9ec3\u91d1', '\u91d1\u689d', '\u91d1\u5e63', '\u9280\u7968', '\u9280\u5169', '\u788e\u9280', '\u9280\u5e63', '\u9285\u9322', '\u9285\u5e63', '\u5143\u5bf6'];
-const CURRENCY_TYPE_KEYWORDS = ['\u8ca1\u5bf6', '\u8ca8\u5e63', '\u91d1\u9322'];
-const CURRENCY_CATEGORY_KEYWORDS = ['\u8ca8\u5e63', '\u8ca1\u5bf6'];
-
-// 【規則修正】調整裝備顯示順序，以符合 "左腰 > 右腰 > 背後" 的規則
-const equipOrder = ['weapon_left', 'weapon_right', 'weapon_back', 'head', 'body', 'hands', 'feet', 'accessory1', 'accessory2', 'manuscript'];
 
 // --- UI 更新核心函式 ---
 
@@ -84,85 +44,10 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateDeathCountdownUI(roundData.deathCountdown);
     updatePowerBars(roundData);
     updateMoralityBar(roundData.morality);
-    updateBulkStatus(roundData.bulkScore || 0); 
     updateLocationInfo(locationData);
     updateNpcList(roundData.NPC);
-    renderInventory(roundData.inventory);
-    updateMoneyBagDisplay(roundData.inventory);
 
-    qstContent.textContent = roundData.QST || '暫無要事';
-    psyContent.textContent = roundData.PSY || '心如止水';
-    clsContent.textContent = roundData.CLS || '尚無線索';
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
-}
-
-function getItemDisplayName(item) {
-    return String(item?.itemName || item?.templateId || '').trim();
-}
-
-function containsKeyword(text, keywords) {
-    return keywords.some(keyword => text.includes(keyword));
-}
-
-export function isCurrencyItem(item) {
-    if (!item || typeof item !== 'object') return false;
-
-    const name = getItemDisplayName(item);
-    const itemType = String(item.itemType || '').trim();
-    const category = String(item.category || '').trim();
-
-    if (itemType && containsKeyword(itemType, CURRENCY_TYPE_KEYWORDS)) return true;
-    if (category && containsKeyword(category, CURRENCY_CATEGORY_KEYWORDS)) return true;
-    if (name && containsKeyword(name, CURRENCY_NAME_KEYWORDS)) return true;
-
-    return false;
-}
-
-function getCurrencyEntries(inventory) {
-    const totals = new Map();
-
-    (inventory || []).forEach((item) => {
-        if (!isCurrencyItem(item)) return;
-        const amount = Number(item.quantity) || 0;
-        if (amount <= 0) return;
-
-        const name = getItemDisplayName(item) || '\u8ca8\u5e63';
-        totals.set(name, (totals.get(name) || 0) + amount);
-    });
-
-    const priorityIndex = new Map(CURRENCY_NAME_PRIORITY.map((name, index) => [name, index]));
-
-    return [...totals.entries()]
-        .map(([name, amount]) => ({ name, amount }))
-        .sort((a, b) => {
-            const aPriority = priorityIndex.has(a.name) ? priorityIndex.get(a.name) : Number.MAX_SAFE_INTEGER;
-            const bPriority = priorityIndex.has(b.name) ? priorityIndex.get(b.name) : Number.MAX_SAFE_INTEGER;
-            if (aPriority !== bPriority) return aPriority - bPriority;
-            return a.name.localeCompare(b.name, 'zh-Hant');
-        });
-}
-
-export function updateMoneyBagDisplay(inventory) {
-    if (!moneyContent) return;
-
-    const currencyEntries = getCurrencyEntries(inventory);
-    if (currencyEntries.length === 0) {
-        moneyContent.classList.remove('money-display-list');
-        moneyContent.textContent = '\u7121\u8ca8\u5e63';
-        return;
-    }
-
-    if (currencyEntries.length === 1 && currencyEntries[0].name === '\u9280\u5169') {
-        moneyContent.classList.remove('money-display-list');
-        moneyContent.textContent = `${currencyEntries[0].amount} \u5169\u9280\u5b50`;
-        return;
-    }
-
-    moneyContent.classList.add('money-display-list');
-    moneyContent.innerHTML = currencyEntries.map((entry) => {
-        const safeName = escapeHtml(entry.name);
-        return `<div class=\"money-line\"><span class=\"money-name\">${safeName}</span><span class=\"money-amount\">x${entry.amount}</span></div>`;
-    }).join('');
 }
 
 export function appendMessageToStory(htmlContent, className, options = {}) {
@@ -199,10 +84,6 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-}
-
-function truncateByChars(value, maxChars) {
-    return Array.from(String(value ?? '').trim()).slice(0, maxChars).join('');
 }
 
 const ALLOWED_NPC_FRIENDLINESS_CLASSES = new Set([
@@ -246,7 +127,6 @@ function renderStatusRow(iconClass, label, value, { multiline = false } = {}) {
 }
 
 function updateStatusBar(roundData) {
-    const atmosphere = truncateByChars(roundData.ATM?.[0] || '未知', 8) || '未知';
     const weather = roundData.WRD || '晴朗';
     const location = roundData.LOC?.[0] || '未知之地';
     const dateString = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日`;
@@ -259,7 +139,6 @@ function updateStatusBar(roundData) {
         </div>
         <div class="status-info-list">
             ${renderStatusRow('fa-cloud-sun', '天氣', weather)}
-            ${renderStatusRow('fa-theater-masks', '氛圍', atmosphere)}
             ${renderStatusRow('fa-map-marked-alt', '地點', location, { multiline: true })}
         </div>
     `;
@@ -317,18 +196,6 @@ function updateDeathCountdownUI(countdownValue) {
     } else if (countdownEl) {
         countdownEl.remove();
     }
-}
-
-export function updateBulkStatus(score) {
-    if (!bulkStatus) return;
-    let emoji = '🎒';
-    let text = '輕裝上陣';
-    let colorClass = 'bulk-light';
-    if (score > 30) { emoji = '🥵'; text = '不堪重負'; colorClass = 'bulk-extreme'; } 
-    else if (score > 15) { emoji = '😫'; text = '重物纏身'; colorClass = 'bulk-heavy'; } 
-    else if (score > 5) { emoji = '🤔'; text = '略有份量'; colorClass = 'bulk-medium'; }
-    bulkStatus.innerHTML = `${emoji} 負重：${text}`;
-    bulkStatus.className = `bulk-status-display ${colorClass}`;
 }
 
 function updateLocationInfo(locationData) {
@@ -391,118 +258,6 @@ function highlightNpcNames(text, npcs) {
     }
     return highlightedText;
 }
-
-export function renderInventory(inventory) {
-    if (!itmContent) return;
-    itmContent.innerHTML = '';
-
-    const allItems = (inventory || []).filter(item => !isCurrencyItem(item));
-
-    allItems.sort((a, b) => {
-        const isEquippedA = a.isEquipped;
-        const isEquippedB = b.isEquipped;
-
-        if (isEquippedA && !isEquippedB) return -1;
-        if (!isEquippedA && isEquippedB) return 1;
-        if (isEquippedA && isEquippedB) {
-            return equipOrder.indexOf(a.equipSlot) - equipOrder.indexOf(b.equipSlot);
-        }
-        return (a.itemName || '').localeCompare(b.itemName || '', 'zh-Hant');
-    });
-
-    if (allItems.length === 0) {
-        itmContent.textContent = '\u7121\u4e00\u822c\u7269\u54c1';
-        return;
-    }
-
-    allItems.forEach(item => {
-        const itemEl = createItemEntry(item);
-        itmContent.appendChild(itemEl);
-    });
-}
-
-
-function createItemEntry(item) {
-    const entry = document.createElement('div');
-    entry.className = `item-entry ${item.isEquipped ? 'equipped' : ''}`;
-    entry.dataset.id = item.instanceId;
-    const safeItemId = escapeHtml(item.instanceId || '');
-    const safeItemName = escapeHtml(item.itemName || '未知物品');
-    const quantity = Number(item.quantity) || 0;
-
-    let iconClass = 'fa-box';
-    if (item.itemType && itemTypeConfig[item.itemType]) {
-        iconClass = itemTypeConfig[item.itemType].icon;
-    }
-    if (item.isEquipped && item.equipSlot && slotConfig[item.equipSlot]) {
-        iconClass = slotConfig[item.equipSlot].icon;
-    }
-
-    let equipControls = '';
-    if (item.itemType === '武器' || item.itemType === '裝備') {
-        equipControls = `
-            <div class="item-controls">
-                <label class="switch">
-                    <input type="checkbox" ${item.isEquipped ? 'checked' : ''} data-item-id="${safeItemId}">
-                    <span class="slider"></span>
-                </label>
-            </div>
-        `;
-    }
-
-    entry.innerHTML = `
-        <div class="item-info">
-             <i class="item-icon fa-solid ${iconClass}"></i>
-            <div>
-                 <a href="#" class="item-link" data-item-id="${safeItemId}">${safeItemName}</a>
-                 ${quantity > 1 ? `<span class="item-quantity">x${quantity}</span>` : ''}
-            </div>
-        </div>
-        ${equipControls}
-    `;
-
-    const checkbox = entry.querySelector('input[type="checkbox"]');
-    if (checkbox) {
-        checkbox.addEventListener('change', (e) => {
-            const itemId = e.target.dataset.itemId;
-            handleEquipToggle(itemId, e.target.checked);
-        });
-    }
-    return entry;
-}
-
-// 【核心修正】前端操作裝備的函式
-async function handleEquipToggle(itemId, shouldEquip) {
-    if (gameState.isRequesting) return;
-    gameState.isRequesting = true;
-    try {
-        let result;
-        // 根據是裝備還是卸下，呼叫不同的API函式
-        if (shouldEquip) {
-            result = await api.equipItem(itemId);
-        } else {
-            result = await api.unequipItem(itemId);
-        }
-
-        if (result.success && result.inventory) {
-             gameState.roundData.inventory = result.inventory;
-             if (result.bulkScore !== undefined) {
-                 gameState.roundData.bulkScore = result.bulkScore;
-                 updateBulkStatus(gameState.roundData.bulkScore);
-             }
-             renderInventory(gameState.roundData.inventory); 
-        } else {
-            throw new Error(result.message || '操作失敗');
-        }
-    } catch (error) {
-        console.error('裝備操作失敗:', error);
-        handleApiError(error);
-        renderInventory(gameState.roundData.inventory); 
-    } finally {
-        gameState.isRequesting = false;
-    }
-}
-
 
 export function handleApiError(error) {
     console.error('API error:', error);

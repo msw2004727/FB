@@ -51,11 +51,6 @@
                             <span class="status-info-label">天氣</span>
                             <span class="status-info-value">--</span>
                         </div>
-                        <div class="status-info-row">
-                            <span class="status-info-icon" aria-hidden="true"><i class="fas fa-theater-masks"></i></span>
-                            <span class="status-info-label">氛圍</span>
-                            <span class="status-info-value">--</span>
-                        </div>
                         <div class="status-info-row status-info-row-multiline">
                             <span class="status-info-icon" aria-hidden="true"><i class="fas fa-map-marked-alt"></i></span>
                             <span class="status-info-label">地點</span>
@@ -90,9 +85,6 @@
                     </a>
                     <a href="relations.html" target="_blank" class="header-link-btn" title="人物關係圖">
                         <i class="fas fa-project-diagram"></i>
-                    </a>
-                    <a href="encyclopedia.html" target="_blank" class="header-link-btn" title="江湖百科">
-                        <i class="fas fa-atlas"></i>
                     </a>
                     <button id="theme-switcher" class="theme-switcher" title="切換主題">
                         <i class="fas fa-moon"></i>
@@ -171,44 +163,8 @@
                     <div id="location-info">讀取中...</div>
                 </div>
                 <div class="info-card">
-                    <h4><i class="fas fa-sack-dollar"></i> 錢袋</h4>
-                    <div id="money-content" class="money-display">-- 銀兩</div>
-                </div>
-
-                <div class="info-card">
-                    <div class="card-header-flex">
-                        <h4><i class="fas fa-briefcase"></i> 隨身物品 (ITM)</h4>
-                        <span id="bulk-status" class="bulk-status-display"></span>
-                    </div>
-                    <div id="itm-content">--</div>
-                </div>
-
-                <div class="info-card">
                     <h4><i class="fas fa-users"></i> 人物見聞 (NPC)</h4>
                     <div id="npc-content">--</div>
-                </div>
-
-                <div class="info-card">
-                    <div class="card-header-flex">
-                        <h4><i class="fas fa-scroll"></i> 任務日誌 (QST)</h4>
-                        <div class="header-action-group">
-                             <span class="header-prompt-text">懸賞告示板→</span>
-                            <a href="bounties.html" target="_blank" id="bounties-btn" class="header-icon-btn" title="查看懸賞">
-                                <i class="fas fa-scroll"></i>
-                            </a>
-                        </div>
-                    </div>
-                    <div id="qst-content">--</div>
-                </div>
-
-                 <div class="info-card">
-                    <h4><i class="fas fa-brain"></i> 內心獨白 (PSY)</h4>
-                    <div id="psy-content">--</div>
-                </div>
-                
-                <div class="info-card">
-                    <h4><i class="fas fa-key"></i> 關鍵線索 (CLS)</h4>
-                    <div id="cls-content">--</div>
                 </div>
                 
                 <div class="info-card">
@@ -312,9 +268,6 @@
                 <div class="chat-input-area">
                     <input type="text" id="chat-input" placeholder="你說..." autocomplete="off">
                     <button id="chat-action-btn">發送</button>
-                    <button id="give-item-btn" class="chat-action-btn give-item-btn" title="贈予物品或金錢">
-                        <i class="fas fa-hand-holding-dollar"></i>
-                    </button>
                 </div>
                 <div class="chat-footer">
                     <button id="end-chat-btn" class="end-chat-btn">結束交談</button>
@@ -329,19 +282,6 @@
             </div>
         </div>
 
-        <div id="give-item-modal" class="chat-modal-overlay">
-            <div class="chat-modal-content">
-                <div class="chat-header">
-                    <h3 id="give-item-title">要贈予什麼？</h3>
-                    <button id="cancel-give-btn" class="chat-close-btn" title="取消贈予"><i class="fas fa-times"></i></button>
-                </div>
-                <div id="give-inventory-list" class="chat-log-area">
-                    </div>
-                <div class="chat-footer">
-                    <p>選擇一項物品來贈予。</p>
-                </div>
-            </div>
-        </div>
 
         <div id="skills-modal" class="skills-modal-overlay">
             <div class="skills-modal-content">
@@ -477,22 +417,6 @@
             </div>
         </div>
 
-        <div id="item-details-modal" class="item-details-modal-overlay">
-            <div class="item-details-modal-content">
-                <header class="item-details-header">
-                    <h3 id="item-details-title">物品詳情</h3>
-                    <button id="close-item-details-btn" title="關閉"><i class="fas fa-times"></i></button>
-                </header>
-                <div class="item-details-body">
-                    <p id="item-details-description">物品的描述會顯示在這裡。</p>
-                    <ul id="item-details-stats">
-                        </ul>
-                </div>
-                <footer class="item-details-footer">
-                    <button id="item-details-delete-btn"><i class="fas fa-trash-alt"></i> 丟棄</button>
-                </footer>
-            </div>
-        </div>
 
         <div id="cultivation-modal" class="skills-modal-overlay">
             <div class="skills-modal-content" style="max-width: 500px; height: auto;">

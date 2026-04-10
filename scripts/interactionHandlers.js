@@ -3,7 +3,7 @@
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 import * as modal from './modalManager.js';
-import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError, updateMoneyBagDisplay } from './uiUpdater.js';
+import { updateUI, appendMessageToStory, addRoundTitleToStory, handleApiError } from './uiUpdater.js';
 import { dom } from './dom.js';
 
 let gameLoop = {};
@@ -25,34 +25,6 @@ const COMBAT_CATEGORY_MAP = {
 };
 
 const SELF_TARGET_STRATEGIES = new Set(['defend', 'evade']);
-
-function syncSilverBalanceToInventory(newBalance) {
-    if (!gameState.roundData) return;
-    if (!Array.isArray(gameState.roundData.inventory)) {
-        gameState.roundData.inventory = [];
-    }
-
-    const numericBalance = Number(newBalance);
-    if (!Number.isFinite(numericBalance) || numericBalance < 0) return;
-
-    const silverIndex = gameState.roundData.inventory.findIndex(item => item && (item.templateId === '\u9280\u5169' || item.itemName === '\u9280\u5169'));
-    if (silverIndex >= 0) {
-        gameState.roundData.inventory[silverIndex] = {
-            ...gameState.roundData.inventory[silverIndex],
-            quantity: numericBalance
-        };
-        return;
-    }
-
-    gameState.roundData.inventory.push({
-        instanceId: 'currency-silver-liang',
-        templateId: '\u9280\u5169',
-        itemName: '\u9280\u5169',
-        quantity: numericBalance,
-        itemType: '\u8ca1\u5bf6',
-        category: '\u8ca8\u5e63'
-    });
-}
 
 
 // --- Helper Functions (Internal to this module) ---
@@ -707,44 +679,15 @@ export async function sendChatMessage() {
     gameLoop.setLoading(true);
 
     try {
-        const chatMode = dom.chatModal.dataset.mode || 'chat';
-        let data;
-
-        if (chatMode === 'inquiry') {
-            try {
-                const paymentResult = await api.startBeggarInquiry();
-                if (gameState.roundData) {
-                    syncSilverBalanceToInventory(paymentResult.newBalance);
-                    updateMoneyBagDisplay(gameState.roundData.inventory);
-                }
-            } catch (error) {
-                if (error.message.includes('not enough') || error.message.includes('不足')) {
-                    modal.appendChatMessage('npc', '你身上的銀兩不夠，等你湊夠了再來問吧。');
-                    dom.chatActionBtn.disabled = true;
-                    return; 
-                } else {
-                    throw error; 
-                }
-            }
-            
-            data = await api.askBeggarQuestion({
-                beggarName: gameState.currentChatNpc,
-                userQuery: message,
-                model: dom.aiModelSelector.value
-            });
-            modal.appendChatMessage('npc', data.response);
-
-        } else {
-            gameState.chatHistory.push({ speaker: 'player', message: message });
-            data = await api.npcChat({
-                npcName: gameState.currentChatNpc,
-                chatHistory: gameState.chatHistory,
-                playerMessage: message,
-                model: dom.aiModelSelector.value
-            });
-            modal.appendChatMessage('npc', data.npcMessage);
-            gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
-        }
+        gameState.chatHistory.push({ speaker: 'player', message: message });
+        const data = await api.npcChat({
+            npcName: gameState.currentChatNpc,
+            chatHistory: gameState.chatHistory,
+            playerMessage: message,
+            model: dom.aiModelSelector.value
+        });
+        modal.appendChatMessage('npc', data.npcMessage);
+        gameState.chatHistory.push({ speaker: 'npc', message: data.npcMessage });
     } catch (error) {
         modal.appendChatMessage('system', `[系統訊息：${error.message}]`);
     } finally {
@@ -754,15 +697,6 @@ export async function sendChatMessage() {
 
 export async function endChatSession() {
     if (gameState.isRequesting || !gameState.currentChatNpc) return;
-    
-    const chatMode = dom.chatModal.dataset.mode || 'chat';
-    if (chatMode === 'inquiry') {
-        modal.closeChatModal();
-        gameState.isInChat = false; 
-        gameState.currentChatNpc = null;
-        gameState.chatHistory = [];
-        return;
-    }
 
     const npcNameToSummarize = gameState.currentChatNpc;
     
@@ -788,35 +722,6 @@ export async function endChatSession() {
         gameState.currentChatNpc = null;
         gameState.chatHistory = [];
         gameLoop.setLoading(false);
-    }
-}
-
-export async function handleGiveItem(giveData) {
-    modal.closeGiveItemModal(); 
-    modal.closeChatModal(); 
-    gameState.isInChat = false;
-    gameLoop.setLoading(true, "正在將物品交給對方..."); 
-
-    try {
-        const body = {
-            giveData: {
-                target: gameState.currentChatNpc,
-                ...giveData
-            },
-            model: dom.aiModelSelector.value
-        };
-        const data = await api.giveItemToNpc(body);
-        if (data && data.roundData) {
-            gameLoop.processNewRoundData(data);
-        } else {
-            throw new Error('給予物品回應格式無效。');
-        }
-    } catch (error) {
-        handleApiError(error); 
-    } finally {
-        gameState.currentChatNpc = null;
-        gameState.chatHistory = [];
-        gameLoop.setLoading(false); 
     }
 }
 

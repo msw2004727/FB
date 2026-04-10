@@ -7,7 +7,7 @@ import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
-import { handleApiError, renderInventory, updateBulkStatus, appendMessageToStory, updateMoneyBagDisplay } from './uiUpdater.js';
+import { handleApiError, appendMessageToStory } from './uiUpdater.js';
 import { restoreAiModelSelection, setStoredAiModel } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
@@ -85,13 +85,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     }
 
-    const itemDetailsModal = document.getElementById('item-details-modal');
-    const itemDetailsTitle = document.getElementById('item-details-title');
-    const itemDetailsDescription = document.getElementById('item-details-description');
-    const itemDetailsStats = document.getElementById('item-details-stats');
-    const itemDetailsDeleteBtn = document.getElementById('item-details-delete-btn');
-    const closeItemDetailsBtn = document.getElementById('close-item-details-btn');
-
     // 【核心修改】重新獲取閉關彈窗的所有元素
     const cultivationModal = document.getElementById('cultivation-modal');
     const openCultivationBtn = document.getElementById('open-cultivation-btn');
@@ -102,72 +95,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const startCultivationBtn = document.getElementById('start-cultivation-btn');
     const reqLocation = document.getElementById('req-location');
     const reqStamina = document.getElementById('req-stamina');
-    const reqFood = document.getElementById('req-food');
 
     function setGameContainerHeight() {
         if (dom.gameContainer) {
             dom.gameContainer.style.height = `${window.innerHeight}px`;
-        }
-    }
-
-    function openItemDetailsModal(itemId) {
-        if (!itemDetailsModal || !gameState.roundData || !gameState.roundData.inventory) return;
-
-        const item = gameState.roundData.inventory.find(i => i.instanceId === itemId);
-        if (!item) {
-            appendMessageToStory(`在你的背包中找不到ID為 ${itemId} 的物品。`, 'system-message');
-            console.error(`在遊戲狀態中找不到 ID 為 ${itemId} 的物品。`);
-            return;
-        }
-
-        itemDetailsTitle.textContent = item.itemName || '未知物品';
-        itemDetailsDescription.textContent = item.baseDescription || '這是一個神秘的物品，沒有任何描述。';
-
-        let statsHtml = '';
-        statsHtml += `<li><span class="key">類型</span> <span class="value">${item.itemType || '未知'}</span></li>`;
-        statsHtml += `<li><span class="key">價值</span> <span class="value">${item.value || 0} 銀兩</span></li>`;
-        statsHtml += `<li><span class="key">份量</span> <span class="value">${item.bulk || '中'}</span></li>`;
-        if (item.stats) {
-            if (item.stats.attack > 0) statsHtml += `<li><span class="key">攻擊</span> <span class="value">${item.stats.attack}</span></li>`;
-            if (item.stats.defense > 0) statsHtml += `<li><span class="key">防禦</span> <span class="value">${item.stats.defense}</span></li>`;
-        }
-        itemDetailsStats.innerHTML = statsHtml;
-
-        itemDetailsDeleteBtn.dataset.itemId = itemId;
-
-        itemDetailsModal.classList.add('visible');
-    }
-
-    function closeItemDetailsModal() {
-        if (itemDetailsModal) {
-            itemDetailsModal.classList.remove('visible');
-        }
-    }
-
-    async function handleDropItemClick(event) {
-        const itemId = event.currentTarget.dataset.itemId;
-        if (!itemId) return;
-
-        if (confirm(`你確定要永久丟棄「${itemDetailsTitle.textContent}」嗎？此操作無法復原。`)) {
-            closeItemDetailsModal();
-            gameLoop.setLoading(true, '正在丟棄物品...');
-            try {
-                const result = await api.dropItem({ itemId });
-                if (result.success) {
-                    gameState.roundData.inventory = result.inventory;
-                    gameState.roundData.bulkScore = result.bulkScore;
-                    appendMessageToStory(result.message, 'system-message');
-                    renderInventory(gameState.roundData.inventory);
-                    updateMoneyBagDisplay(gameState.roundData.inventory);
-                    updateBulkStatus(gameState.roundData.bulkScore);
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                handleApiError(error);
-            } finally {
-                gameLoop.setLoading(false);
-            }
         }
     }
 
@@ -189,16 +120,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const staminaSufficient = roundData.stamina >= 80;
         reqStamina.innerHTML = `<i class="fas ${staminaSufficient ? 'fa-check-circle' : 'fa-times-circle'}"></i> 精力需高於80% (${roundData.stamina}%)`;
 
-        // 條件3: 食物飲水
-        const foodItems = roundData.inventory.filter(item => item.category === '食物');
-        const drinkItems = roundData.inventory.filter(item => item.category === '飲品');
-        const totalFood = foodItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        const totalDrinks = drinkItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        const resourcesSufficient = totalFood >= days && totalDrinks >= days;
-        reqFood.innerHTML = `<i class="fas ${resourcesSufficient ? 'fa-check-circle' : 'fa-times-circle'}"></i> 需備足糧食飲水 (需${days}份, 備有${totalFood}糧/${totalDrinks}水)`;
-        
         // 最終判斷
-        startCultivationBtn.disabled = !(isPrivate && staminaSufficient && resourcesSufficient);
+        startCultivationBtn.disabled = !(isPrivate && staminaSufficient);
     }
 
     async function openCultivationModal() {
@@ -377,13 +300,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        if (dom.bountiesBtn) {
-            dom.bountiesBtn.addEventListener('click', () => {
-                interaction.hideNpcInteractionMenu();
-                dom.bountiesBtn.classList.remove('has-new-bounty');
-            });
-        }
-        
         document.addEventListener('click', (e) => {
             const locationBtn = e.target.closest('#view-location-details-btn');
             if (locationBtn) {
@@ -391,15 +307,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     modal.openLocationDetailsModal(gameState.currentLocationData);
                 } else {
                     alert("當前地區的詳細情報尚未載入。");
-                }
-            }
-
-            const itemLink = e.target.closest('.item-link');
-            if (itemLink) {
-                e.preventDefault();
-                const itemId = itemLink.dataset.itemId;
-                if (itemId) {
-                    openItemDetailsModal(itemId);
                 }
             }
         });
@@ -429,13 +336,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         dom.endChatBtn.addEventListener('click', interaction.endChatSession);
 
-        dom.giveItemBtn.addEventListener('click', () => {
-            if (gameState.isInChat && gameState.currentChatNpc) {
-                modal.openGiveItemModal(gameState.currentChatNpc, interaction.handleGiveItem);
-            }
-        });
-
-        dom.cancelGiveBtn.addEventListener('click', modal.closeGiveItemModal);
         dom.closeSkillsBtn.addEventListener('click', modal.closeSkillsModal);
 
         if (dom.closeLocationDetailsBtn) {
@@ -449,20 +349,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        if (closeItemDetailsBtn) {
-            closeItemDetailsBtn.addEventListener('click', closeItemDetailsModal);
-        }
-        if (itemDetailsDeleteBtn) {
-            itemDetailsDeleteBtn.addEventListener('click', handleDropItemClick);
-        }
-        if (itemDetailsModal) {
-            itemDetailsModal.addEventListener('click', (e) => {
-                if (e.target === itemDetailsModal) {
-                    closeItemDetailsModal();
-                }
-            });
-        }
-        
         // --- 【核心修改 v2.0】為閉關系統綁定事件 ---
         if (openCultivationBtn) openCultivationBtn.addEventListener('click', openCultivationModal);
         if (closeCultivationBtn) closeCultivationBtn.addEventListener('click', () => cultivationModal.classList.remove('visible'));

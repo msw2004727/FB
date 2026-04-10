@@ -373,24 +373,17 @@ export function openChatModalUI(profile, mode = 'chat') {
     const chatNpcName = document.getElementById('chat-npc-name');
     const chatNpcInfo = document.getElementById('chat-npc-info');
     const chatLog = document.getElementById('chat-log');
-    const giveItemBtn = document.getElementById('give-item-btn');
     const chatFooter = document.querySelector('.chat-footer');
     const chatActionBtn = document.getElementById('chat-action-btn');
 
-    if (!chatModal || !chatNpcName || !chatNpcInfo || !chatLog || !giveItemBtn || !chatFooter) return;
+    if (!chatModal || !chatNpcName || !chatNpcInfo || !chatLog || !chatFooter) return;
 
-    if (mode === 'inquiry') {
-        chatNpcName.textContent = `向 ${profile.name} 打聽消息`;
-        chatNpcInfo.innerHTML = `<span class="inquiry-cost-text"><i class="fas fa-coins"></i> 每次提問消耗 100 銀兩</span>`;
-    } else {
-        chatNpcName.textContent = `與 ${profile.name} 對話`;
-        chatNpcInfo.innerHTML = profile.status_title || '';
-        displayRomanceValue(profile.romanceValue);
-        displayFriendlinessBar(profile.friendlinessValue);
-    }
+    chatNpcName.textContent = `與 ${profile.name} 對話`;
+    chatNpcInfo.innerHTML = profile.status_title || '';
+    displayRomanceValue(profile.romanceValue);
+    displayFriendlinessBar(profile.friendlinessValue);
 
-    giveItemBtn.style.display = mode === 'inquiry' ? 'none' : 'inline-flex';
-    chatFooter.style.display = mode === 'inquiry' ? 'none' : 'block';
+    chatFooter.style.display = 'block';
     chatLog.innerHTML = `<p class="system-message">你開始與 ${profile.name} 對話...</p>`;
 
     if (chatActionBtn) chatActionBtn.disabled = false;
@@ -417,55 +410,6 @@ export function setChatLoading(isLoading) {
     if (chatLoader) chatLoader.classList.toggle('visible', isLoading);
 }
 
-// --- ??????????? ---
-export async function openGiveItemModal(currentNpcName, giveItemCallback) {
-    const giveItemModal = document.getElementById('give-item-modal');
-    const giveInventoryList = document.getElementById('give-inventory-list');
-    if (!giveItemModal || !giveInventoryList) return;
-
-    giveInventoryList.innerHTML = '<p class="system-message">載入物品中...</p>';
-    giveItemModal.classList.add('visible');
-
-    try {
-        const inventory = await api.getInventory();
-        giveInventoryList.innerHTML = '';
-
-        if (inventory && inventory.length > 0) {
-            inventory.forEach((itemData) => {
-                if (itemData.quantity <= 0) return;
-
-                const itemName = itemData.itemName || itemData.templateId;
-                const isMoney = /coin|gold|silver|money|cash/i.test(String(itemName || ''));
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'give-item';
-                itemDiv.innerHTML = `<i class="fas ${isMoney ? 'fa-coins' : 'fa-box-open'}"></i> ${itemName} (Qty: ${itemData.quantity})`;
-
-                itemDiv.addEventListener('click', () => {
-                    if (isMoney) {
-                        const amount = prompt(`請輸入要給予的金額（最多 ${itemData.quantity}）`, itemData.quantity);
-                        if (amount === null) return;
-                        const parsed = Number.parseInt(amount, 10);
-                        if (Number.isInteger(parsed) && parsed > 0 && parsed <= itemData.quantity) {
-                            giveItemCallback({ type: 'money', amount: parsed, itemName });
-                        } else {
-                            alert('請輸入有效的數量。');
-                        }
-                        return;
-                    }
-
-                    giveItemCallback({ type: 'item', itemId: itemData.instanceId, itemName });
-                });
-
-                giveInventoryList.appendChild(itemDiv);
-            });
-        } else {
-            giveInventoryList.innerHTML = '<p class="system-message">目前沒有可給予的物品。</p>';
-        }
-    } catch (error) {
-        console.error('Failed to load give-item inventory:', error);
-        giveInventoryList.innerHTML = `<p class="system-message">載入物品失敗：${error.message}</p>`;
-    }
-}
 export function openSkillsModal(skillsData) {
     const skillsModal = document.getElementById('skills-modal');
     const skillsTabsContainer = document.getElementById('skills-tabs-container');
