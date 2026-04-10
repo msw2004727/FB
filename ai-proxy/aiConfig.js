@@ -4,55 +4,58 @@
  * AI模型中控設定檔
  * =================================================================
  * 此檔案為遊戲中所有AI任務的模型指派中心。
- * 你可以在這裡為每一個具體的AI任務（如生成故事、生成摘要、戰鬥裁決等），
- * 指定要使用的AI模型。
+ * 預設全部使用 MiniMax（伺服器端內建金鑰）。
+ * 玩家可透過前端介面自行填寫其他 AI 服務的 API Key 來切換模型。
  *
  * 可用模型名稱:
- * - 'openai'   : GPT-4o-mini，速度快且成本低。
- * - 'gpt5.2'   : GPT-5.2，品質較高（通常較慢/較貴）。
- * - 'deepseek' : DeepSeek-Chat，創造力和遵循複雜指令的能力很強，文筆奇幻。
- * - 'grok'     : Grok-3-Fast，速度快，反應不按常理出牌，風格獨特。
- * - 'gemini'   : Gemini-1.5-Flash，目前服務不穩，暫不建議使用。
- * - 'claude'   : Claude-3.5-Sonnet，文筆優美，邏輯清晰。
- * - 'minimax'  : MiniMax-M2.7，中文理解力強，性價比高。
+ * - 'minimax'  : MiniMax-M2.7（預設，中文理解力強，性價比高）
+ * - 'openai'   : GPT-5.4（需用戶自行提供 API Key）
+ * - 'deepseek' : DeepSeek-V4（需用戶自行提供 API Key）
+ * - 'grok'     : Grok-4.20（需用戶自行提供 API Key）
+ * - 'gemini'   : Gemini 3.1 Pro（需用戶自行提供 API Key）
+ * - 'claude'   : Claude Opus 4.6（需用戶自行提供 API Key）
  *
- * 注意：所有來自玩家前端選擇的模型，會覆蓋此處的設定。
+ * 注意：玩家前端選擇的模型會覆蓋此處的設定。
  * =================================================================
  */
 
 const aiConfig = {
     // --- 核心故事與敘事 ---
-    story: 'minimax',         // 主線故事生成器
-    narrative: 'minimax',     // 將數據轉換為小說旁白
-    prequel: 'minimax',       // 前情提要生成器
-    epilogue: 'minimax',      // 角色結局（身後事）生成器
-    deathCause: 'minimax',    // 為自殺角色生成一個合理的死因
+    story: 'minimax',
+    narrative: 'minimax',
+    prequel: 'minimax',
+    epilogue: 'minimax',
+    deathCause: 'minimax',
 
     // --- 遊戲邏輯與數據處理 ---
-    summary: 'minimax',       // 將回合數據總結為長期記憶
-    actionClassifier: 'minimax',// 玩家行動意圖分類器
-    suggestion: 'minimax',    // 書僮的行動建議
+    summary: 'minimax',
+    actionClassifier: 'minimax',
+    suggestion: 'minimax',
 
     // --- 戰鬥相關 ---
-    combat: 'minimax',      // 戰鬥過程裁決
-    surrender: 'minimax',   // 認輸情境裁決
+    combat: 'minimax',
+    combatSetup: 'minimax',
+    surrender: 'minimax',
+    postCombat: 'minimax',
 
     // --- NPC與互動 ---
-    npcProfile: 'minimax',  // 新NPC的詳細人設生成
-    npcChat: 'minimax',       // NPC密談時的回應
-    npcChatSummary: 'minimax',// 總結密談內容
-    giveItem: 'minimax',      // 贈予NPC物品時的反應
-    giveNarrative: 'minimax', // 贈予事件的小說化描述
-    proactiveChat: 'minimax', // NPC主動發起對話的內容
+    npcProfile: 'minimax',
+    npcChat: 'minimax',
+    npcChatSummary: 'minimax',
+    npcMemory: 'minimax',
+    giveItem: 'minimax',
+    giveNarrative: 'minimax',
+    proactiveChat: 'minimax',
+    romanceEvent: 'minimax',
 
     // --- 世界觀與生成 ---
-    encyclopedia: 'minimax',  // 江湖百科生成
-    relationGraph: 'minimax', // 人物關係圖生成
-    bounty: 'minimax',        // 懸賞任務生成
-    itemTemplate: 'minimax',  // 新物品的設計圖生成
-    location: 'minimax',      // 新地點的檔案生成
-    reward: 'minimax',        // 領取懸賞時的獎勵生成
-    skillTemplate: 'minimax', // 【核心新增】新武學的設計圖生成
+    encyclopedia: 'minimax',
+    relationGraph: 'minimax',
+    bounty: 'minimax',
+    itemTemplate: 'minimax',
+    location: 'minimax',
+    reward: 'minimax',
+    skillTemplate: 'minimax',
 };
 
 module.exports = { aiConfig };

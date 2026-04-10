@@ -79,9 +79,8 @@ ${JSON.stringify(npcProfile, null, 2)}
 \`\`\`
 
 ## 【玩家檔案 (你的互動對象)】
-\`\`\`json
-${JSON.stringify(playerProfile, null, 2)}
-\`\`\`
+- **姓名**: ${playerProfile.username}
+- **立場傾向**: ${playerProfile.morality ?? 0}
 ---
 
 現在，請開始你的編劇工作。

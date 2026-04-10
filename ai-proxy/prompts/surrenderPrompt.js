@@ -84,8 +84,9 @@ const getSurrenderPrompt = (playerProfile, combatState) => {
 
 ---
 ## 【當前戰鬥情境】
-- **玩家檔案**: ${JSON.stringify(playerProfile)}
-- **敵人**: ${JSON.stringify(combatState.enemies)}
+- **玩家名稱**: ${playerProfile.username || '俠客'}
+- **玩家立場 (morality)**: ${playerProfile.morality ?? 0}
+- **敵人**: ${combatState.enemies.map(e => e.name).join('、')}
 - **對手友好度**: ${opponentFriendliness}
 - **戰鬥紀錄**: ${combatLog}
 

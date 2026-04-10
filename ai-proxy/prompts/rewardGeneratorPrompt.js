@@ -54,7 +54,8 @@ const getRewardGeneratorPrompt = (bounty, playerProfile) => {
 ${JSON.stringify(bounty, null, 2)}
 
 ## 【玩家檔案】
-${JSON.stringify(playerProfile, null, 2)}
+- **姓名**: ${playerProfile.username || '俠客'}
+- **立場傾向 (morality)**: ${playerProfile.morality ?? 0}
 
 ---
 

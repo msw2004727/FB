@@ -34,24 +34,24 @@ const { aiConfig } = require('../aiConfig.js');
 
 // --- 從 prompts 資料夾導入腳本 ---
 const { getStoryPrompt } = require('../prompts/storyPrompt.js');
-const { getNarrativePrompt } = require('../prompts/narrativePrompt.js');
+
 const { getSummaryPrompt } = require('../prompts/summaryPrompt.js');
 const { getPrequelPrompt } = require('../prompts/prequelPrompt.js');
 const { getSuggestionPrompt } = require('../prompts/suggestionPrompt.js');
 const { getEncyclopediaPrompt } = require('../prompts/encyclopediaPrompt.js');
 const { getCombatPrompt } = require('../prompts/combatPrompt.js');
-const { getNpcCreatorPrompt } = require('../prompts/npcCreatorPrompt.js');
+
 const { getChatMasterPrompt } = require('../prompts/chatMasterPrompt.js');
 const { getChatSummaryPrompt } = require('../prompts/chatSummaryPrompt.js');
 const { getGiveItemPrompt } = require('../prompts/giveItemPrompt.js');
 const { getAINarrativeForGive: getGiveNarrativePrompt } = require('../prompts/narrativeForGivePrompt.js');
 const { getRelationGraphPrompt } = require('../prompts/relationGraphPrompt.js');
-const { getRomanceEventPrompt } = require('../prompts/romanceEventPrompt.js');
+
 const { getEpiloguePrompt } = require('../prompts/epiloguePrompt.js');
 const { getDeathCausePrompt } = require('../prompts/deathCausePrompt.js');
-const { getActionClassifierPrompt } = require('../prompts/actionClassifierPrompt.js');
+
 const { getSurrenderPrompt } = require('../prompts/surrenderPrompt.js');
-const { getProactiveChatPrompt } = require('../prompts/proactiveChatPrompt.js');
+
 const { getCombatSetupPrompt } = require('../prompts/combatSetupPrompt.js');
 const { getAnachronismPrompt } = require('../prompts/anachronismPrompt.js');
 const { getAIPostCombatResultPrompt } = require('../prompts/postCombatPrompt.js');
@@ -270,15 +270,6 @@ async function getAIAnachronismResponse(playerModelChoice, playerAction, anachro
 }
 
 
-async function getNarrative(roundData) {
-    const prompt = getNarrativePrompt(roundData);
-    try {
-        return await callAI(aiConfig.narrative, prompt, false);
-    } catch (error) {
-        console.error("[AI 任務失敗] 小說家任務:", error);
-        return "在那一刻，時間的長河似乎出現了斷層...";
-    }
-}
 
 async function getAISummary(oldSummary, newRoundData) {
     const prompt = getSummaryPrompt(oldSummary, newRoundData);
@@ -338,16 +329,6 @@ async function getAIEncyclopedia(longTermSummary, username, npcDetails) {
     }
 }
 
-async function getAINpcProfile(username, npcName, roundData, playerProfile) {
-    const prompt = getNpcCreatorPrompt(username, npcName, roundData, playerProfile);
-    try {
-        const text = await callAI(aiConfig.npcProfile, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 人物設定師任務:", error);
-        return null;
-    }
-}
 
 async function getAIChatResponse(playerModelChoice, npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext) {
     const prompt = getChatMasterPrompt(npcProfile, chatHistory, playerMessage, longTermSummary, localLocationContext, mentionedNpcContext);
@@ -473,17 +454,6 @@ async function getRelationGraph(longTermSummary, username, npcDetails) {
     }
 }
 
-async function getAIRomanceEvent(playerProfile, npcProfile, eventType) {
-    const prompt = getRomanceEventPrompt(playerProfile, npcProfile, eventType);
-    try {
-        const text = await callAI(aiConfig.romanceEvent, prompt, true);
-        const jsonObj = parseJsonResponse(text);
-        return JSON.stringify(jsonObj);
-    } catch (error) {
-        console.error("[AI 任務失敗] 言情小說家任務:", error);
-        return "{}";
-    }
-}
 
 async function getAIEpilogue(playerData) {
     const prompt = getEpiloguePrompt(playerData);
@@ -509,17 +479,6 @@ async function getAIDeathCause(playerModelChoice, username, lastRoundData) {
     }
 }
 
-async function getAIActionClassification(playerModelChoice, playerAction, context) {
-    const prompt = getActionClassifierPrompt(playerAction, context);
-    try {
-        const modelToUse = playerModelChoice || aiConfig.actionClassifier;
-        const text = await callAI(modelToUse, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 總導演AI任務:", error);
-        return { actionType: 'GENERAL_STORY', details: {} };
-    }
-}
 
 async function getAISurrenderResult(playerModelChoice, playerProfile, combatState) {
     const prompt = getSurrenderPrompt(playerProfile, combatState);
@@ -537,19 +496,6 @@ async function getAISurrenderResult(playerModelChoice, playerProfile, combatStat
     }
 }
 
-async function getAIProactiveChat(playerProfile, npcProfile, triggerEvent) {
-    const prompt = getProactiveChatPrompt(playerProfile, npcProfile, triggerEvent);
-    try {
-        const text = await callAI(aiConfig.proactiveChat, prompt, true);
-        return parseJsonResponse(text);
-    } catch (error) {
-        console.error("[AI 任務失敗] 首席編劇任務:", error);
-        return {
-            openingLine: "（他/她看了你一眼，欲言又止，最終還是什麼也沒說。）",
-            itemChanges: []
-        };
-    }
-}
 
 async function getAIPostCombatResult(playerModelChoice, playerProfile, finalCombatState, combatLog, killerName) {
     const prompt = getAIPostCombatResultPrompt(playerProfile, finalCombatState, combatLog, killerName);
@@ -582,13 +528,11 @@ module.exports = {
     getAIForgetSkillStory,
     getAICultivationResult,
     getAIPerNpcSummary,
-    getNarrative,
     getAISummary,
     getAIStory,
     getAIPrequel,
     getAISuggestion,
     getAIEncyclopedia,
-    getAINpcProfile,
     getAICombatAction,
     getAICombatSetup,
     getAIChatResponse,
@@ -597,11 +541,8 @@ module.exports = {
     getAIGiveItemResponse,
     getAINarrativeForGive,
     getRelationGraph,
-    getAIRomanceEvent,
     getAIEpilogue,
     getAIDeathCause,
-    getAIActionClassification,
     getAISurrenderResult,
-    getAIProactiveChat,
     getAIPostCombatResult,
 };
