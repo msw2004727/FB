@@ -138,6 +138,14 @@
                 </div>
                 
                 <div class="info-card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <h4 style="margin:0;"><i class="fas fa-book"></i> 旅程</h4>
+                        <span id="round-counter" style="font-size:.85rem;opacity:.7;">第 0 回</span>
+                    </div>
+                    <div id="quest-journal" style="font-size:.85rem;margin-top:.4rem;color:var(--text-secondary,#888);line-height:1.5;">手中的紙條寫著：「尋找回家的方法」</div>
+                </div>
+
+                <div class="info-card">
                     <h4><i class="fas fa-microchip"></i> AI 核心</h4>
                     <div class="ai-model-row">
                         <div class="select-wrapper">
@@ -217,6 +225,13 @@
                         <summary style="cursor:pointer;font-weight:bold;padding:.3rem 0;"><i class="fas fa-map" style="width:20px;text-align:center;margin-right:4px;"></i> 當前地區</summary>
                         <div style="padding:.25rem 0 .25rem 24px;color:var(--text-secondary,#666);">
                             <p>顯示你所在的地點資訊，包括地名、統治者與地區簡介。在輸入框中描述移動行為即可前往其他地點。</p>
+                        </div>
+                    </details>
+
+                    <details style="margin-bottom:.75rem;">
+                        <summary style="cursor:pointer;font-weight:bold;padding:.3rem 0;"><i class="fas fa-book" style="width:20px;text-align:center;margin-right:4px;"></i> 旅程</summary>
+                        <div style="padding:.25rem 0 .25rem 24px;color:var(--text-secondary,#666);">
+                            <p>顯示你的冒險回合數和任務日誌。你的最終目標是找到回家的方法，但你也可以選擇在這個世界自由生活。AI 會根據你的行動自然地推進（或不推進）主線劇情。</p>
                         </div>
                     </details>
 

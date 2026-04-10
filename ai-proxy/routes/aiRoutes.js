@@ -57,6 +57,17 @@ const TASK_HANDLERS = {
         return { prompt, json: true, configKey: 'story' };
     },
 
+    'progress-evaluator': (ctx) => {
+        const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
+        const prompt = getProgressEvaluatorPrompt(
+            ctx.story || '',
+            ctx.achievedMilestones || [],
+            ctx.cluesSummary || ''
+        );
+        if (!prompt) return { prompt: '{"triggered":false,"reason":"all done","questJournal":"你已找到回家的路。"}', json: true, configKey: 'story' };
+        return { prompt, json: true, configKey: 'story' };
+    },
+
     'narrative': (ctx) => {
         const { getNarrativePrompt } = require('../prompts/narrativePrompt');
         const prompt = getNarrativePrompt(ctx.roundData);
@@ -394,6 +405,35 @@ router.post('/generate', async (req, res, next) => {
                 mempalace.saveRoundMemory(playerId, roundData, story);
             } catch (memErr) {
                 console.warn('[MemPalace] Write failed (non-blocking):', memErr.message);
+            }
+        }
+
+        // Phase: 主線進度評估（story 任務後自動執行，fire-and-forget 注入結果）
+        if (task === 'story' && data && typeof data === 'object') {
+            try {
+                const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
+                const story = data.story || (data.roundData && data.roundData.story) || '';
+                const achieved = context.achievedMilestones || [];
+                const clues = context.cluesSummary || '';
+                const evalPrompt = getProgressEvaluatorPrompt(story, achieved, clues);
+
+                if (evalPrompt) {
+                    const evalRaw = await callAI('minimax', evalPrompt, true, {});
+                    try {
+                        const evalResult = parseJsonResponse(evalRaw);
+                        // 注入評估結果到回應中
+                        if (!data.roundData) data.roundData = {};
+                        data.roundData.progressEval = evalResult;
+                        if (evalResult.questJournal) {
+                            data.roundData.questJournal = evalResult.questJournal;
+                        }
+                        if (evalResult.triggered) {
+                            console.log(`[Progress] Milestone triggered! Reason: ${evalResult.reason}`);
+                        }
+                    } catch (_) {}
+                }
+            } catch (progErr) {
+                console.warn('[Progress] Evaluation failed (non-blocking):', progErr.message);
             }
         }
 

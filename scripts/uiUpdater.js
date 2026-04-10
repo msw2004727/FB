@@ -10,6 +10,8 @@ const pcContent = document.getElementById('pc-content');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const locationInfo = document.getElementById('location-info');
 const actionSuggestion = document.getElementById('action-suggestion');
+const roundCounter = document.getElementById('round-counter');
+const questJournal = document.getElementById('quest-journal');
 
 // --- UI 更新核心函式 ---
 
@@ -37,6 +39,14 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     updateDeathCountdownUI(roundData.deathCountdown);
     updateMoralityBar(roundData.morality);
     updateLocationInfo(locationData);
+
+    // 回合計數
+    if (roundCounter) roundCounter.textContent = `第 ${roundData.R || 0} 回`;
+
+    // 任務日誌（來自 AI 的線索追蹤）
+    if (questJournal && roundData.questJournal) {
+        questJournal.textContent = roundData.questJournal;
+    }
 
     actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
 }

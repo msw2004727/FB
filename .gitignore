@@ -9,3 +9,4 @@ test_mempalace.py
 # 遊戲存檔（瀏覽器 IndexedDB，不在檔案系統）
 *.sqlite3
 chroma_db/
+ai-proxy/.env.vercel

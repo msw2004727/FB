@@ -7,6 +7,19 @@ import { buildContext, buildLightContext } from './contextBuilder.js';
 import { applyAllChanges } from './stateManager.js';
 import { clamp, toFiniteNumber } from '../utils/gameUtils.js';
 
+// 8 個線索里程碑 ID（順序固定）
+const MILESTONE_IDS = [
+    'M1_WORLD_AWARENESS', 'M2_FIRST_CLUE', 'M3_KEY_NPC', 'M4_ANCIENT_KNOWLEDGE',
+    'M5_OBSTACLE', 'M6_BREAKTHROUGH', 'M7_FINAL_PREPARATION', 'M8_HOMECOMING'
+];
+
+function getNextMilestoneId(achieved) {
+    for (const id of MILESTONE_IDS) {
+        if (!achieved.includes(id)) return id;
+    }
+    return null; // 全部達成
+}
+
 // ── 當前活躍檔案 ────────────────────────────────────
 
 let _activeProfileId = null;
@@ -83,11 +96,18 @@ export async function interact({ action, model }) {
     const profileId = getActiveProfileId();
     const context = await buildContext(profileId);
 
+    // 讀取已達成的里程碑
+    const milestonesData = await clientDB.state.get(profileId, 'milestones');
+    const achievedMilestones = milestonesData || [];
+    const cluesSummary = await clientDB.state.get(profileId, 'clues_summary') || '';
+
     const aiResult = await aiProxy.generate('story', model, {
         ...context,
         playerAction: action,
         actorCandidates: [],
-        blackShadowEvent: Math.random() < 0.1
+        blackShadowEvent: Math.random() < 0.1,
+        achievedMilestones,
+        cluesSummary
     });
 
     if (!aiResult || !aiResult.roundData) {
@@ -97,6 +117,21 @@ export async function interact({ action, model }) {
     const roundData = aiResult.roundData;
     roundData.R = (context.player.R || 0) + 1;
     roundData.story = aiResult.story || roundData.story;
+
+    // 處理里程碑評估結果
+    if (roundData.progressEval && roundData.progressEval.triggered) {
+        const nextMilestoneId = getNextMilestoneId(achievedMilestones);
+        if (nextMilestoneId) {
+            achievedMilestones.push(nextMilestoneId);
+            await clientDB.state.set(profileId, 'milestones', achievedMilestones);
+        }
+    }
+    // 更新線索摘要
+    if (roundData.questJournal) {
+        await clientDB.state.set(profileId, 'clues_summary',
+            cluesSummary ? cluesSummary + '\n' + roundData.questJournal : roundData.questJournal
+        );
+    }
 
     const result = await applyAllChanges(profileId, roundData);
 
