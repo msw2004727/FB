@@ -3,9 +3,7 @@
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
-import * as modal from './modalManager.js';
 import { gameTips } from './tips.js';
-import * as interaction from './interactionHandlers.js';
 import { dom } from './dom.js';
 
 // ... (setLoading, handlePlayerDeath, startProactiveChat ????????) ...
@@ -21,16 +19,10 @@ let disclaimerInterval = null;
 
 export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
-    dom.playerInput.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    dom.submitButton.disabled = isLoading || gameState.isInCombat || gameState.isInChat;
-    dom.submitButton.textContent = isLoading ? '送出中...' : '送出';
-    dom.chatInput.disabled = isLoading;
-    dom.chatActionBtn.disabled = isLoading;
-    dom.endChatBtn.disabled = isLoading;
-
-    const combatSurrenderBtn = document.getElementById('combat-surrender-btn');
-    if (combatSurrenderBtn) {
-        combatSurrenderBtn.disabled = isLoading;
+    if (dom.playerInput) dom.playerInput.disabled = isLoading;
+    if (dom.submitButton) {
+        dom.submitButton.disabled = isLoading;
+        dom.submitButton.textContent = isLoading ? '送出中...' : '送出';
     }
 
     if (dom.aiThinkingLoader) {
@@ -40,7 +32,7 @@ export function setLoading(isLoading, text = '') {
 
         if(loaderTextElement) loaderTextElement.textContent = text;
 
-        const showGlobalLoader = isLoading && !gameState.isInCombat && !gameState.isInChat && !document.getElementById('epilogue-modal').classList.contains('visible');
+        const showGlobalLoader = isLoading && !document.getElementById('epilogue-modal').classList.contains('visible');
 
         if (showGlobalLoader) {
             const rotateDisclaimer = () => {
@@ -75,61 +67,28 @@ export function setLoading(isLoading, text = '') {
         dom.aiThinkingLoader.classList.toggle('visible', showGlobalLoader);
     }
 
-    modal.setCombatLoading(isLoading && gameState.isInCombat);
-    modal.setChatLoading(isLoading && gameState.isInChat);
 }
 
 export async function handlePlayerDeath() {
-    modal.showEpilogueModal('<div class="loading-placeholder"><p>正在回顧你在江湖的最後足跡...</p><div class="loader-dots"><span></span><span></span><span></span></div></div>', () => {
-        modal.showDeceasedScreen();
-    });
+    // 顯示結局
+    const epilogueModal = document.getElementById('epilogue-modal');
+    const epilogueStory = document.getElementById('epilogue-story');
+    const deceasedOverlay = document.getElementById('deceased-overlay');
+
+    if (epilogueModal) epilogueModal.classList.add('visible');
+    if (epilogueStory) epilogueStory.innerHTML = '<p>正在回顧你在江湖的最後足跡...</p>';
 
     try {
         const data = await api.getEpilogue();
         if (data && data.epilogue) {
-            const formattedEpilogue = data.epilogue.replace(/\n/g, '<br><br>');
-            modal.showEpilogueModal(formattedEpilogue, () => {
-                modal.showDeceasedScreen();
-            });
-        } else {
-            throw new Error('載入結局失敗。');
+            if (epilogueStory) epilogueStory.innerHTML = data.epilogue.replace(/\n/g, '<br><br>');
         }
     } catch (error) {
-        modal.showEpilogueModal(`<p class="system-message">結局載入失敗，顯示預設身故畫面。<br>(${error.message})</p>`, () => {
-            modal.showDeceasedScreen();
-        });
+        if (epilogueStory) epilogueStory.innerHTML = `<p>結局載入失敗。(${error.message})</p>`;
         console.error('結局載入失敗:', error);
     }
 }
 
-async function startProactiveChat(proactiveData) {
-    const { npcName, openingLine, itemChanges } = proactiveData;
-
-    try {
-        const profile = await api.getNpcProfile(npcName);
-
-        gameState.isInChat = true;
-        gameState.currentChatNpc = npcName;
-        gameState.chatHistory = [];
-
-        modal.openChatModalUI(profile);
-
-        modal.appendChatMessage('npc', openingLine);
-        gameState.chatHistory.push({ speaker: 'npc', message: openingLine });
-
-        if (itemChanges && itemChanges.length > 0) {
-            const itemNames = itemChanges.map((item) => String(item.itemName) + ' x' + String(item.quantity)).join(', ');
-            const giftMessage = `系統：${npcName} 給了你 ${itemNames}。`;
-            modal.appendChatMessage('system', giftMessage);
-            gameState.chatHistory.push({ speaker: 'system', message: giftMessage });
-        }
-
-        dom.chatInput.focus();
-    } catch (error) {
-        console.error(`與 ${npcName} 的主動對話啟動失敗`, error);
-        appendMessageToStory(`與 ${npcName} 的主動對話啟動失敗。`, 'system-message');
-    }
-}
 
 
 /**
@@ -195,14 +154,10 @@ export async function processNewRoundData(data) {
         return;
     }
 
-    if (data.proactiveChat) {
-        startProactiveChat(data.proactiveChat);
-    }
 }
 
 
 export async function handlePlayerAction() {
-    interaction.hideNpcInteractionMenu();
     const actionText = dom.playerInput.value.trim();
     if (!actionText || gameState.isRequesting) return;
 
@@ -235,10 +190,6 @@ export async function handlePlayerAction() {
             throw new Error('API 未回傳有效的 roundData。');
         }
 
-        if (data.combatInfo && data.combatInfo.status === 'COMBAT_START') {
-            interaction.startCombat(data.combatInfo.initialState);
-        }
-
     } catch (error) {
         console.error('API 互動請求失敗', error);
         const errorMessage = String(error.message || '');
@@ -250,7 +201,7 @@ export async function handlePlayerAction() {
             appendMessageToStory('操作失敗：' + errorMessage, 'system-message');
         }
     } finally {
-        if (!document.getElementById('epilogue-modal').classList.contains('visible') && !gameState.isInChat) {
+        if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
              setLoading(false);
         }
     }
