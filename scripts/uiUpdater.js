@@ -1,6 +1,7 @@
 // scripts/uiUpdater.js
 import { MAX_POWER } from './config.js';
 import { DEFAULT_AI_MODEL, resetAiModelSelectionToDefault } from './aiModelPreference.js';
+import * as timeEffects from './timeEffects.js';
 
 // --- DOM元素獲取 ---
 const storyPanelWrapper = document.querySelector('.story-panel');
@@ -216,6 +217,43 @@ function updateTimeIcon(timeOfDay) {
     el.innerHTML = TIME_SVGS[timeOfDay] || TIME_SVGS['上午'];
 }
 
+// --- 時辰主題 ---
+const TIME_CLASS_MAP = {
+    '清晨': 'time-dawn',
+    '上午': 'time-morning',
+    '中午': 'time-noon',
+    '下午': 'time-afternoon',
+    '黃昏': 'time-dusk',
+    '夜晚': 'time-night',
+    '深夜': 'time-midnight',
+};
+let _timeEffectsInited = false;
+let _lastTimeClass = '';
+
+function updateTimeTheme(timeOfDay) {
+    const cls = TIME_CLASS_MAP[timeOfDay] || 'time-morning';
+    if (cls === _lastTimeClass) return;
+
+    const main = document.getElementById('main-content');
+    if (main) {
+        if (_lastTimeClass) main.classList.remove(_lastTimeClass);
+        main.classList.add(cls);
+    }
+    _lastTimeClass = cls;
+
+    // canvas 特效初始化
+    if (!_timeEffectsInited) {
+        const canvas = document.getElementById('time-effect-canvas');
+        if (canvas) {
+            timeEffects.init(canvas);
+            _timeEffectsInited = true;
+        }
+    }
+    if (_timeEffectsInited) {
+        timeEffects.switchEffect(timeOfDay);
+    }
+}
+
 function updateStatusBar(roundData) {
     const weather = roundData.WRD || '晴朗';
     const location = roundData.LOC?.[0] || '未知之地';
@@ -233,6 +271,7 @@ function updateStatusBar(roundData) {
         </div>
     `;
     updateTimeIcon(roundData.timeOfDay);
+    updateTimeTheme(roundData.timeOfDay);
 }
 
 function updatePowerBars(roundData) {

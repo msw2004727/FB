@@ -81,13 +81,16 @@ body.dark-theme .header-buttons .menu-toggle:hover {
 .story-header {
     position: sticky;
     top: 0;
-    background-color: var(--light-surface-bg);
+    background-color: var(--time-bg, var(--light-surface-bg));
+    color: var(--time-text, inherit);
     padding: 0.5rem 0 0;
     z-index: 10;
     flex-shrink: 0;
+    transition: background-color 0.8s ease, color 0.8s ease;
 }
 body.dark-theme .story-header {
-    background-color: var(--dark-surface-bg);
+    background-color: var(--time-bg, var(--dark-surface-bg));
+    color: var(--time-text, inherit);
 }
 
 .status-bar {
@@ -306,14 +309,17 @@ body.dark-theme .system-message {
 .story-footer {
     position: sticky;
     bottom: 0;
-    border-top: 1px solid var(--light-border);
-    background: var(--light-surface-bg);
+    border-top: 1px solid var(--time-border, var(--light-border));
+    background: var(--time-bg, var(--light-surface-bg));
+    color: var(--time-text, inherit);
     z-index: 10;
     flex-shrink: 0;
+    transition: background-color 0.8s ease, color 0.8s ease, border-color 0.8s ease;
 }
 body.dark-theme .story-footer {
-    border-top: 1px solid var(--dark-border);
-    background: var(--dark-surface-bg);
+    border-top: 1px solid var(--time-border, var(--dark-border));
+    background: var(--time-bg, var(--dark-surface-bg));
+    color: var(--time-text, inherit);
 }
 
 .input-action-wrapper {
@@ -487,3 +493,30 @@ body.dark-theme .cultivation-error {
     color: #fff;
     border-color: #ffd700;
 }
+
+/* === 時辰 Canvas 特效層 === */
+#time-effect-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* === 時辰動態配色（套用在 .main-content 上，向下影響 header/footer） === */
+.main-content.time-dawn    { --time-bg: #fdf0e0; --time-text: #6b5344; --time-border: #e8d5be; }
+.main-content.time-morning { --time-bg: #faf8f5; --time-text: #5a4a3a; --time-border: #e0d8cd; }
+.main-content.time-noon    { --time-bg: #fff9ee; --time-text: #5a4a3a; --time-border: #e8dcc8; }
+.main-content.time-afternoon { --time-bg: #faf5ed; --time-text: #6b5344; --time-border: #e0d5c5; }
+.main-content.time-dusk    { --time-bg: #3d2b1f; --time-text: #f0d9b5; --time-border: #5a4030; }
+.main-content.time-night   { --time-bg: #1a1a2e; --time-text: #b8c4d0; --time-border: #2a2a40; }
+.main-content.time-midnight { --time-bg: #0d0d14; --time-text: #8090a0; --time-border: #1a1a24; }
+
+/* 暗色主題下，白天時辰使用暗色變體 */
+body.dark-theme .main-content.time-dawn    { --time-bg: #2a2018; --time-text: #d4b896; --time-border: #3d3028; }
+body.dark-theme .main-content.time-morning { --time-bg: #1e1e22; --time-text: #c8c0b4; --time-border: #333; }
+body.dark-theme .main-content.time-noon    { --time-bg: #252218; --time-text: #d4c8a8; --time-border: #3a3528; }
+body.dark-theme .main-content.time-afternoon { --time-bg: #221e18; --time-text: #d0c0a0; --time-border: #383028; }
+/* 暗色主題下，黃昏/夜晚/深夜保持原色 */
