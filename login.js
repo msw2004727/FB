@@ -1,7 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // PWA 本機化：登入頁已不再使用，自動導向遊戲主頁
+    window.location.href = 'index.html';
+    return;
+
+    // === 以下為舊版登入邏輯（保留供參考）===
     const form = document.getElementById('login-form');
     const messageElement = document.getElementById('message');
-    // 【核心新增】獲取載入動畫元素
     const loader = document.getElementById('loader');
     const backendBaseUrl = 'https://ai-novel-final.onrender.com';
 

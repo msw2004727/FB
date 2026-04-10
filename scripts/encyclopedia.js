@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const username = localStorage.getItem('username');
 
     if (!token) {
-        window.location.href = 'login.html';
+        window.location.href = 'index.html';
         return; 
     }
 
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 如果是授權問題，3秒後跳轉回登入頁
         if (error.message.includes('未經授權') || error.message.includes('無效的身份令牌')) {
             setTimeout(() => {
-                window.location.href = 'login.html';
+                window.location.href = 'index.html';
             }, 3000);
         }
     }

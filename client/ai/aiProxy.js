@@ -2,10 +2,18 @@
 // AI Proxy 客戶端 — 負責與 AI Proxy 伺服器通訊
 
 const PROXY_URL_KEY = 'wenjiang_ai_proxy_url';
-const DEFAULT_PROXY_URL = 'https://ai-wenjiang-proxy.vercel.app';
+
+// 自動偵測：如果在 localhost 開發，預設連本機 AI Proxy；否則連線上版
+function detectDefaultProxyUrl() {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:3001';
+    }
+    return 'https://ai-wenjiang-proxy.vercel.app';
+}
 
 function getProxyUrl() {
-    return localStorage.getItem(PROXY_URL_KEY) || DEFAULT_PROXY_URL;
+    return localStorage.getItem(PROXY_URL_KEY) || detectDefaultProxyUrl();
 }
 
 export function setProxyUrl(url) {

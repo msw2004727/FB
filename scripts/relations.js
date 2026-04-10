@@ -330,7 +330,7 @@ async function init() {
     refs();
     bind();
     const token = localStorage.getItem('jwt_token');
-    if (!token) { window.location.href = 'login.html'; return; }
+    if (!token) { window.location.href = 'index.html'; return; }
     S.u = localStorage.getItem('username') || '主角';
     S.hidden = readHidden();
     if (S.r.relationsTitle) S.r.relationsTitle.textContent = `${S.u} 的人物關係圖`;

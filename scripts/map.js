@@ -21,7 +21,7 @@ async function initializeMapPage() {
     const token = localStorage.getItem('jwt_token');
     if (!token) {
         mapContent.innerHTML = '<p class="loading-text">尚未登入，正在返回登入頁...</p>';
-        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+        setTimeout(() => { window.location.href = 'index.html'; }, 1500);
         return;
     }
 

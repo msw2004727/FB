@@ -255,9 +255,9 @@
                     <a href="library.html" target="_blank" class="deceased-btn review-btn">
                         <i class="fas fa-book-open-reader"></i> 回顧生平事蹟
                     </a>
-                    <a href="register.html" class="deceased-btn restart-btn">
-                        <i class="fas fa-user-plus"></i> 註冊新名號
-                    </a>
+                    <button id="restart-new-game-btn" class="deceased-btn restart-btn" onclick="(async()=>{const n=prompt('新角色名稱：');if(n){const g=prompt('性別（男/女）：')||'男';const{createNewGame,setActiveProfile}=await import('./client/engine/gameEngine.js');const r=await createNewGame(n,g);setActiveProfile(r.profile.id);localStorage.setItem('wenjiang_active_profile',r.profile.id);localStorage.setItem('username',n);window.location.reload();}})()">
+                        <i class="fas fa-user-plus"></i> 建立新角色
+                    </button>
                 </div>
             </div>
         </div>

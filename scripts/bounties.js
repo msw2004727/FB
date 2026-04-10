@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- 登入守衛 ---
     const token = localStorage.getItem('jwt_token');
     if (!token) {
-        window.location.href = 'login.html';
+        window.location.href = 'index.html';
         return;
     }
 

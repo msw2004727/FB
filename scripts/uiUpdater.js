@@ -519,19 +519,6 @@ export function handleApiError(error) {
     }
 
     appendMessageToStory(`[System] Connection failed... (${errorMessage})`, 'system-message');
-    if (
-        errorMessage.includes('\u672a\u7d93\u6388\u6b0a') ||
-        errorMessage.includes('\u7121\u6548\u7684\u8eab\u4efd\u4ee4\u724c') ||
-        normalizedError.includes('unauthorized') ||
-        normalizedError.includes('invalid token') ||
-        normalizedError.includes('jwt')
-    ) {
-        setTimeout(() => {
-            localStorage.removeItem('jwt_token');
-            localStorage.removeItem('username');
-            window.location.href = 'login.html';
-        }, 3000);
-    }
 }
 
 function isAiModelRuntimeFailure(message) {
