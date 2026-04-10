@@ -77,7 +77,7 @@ export const profiles = {
         const profile = {
             id,
             username: data.username || '無名俠客',
-            gender: data.gender || '男',
+            gender: data.gender || 'male',
             morality: 0,
             isDeceased: false,
             timeOfDay: '上午',

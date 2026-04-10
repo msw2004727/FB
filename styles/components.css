@@ -388,6 +388,58 @@ body.dark-theme .info-card:hover {
         inset 0 1px 0 rgba(255,255,255,0.02);
 }
 
+/* 角色名字+性別編輯 */
+.player-identity-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+}
+.player-name-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.95rem;
+    font-family: var(--font-serif);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    color: var(--text-primary, #f0e6d8);
+    outline: none;
+    transition: border-color 0.2s;
+}
+.player-name-input:focus {
+    border-color: #c3a98a;
+}
+.player-gender-select {
+    padding: 0.35rem 0.3rem;
+    font-size: 0.9rem;
+    font-family: var(--font-sans);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    color: var(--text-primary, #f0e6d8);
+    cursor: pointer;
+    outline: none;
+}
+.player-identity-save-btn {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.85rem;
+    background: rgba(195, 169, 138, 0.25);
+    border: 1px solid rgba(195, 169, 138, 0.3);
+    border-radius: 5px;
+    color: #c3a98a;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: none; /* 預設隱藏，有變更時才顯示 */
+}
+.player-identity-save-btn.visible {
+    display: inline-flex;
+}
+.player-identity-save-btn:hover {
+    background: rgba(195, 169, 138, 0.4);
+}
+
 .info-card .money-container {
     display: flex;
     justify-content: space-between;

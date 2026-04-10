@@ -151,6 +151,18 @@
                 </div>
 
                 <div class="info-card">
+                    <h4><i class="fas fa-user-pen"></i> 角色</h4>
+                    <div class="player-identity-row">
+                        <input type="text" id="player-name-display" class="player-name-input" maxlength="8" autocomplete="one-time-code" data-form-type="other" data-lpignore="true" />
+                        <select id="player-gender-select" class="player-gender-select">
+                            <option value="male">男</option>
+                            <option value="female">女</option>
+                        </select>
+                        <button id="player-identity-save" class="player-identity-save-btn" title="儲存"><i class="fas fa-check"></i></button>
+                    </div>
+                </div>
+
+                <div class="info-card">
                     <h4><i class="fas fa-microchip"></i> AI 核心</h4>
                     <div class="ai-model-row">
                         <div class="select-wrapper">
@@ -379,8 +391,8 @@
                     <p class="intro-prompt">你是？</p>
                 </div>
                 <div class="intro-gender-btns" style="display:none;">
-                    <button class="intro-gender-btn" data-gender="男"><i class="fas fa-mars"></i> 男</button>
-                    <button class="intro-gender-btn" data-gender="女"><i class="fas fa-venus"></i> 女</button>
+                    <button class="intro-gender-btn" data-gender="male"><i class="fas fa-mars"></i> 男</button>
+                    <button class="intro-gender-btn" data-gender="female"><i class="fas fa-venus"></i> 女</button>
                 </div>
             </div>
         </div>

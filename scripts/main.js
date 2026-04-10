@@ -151,6 +151,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initializeDOM();
 
+    // --- 角色名字+性別即時編輯 ---
+    const playerNameInput = document.getElementById('player-name-display');
+    const playerGenderSelect = document.getElementById('player-gender-select');
+    const playerIdentitySaveBtn = document.getElementById('player-identity-save');
+
+    if (playerNameInput && playerGenderSelect && playerIdentitySaveBtn) {
+        // 填入當前值
+        playerNameInput.value = activeProfile.username || '';
+        playerGenderSelect.value = activeProfile.gender === 'female' || activeProfile.gender === '女' ? 'female' : 'male';
+
+        let originalName = playerNameInput.value;
+        let originalGender = playerGenderSelect.value;
+
+        function checkIdentityChanged() {
+            const changed = playerNameInput.value.trim() !== originalName || playerGenderSelect.value !== originalGender;
+            playerIdentitySaveBtn.classList.toggle('visible', changed && playerNameInput.value.trim().length > 0);
+        }
+
+        playerNameInput.addEventListener('input', checkIdentityChanged);
+        playerGenderSelect.addEventListener('change', checkIdentityChanged);
+
+        playerIdentitySaveBtn.addEventListener('click', async () => {
+            const newName = playerNameInput.value.trim();
+            const newGender = playerGenderSelect.value;
+            if (!newName || newName.length > 8) return;
+            try {
+                await gameEngine.renamePlayer(newName);
+                await clientDB.profiles.update(activeProfile.id, { gender: newGender });
+                activeProfile.username = newName;
+                activeProfile.gender = newGender;
+                originalName = newName;
+                originalGender = newGender;
+                playerIdentitySaveBtn.classList.remove('visible');
+            } catch (e) {
+                alert('儲存失敗：' + e.message);
+            }
+        });
+    }
+
     // --- API Key 彈窗邏輯 ---
     let _previousModel = null;
 
