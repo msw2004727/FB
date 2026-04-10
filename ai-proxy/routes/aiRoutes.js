@@ -300,22 +300,33 @@ router.post('/generate', async (req, res, next) => {
             const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
             const t0 = Date.now();
 
-            // 第一波並行：故事 + 選項
-            const [storyRaw, optionsRaw] = await Promise.all([
+            // 用上一回合的故事做進度評估（這樣三個呼叫可以全部並行）
+            const lastStory = context.recentHistory?.[context.recentHistory.length - 1]?.story || '';
+            const evalPrompt = getProgressEvaluatorPrompt(lastStory, context.achievedMilestones || [], context.cluesSummary || '');
+
+            // 三個 AI 呼叫全部並行
+            const promises = [
                 callAI(modelToUse, prompt, true, {}, apiKey || null),
                 callAI(modelToUse, getOptionsPrompt(
                     context.playerAction || '',
                     context.recentHistory?.[context.recentHistory.length - 1]?.EVT || '',
                     context.player?.PC || ''
                 ), true, {}, apiKey || null),
-            ]);
+            ];
+            if (evalPrompt) promises.push(callAI('minimax', evalPrompt, true, {}));
+
+            const results = await Promise.all(promises);
+            const storyRaw = results[0];
+            const optionsRaw = results[1];
+            const evalRaw = results[2];
 
             let data;
             try { data = parseJsonResponse(storyRaw); } catch (_) { data = storyRaw; }
 
-            // 合併選項結果
             if (data && typeof data === 'object') {
                 if (!data.roundData) data.roundData = {};
+
+                // 合併選項
                 try {
                     const opts = parseJsonResponse(optionsRaw);
                     if (opts.actionOptions) data.roundData.actionOptions = opts.actionOptions;
@@ -325,19 +336,14 @@ router.post('/generate', async (req, res, next) => {
                     console.warn('[AI Proxy] Options parse failed');
                 }
 
-                // 第二波：進度評估（await 等結果，但 prompt 很短所以快）
-                const storyText = data.story || data.roundData.story || '';
-                const evalPrompt = getProgressEvaluatorPrompt(storyText, context.achievedMilestones || [], context.cluesSummary || '');
-                if (evalPrompt) {
+                // 合併進度評估
+                if (evalRaw) {
                     try {
-                        const evalRaw = await callAI('minimax', evalPrompt, true, {});
                         const evalResult = parseJsonResponse(evalRaw);
                         data.roundData.progressEval = evalResult;
                         if (evalResult.questJournal) data.roundData.questJournal = evalResult.questJournal;
                         if (evalResult.triggered) console.log(`[Progress] Milestone triggered! ${evalResult.reason}`);
-                    } catch (e) {
-                        console.warn('[Progress] Eval failed:', e.message);
-                    }
+                    } catch (_) {}
                 }
 
                 // MemPalace: fire-and-forget
