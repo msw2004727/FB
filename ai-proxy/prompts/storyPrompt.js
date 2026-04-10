@@ -1,6 +1,5 @@
 // prompts/storyPrompt.js
 const { getItemLedgerRule } = require('./story_components/itemLedgerRule.js');
-const { getMartialArtsRule } = require('./story_components/martialArtsRule.js');
 const { getNpcRule } = require('./story_components/npcRule.js');
 const { getInteractionRule } = require('./story_components/interactionRule.js');
 const { getPlayerAttributeRule } = require('./story_components/playerAttributeRule.js');
@@ -10,7 +9,7 @@ const { getSystemInteractionRule } = require('./story_components/systemInteracti
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
 const { getNarrativeStyleRule } = require('./story_components/narrativeStyleRule.js'); // 【核心新增】
 
-const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = { internal: 5, external: 5, lightness: 5 }, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = [], blackShadowEvent = null) => {
+const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', playerPower = null, playerMorality = 0, levelUpEvents = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, playerBulkScore = 0, actorCandidates = [], blackShadowEvent = null) => {
     const protagonistDescription = userProfile.gender === 'female'
         ? '她附身在一個不知名、約20歲的少女身上。'
         : '他附身在一個不知名、約20歲的少年身上。';
@@ -160,12 +159,12 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 4.  **【數據一致性鐵律】**: 你在 \`story\` 中的文字描述，必須與你回傳的 \`staminaChange\` 數值**完全一致**。如果你在故事中寫到「感到疲憊」、「氣喘吁吁」、「體力消耗」，那麼你的 \`staminaChange\` **絕對不能** 為0或正數。反之，如果你在故事中描述玩家正在「休息」，那麼 \`staminaChange\` **必須**是正數。任何數據與描述的矛盾，都將被視為一次嚴重的判斷失誤。
 5.  **【昏迷鐵律】**: 如果玩家的體力在行動前就已經是 0 或更低，你**必須**忽略玩家的任何行動指令（除非是求救或使用丹藥等合理求生行為），並直接觸發「昏迷事件」。你的故事描述必須是關於玩家體力不支、失去意識的過程。同時，你必須回傳一個較大的**正數** \`staminaChange\`（例如 +100）來代表昏迷後的體力恢復，並推進至少一個時間單位。`;
     
-    const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality, playerPower });
+    const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality });
     const romanceRules = getRomanceRule({ playerGender });
-    const worldviewAndProgressionRules = getWorldviewAndProgressionRule({ protagonistDescription, playerPower });
+    const currentRound = userProfile.R || 0;
+    const worldviewAndProgressionRules = getWorldviewAndProgressionRule({ protagonistDescription, currentRound });
     const systemInteractionRules = getSystemInteractionRule({ locationName: locationContext?.locationName });
     const outputStructureRules = getOutputStructureRule({ username, timeSequence });
-    const martialArtsRules = getMartialArtsRule();
     const itemLedgerRule = getItemLedgerRule();
     const interactionRule = getInteractionRule();
     const npcRule = getNpcRule();
@@ -186,7 +185,6 @@ ${encumbranceInstruction}
 ${staminaSystemRule}
 ${playerAttributeRules}
 ${itemLedgerRule}
-${martialArtsRules}
 ${npcRule}
 ${interactionRule}
 ${romanceRules}
