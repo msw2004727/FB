@@ -66,8 +66,14 @@ export async function getLatestGame() {
         return { gameState: 'deceased', roundData: lastSave, locationData: null };
     }
 
-    const lastSave = await clientDB.saves.getLatest(profileId);
-    if (!lastSave) throw new Error('找不到存檔資料。');
+    let lastSave = await clientDB.saves.getLatest(profileId);
+    if (!lastSave) {
+        // 沒有存檔 — 自動建立 R0
+        console.warn('[GameEngine] 找不到存檔，自動建立初始回合');
+        await startNewGame();
+        lastSave = await clientDB.saves.getLatest(profileId);
+        if (!lastSave) throw new Error('找不到存檔資料。');
+    }
 
     const roundData = {
         ...lastSave,
@@ -223,5 +229,13 @@ export async function startNewGame() {
     };
 
     await clientDB.saves.add(profileId, initialRound);
+
+    // 確認存檔確實寫入
+    const verify = await clientDB.saves.getLatest(profileId);
+    if (!verify) {
+        // 如果寫入失敗，再試一次
+        await clientDB.saves.add(profileId, initialRound);
+    }
+
     return { profile, roundData: initialRound };
 }
