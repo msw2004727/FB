@@ -206,10 +206,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const username = activeProfile.username;
-    if (dom.playerInput && username) {
-        dom.playerInput.placeholder = '在此輸入文字即可';
-    } else if (dom.playerInput) {
+    if (dom.playerInput) {
+        dom.playerInput.value = '';
         dom.playerInput.placeholder = '在此輸入文字即可';
     }
 

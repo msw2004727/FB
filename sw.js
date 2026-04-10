@@ -1,5 +1,5 @@
 // sw.js — Service Worker for AI 文江 PWA
-const CACHE_NAME = 'wenjiang-v21';
+const CACHE_NAME = 'wenjiang-v22';
 
 // 靜態資源快取列表（使用相對路徑，相容 GitHub Pages 子目錄部署）
 const STATIC_ASSETS = [
