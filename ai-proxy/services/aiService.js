@@ -48,7 +48,7 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
                 const key = userApiKey || process.env.OPENAI_API_KEY;
                 if (!key) throw new Error('缺少 OpenAI API Key，請在前端設定頁面填寫。');
                 const client = createOpenAIClient(key);
-                options.model = "gpt-5.4";
+                options.model = "gpt-5.4-mini";
                 if (isJsonExpected) options.response_format = { type: "json_object" };
                 const result = await client.chat.completions.create(options);
                 textResponse = result.choices[0].message.content;
