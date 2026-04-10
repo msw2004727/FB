@@ -29,7 +29,8 @@ export const api = {
     // ── Gameplay ─────────────────────────────
     interact: (body) => safeCall(() => gameEngine.interact({
         action: body.action,
-        model: body.model
+        model: body.model,
+        optionMorality: body.optionMorality || 0
     })),
 
     // ── State ────────────────────────────────

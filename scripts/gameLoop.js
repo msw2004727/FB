@@ -153,7 +153,7 @@ export async function processNewRoundData(data) {
 }
 
 
-export async function handlePlayerAction(actionOverride) {
+export async function handlePlayerAction(actionOverride, optionMorality = 0) {
     let actionText;
     if (actionOverride) {
         actionText = actionOverride;
@@ -184,7 +184,8 @@ export async function handlePlayerAction(actionOverride) {
         const data = await api.interact({
             action: actionText,
             round: gameState.currentRound,
-            model: dom.aiModelSelector.value
+            model: dom.aiModelSelector.value,
+            optionMorality
         });
         
         if (data && data.roundData) {

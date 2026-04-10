@@ -101,7 +101,7 @@ export async function getLatestGame() {
 
 // ── 玩家行動 ────────────────────────────────────────
 
-export async function interact({ action, model }) {
+export async function interact({ action, model, optionMorality = 0 }) {
     const profileId = getActiveProfileId();
     const context = await buildContext(profileId);
 
@@ -126,6 +126,9 @@ export async function interact({ action, model }) {
     const roundData = aiResult.roundData;
     roundData.R = (context.player.R || 0) + 1;
     roundData.story = aiResult.story || roundData.story;
+
+    // 將選項的預設善惡值加到 AI 判定的 moralityChange 上
+    roundData.moralityChange = (roundData.moralityChange || 0) + optionMorality;
 
     // 處理里程碑評估結果
     if (roundData.progressEval && roundData.progressEval.triggered) {

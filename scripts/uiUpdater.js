@@ -283,8 +283,8 @@ function updateStatusBar(roundData) {
 }
 
 function updateMoralityBar(morality) {
+    const safeMorality = Number.isFinite(Number(morality)) ? Number(morality) : 0;
     if (moralityBarIndicator) {
-        const safeMorality = Number.isFinite(Number(morality)) ? Number(morality) : 0;
         const percentage = Math.max(0, Math.min(((safeMorality + 100) / 200) * 100, 100));
         moralityBarIndicator.style.left = `${percentage}%`;
         let colorVar;
@@ -293,6 +293,8 @@ function updateMoralityBar(morality) {
         else colorVar = document.body.classList.contains('dark-theme') ? 'var(--dark-text-secondary)' : 'var(--morality-neutral-light)';
         moralityBarIndicator.style.backgroundColor = colorVar;
     }
+    const valueEl = document.getElementById('morality-value');
+    if (valueEl) valueEl.textContent = safeMorality > 0 ? `+${safeMorality}` : String(safeMorality);
 }
 
 function updateDeathCountdownUI(countdownValue) {

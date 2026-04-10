@@ -392,14 +392,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (dom.submitButton) dom.submitButton.addEventListener('click', () => gameLoop.handlePlayerAction());
         if (dom.playerInput) dom.playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); gameLoop.handlePlayerAction(); } });
 
-        // 選項按鈕點擊 → 直接送出
+        // 選項按鈕點擊 → 直接送出（附帶善惡值）
         if (dom.actionOptionButtons) {
-            dom.actionOptionButtons.forEach(btn => {
+            dom.actionOptionButtons.forEach((btn, idx) => {
                 btn.addEventListener('click', () => {
                     const textEl = btn.querySelector('.option-text');
                     const text = textEl ? textEl.textContent : btn.textContent;
                     if (text && !gameState.isRequesting) {
-                        gameLoop.handlePlayerAction(text);
+                        const morality = (gameState.currentActionMorality || [])[idx] || 0;
+                        gameLoop.handlePlayerAction(text, morality);
                     }
                 });
             });
