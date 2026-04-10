@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (modelNameEl) modelNameEl.textContent = info.name;
         dom.apikeyModalDesc.textContent = info.hint || '請輸入您的 API Key 以啟用此 AI 模型。';
         dom.apikeyInput.value = getStoredApiKey(model) || '';
-        dom.apikeyInput.type = 'password';
+        dom.apikeyInput.style.webkitTextSecurity = 'disc';
         if (dom.apikeyToggleBtn) {
             dom.apikeyToggleBtn.querySelector('i').className = 'fas fa-eye';
         }
@@ -201,12 +201,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 顯示/隱藏密碼
+    // 顯示/隱藏密碼（用 CSS -webkit-text-security 代替 type="password" 避免瀏覽器自動填入）
     if (dom.apikeyToggleBtn) {
         dom.apikeyToggleBtn.addEventListener('click', () => {
-            const isPassword = dom.apikeyInput.type === 'password';
-            dom.apikeyInput.type = isPassword ? 'text' : 'password';
-            dom.apikeyToggleBtn.querySelector('i').className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+            const isHidden = dom.apikeyInput.style.webkitTextSecurity === 'disc';
+            dom.apikeyInput.style.webkitTextSecurity = isHidden ? 'none' : 'disc';
+            dom.apikeyToggleBtn.querySelector('i').className = isHidden ? 'fas fa-eye-slash' : 'fas fa-eye';
         });
     }
 

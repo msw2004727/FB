@@ -85,7 +85,7 @@
                 <div id="text-input-mode" class="input-mode">
                     <div class="input-action-wrapper">
                         <div class="text-input-container">
-                            <input type="text" id="player-input" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="player-action-nocomplete" maxlength="10">
+                            <input type="text" id="player-input" placeholder="" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" maxlength="10">
                             <span id="char-counter" class="char-counter">0/10</span>
                         </div>
                         <button id="submit-button">動作</button>
@@ -359,7 +359,7 @@
                 <p id="apikey-modal-model-name" class="apikey-model-name"></p>
                 <p id="apikey-modal-desc" class="apikey-hint"></p>
                 <div class="apikey-input-wrapper">
-                    <input type="password" id="apikey-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+                    <input type="text" id="apikey-input" placeholder="sk-..." autocomplete="new-password" spellcheck="false" data-form-type="other" data-lpignore="true" style="-webkit-text-security: disc;" />
                     <button id="apikey-toggle-visibility" class="apikey-toggle-btn" type="button" title="顯示/隱藏">
                         <i class="fas fa-eye"></i>
                     </button>
@@ -380,7 +380,7 @@
                     <p>你試著回想自己是誰，記憶像碎片一樣慢慢浮現......你努力抓住腦中最清晰的那一塊——</p>
                     <p class="intro-prompt">你叫什麼名字？</p>
                 </div>
-                <input type="text" id="intro-name-input" class="intro-input" placeholder="輸入你的名字" maxlength="8" autocomplete="off" spellcheck="false" />
+                <input type="text" id="intro-name-input" class="intro-input" placeholder="輸入你的名字" maxlength="8" autocomplete="one-time-code" spellcheck="false" data-form-type="other" data-lpignore="true" />
                 <div class="intro-story intro-story-2" style="display:none;">
                     <p>名字想起來了。你低頭看了看自己的身體——</p>
                     <p class="intro-prompt">你是？</p>
