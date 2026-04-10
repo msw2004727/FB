@@ -1,3 +1,6 @@
 ai-proxy/node_modules/
 ai-proxy/.env
+ai-proxy/mempalace_data/
 .env
+_mempalace_test/
+test_mempalace.py

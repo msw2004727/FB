@@ -363,6 +363,19 @@ router.post('/generate', async (req, res, next) => {
             data = rawText;
         }
 
+        // MemPalace: 自動寫入記憶（fire-and-forget，不阻塞回應）
+        if (task === 'story' && data && typeof data === 'object') {
+            try {
+                const mempalace = require('../services/mempalaceClient');
+                const playerId = context.player?.id || context.profileId || 'unknown';
+                const story = data.story || (data.roundData && data.roundData.story) || '';
+                const roundData = data.roundData || data;
+                mempalace.saveRoundMemory(playerId, roundData, story);
+            } catch (memErr) {
+                console.warn('[MemPalace] Write failed (non-blocking):', memErr.message);
+            }
+        }
+
         return res.json({
             success: true,
             data,

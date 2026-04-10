@@ -31,6 +31,80 @@ body.dark-theme .prequel-summary h3 {
 }
 
 /* --- 儀表板元件 --- */
+/* --- PWA 安裝橫幅 --- */
+.pwa-install-banner {
+    width: 100%;
+}
+
+.pwa-install-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    aspect-ratio: 2.8 / 1;
+    border: 1px solid var(--light-border);
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-weight: bold;
+    color: #fff;
+    background-color: var(--light-accent);
+    background-image: var(--pwa-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow:
+        0 6px 18px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 背景圖存在時加暗底以確保文字可讀 */
+.pwa-install-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.45)
+    );
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.pwa-install-text,
+.pwa-install-icon {
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.pwa-install-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    filter: brightness(1.08);
+}
+
+.pwa-install-btn:active {
+    transform: translateY(0);
+}
+
+body.dark-theme .pwa-install-btn {
+    background-color: var(--dark-accent);
+    border-color: var(--dark-border);
+    box-shadow:
+        0 6px 18px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
 .info-card {
     font-family: var(--font-sans);
     font-size: 0.9rem;
