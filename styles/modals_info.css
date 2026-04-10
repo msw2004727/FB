@@ -238,22 +238,23 @@ body.dark-theme .exp-bar-fill {
     text-align: right;
 }
 
-/* --- API Key 設定彈窗 --- */
+/* --- API Key 設定彈窗（毛玻璃效果）--- */
 .apikey-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.75);
+    background-color: rgba(0, 0, 0, 0.35);
     z-index: 1020;
     display: flex;
     justify-content: center;
     align-items: center;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-    backdrop-filter: blur(4px);
+    transition: opacity 0.35s ease, visibility 0.35s ease;
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
 }
 
 .apikey-modal-overlay.visible {
@@ -262,25 +263,32 @@ body.dark-theme .exp-bar-fill {
 }
 
 .apikey-modal-content {
-    background-color: var(--light-surface-bg);
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    border-radius: 16px;
     width: 90%;
     max-width: 420px;
     padding: 2rem;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    transform: scale(0.95);
-    transition: transform 0.4s ease;
-    border: 1px solid var(--light-border);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.18),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+    transform: scale(0.92) translateY(12px);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(255, 255, 255, 0.45);
     text-align: center;
 }
 
 .apikey-modal-overlay.visible .apikey-modal-content {
-    transform: scale(1);
+    transform: scale(1) translateY(0);
 }
 
 body.dark-theme .apikey-modal-content {
-    background-color: var(--dark-surface-bg);
-    border-color: var(--dark-border);
+    background: rgba(30, 30, 40, 0.68);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .apikey-modal-content h3 {
@@ -312,29 +320,33 @@ body.dark-theme .apikey-modal-content p {
 .apikey-input-wrapper input {
     width: 100%;
     padding: 0.75rem 2.8rem 0.75rem 0.75rem;
-    border: 1px solid var(--light-border);
-    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
     font-size: 0.95rem;
     font-family: monospace;
-    background-color: var(--light-bg);
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     color: var(--light-text-primary);
     box-sizing: border-box;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .apikey-input-wrapper input:focus {
     outline: none;
     border-color: var(--light-accent);
+    box-shadow: 0 0 0 3px rgba(var(--light-accent-rgb, 139, 90, 43), 0.15);
 }
 
 body.dark-theme .apikey-input-wrapper input {
-    background-color: var(--dark-bg);
-    border-color: var(--dark-border);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
     color: var(--dark-text-primary);
 }
 
 body.dark-theme .apikey-input-wrapper input:focus {
     border-color: var(--dark-accent);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
 }
 
 .apikey-toggle-btn {
@@ -376,27 +388,40 @@ body.dark-theme .apikey-toggle-btn {
 }
 
 .apikey-btn.cancel {
-    background-color: var(--light-border);
+    background: rgba(0, 0, 0, 0.06);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     color: var(--light-text-primary);
 }
 
+.apikey-btn.cancel:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
 body.dark-theme .apikey-btn.cancel {
-    background-color: var(--dark-border);
+    background: rgba(255, 255, 255, 0.1);
     color: var(--dark-text-primary);
 }
 
+body.dark-theme .apikey-btn.cancel:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
 .apikey-btn.save {
-    background-color: var(--light-accent);
+    background: var(--light-accent);
     color: #fff;
     font-weight: bold;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
 .apikey-btn.save:hover {
     filter: brightness(1.1);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 }
 
 body.dark-theme .apikey-btn.save {
-    background-color: var(--dark-accent);
+    background: var(--dark-accent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 .apikey-note {

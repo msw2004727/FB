@@ -15,9 +15,7 @@ export function initializeDOM() {
     dom.submitButton = document.getElementById('submit-button');
     dom.menuToggle = document.getElementById('menu-toggle');
     dom.themeSwitcher = document.getElementById('theme-switcher');
-    dom.logoutButton = document.getElementById('logout-btn');
     dom.suicideButton = document.getElementById('suicide-btn');
-    dom.skillsBtn = document.getElementById('skills-btn');
     dom.aiModelSelector = document.getElementById('ai-model-selector');
     dom.npcInteractionMenu = document.getElementById('npc-interaction-menu');
 
