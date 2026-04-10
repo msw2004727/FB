@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (dom.playerInput) {
         dom.playerInput.value = '';
-        dom.playerInput.placeholder = '在此輸入文字即可';
+        dom.playerInput.placeholder = '本回劇情開放文字輸入';
     }
 
     // 備份提醒（頁面內 banner，不彈窗）
