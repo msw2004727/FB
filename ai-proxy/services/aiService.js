@@ -181,7 +181,8 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
             }
         }
         console.error(`[AI 調度中心] 使用模型 ${modelName} 時出錯:`, error);
-        throw new Error(`AI模型 ${modelName} 呼叫失敗，請檢查API金鑰與服務狀態。`);
+        const detail = error?.message || String(error);
+        throw new Error(`AI模型 ${modelName} 呼叫失敗: ${detail}`);
     }
 }
 

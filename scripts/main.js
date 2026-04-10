@@ -211,17 +211,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         dom.playerInput.placeholder = '在此輸入文字即可';
     }
 
-    // 備份提醒
-    if (shouldRemindBackup()) {
-        const iosWarning = isIOSSafari() ? '\n\n⚠️ 您正在使用 iOS Safari，長時間未使用可能導致存檔被系統清除！' : '';
-        setTimeout(() => {
-            if (confirm(`建議定期匯出存檔以防資料遺失。${iosWarning}\n\n是否現在匯出存檔？`)) {
-                exportSave(activeProfile.id).then(filename => {
-                    alert(`存檔已匯出: ${filename}`);
-                });
-            }
+    // 備份提醒（頁面內 banner，不彈窗）
+    const backupBanner = document.getElementById('backup-remind-banner');
+    const backupExportBtn = document.getElementById('backup-remind-export');
+    const backupDismissBtn = document.getElementById('backup-remind-dismiss');
+
+    if (shouldRemindBackup() && backupBanner) {
+        setTimeout(() => { backupBanner.style.display = ''; }, 3000);
+    }
+    if (backupExportBtn) {
+        backupExportBtn.addEventListener('click', async () => {
+            try {
+                await exportSave(activeProfile.id);
+                markBackupReminded();
+                if (backupBanner) backupBanner.style.display = 'none';
+            } catch (e) { console.error('匯出失敗:', e); }
+        });
+    }
+    if (backupDismissBtn) {
+        backupDismissBtn.addEventListener('click', () => {
             markBackupReminded();
-        }, 3000);
+            if (backupBanner) backupBanner.style.display = 'none';
+        });
     }
 
     function setGameContainerHeight() {
