@@ -68,7 +68,7 @@ const { getForgetSkillPrompt } = require('../prompts/forgetSkillPrompt.js');
 
 
 // 全域繁體中文語言規則 — 所有 AI 呼叫統一注入
-const LANG_SYSTEM_RULE = '【語言鐵律】你的所有回應文字（包括 JSON 欄位值）必須全程使用「繁體中文」。嚴格禁止簡體中文字元。';
+const LANG_SYSTEM_RULE = '【語言鐵律】你的所有回應文字（包括 JSON 欄位值）必須全程使用「繁體中文」。嚴格禁止簡體中文字元。允許少量 emoji 來增強氣氛與情緒。';
 
 // 統一的AI調度中心
 function canRetryWithDefaultModel(modelName) {
