@@ -1,30 +1,15 @@
 // prompts/suggestionPrompt.js
 
 const getSuggestionPrompt = (roundData) => {
-    // 【核心修改】在生成建議前，先過濾掉已經死亡的NPC
     const aliveNpcs = (roundData.NPC || []).filter(npc => !npc.isDeceased);
     const aliveNpcNames = aliveNpcs.map(npc => npc.name).join('、') || '無';
 
-    // 【核心修正 v2.0】改為從 inventory 陣列讀取物品，並生成易讀的字串
-    let itemsString = '身無長物';
-    if (roundData.inventory && Array.isArray(roundData.inventory) && roundData.inventory.length > 0) {
-        const playerItems = roundData.inventory
-            .filter(item => item.itemName !== '銀兩') // 過濾掉銀兩，專注於可互動的物品
-            .map(item => `${item.itemName}${item.quantity > 1 ? `(x${item.quantity})` : ''}`);
-        
-        if (playerItems.length > 0) {
-            itemsString = playerItems.join('、');
-        }
-    }
-
-    // 將當前回合的數據轉換為易讀的摘要
     const context = `
-- 玩家狀態: ${roundData.PC}
-- 人物見聞: ${aliveNpcNames}
-- 隨身物品: ${itemsString}
-- 任務日誌: ${roundData.QST || '無'}
-- 關鍵線索: ${roundData.CLS || '無'}
-- 內心獨白: ${roundData.PSY}
+- 玩家狀態: ${roundData.PC || '未知'}
+- 故事場景: ${roundData.EVT || '未知'}
+- 周圍人物: ${aliveNpcNames}
+- 當前地點: ${Array.isArray(roundData.LOC) ? roundData.LOC.join(' > ') : roundData.LOC || '未知'}
+- 天氣時辰: ${roundData.WRD || '未知'}，${roundData.timeOfDay || '未知'}
     `;
 
     return `
@@ -35,21 +20,19 @@ const getSuggestionPrompt = (roundData) => {
 
 **【三種建議風格】**
 
-1.  **正向引導 (約1/3機率)**：當有明確任務或線索時，給出有建設性的建議。
+1.  **正向引導 (約1/3機率)**：當有明確線索或機會時，給出有建設性的建議。
     * 範例："或許可以問問那個樵夫關於山賊的事？"
-    * 範例："是時候去回覆城門口的懸賞了。"
-    * **瀕死時範例**: "快！快找人求救！", "把那顆丹藥吃下去！"
+    * 範例："這條路看起來通往鎮上，去看看吧。"
+    * **瀕死時範例**: "快！快找人求救！"
 
 2.  **中立探索 (約1/3機率)**：當情況不明朗時，提出觀察或探索的建議。
-    * 範例："檢查一下自己的身體狀況吧。"
+    * 範例："先觀察一下四周再說。"
     * 範例："不如先在這附近四處探查一番。"
 
 3.  **負面吐槽 (約1/3機率)**：當主人處於窘境、或可以採取邪道時，給出吐槽、腹黑或高風險的建議。
-    * 範例："這時候打坐，心真大啊..."
+    * 範例："這時候發呆，心真大啊..."
     * 範例："直接動手搶過來，可能還比較快。"
-    * 範例："咱們的錢快沒了，該找個「財主」聊聊了。"
-    * 範例："這村姑身材不錯，不如咱們直接跟她舒服一下。"
-    * 範例："捏他胸部後快跑，以我們的輕功沒損失吧。"
+    * 範例："咱們身無分文，該找個「財主」聊聊了。"
 
 **【語言鐵律】**: 你的建議必須只包含「繁體中文」。絕對禁止使用任何簡體中文、英文或表情符號。
 
