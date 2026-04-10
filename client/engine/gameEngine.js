@@ -258,9 +258,20 @@ export async function startNewGame() {
     // 確認存檔確實寫入
     const verify = await clientDB.saves.getLatest(profileId);
     if (!verify) {
-        // 如果寫入失敗，再試一次
         await clientDB.saves.add(profileId, initialRound);
     }
 
     return { profile, roundData: initialRound };
+}
+
+// ── 改名 ────────────────────────────────────────────
+
+export async function renamePlayer(newName) {
+    const profileId = getActiveProfileId();
+    if (!profileId) throw new Error('沒有活躍檔案');
+    const trimmed = (newName || '').trim();
+    if (!trimmed || trimmed.length > 8) throw new Error('名字須為 1-8 個字');
+    await clientDB.profiles.update(profileId, { username: trimmed });
+    localStorage.setItem('username', trimmed);
+    return trimmed;
 }

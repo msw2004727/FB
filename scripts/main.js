@@ -95,22 +95,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!activeProfile) {
         const introModal = document.getElementById('intro-modal');
         const introNameInput = document.getElementById('intro-name-input');
+        const introConfirmBtn = document.getElementById('intro-name-confirm');
         const introStory2 = introModal.querySelector('.intro-story-2');
         const introGenderBtns = introModal.querySelector('.intro-gender-btns');
 
         introModal.style.display = 'flex';
+        introNameInput.focus();
 
-        // 輸入名字後 → 顯示性別選擇
+        function confirmName() {
+            const name = introNameInput.value.trim();
+            if (!name) return;
+            introNameInput.disabled = true;
+            introConfirmBtn.disabled = true;
+            introStory2.style.display = '';
+            introGenderBtns.style.display = '';
+        }
+
+        // 輸入時即時啟用/禁用確認按鈕
+        introNameInput.addEventListener('input', () => {
+            introConfirmBtn.disabled = !introNameInput.value.trim();
+        });
+
+        // Enter 鍵確認（桌面）
         introNameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.isComposing) {
                 e.preventDefault();
-                const name = introNameInput.value.trim();
-                if (!name) return;
-                introNameInput.disabled = true;
-                introStory2.style.display = '';
-                introGenderBtns.style.display = '';
+                confirmName();
             }
         });
+
+        // 確認按鈕點擊（手機友好）
+        introConfirmBtn.addEventListener('click', confirmName);
 
         // 選擇性別 → 建立角色並開始遊戲
         const genderSelected = await new Promise((resolve) => {

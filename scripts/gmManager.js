@@ -1,6 +1,7 @@
 // scripts/gmManager.js
 // GM 面板 — 精簡版，僅保留可用功能
 import { api } from './api.js';
+import * as gameEngine from '../client/engine/gameEngine.js';
 
 let _gmPanel, _gmCloseBtn, _gmMenu, _gmContent;
 
@@ -37,6 +38,7 @@ async function loadPageContent(pageId) {
     if (!_gmContent) return;
     switch (pageId) {
         case 'player-stats': return loadPlayerStats();
+        case 'character-manage': return loadCharacterManage();
         case 'locations': return loadLocations();
         default:
             _gmContent.innerHTML = `<p style="text-align:center;opacity:.5;">此功能尚未啟用</p>`;
@@ -68,6 +70,59 @@ async function loadPlayerStats() {
     } catch (error) {
         _gmContent.innerHTML = `<p class="error-message">載入失敗</p>`;
         console.error('[GM] loadPlayerStats error:', error);
+    }
+}
+
+// --- 角色管理（改名 + 重新開始）---
+async function loadCharacterManage() {
+    _gmContent.innerHTML = '<p class="loading-text">載入中...</p>';
+    try {
+        const state = await api.getPlayerStateForGM();
+        const currentName = state.username || localStorage.getItem('username') || '未知';
+        _gmContent.innerHTML = `
+            <h3><i class="fa-solid fa-id-card"></i> 角色管理</h3>
+            <div class="gm-form-section">
+                <div class="gm-input-group">
+                    <label for="gm-rename">角色名稱（1-8 字）</label>
+                    <input type="text" id="gm-rename" class="gm-input" value="${escapeHtml(currentName)}" maxlength="8" autocomplete="off">
+                    <button id="gm-save-rename" class="gm-button save"><i class="fa-solid fa-pen"></i> 改名</button>
+                </div>
+            </div>
+            <hr style="border-color:#333;margin:1.5rem 0;">
+            <div class="gm-form-section">
+                <h4 style="color:#e74c3c;">危險區域</h4>
+                <p style="font-size:.85rem;opacity:.6;margin-bottom:.8rem;">重新開始會清除所有遊戲進度（存檔、章節、記憶），但保留角色名稱。此操作無法復原。</p>
+                <button id="gm-restart-game" class="gm-button" style="background:#e74c3c;"><i class="fa-solid fa-rotate-right"></i> 重新開始遊戲</button>
+            </div>
+        `;
+
+        document.getElementById('gm-save-rename').addEventListener('click', async () => {
+            const newName = document.getElementById('gm-rename').value.trim();
+            if (!newName || newName.length > 8) return alert('名字須為 1-8 個字');
+            try {
+                await gameEngine.renamePlayer(newName);
+                alert('改名成功！新名字：' + newName);
+                // 更新 UI 上的名字顯示
+                document.querySelectorAll('[data-player-name]').forEach(el => { el.textContent = newName; });
+            } catch (e) {
+                alert('改名失敗：' + e.message);
+            }
+        });
+
+        document.getElementById('gm-restart-game').addEventListener('click', async () => {
+            if (!confirm('確定要重新開始嗎？\n\n所有遊戲進度將被清除，此操作無法復原。\n\n建議先到匯出功能備份存檔。')) return;
+            if (!confirm('再次確認：真的要重新開始？')) return;
+            try {
+                await gameEngine.startNewGame();
+                alert('重新開始成功！頁面將重新載入。');
+                window.location.reload();
+            } catch (e) {
+                alert('重新開始失敗：' + e.message);
+            }
+        });
+    } catch (error) {
+        _gmContent.innerHTML = `<p class="error-message">載入失敗</p>`;
+        console.error('[GM] loadCharacterManage error:', error);
     }
 }
 

@@ -187,6 +187,33 @@ body.dark-theme .loader-tip {
     color: #666;
     letter-spacing: 0.05em;
 }
+.intro-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.intro-name-row .intro-input {
+    flex: 1;
+}
+.intro-confirm-btn {
+    padding: 0.65rem 1.2rem;
+    font-size: 1rem;
+    font-family: var(--font-serif);
+    background: #c3a98a;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.3s;
+}
+.intro-confirm-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+.intro-confirm-btn:not(:disabled):hover {
+    opacity: 0.85;
+}
 .intro-gender-btns {
     display: flex;
     gap: 1rem;

@@ -327,6 +327,7 @@
                     </header>
                     <ul id="gm-menu" class="gm-panel-menu">
                         <li class="gm-menu-item"><a href="#player-stats" class="active"><i class="fa-solid fa-user-pen"></i> 玩家屬性</a></li>
+                        <li class="gm-menu-item"><a href="#character-manage"><i class="fa-solid fa-id-card"></i> 角色管理</a></li>
                         <li class="gm-menu-item"><a href="#locations"><i class="fa-solid fa-map"></i> 地點查看</a></li>
                     </ul>
                     <footer class="gm-panel-footer">
@@ -369,7 +370,10 @@
                     <p>你試著回想自己是誰，記憶像碎片一樣慢慢浮現......你努力抓住腦中最清晰的那一塊——</p>
                     <p class="intro-prompt">你叫什麼名字？</p>
                 </div>
-                <input type="text" id="intro-name-input" class="intro-input" placeholder="輸入你的名字" maxlength="8" autocomplete="one-time-code" spellcheck="false" data-form-type="other" data-lpignore="true" />
+                <div class="intro-name-row">
+                    <input type="text" id="intro-name-input" class="intro-input" placeholder="輸入你的名字" maxlength="8" autocomplete="one-time-code" spellcheck="false" data-form-type="other" data-lpignore="true" />
+                    <button id="intro-name-confirm" class="intro-confirm-btn" disabled>確認</button>
+                </div>
                 <div class="intro-story intro-story-2" style="display:none;">
                     <p>名字想起來了。你低頭看了看自己的身體——</p>
                     <p class="intro-prompt">你是？</p>
