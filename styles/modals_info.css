@@ -15,7 +15,7 @@
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 
@@ -255,7 +255,7 @@ body.dark-theme .exp-bar-fill {
     visibility: hidden;
     transition: opacity 0.35s ease, visibility 0.35s ease;
     -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
     backdrop-filter: blur(16px) saturate(1.4);
 }
 
@@ -267,7 +267,7 @@ body.dark-theme .exp-bar-fill {
 .apikey-modal-content {
     background: rgba(255, 255, 255, 0.72);
     -webkit-backdrop-filter: blur(24px) saturate(1.6);
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
     backdrop-filter: blur(24px) saturate(1.6);
     border-radius: 16px;
     width: 90%;
@@ -350,7 +350,7 @@ body.dark-theme .apikey-modal-content p {
     font-family: monospace;
     background: rgba(255, 255, 255, 0.55);
     -webkit-backdrop-filter: blur(8px);
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     color: var(--light-text-primary);
     box-sizing: border-box;
@@ -415,7 +415,7 @@ body.dark-theme .apikey-toggle-btn {
 .apikey-btn.cancel {
     background: rgba(0, 0, 0, 0.06);
     -webkit-backdrop-filter: blur(6px);
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
     color: var(--light-text-primary);
 }
@@ -510,7 +510,7 @@ body.dark-theme .apikey-note {
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.5);
     -webkit-backdrop-filter: blur(6px);
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
     color: var(--light-text-secondary);
     cursor: pointer;

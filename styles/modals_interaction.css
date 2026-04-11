@@ -15,7 +15,7 @@
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 
@@ -449,7 +449,7 @@ body.dark-theme .skill-selection .system-message {
     display: flex; justify-content: center; align-items: center;
     opacity: 0; visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
-    -webkit-backdrop-filter:
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 .chat-modal-overlay.visible { opacity: 1; visibility: visible; }

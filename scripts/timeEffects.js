@@ -212,7 +212,11 @@ function _drawLeaves() {
         _ctx.translate(p.x, p.y);
         _ctx.rotate(p.rot);
         _ctx.beginPath();
-        _ctx.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, Math.PI * 2);
+        if (_ctx.ellipse) {
+            _ctx.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, Math.PI * 2);
+        } else {
+            _ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        }
         _ctx.fillStyle = colors[i % colors.length];
         _ctx.fill();
         _ctx.restore();
