@@ -98,12 +98,12 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         : '';
 
     
-    const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality });
+    const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality, scenario });
     const romanceRules = getRomanceRule({ playerGender });
     const currentRound = userProfile.R || 0;
     const worldviewAndProgressionRules = scenario.worldview(protagonistDescription, currentRound);
     const systemInteractionRules = getSystemInteractionRule({ locationName: locationContext?.locationName });
-    const outputStructureRules = getOutputStructureRule({ username, timeSequence });
+    const outputStructureRules = getOutputStructureRule({ username, timeSequence, scenario });
     const interactionRule = getInteractionRule();
     const npcRule = getNpcRule();
 
