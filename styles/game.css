@@ -302,6 +302,7 @@ body.dark-theme .footer-toggle {
 }
 .footer-toggle-icon {
     font-size: 0.65rem;
+    font-weight: 900;
     transition: transform 0.25s ease;
 }
 .story-footer.footer-collapsed .footer-toggle-icon {

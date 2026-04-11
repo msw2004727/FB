@@ -123,6 +123,10 @@ export async function processNewRoundData(data) {
     // ????????????????????????????????
     addRoundTitleToStory(data.roundData.EVT || `第${data.roundData.R}回合`);
 
+    // 每回合預設收起 footer
+    const footer = document.querySelector('.story-footer');
+    if (footer) footer.classList.add('footer-collapsed');
+
     // 同步 gameState
     Object.assign(gameState.roundData, data.roundData);
     gameState.currentRound = data.roundData.R;
