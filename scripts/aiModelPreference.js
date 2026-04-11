@@ -51,16 +51,20 @@ export function verifyVipPassword(password) {
     return simpleHash(String(password).trim()) === VIP_HASH;
 }
 
-/** 啟用 VIP */
+/** 啟用 VIP（僅本次 session，關閉網頁即失效） */
+let _vipSession = false;
 export function activateVip() {
-    if (!canUseBrowserStorage()) return;
-    localStorage.setItem('wenjiang_vip', 'true');
+    _vipSession = true;
+}
+
+/** 取消 VIP */
+export function deactivateVip() {
+    _vipSession = false;
 }
 
 /** 是否為 VIP */
 export function isVip() {
-    if (!canUseBrowserStorage()) return false;
-    return localStorage.getItem('wenjiang_vip') === 'true';
+    return _vipSession;
 }
 
 /** 此模型是否需要用戶手動提供 API Key */

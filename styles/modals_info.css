@@ -528,3 +528,17 @@ body.dark-theme .edit-apikey-btn:hover {
     color: #fff;
     border-color: var(--dark-accent);
 }
+
+.cancel-vip-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.cancel-vip-btn:hover {
+    opacity: 0.8;
+}

@@ -6,7 +6,7 @@ import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
 import { handleApiError } from './uiUpdater.js';
-import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO, verifyVipPassword, activateVip, isVip } from './aiModelPreference.js';
+import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO, verifyVipPassword, activateVip, deactivateVip, isVip } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
 import { exportSave, importSave, shouldRemindBackup, markBackupReminded } from '../client/utils/exportImport.js';
@@ -395,6 +395,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // VIP 按鈕 → 輸入密碼啟用
     const vipBtn = document.getElementById('apikey-vip-btn');
+    const cancelVipBtn = document.getElementById('cancel-vip-btn');
+
+    function updateVipUI() {
+        if (cancelVipBtn) cancelVipBtn.style.display = isVip() ? '' : 'none';
+    }
+
     if (vipBtn) {
         vipBtn.addEventListener('click', () => {
             const pw = prompt('請輸入 VIP 驗證碼：');
@@ -405,12 +411,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setStoredAiModel(model);
                 _previousModel = model;
                 closeApiKeyModal();
-                alert('VIP 已啟用！所有 AI 模型皆可免費使用。');
+                updateVipUI();
+                alert('VIP 已啟用！本次瀏覽期間所有 AI 模型皆可免費使用。');
             } else {
                 alert('驗證碼錯誤。');
             }
         });
     }
+
+    // 取消 VIP 按鈕
+    if (cancelVipBtn) {
+        cancelVipBtn.addEventListener('click', () => {
+            if (confirm('確定取消 VIP？\n取消後需要自行輸入 API Key 才能使用非預設模型。')) {
+                deactivateVip();
+                updateVipUI();
+                // 如果當前模型需要 key，切回 minimax
+                const current = dom.aiModelSelector?.value;
+                if (needsUserApiKey(current) && !getStoredApiKey(current)) {
+                    dom.aiModelSelector.value = 'minimax';
+                    setStoredAiModel('minimax');
+                    _previousModel = 'minimax';
+                }
+                alert('VIP 已取消。');
+            }
+        });
+    }
+
+    updateVipUI();
 
     // 顯示/隱藏密碼（用 CSS -webkit-text-security 代替 type="password" 避免瀏覽器自動填入）
     if (dom.apikeyToggleBtn) {
