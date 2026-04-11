@@ -46,12 +46,11 @@ export function switchEffect(timeOfDay) {
         // 英雄
         '晨光時段': 'dawn', '上午巡邏': 'morning', '正午休整': 'noon',
         '下午任務': 'afternoon', '黃昏警備': 'dusk', '夜間值守': 'night', '深夜潛行': 'midnight',
-        // 現代
-        '早晨通勤': 'dawn', '上午工時': 'morning', '午餐時間': 'noon',
-        '下午工時': 'afternoon', '傍晚下班': 'dusk', '夜間自由': 'night', '深夜時分': 'midnight',
-        // 動物
-        '晨露': 'dawn', '日出覓食': 'morning', '正午休憩': 'noon',
-        '午後巡域': 'afternoon', '黃昏歸巢': 'dusk', '月夜': 'night', '子夜': 'midnight',
+        // 現代（backend timeSequence: 早晨通勤/上午/午休/下午/下班尖峰/夜生活/深夜）
+        '早晨通勤': 'dawn', '下班尖峰': 'dusk', '夜生活': 'night',
+        // 動物（backend timeSequence: 晨露/日昇/日中/午憩/斜陽/暮歸/月隱）
+        '晨露': 'dawn', '日昇': 'morning', '日中': 'noon',
+        '午憩': 'afternoon', '斜陽': 'dusk', '暮歸': 'night', '月隱': 'midnight',
     };
     const effect = effectMap[timeOfDay];
     _currentEffect = effect;
@@ -91,6 +90,7 @@ function _initBirds() {
     _spawnBirdGroup();
 }
 function _spawnBirdGroup() {
+    if (_particles.length >= 12) return; // 防止鳥群累積過多
     const y = 30 + Math.random() * (_canvas.height * 0.25);
     const count = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i < count; i++) {
@@ -120,7 +120,9 @@ function _drawBirds() {
     }
     if (allGone) {
         _particles = [];
-        setTimeout(() => { if (_currentEffect === 'dawn') _spawnBirdGroup(); }, 6000 + Math.random() * 8000);
+        setTimeout(() => {
+            if (_currentEffect === 'dawn' && _particles.length === 0) _spawnBirdGroup();
+        }, 6000 + Math.random() * 8000);
     }
 }
 
