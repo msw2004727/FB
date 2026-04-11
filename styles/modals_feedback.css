@@ -41,6 +41,13 @@
     color: #888;
     margin: 0;
 }
+.scenario-howto {
+    font-size: 0.72rem;
+    opacity: 0.4;
+    margin: 0.5rem 0 0;
+    line-height: 1.5;
+}
+
 .scenario-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
