@@ -167,8 +167,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const playerName = introNameInput.value.trim() || '無名俠客';
         introModal.style.display = 'none';
 
-        // 如果已有存檔，先重置再建新局
+        // 如果已有存檔，先設定 activeProfile 再重置
         if (activeProfile) {
+            gameEngine.setActiveProfile(activeProfile.id);
             await gameEngine.startNewGame();
             await clientDB.profiles.update(activeProfile.id, { username: playerName, gender: genderSelected });
             activeProfile = await clientDB.profiles.get(activeProfile.id);
