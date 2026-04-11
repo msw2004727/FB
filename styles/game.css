@@ -203,20 +203,15 @@ body.dark-theme .status-info-value { color: var(--dark-text-primary); }
     padding-bottom: 0;
 }
 
-/* --- 收折時的時辰 SVG 指示器 --- */
-.time-icon-indicator {
-    position: absolute;
-    top: 0.75rem;
-    left: 25%;
-    width: 1.5rem;
-    height: 1.5rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-    z-index: 11;
+/* --- menu-toggle 內的時辰圖示 --- */
+.menu-toggle-time-icon {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
-.story-header.collapsed .time-icon-indicator {
-    opacity: 1;
+.menu-toggle-time-icon svg {
+    width: 100%;
+    height: 100%;
 }
 
 .story-panel {

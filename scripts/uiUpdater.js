@@ -255,7 +255,7 @@ const TIME_SVGS = {
 };
 
 function updateTimeIcon(timeOfDay) {
-    const el = document.getElementById('time-icon-indicator');
+    const el = document.getElementById('menu-toggle-time-icon');
     if (!el) return;
     el.innerHTML = TIME_SVGS[timeOfDay] || TIME_SVGS['上午'];
 }

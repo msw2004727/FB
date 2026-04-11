@@ -350,17 +350,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        const menuToggleIcon = dom.menuToggle?.querySelector('i');
         const setSidebarOpenState = (isOpen) => {
             if (dom.gameContainer) dom.gameContainer.classList.toggle('sidebar-open', isOpen);
             if (dom.menuToggle) {
                 dom.menuToggle.setAttribute('aria-expanded', String(isOpen));
                 dom.menuToggle.title = isOpen ? '收起右側欄' : '展開右側欄';
                 dom.menuToggle.setAttribute('aria-label', isOpen ? '收起右側欄' : '展開右側欄');
-            }
-            if (menuToggleIcon) {
-                menuToggleIcon.classList.toggle('fa-bars', !isOpen);
-                menuToggleIcon.classList.toggle('fa-xmark', isOpen);
             }
         };
         if (dom.gameContainer) setSidebarOpenState(dom.gameContainer.classList.contains('sidebar-open'));
