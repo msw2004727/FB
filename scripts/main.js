@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const scn = getScenario(scenarioId);
 
         // 切換主題預覽
-        document.body.classList.remove('school-theme', 'mecha-theme');
+        document.body.classList.remove('school-theme', 'mecha-theme', 'animal-theme', 'modern-theme', 'hero-theme');
         if (scn.themeClass) document.body.classList.add(scn.themeClass);
 
         // 高亮選中的按鈕
