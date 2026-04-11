@@ -79,7 +79,8 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
         questJournal.textContent = roundData.questJournal;
     }
 
-    actionSuggestion.textContent = roundData.suggestion ? `書僮小聲說：${roundData.suggestion}` : '';
+    const sugPrefix = window.__activeScenario?.suggestionPrefix || '書僮小聲說：';
+    actionSuggestion.textContent = roundData.suggestion ? `${sugPrefix}${roundData.suggestion}` : '';
 }
 
 function updateMilestoneRunes(count) {

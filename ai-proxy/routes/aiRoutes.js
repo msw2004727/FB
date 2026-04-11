@@ -85,7 +85,7 @@ const TASK_HANDLERS = {
             ctx.cluesSummary || '',
             scenario
         );
-        if (!prompt) return { prompt: '{"triggered":false,"reason":"all done","questJournal":"你已找到回家的路。"}', json: true, configKey: 'story' };
+        if (!prompt) return { prompt: '{"triggered":false,"reason":"all done","questJournal":"所有里程碑已達成。"}', json: true, configKey: 'story' };
         return { prompt, json: true, configKey: 'story' };
     },
 

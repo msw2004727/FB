@@ -191,12 +191,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lblPos = document.getElementById('morality-label-pos');
     if (lblNeg && activeScenario.moralityLabels) lblNeg.textContent = activeScenario.moralityLabels.negative;
     if (lblPos && activeScenario.moralityLabels) lblPos.textContent = activeScenario.moralityLabels.positive;
-    // 里程碑 tooltip 動態化
+    // 里程碑文字 + tooltip 動態化
     const milestoneEl = document.getElementById('milestone-runes');
-    if (milestoneEl && activeScenario.milestoneDisplay) {
-        milestoneEl.title = `${activeScenario.milestoneDisplay.title} — ${activeScenario.milestoneDisplay.description}`;
+    if (milestoneEl) {
+        if (activeScenario.milestoneDisplay) {
+            milestoneEl.title = `${activeScenario.milestoneDisplay.title} — ${activeScenario.milestoneDisplay.description}`;
+        }
+        if (activeScenario.milestoneChars) {
+            milestoneEl.querySelectorAll('.rune').forEach((r, i) => {
+                if (activeScenario.milestoneChars[i]) r.textContent = activeScenario.milestoneChars[i];
+            });
+        }
     }
-    // 儲存劇本 ID 供 tips 等使用
+    // 任務日誌預設文字
+    const questJournal = document.getElementById('quest-journal');
+    if (questJournal && activeScenario.questJournalDefault && !questJournal.textContent.trim()) {
+        questJournal.textContent = activeScenario.questJournalDefault;
+    }
+    // 儲存劇本供 uiUpdater 等使用
+    window.__activeScenario = activeScenario;
     localStorage.setItem('wenjiang_scenario', activeProfile.scenario || 'wuxia');
 
     // 設定活躍檔案

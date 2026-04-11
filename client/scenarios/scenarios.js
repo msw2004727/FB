@@ -5,6 +5,9 @@ export const SCENARIOS = {
     wuxia: {
         id: 'wuxia',
         milestoneIds: ['M1_WORLD_AWARENESS','M2_FIRST_CLUE','M3_KEY_NPC','M4_ANCIENT_KNOWLEDGE','M5_OBSTACLE','M6_BREAKTHROUGH','M7_FINAL_PREPARATION','M8_HOMECOMING'],
+        milestoneChars: ['符','文','漸','次','浮','現','歸','途'],
+        suggestionPrefix: '書僮小聲說：',
+        questJournalDefault: '手中的紙條寫著：「尋找回家的方法」',
         name: '武俠',
         themeClass: '',
         defaultProfile: { yearName: '元祐', year: 1, month: 1, day: 1, timeOfDay: '上午' },
@@ -30,6 +33,9 @@ export const SCENARIOS = {
     school: {
         id: 'school',
         milestoneIds: ['M1_AWAKENING','M2_SYSTEM_GLITCH','M3_ALLIES','M4_PROTAGONIST','M5_ADMIN_TRACE','M6_REBELLION','M7_CONFRONTATION','M8_EXIT_GAME'],
+        milestoneChars: ['學','分','逐','步','集','滿','畢','業'],
+        suggestionPrefix: '直覺告訴你：',
+        questJournalDefault: '課本封面寫著：「角色定位：無劇情路人」',
         name: '學園',
         themeClass: 'school-theme',
         defaultProfile: { yearName: '', year: 0, month: 4, day: 8, timeOfDay: '上午課' },
