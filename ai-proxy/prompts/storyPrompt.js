@@ -103,7 +103,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const currentRound = userProfile.R || 0;
     const worldviewAndProgressionRules = scenario.worldview(protagonistDescription, currentRound);
     const systemInteractionRules = getSystemInteractionRule({ locationName: locationContext?.locationName });
-    const outputStructureRules = getOutputStructureRule({ username, timeSequence, scenario });
+    const outputStructureRules = getOutputStructureRule({ username, timeSequence, scenario, playerGender });
     const interactionRule = getInteractionRule();
     const npcRule = getNpcRule();
 

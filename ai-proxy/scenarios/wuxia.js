@@ -74,8 +74,10 @@ ${currentRound > 30 ? '【後期】世界已充分展開，主角面對更複雜
     // EVT 範例
     evtExamples: '如「初探無名村」「偶遇黑衣人」「酒館密談」「夜襲危機」',
 
-    // NPC 稱呼範例
+    // NPC 稱呼範例（男女不同）
     npcAddressExamples: '「少俠」「兄台」「姑娘」「這位公子」「閣下」',
+    npcAddressMale: '「少俠」「兄台」「這位公子」「閣下」「小哥」',
+    npcAddressFemale: '「姑娘」「小姐」「女俠」「這位姑娘」「閣下」',
 
     // 里程碑顯示
     milestoneDisplay: { title: '歸途印記', description: '集齊八枚即可回家' },

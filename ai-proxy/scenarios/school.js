@@ -80,6 +80,8 @@ ${currentRound > 30 ? `【後期】主角接近真相，遊戲世界的「修正
 
     // NPC 稱呼範例
     npcAddressExamples: '「同學」「學長」「學姐」「那個……」「欸」',
+    npcAddressMale: '「同學」「學長」「那個男生」「欸你」',
+    npcAddressFemale: '「同學」「學姐」「那個女生」「欸你」',
 
     // 里程碑顯示
     milestoneDisplay: { title: '畢業學分', description: '集滿八學分即可登出' },
