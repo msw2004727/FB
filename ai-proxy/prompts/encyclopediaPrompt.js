@@ -78,7 +78,7 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     </div>
     <div class="entry">
       <h3 class="entry-title">特殊技能</h3>
-      <p class="entry-content">由張真人所傳授的基礎內功，修習後讓你的能力修為獲得提升。</p>
+      <p class="entry-content">由某位導師傳授的基礎能力，修習後讓你的能力修為獲得提升。</p>
     </div>
   </div>
 
@@ -93,8 +93,8 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
       <p class="entry-content">接受了村民的請託，調查後山異響的原因，並在回報某個NPC後完成任務。此事讓你獲得了村民的初步信任。</p>
     </div>
     <div class="entry">
-      <h3 class="entry-title">青龍會的傳聞</h3>
-      <p class="entry-content">從鎮上說書人處聽聞，「青龍會」是掌控本地勢力範圍的某個組織，勢力龐大，行事隱密。</p>
+      <h3 class="entry-title">某個組織的傳聞</h3>
+      <p class="entry-content">從鎮上說書人處聽聞，「某個組織」勢力龐大，勢力龐大，行事隱密。</p>
     </div>
   </div>
 

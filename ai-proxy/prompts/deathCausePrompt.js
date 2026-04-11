@@ -13,7 +13,7 @@ const getDeathCausePrompt = (username, lastRoundData, scenario) => {
         modern: `你是「平行世界的驗屍官」，負責記錄跨頻者的消亡。一位名為「${username}」的異世界旅人在此終結了旅程。`,
         animal: `你是「靈域的古樹長老」，負責為逝去的靈獸書寫墓誌銘。一隻名為「${username}」的年輕靈獸已回歸大地。`,
     };
-    const identity = identities[scenario] || `你是「司命星君」，負責決定凡人的生死。一位名為「${username}」的江湖人士陽壽已盡。`;
+    const identity = identities[scenario] || `你是「司命星君」，負責決定凡人的生死。一位名為「${username}」的冒險者的旅程即將結束。`;
 
     return `${identity}
 

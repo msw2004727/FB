@@ -2,7 +2,7 @@
 
 const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     const { type, amount, itemName } = itemInfo;
-    // 【核心修正】將單位從 "文錢" 改為 "銀兩"
+    // 【核心修正】將單位從 "文錢" 改為 "貨幣"
     const itemGiven = type === 'money' ? `${amount}兩銀子` : itemName;
 
     return `
@@ -69,9 +69,9 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
       "action": "add",
       "itemName": "特殊技能譜",
       "quantity": 1,
-      "itemType": "秘笈",
+      "itemType": "珍貴文件",
       "rarity": "稀有",
-      "description": "記載著少林入門拳法「特殊技能」的拳譜。"
+      "description": "記載著某種技能的手冊。"
     }
   ]
 }

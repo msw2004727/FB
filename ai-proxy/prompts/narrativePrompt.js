@@ -8,7 +8,7 @@ const getNarrativePrompt = (roundData, scenario) => {
         modern: '你是一位擅長都市懸疑的小說家，文筆細膩寫實，擅長在日常中營造違和感。',
         animal: '你是一位擅長自然靈性文學的小說家，文筆溫暖靈動，擅長以動物視角描寫世界。',
     };
-    const identity = identities[scenario] || '你是一位功力深厚的武俠小說家，風格近似金庸。';
+    const identity = identities[scenario] || '你是一位功力深厚的小說家，文筆流暢生動。';
 
     return `${identity}你的任務是將以下提供的結構化遊戲數據，改寫成一段充滿意境、文筆流暢、富有細節的敘述性小說段落。
 

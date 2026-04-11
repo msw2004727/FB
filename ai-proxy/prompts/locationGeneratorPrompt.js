@@ -13,7 +13,7 @@ const getLocationGeneratorPrompt = (locationName, locationType, worldSummary, sc
         animal: `- **世界背景**: 翠谷靈域——一個由動物靈族統治的神秘自然世界。萬獸有靈，各有族群與領地。
 - **技術水平**: 自然法則為主，靈力運作代替科技。`,
     };
-    const worldDesc = worldDescs[scenario] || `- **時代背景**: 架空的古代武俠世界。天下並不太平，各種勢力盤根錯節。
+    const worldDesc = worldDescs[scenario] || `- **時代背景**: 根據劇本設定的架空世界。
 - **技術水平**: 古代封建社會，農業為本，商業正在萌芽。`;
 
     return `
@@ -30,7 +30,7 @@ ${worldDesc}
 你的輸出現在**必須**是一個包含 \`locationHierarchy\` 鍵的單一JSON物件。該鍵的值**必須**是一個**陣列**，陣列中的每一個物件都代表一個地點的完整檔案。
 
 ### 1. \`locationHierarchy\` (地點層級陣列)
-* **【層級生成鐵律】**: 如果你要創造的地點（例如一個山寨或一個小門派）在邏輯上應該屬於某個更大的行政區（例如某個「縣」或「府」），但現有摘要中並未提供這個上級地點，你**必須**自行創造一個合理的上級地點。然後，你必須將**所有層級**（從最上級的縣，到最下級的村或山寨）都作為獨立的物件，放入這個 \`locationHierarchy\` 陣列中。
+* **【層級生成鐵律】**: 如果你要創造的地點（例如一個某個據點或組織）在邏輯上應該屬於某個更大的行政區（例如某個「縣」或「府」），但現有摘要中並未提供這個上級地點，你**必須**自行創造一個合理的上級地點。然後，你必須將**所有層級**（從最上級的縣，到最下級的村或據點）都作為獨立的物件，放入這個 \`locationHierarchy\` 陣列中。
 * **陣列順序**: 陣列中的地點物件順序並不重要。
 * **【地理關聯鐵律】**: 你生成的新地點檔案中，其 \`parentLocation\` 欄位**必須**被設定為我提供給你的「世界現況摘要」中的「玩家當前位置」。這將確保新地點與玩家的足跡在地理上是相連的。如果生成的是一個與當前位置平級的地點（如鄰村），則必須在當前位置的檔案中，透過 \`geography.nearbyLocations\` 欄位將新地點標記為鄰居。
 
@@ -55,67 +55,26 @@ ${worldDesc}
 {
   "locationHierarchy": [
     {
-      "locationName": "豐城縣",
+      "locationName": "上級地點名",
       "staticTemplate": {
-        "locationId": "豐城縣",
-        "locationName": "豐城縣",
-        "parentLocation": "洪州",
-        "locationType": "縣城",
+        "locationId": "上級地點名",
+        "locationName": "上級地點名",
+        "parentLocation": "更上一級地點",
+        "locationType": "城市/區域",
         "isPrivate": false,
-        "address": {
-          "country": "大宋",
-          "region": "江南西路",
-          "city": "洪州",
-          "district": "豐城縣"
-        },
-        "geography": {
-            "terrain": "平原與丘陵交錯",
-            "nearbyLocations": [
-                { "name": "豫章鎮", "travelTime": "半日" }
-            ]
-        },
-        "economy": { "prosperityPotential": "殷實", "specialty": ["稻米", "瓷器"] },
-        "lore": { "history": "自前朝便已存在的古縣，因瓷器貿易而興盛。" }
+        "address": { "country": "國家", "region": "地區", "city": "城市" },
+        "geography": { "terrain": "地形描述", "nearbyLocations": [{ "name": "鄰近地點", "travelTime": "旅行時間" }] },
+        "economy": { "prosperityPotential": "繁榮程度", "specialty": ["特產1", "特產2"] },
+        "lore": { "history": "此地的歷史背景。" }
       },
       "initialDynamicState": {
-        "governance": { "ruler": "縣令王之渙", "allegiance": "大宋朝廷", "security": "一隊縣衙捕快與巡邏官兵" },
-        "economy": { "currentProsperity": "繁榮" },
-        "lore": { "currentIssues": ["城中最大的瓷器商『蘇氏瓷行』似乎正與官府有所勾結。"] }
-      }
-    },
-    {
-      "locationName": "無名村",
-      "staticTemplate": {
-        "locationId": "無名村",
-        "locationName": "無名村",
-        "parentLocation": "豐城縣",
-        "locationType": "村莊",
-        "isPrivate": false,
-        "address": {
-          "country": "大宋",
-          "region": "江南西路",
-          "city": "洪州",
-          "district": "豐城縣",
-          "town": "無名村"
-        },
-        "geography": { 
-            "terrain": "位於丘陵地帶的小平原", 
-            "nearbyLocations": [
-                { "name": "黑風寨", "travelTime": "半個時辰" }
-            ] 
-        },
-        "economy": { "prosperityPotential": "普通", "specialty": ["翠竹", "草藥"] },
-        "lore": { "history": "一個有著數百年歷史的古老村莊，據說祖上是為了躲避戰亂而遷徙至此。" }
-      },
-      "initialDynamicState": {
-        "governance": { "ruler": "村長李大山", "allegiance": "無名村自治", "security": "由幾位年輕村民組成的鄉勇隊，裝備簡陋。" },
-        "economy": { "currentProsperity": "普通" },
+        "governance": { "ruler": "領導者", "allegiance": "所屬勢力", "security": "治安描述" },
+        "economy": { "currentProsperity": "目前繁榮度" },
         "facilities": [
-          { "name": "葉家鐵鋪", "type": "鐵匠鋪", "owner": "葉繼安", "status": "營業中" },
-          { "name": "王大夫藥鋪", "type": "藥鋪", "owner": "王大夫", "status": "營業中" }
+          { "name": "設施A", "type": "類型", "owner": "擁有者", "status": "營業中" }
         ],
         "buildings": [],
-        "lore": { "currentIssues": ["近來常有黑風寨的山賊下山騷擾，村民對此憂心忡忡。"] }
+        "lore": { "currentIssues": ["當前的問題或事件描述"] }
       }
     }
   ]

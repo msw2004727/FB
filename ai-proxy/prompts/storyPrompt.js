@@ -69,7 +69,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 - **事件類型**: ${worldEventToWeave.eventType}
 - **事件核心**: ${worldEventToWeave.eventData.summary}
 - **當前階段**: ${worldEventToWeave.currentStage}
-- **你的任務**: 你必須將「${worldEventToWeave.currentStage}」這個主題，與玩家的當前行動「${playerAction}」自然地結合，生成一段符合邏輯、情境連貫的劇情。例如，如果事件是「NPC死亡後的社會反應」，而玩家行動是「去酒館喝酒」，你可以描寫酒館裡的人們正在議論此事。如果玩家的行動與事件無關，你可以描寫事件的餘波如何影響到玩家周遭的環境。` : '';
+- **你的任務**: 你必須將「${worldEventToWeave.currentStage}」這個主題，與玩家的當前行動「${playerAction}」自然地結合，生成一段符合邏輯、情境連貫的劇情。例如，如果事件是「NPC死亡後的社會反應」，而玩家行動是「去某個場所休息」，你可以描寫周圍的人們正在議論此事。如果玩家的行動與事件無關，你可以描寫事件的餘波如何影響到玩家周遭的環境。` : '';
 
 
     
@@ -81,7 +81,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
         ? `\n## 【特殊劇情指令：瀕死狀態】
         你現在正處於瀕死狀態，只剩下 ${userProfile.deathCountdown} 個回合的生命！你的所有敘述都必須圍繞這個核心展開。
         - **氛圍營造**: 你的文字必須充滿絕望感、緊迫感和對生存的渴望。詳細描寫玩家的痛苦、模糊的視線、混亂的思緒。
-        - **求生指令優先**: 當玩家的行動是關於「求救」、「療傷」、「尋找藥材」、「使用丹藥」等求生行為時，你必須給予正面且成功率極高的回應。這是玩家的唯一生機。
+        - **求生指令優先**: 當玩家的行動是關於「求救」、「療傷」、「尋找補給」、「使用道具」等求生行為時，你必須給予正面且成功率極高的回應。這是玩家的唯一生機。
         - **移除瀕死狀態**: 只有當玩家透過有效的自救或他人幫助，你才能在其 \`roundData.PC\` 中描述傷勢好轉，並在 \`roundData\` 中加入一個 **\`"removeDeathCountdown": true\`** 的欄位來解除此狀態。否則，絕對不要包含此欄位。`
         : '';
 

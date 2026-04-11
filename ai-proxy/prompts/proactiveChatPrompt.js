@@ -46,7 +46,7 @@ const getProactiveChatPrompt = (playerProfile, npcProfile, triggerEvent) => {
 3.  **贈禮邏輯**：
     * 你擁有決定NPC是否贈禮的權力。
     * 如果你決定讓NPC贈禮，你**必須**在回傳的JSON中，提供一個符合「物品帳本系統」格式的 \`itemChanges\` 陣列。
-    * 贈送的禮物必須符合NPC的身份和他/她的背包庫存。例如，鐵匠送礦石，郎中送藥材。
+    * 贈送的禮物必須符合NPC的身份和他/她的背包庫存。例如，手藝人送材料，醫者送藥品。
     * 如果不贈禮，則回傳一個**空陣列 \`[]\`**。
 
 ## JSON 輸出結構：

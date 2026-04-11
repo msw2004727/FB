@@ -17,14 +17,14 @@ const getEpiloguePrompt = (playerData) => {
         moralityDesc = morality > 30 ? '一位人人敬佩的模範生' : morality < -30 ? '一個令老師頭痛的問題學生' : '一個在校園中特立獨行的人';
         worldTerm = '這所學校';
     } else if (scenario === 'mecha') {
-        moralityDesc = morality > 30 ? '一位與始核深度共鳴的駕駛員' : morality < -30 ? '一個冷靜到令人膽寒的戰術機器' : '一個在共感與理性之間搖擺的穿越者';
+        moralityDesc = morality > 30 ? '一位與始核深度共鳴的駕駛員' : morality < -30 ? '一個冷靜到令人膽寒的戰術機器' : '一個在共感與理性之間搖擺的外來者';
         worldTerm = '這片天裂下的世界';
     } else if (scenario === 'hero') {
         moralityDesc = morality > 30 ? '一位被管理局信賴的正義守護者' : morality < -30 ? '一個讓體制膽寒的真相追尋者' : '一個在正義與真相之間遊走的諮商師';
         worldTerm = '這個英雄與反派共存的世界';
     } else {
         moralityDesc = morality > 30 ? '一位受人敬重的義士' : morality < -30 ? '一個令人忌憚的狠角色' : '一個立場曖昧的奇人';
-        worldTerm = '這片江湖';
+        worldTerm = '這個世界';
     }
 
     return `你是一位幽默而富有洞察力的「世界歷史學家」。請為以下角色撰寫一篇500字的結局故事。
