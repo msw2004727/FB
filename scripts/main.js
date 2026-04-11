@@ -350,6 +350,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // --- 強制更新按鈕 ---
+    const forceUpdateBtn = document.getElementById('force-update-btn');
+    if (forceUpdateBtn) {
+        forceUpdateBtn.addEventListener('click', async () => {
+            if (!confirm('檢查並更新到最新版本？\n（遊戲存檔不會受影響）')) return;
+            try {
+                // 1. 清除所有 SW 快取
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+                // 2. 註銷 SW
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.unregister()));
+                // 3. 強制重新載入（略過快取）
+                alert('快取已清除！頁面將重新載入。');
+                window.location.reload(true);
+            } catch (e) {
+                alert('更新失敗：' + e.message + '\n\n請手動清除瀏覽器快取。');
+            }
+        });
+    }
+
     // --- 卡片說明彈窗 ---
     const CARD_HELP = {
         pc: { title: '角色狀態 (PC)', body: '這是你目前的身體和精神狀態的簡短描述。\n\n受傷了會顯示傷勢、心情好會顯示狀態良好。簡單說就是「你現在看起來怎麼樣」。\n\n如果這裡寫著什麼很嚇人的東西……嗯，也許該考慮去找個醫生（如果這個世界有的話）。' },
