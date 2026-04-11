@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     scenarioSelect.style.display = 'none';
+    document.querySelector('.game-container').style.display = '';
 
     // 繼續上次 → 直接進遊戲
     if (scenarioChoice === 'continue' && activeProfile) {

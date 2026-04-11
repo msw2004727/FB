@@ -26,7 +26,7 @@
 // 防閃爍：在 DOM 繪製前立即設定主題
 (function(){var t=localStorage.getItem('game_theme');if(!t)t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.body.className=t+'-theme';})();
 </script>
-    <div class="game-container">
+    <div class="game-container" style="display:none;">
         <button id="menu-toggle" class="menu-toggle" type="button" title="展開右側欄" aria-label="展開右側欄" aria-controls="dashboard" aria-expanded="false"><span id="menu-toggle-time-icon" class="menu-toggle-time-icon"></span></button>
 
         <main id="main-content" class="main-content">
