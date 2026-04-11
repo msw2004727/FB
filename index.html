@@ -20,11 +20,12 @@
     <link rel="stylesheet" href="styles/modals_location.css">
     <link rel="stylesheet" href="styles/gmPanel.css">
     <link rel="stylesheet" href="styles/modals_info.css">
+    <link rel="stylesheet" href="styles/themes/school.css">
 </head>
 <body>
 <script>
 // 防閃爍：在 DOM 繪製前立即設定主題
-(function(){var t=localStorage.getItem('game_theme');if(!t)t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.body.className=t+'-theme';})();
+(function(){var t=localStorage.getItem('game_theme');if(!t)t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.body.classList.add(t+'-theme');})();
 </script>
     <div class="game-container" hidden>
         <button id="menu-toggle" class="menu-toggle" type="button" title="展開右側欄" aria-label="展開右側欄" aria-controls="dashboard" aria-expanded="false"><span id="menu-toggle-time-icon" class="menu-toggle-time-icon"></span></button>
@@ -416,10 +417,10 @@
                         <span class="scenario-name">武俠</span>
                         <span class="scenario-desc">穿越古代武林</span>
                     </button>
-                    <button class="scenario-btn locked" data-scenario="school" disabled>
+                    <button class="scenario-btn" data-scenario="school">
                         <i class="fas fa-school scenario-icon"></i>
                         <span class="scenario-name">學園</span>
-                        <span class="scenario-tag">籌畫中</span>
+                        <span class="scenario-desc">重返青春校園</span>
                     </button>
                     <button class="scenario-btn locked" data-scenario="mecha" disabled>
                         <i class="fas fa-robot scenario-icon"></i>

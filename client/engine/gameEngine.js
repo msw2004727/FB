@@ -6,18 +6,14 @@ import aiProxy from '../ai/aiProxy.js';
 import { buildContext, buildLightContext } from './contextBuilder.js';
 import { applyAllChanges } from './stateManager.js';
 import { clamp, toFiniteNumber } from '../utils/gameUtils.js';
+import { getScenario } from '../scenarios/scenarios.js';
 
-// 8 個線索里程碑 ID（順序固定）
-const MILESTONE_IDS = [
-    'M1_WORLD_AWARENESS', 'M2_FIRST_CLUE', 'M3_KEY_NPC', 'M4_ANCIENT_KNOWLEDGE',
-    'M5_OBSTACLE', 'M6_BREAKTHROUGH', 'M7_FINAL_PREPARATION', 'M8_HOMECOMING'
-];
-
-function getNextMilestoneId(achieved) {
-    for (const id of MILESTONE_IDS) {
+function getNextMilestoneId(achieved, scenario = 'wuxia') {
+    const scenarioConfig = getScenario(scenario);
+    for (const id of scenarioConfig.milestoneIds) {
         if (!achieved.includes(id)) return id;
     }
-    return null; // 全部達成
+    return null;
 }
 
 // ── 當前活躍檔案 ────────────────────────────────────
@@ -29,26 +25,14 @@ export function getActiveProfileId() { return _activeProfileId; }
 
 // ── 遊戲初始化 ──────────────────────────────────────
 
-export async function createNewGame(username, gender) {
+export async function createNewGame(username, gender, scenario = 'wuxia') {
     await clientDB.init();
-    const profile = await clientDB.profiles.create({ username, gender });
+    const scenarioConfig = getScenario(scenario);
+    const profileData = { username, gender, scenario, ...scenarioConfig.defaultProfile };
+    const profile = await clientDB.profiles.create(profileData);
     const profileId = profile.id;
 
-    const initialRound = {
-        R: 0,
-        EVT: '莫名其妙的穿越',
-        story: `你睜開眼睛。\n\n頭頂是一片刺眼的藍天，身下是一堆扎人的乾草。空氣裡飄著一股你完全無法辨認的味道——像是有人把中藥房和燒烤攤強行混在一起。\n\n你猛地坐起來，四周是一條塵土飛揚的泥巴路，兩旁是低矮的土牆和掛著褪色布簾的店鋪。遠處傳來雞鳴狗吠，還有一個大嬸扯著嗓子罵誰家的孩子偷了她晾的蘿蔔乾。\n\n這絕對不是你的房間。\n\n你低頭一看——身上穿著一件灰撲撲的粗布衣裳，腳上是一雙草鞋，左邊那隻還破了個洞。你完全不記得自己是怎麼到這裡的，腦子裡一片空白，像是被人用橡皮擦狠狠擦過一遍。\n\n然後你發現右手緊緊攥著一張皺巴巴的紙條。你展開一看，上面用歪歪扭扭的毛筆字寫著：\n\n「任務：尋找回家的方法。」\n\n紙條背面還有一行小字：「附註：別死了，死了就真回不去了。」\n\n你盯著這張紙條看了三秒鐘，然後抬頭環顧四周。一個挑著扁擔的老大爺正好路過，用一種看傻子的眼神瞟了你一眼。\n\n好吧。看來你得先搞清楚這是哪裡，然後——想辦法活著回家。`,
-        WRD: '大晴天，熱得要命',
-        LOC: ['梁國', '東境', '臨川', '無名村'],
-        PC: `${username}剛穿越，一臉懵，手握紙條。`,
-        NPC: [],
-        timeOfDay: '上午',
-        morality: 0,
-        yearName: '元祐', year: 1, month: 1, day: 1,
-        playerState: 'alive',
-        moralityChange: 0,
-        suggestion: '你站在一條陌生的村莊小路上，手裡捏著一張寫著「尋找回家方法」的紙條。四周的一切都很古代，你需要先搞清楚狀況。'
-    };
+    const initialRound = scenarioConfig.getInitialRound(username);
 
     await clientDB.saves.add(profileId, initialRound);
     setActiveProfile(profileId);
@@ -131,7 +115,7 @@ export async function interact({ action, model, optionMorality = 0 }) {
 
     // 處理里程碑評估結果
     if (roundData.progressEval && roundData.progressEval.triggered) {
-        const nextMilestoneId = getNextMilestoneId(achievedMilestones);
+        const nextMilestoneId = getNextMilestoneId(achievedMilestones, context.player?.scenario);
         if (nextMilestoneId) {
             achievedMilestones.push(nextMilestoneId);
             await clientDB.state.set(profileId, 'milestones', achievedMilestones);
@@ -183,26 +167,29 @@ export async function forceSuicide({ model }) {
     const profileId = getActiveProfileId();
     const context = await buildLightContext(profileId);
 
+    const profile = await clientDB.profiles.get(profileId);
+    const scenarioConfig = getScenario(profile?.scenario);
+
     let story;
     try {
         const aiResult = await aiProxy.generate('death-cause', model, context);
-        story = typeof aiResult === 'string' ? aiResult : aiResult?.story || '你在混亂與寂靜之間做出了終局的選擇，江湖傳奇在此刻落幕。';
+        story = typeof aiResult === 'string' ? aiResult : aiResult?.story || scenarioConfig.deathFallbackStory;
     } catch {
-        story = '你在混亂與寂靜之間做出了終局的選擇，江湖傳奇在此刻落幕。';
+        story = scenarioConfig.deathFallbackStory;
     }
 
     const lastSave = await clientDB.saves.getLatest(profileId);
     const roundData = {
         ...(lastSave || {}),
         R: (lastSave?.R || 0) + 1,
-        EVT: '英雄末路',
+        EVT: '終局',
         story,
         playerState: 'dead',
         moralityChange: 0
     };
 
     await applyAllChanges(profileId, roundData);
-    return { story, roundData, suggestion: '重新開始一段新的江湖人生。' };
+    return { story, roundData, suggestion: scenarioConfig.restartSuggestion };
 }
 
 // ── 結局 ────────────────────────────────────────────
@@ -227,41 +214,28 @@ export async function getEpilogue() {
 
 // ── 重新開始 ────────────────────────────────────────
 
-export async function startNewGame() {
+export async function startNewGame(scenario) {
     const profileId = getActiveProfileId();
     const profile = await clientDB.profiles.get(profileId);
-    const username = profile.username;
-    const gender = profile.gender;
+    const effectiveScenario = scenario || profile.scenario || 'wuxia';
+    const scenarioConfig = getScenario(effectiveScenario);
 
     // 重置所有遊戲資料
     await clientDB.resetProfile(profileId);
 
-    // 寫入新的 R0 存檔（不建立新 profile，避免 username 唯一索引衝突）
-    const initialRound = {
-        R: 0,
-        EVT: '莫名其妙的穿越',
-        story: `你睜開眼睛。\n\n頭頂是一片刺眼的藍天，身下是一堆扎人的乾草。空氣裡飄著一股你完全無法辨認的味道——像是有人把中藥房和燒烤攤強行混在一起。\n\n你猛地坐起來，四周是一條塵土飛揚的泥巴路，兩旁是低矮的土牆和掛著褪色布簾的店鋪。\n\n你完全不記得自己是怎麼到這裡的，腦子裡一片空白。\n\n然後你發現右手緊緊攥著一張皺巴巴的紙條：「任務：尋找回家的方法。」\n\n紙條背面：「附註：別死了，死了就真回不去了。」\n\n一個挑著扁擔的老大爺正好路過，用一種看傻子的眼神瞟了你一眼。`,
-        WRD: '大晴天',
-        LOC: ['梁國', '東境', '臨川', '無名村'],
-        PC: `${username}剛穿越，一臉懵。`,
-        NPC: [],
-        timeOfDay: '上午',
-        morality: 0,
-        yearName: '元祐', year: 1, month: 1, day: 1,
-        playerState: 'alive',
-        moralityChange: 0,
-        suggestion: '先搞清楚這是哪裡。'
-    };
+    // 更新 scenario 到 profile
+    await clientDB.profiles.update(profileId, { scenario: effectiveScenario, ...scenarioConfig.defaultProfile });
 
+    // 寫入劇本對應的 R0 存檔
+    const initialRound = scenarioConfig.getInitialRound(profile.username);
     await clientDB.saves.add(profileId, initialRound);
 
-    // 確認存檔確實寫入
     const verify = await clientDB.saves.getLatest(profileId);
     if (!verify) {
         await clientDB.saves.add(profileId, initialRound);
     }
 
-    return { profile, roundData: initialRound };
+    return { profile: await clientDB.profiles.get(profileId), roundData: initialRound };
 }
 
 // ── 改名 ────────────────────────────────────────────

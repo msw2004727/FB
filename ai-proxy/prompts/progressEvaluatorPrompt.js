@@ -63,8 +63,11 @@ const MILESTONES = [
  * @param {string} cluesSummary - 之前收集的線索摘要
  * @returns {string} prompt
  */
-function getProgressEvaluatorPrompt(story, achievedMilestones = [], cluesSummary = '') {
-    const remaining = MILESTONES.filter(m => !achievedMilestones.includes(m.id));
+function getProgressEvaluatorPrompt(story, achievedMilestones = [], cluesSummary = '', scenario = 'wuxia') {
+    const { getScenario } = require('../scenarios/index.js');
+    const scenarioConfig = getScenario(scenario);
+    const milestones = scenarioConfig.MILESTONES;
+    const remaining = milestones.filter(m => !achievedMilestones.includes(m.id));
     const nextMilestone = remaining[0];
 
     if (!nextMilestone) {

@@ -45,12 +45,13 @@ export async function buildContext(profileId) {
         currentLocation: lastSave?.LOC || [],
         morality: toSafeNumber(profile.morality, 0),
         currentDate: {
-            yearName: profile.yearName || '元祐',
+            yearName: profile.yearName ?? '',
             year: toSafeNumber(profile.year, 1),
             month: toSafeNumber(profile.month, 1),
             day: toSafeNumber(profile.day, 1)
         },
-        currentTimeOfDay: profile.timeOfDay || '上午'
+        currentTimeOfDay: profile.timeOfDay || '上午',
+        scenario: profile.scenario || 'wuxia'
     };
 
     // 從最近存檔組裝 NPC 上下文（名字、狀態、好感度）

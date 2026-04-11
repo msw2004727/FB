@@ -11,6 +11,7 @@ import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
 import { exportSave, importSave, shouldRemindBackup, markBackupReminded } from '../client/utils/exportImport.js';
 import { initStorageManager } from '../client/db/storageManager.js';
+import { getScenario } from '../client/scenarios/scenarios.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始化 IndexedDB + 請求持久化儲存
@@ -84,7 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         scenarioThemeSwitcher.addEventListener('change', () => {
             const t = scenarioThemeSwitcher.checked ? 'dark' : 'light';
             localStorage.setItem('game_theme', t);
-            document.body.className = `${t}-theme`;
+            document.body.classList.remove('light-theme', 'dark-theme'); document.body.classList.add(`${t}-theme`);
         });
     }
 
@@ -171,13 +172,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 如果已有存檔，先設定 activeProfile 再重置
         if (activeProfile) {
             gameEngine.setActiveProfile(activeProfile.id);
-            await gameEngine.startNewGame();
+            await gameEngine.startNewGame(scenarioChoice);
             await clientDB.profiles.update(activeProfile.id, { username: playerName, gender: genderSelected });
             activeProfile = await clientDB.profiles.get(activeProfile.id);
         } else {
-            const result = await gameEngine.createNewGame(playerName, genderSelected);
+            const result = await gameEngine.createNewGame(playerName, genderSelected, scenarioChoice);
             activeProfile = result.profile;
         }
+    }
+
+    // 套用劇本主題 CSS class
+    const activeScenario = getScenario(activeProfile.scenario || 'wuxia');
+    if (activeScenario.themeClass) {
+        document.body.classList.add(activeScenario.themeClass);
     }
 
     // 設定活躍檔案

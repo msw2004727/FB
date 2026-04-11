@@ -46,14 +46,17 @@ const TASK_HANDLERS = {
             ctx.actorCandidates,
             ctx.blackShadowEvent
         );
-        // 注入里程碑進度（引導 AI 自然融入回家線索）
+        // 注入里程碑進度（根據劇本顯示不同標題和引導文字）
         const achieved = ctx.achievedMilestones || [];
         const clues = ctx.cluesSummary || '';
         if (achieved.length > 0 || clues) {
-            const milestoneNames = ['異世界認知','第一條線索','關鍵人物','古老知識','重大阻礙','關鍵突破','最終準備','歸途'];
-            const progress = `已達成 ${achieved.length}/8 個歸途印記。`;
-            const next = achieved.length < 8 ? `下一個線索方向：${milestoneNames[achieved.length]}。` : '所有印記已集齊，可以嘗試回家了。';
-            const milestoneSection = `\n## 【主線進度 — 歸途印記】\n${progress}${next}\n已知線索：${clues || '尚無'}\n請在故事中偶爾自然地融入與「穿越」或「回家」相關的線索、NPC暗示或神秘事件，但不要強迫出現。讓玩家感覺到這個世界藏著穿越的秘密。\n`;
+            const { getScenario: getScn } = require('../scenarios/index.js');
+            const scn = getScn(player.scenario);
+            const milestoneNames = scn.MILESTONE_NAMES;
+            const mTitle = scn.milestoneDisplay.title;
+            const progress = `已達成 ${achieved.length}/8 個${mTitle}。`;
+            const next = achieved.length < 8 ? `下一個線索方向：${milestoneNames[achieved.length]}。` : `所有${mTitle}已集齊。`;
+            const milestoneSection = `\n## 【主線進度 — ${mTitle}】\n${progress}${next}\n已知線索：${clues || '尚無'}\n請在故事中偶爾自然地融入與主線目標相關的線索或暗示，但不要強迫出現。\n`;
             const idx = prompt.lastIndexOf('現在，請根據');
             if (idx > 0) prompt = prompt.slice(0, idx) + milestoneSection + prompt.slice(idx);
             else prompt += milestoneSection;
@@ -75,10 +78,12 @@ const TASK_HANDLERS = {
 
     'progress-evaluator': (ctx) => {
         const { getProgressEvaluatorPrompt } = require('../prompts/progressEvaluatorPrompt');
+        const scenario = ctx.player?.scenario || ctx.scenario || 'wuxia';
         const prompt = getProgressEvaluatorPrompt(
             ctx.story || '',
             ctx.achievedMilestones || [],
-            ctx.cluesSummary || ''
+            ctx.cluesSummary || '',
+            scenario
         );
         if (!prompt) return { prompt: '{"triggered":false,"reason":"all done","questJournal":"你已找到回家的路。"}', json: true, configKey: 'story' };
         return { prompt, json: true, configKey: 'story' };
@@ -302,7 +307,8 @@ router.post('/generate', async (req, res, next) => {
 
             // 用上一回合的故事做進度評估（這樣三個呼叫可以全部並行）
             const lastStory = context.recentHistory?.[context.recentHistory.length - 1]?.story || '';
-            const evalPrompt = getProgressEvaluatorPrompt(lastStory, context.achievedMilestones || [], context.cluesSummary || '');
+            const playerScenario = context.player?.scenario || 'wuxia';
+            const evalPrompt = getProgressEvaluatorPrompt(lastStory, context.achievedMilestones || [], context.cluesSummary || '', playerScenario);
 
             // 三個 AI 呼叫全部並行
             const promises = [

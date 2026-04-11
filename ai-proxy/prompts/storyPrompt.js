@@ -6,7 +6,8 @@ const { getRomanceRule } = require('./story_components/romanceRule.js');
 const { getWorldviewAndProgressionRule } = require('./story_components/worldviewAndProgressionRule.js');
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
-const { getNarrativeStyleRule } = require('./story_components/narrativeStyleRule.js'); // 【核心新增】
+const { getNarrativeStyleRule } = require('./story_components/narrativeStyleRule.js');
+const { getScenario } = require('../scenarios/index.js');
 
 // 將 recentHistory 陣列格式化為精簡文字（修復 [object Object] 亂碼）
 function formatRecentHistory(saves) {
@@ -21,19 +22,20 @@ function formatRecentHistory(saves) {
 }
 
 const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfile = {}, username = '主角', currentTimeOfDay = '上午', _unused1 = null, playerMorality = 0, _unused2 = [], romanceEventToWeave = null, worldEventToWeave = null, locationContext = null, npcContext = {}, _unused3 = 0, _unused4 = [], blackShadowEvent = null) => {
-    const protagonistDescription = userProfile.gender === 'female'
-        ? '她附身在一個不知名、約20歲的少女身上。'
-        : '他附身在一個不知名、約20歲的少年身上。';
+    // 根據劇本載入對應配置
+    const scenario = getScenario(userProfile.scenario);
+    const protagonistDescription = scenario.protagonistDescription(userProfile.gender || 'male');
 
-    const timeSequence = ['清晨', '上午', '中午', '下午', '黃昏', '夜晚', '深夜'];
-    const currentDateString = `${userProfile.yearName || '元祐'}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`;
+    const timeSequence = scenario.timeSequence;
+    const currentDateString = userProfile.yearName
+        ? `${userProfile.yearName}${userProfile.year || 1}年${userProfile.month || 1}月${userProfile.day || 1}日`
+        : `${userProfile.month || 1}月${userProfile.day || 1}日`;
     const playerGender = userProfile.gender || 'male';
-    // playerStamina 已移除
 
-    // 【核心修改】從新模組獲取風格規則
-    const narrativeStyle = getNarrativeStyleRule('modern'); 
+    // 從劇本配置載入敘事風格
+    const narrativeStyle = scenario.narrativeStyle; 
 
-    const blackShadowRule = blackShadowEvent 
+    const blackShadowRule = (blackShadowEvent && scenario.hasBlackShadow)
         ? `
 ## 【最高優先級特殊劇情指令：神秘黑影人】
 在本回合的故事中，你**必須**讓一個神秘的「黑影人」登場。這不是一個可選項，而是必須完成的核心任務！
@@ -58,8 +60,8 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
     const spatialContextRule = `
 ## 空間移動規則
-- **內部移動**：前往同一地點內的設施（如「去鐵匠鋪」）→ LOC 追加子地點，如 ["無名村", "葉家鐵鋪"]。優先使用地點情境中已有的設施。
-- **外部移動**：前往不同地點（如「前往開封府」）→ LOC 設定新的地點層級。
+- **內部移動**：前往同一地點內的設施 → LOC 追加子地點。優先使用地點情境中已有的設施。
+- **外部移動**：前往不同地點 → LOC 設定新的地點層級。
 `;
     
 
@@ -99,7 +101,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     const playerAttributeRules = getPlayerAttributeRule({ currentDateString, currentTimeOfDay, timeSequence, playerMorality });
     const romanceRules = getRomanceRule({ playerGender });
     const currentRound = userProfile.R || 0;
-    const worldviewAndProgressionRules = getWorldviewAndProgressionRule({ protagonistDescription, currentRound });
+    const worldviewAndProgressionRules = scenario.worldview(protagonistDescription, currentRound);
     const systemInteractionRules = getSystemInteractionRule({ locationName: locationContext?.locationName });
     const outputStructureRules = getOutputStructureRule({ username, timeSequence });
     const interactionRule = getInteractionRule();

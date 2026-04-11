@@ -1,0 +1,29 @@
+/* styles/themes/school.css — 學園主題覆蓋 */
+/* 透過覆蓋 CSS 變數，所有現有元件自動適配新色系 */
+
+@import url('https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap');
+
+body.school-theme {
+    --font-serif: 'LXGW WenKai TC', 'Noto Sans TC', sans-serif;
+
+    --light-bg: #f0f4f8;
+    --light-surface-bg: #ffffff;
+    --light-text-primary: #1e293b;
+    --light-text-secondary: #64748b;
+    --light-accent: #3b82f6;
+    --light-border: #cbd5e1;
+
+    --dark-bg: #0f172a;
+    --dark-surface-bg: #1e293b;
+    --dark-text-primary: #e2e8f0;
+    --dark-text-secondary: #94a3b8;
+    --dark-accent: #60a5fa;
+    --dark-border: #334155;
+
+    --morality-evil-light: #78716c;
+    --morality-justice-light: #8b5cf6;
+    --morality-neutral-light: #94a3b8;
+    --morality-evil-dark: #a8a29e;
+    --morality-justice-dark: #a78bfa;
+    --morality-neutral-dark: #94a3b8;
+}
