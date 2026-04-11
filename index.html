@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="styles/themes/mecha.css">
 </head>
 <body>
+<div id="app-loading-screen" style="position:fixed;inset:0;z-index:99999;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;transition:opacity 0.4s ease;"><div style="color:#fff;font-family:serif;font-size:1.2rem;opacity:0.7;letter-spacing:0.1em;">載入中⋯</div></div>
 <script>
 // 防閃爍：在 DOM 繪製前立即設定主題
 (function(){var t=localStorage.getItem('game_theme');if(!t)t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.body.classList.add(t+'-theme');})();

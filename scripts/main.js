@@ -115,6 +115,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     scenarioSelect.style.display = 'flex';
 
+    // 移除毛玻璃載入遮罩
+    const loadingScreen = document.getElementById('app-loading-screen');
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => loadingScreen.remove(), 400);
+    }
+
     let selectedScenario = null;
 
     // Step 1: 點劇本按鈕 → 預覽主題 + 顯示 NEW/存檔
