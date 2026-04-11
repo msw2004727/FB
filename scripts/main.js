@@ -205,7 +205,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function confirmName() {
             const name = introNameInput.value.trim();
-            if (!name) return;
+            if (!name) {
+                introNameInput.classList.add('shake');
+                setTimeout(() => introNameInput.classList.remove('shake'), 400);
+                introNameInput.focus();
+                return;
+            }
             introNameInput.disabled = true;
             introConfirmBtn.disabled = true;
             introStory2.style.display = '';
@@ -620,6 +625,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                     localStorage.setItem('wenjiang_active_profile', profileId);
                     window.location.reload();
                 } catch (e) { alert('載入失敗: ' + e.message); }
+            });
+        }
+
+        // 故事回顧
+        const storyArchiveBtn = document.getElementById('story-archive-btn');
+        if (storyArchiveBtn) {
+            storyArchiveBtn.addEventListener('click', async () => {
+                try {
+                    const chapters = await clientDB.novel.getAll(gameEngine.getActiveProfileId());
+                    if (!chapters || chapters.length === 0) {
+                        alert('尚無故事記錄。');
+                        return;
+                    }
+                    const text = chapters
+                        .sort((a, b) => a.round - b.round)
+                        .map(ch => `【第 ${ch.round} 回】\n${ch.story}`)
+                        .join('\n\n────────\n\n');
+                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `story_${localStorage.getItem('username') || 'archive'}_R${chapters.length}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert('匯出故事失敗: ' + e.message);
+                }
             });
         }
 

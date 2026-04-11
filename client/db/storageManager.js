@@ -47,7 +47,7 @@ async function pruneGameSaves(profileId) {
         tx.onerror = () => reject(tx.error);
     });
 
-    console.log(`[StorageManager] 清理了 ${toDelete.length} 筆舊存檔（保留 ${toKeep.size} 筆）`);
+    console.debug(`[StorageManager] 清理了 ${toDelete.length} 筆舊存檔（保留 ${toKeep.size} 筆）`);
     return toDelete.length;
 }
 
@@ -75,7 +75,7 @@ async function pruneNovelChapters(profileId) {
         tx.onerror = () => reject(tx.error);
     });
 
-    console.log(`[StorageManager] 清理了 ${toDelete.length} 筆舊章節`);
+    console.debug(`[StorageManager] 清理了 ${toDelete.length} 筆舊章節`);
     return toDelete.length;
 }
 
@@ -92,7 +92,7 @@ async function trimCluesSummary(profileId) {
     const clean = firstNewline > 0 ? trimmed.slice(firstNewline + 1) : trimmed;
 
     await clientDB.state.set(profileId, 'clues_summary', clean);
-    console.log(`[StorageManager] 截斷 clues_summary: ${clues.length} → ${clean.length} 字元`);
+    console.debug(`[StorageManager] 截斷 clues_summary: ${clues.length} → ${clean.length} 字元`);
     return true;
 }
 
@@ -102,7 +102,7 @@ async function trimCluesSummary(profileId) {
 export async function requestPersistentStorage() {
     if (navigator.storage && navigator.storage.persist) {
         const granted = await navigator.storage.persist();
-        console.log(`[StorageManager] 持久化儲存: ${granted ? '已授權' : '未授權'}`);
+        console.debug(`[StorageManager] 持久化儲存: ${granted ? '已授權' : '未授權'}`);
         return granted;
     }
     return false;
@@ -124,7 +124,7 @@ export async function runCleanup(profileId, currentRound) {
         if (savedCount > 0 || chapterCount > 0) {
             if (navigator.storage && navigator.storage.estimate) {
                 const est = await navigator.storage.estimate();
-                console.log(`[StorageManager] 使用量: ${((est.usage || 0) / 1024 / 1024).toFixed(2)} MB`);
+                console.debug(`[StorageManager] 使用量: ${((est.usage || 0) / 1024 / 1024).toFixed(2)} MB`);
             }
         }
     } catch (err) {

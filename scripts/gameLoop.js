@@ -202,7 +202,15 @@ export async function handlePlayerAction(actionOverride, optionMorality = 0) {
     } catch (error) {
         console.error('API 互動請求失敗', error);
         const errorMessage = String(error.message || '');
-        appendMessageToStory('操作失敗：' + errorMessage, 'system-message');
+        const retryContainer = document.createElement('div');
+        retryContainer.className = 'system-message retry-message';
+        retryContainer.innerHTML = `操作失敗：${errorMessage.replace(/</g,'&lt;')} <button class="retry-btn">重試</button>`;
+        retryContainer.querySelector('.retry-btn').addEventListener('click', () => {
+            retryContainer.remove();
+            handlePlayerAction(actionOverride, optionMorality);
+        });
+        const wrapper = document.getElementById('story-text-wrapper');
+        if (wrapper) wrapper.appendChild(retryContainer);
     } finally {
         if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
              setLoading(false);

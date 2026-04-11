@@ -3,5 +3,5 @@
 
 export const MAX_POWER = 999;
 
-// AI Proxy URL（可在設定中更改）
-export const AI_PROXY_URL = localStorage.getItem('wenjiang_ai_proxy_url') || 'https://ai-proxy-cyan.vercel.app';
+// AI Proxy URL — 統一由 aiProxy.js 管理，此處保留向後相容
+// 實際 URL 邏輯在 client/ai/aiProxy.js 的 detectDefaultProxyUrl()

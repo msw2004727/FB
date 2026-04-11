@@ -244,7 +244,7 @@ export async function exportAll(profileId) {
         if (tpl) locationTemplateList.push(tpl);
     }
 
-    const stateKeys = ['summary'];
+    const stateKeys = ['summary', 'milestones', 'clues_summary'];
     const stateData = {};
     for (const key of stateKeys) {
         const val = await state.get(profileId, key);

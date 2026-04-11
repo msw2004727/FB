@@ -7,8 +7,9 @@
 //   5. KG Timeline 查詢
 
 const MEMPALACE_URL = process.env.MEMPALACE_URL || 'https://mempalace-server-322557520154.asia-east2.run.app';
-const TIMEOUT_MS = 3000; // 加大至 3 秒（ranked search 需多取 3 倍再排序）
-const TOKEN_BUDGET = 800; // deepMemoryContext 最大 token 預算
+const TIMEOUT_MS = 3000;
+const TOKEN_BUDGET = 800;
+let _timeoutCount = 0;
 
 async function request(path, body) {
     const controller = new AbortController();
@@ -28,6 +29,10 @@ async function request(path, body) {
         return await res.json();
     } catch (err) {
         clearTimeout(timer);
+        _timeoutCount++;
+        if (_timeoutCount >= 3) {
+            console.warn(`[MemPalace] 連續 ${_timeoutCount} 次超時，記憶系統可能不可用`);
+        }
         return null;
     }
 }

@@ -32,7 +32,7 @@ export async function createNewGame(username, gender, scenario = 'wuxia') {
     const profile = await clientDB.profiles.create(profileData);
     const profileId = profile.id;
 
-    const initialRound = scenarioConfig.getInitialRound(username);
+    const initialRound = scenarioConfig.getInitialRound(username, profileData?.gender || gender || 'male');
 
     await clientDB.saves.add(profileId, initialRound);
     setActiveProfile(profileId);
@@ -227,7 +227,7 @@ export async function startNewGame(scenario) {
     await clientDB.profiles.update(profileId, { scenario: effectiveScenario, ...scenarioConfig.defaultProfile });
 
     // 寫入劇本對應的 R0 存檔
-    const initialRound = scenarioConfig.getInitialRound(profile.username);
+    const initialRound = scenarioConfig.getInitialRound(profile.username, profile.gender || 'male');
     await clientDB.saves.add(profileId, initialRound);
 
     const verify = await clientDB.saves.getLatest(profileId);

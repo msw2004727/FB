@@ -1,0 +1,7 @@
+/* styles/themes/wuxia.css — 武俠主題 */
+/* 武俠使用 base.css 的預設色系，此處僅做微調 */
+
+body.wuxia-theme {
+    /* 武俠特有的字型強調 */
+    --font-serif: 'Noto Serif TC', serif;
+}

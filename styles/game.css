@@ -263,6 +263,19 @@ body.dark-theme .player-action-log {
 body.dark-theme .system-message {
     color: var(--dark-text-secondary);
 }
+.retry-btn {
+    margin-left: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--light-accent, #8c6f54);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--light-accent, #8c6f54);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.retry-btn:hover { background: var(--light-accent, #8c6f54); color: #fff; }
+body.dark-theme .retry-btn { border-color: var(--dark-accent); color: var(--dark-accent); }
+body.dark-theme .retry-btn:hover { background: var(--dark-accent); color: #1a1a1e; }
 
 .story-footer {
     position: sticky;
