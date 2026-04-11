@@ -338,6 +338,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // --- 卡片說明彈窗 ---
+    const CARD_HELP = {
+        pc: { title: '角色狀態 (PC)', body: '這是你目前的身體和精神狀態的簡短描述。\n\n受傷了會顯示傷勢、心情好會顯示狀態良好。簡單說就是「你現在看起來怎麼樣」。\n\n如果這裡寫著什麼很嚇人的東西……嗯，也許該考慮去找個醫生（如果這個世界有的話）。' },
+        morality: { title: '立場傾向', body: '這條軸線反映你在這個世界裡的行事風格。\n\n每個劇本的兩端含義不同——可能是正義與邪惡、秩序與自由、共感與理性等等。\n\n你的每一個選擇都會微妙地推動這個數值。NPC 們會根據你的立場傾向，用不同的態度對待你。\n\n沒有所謂的「正確」方向，走到哪邊都有獨特的故事體驗。' },
+        journey: { title: '旅程', body: '這裡記錄你的主線進度和目前的回合數。\n\n上面那排神秘的字元是里程碑標記——每當你觸發一個重大劇情轉折，就會點亮一個。集滿全部就能到達結局。\n\n下方的文字是你目前的主線任務提示。如果你迷路了，看看這裡也許能找到方向。\n\n（但說真的，迷路也是冒險的一部分不是嗎？）' },
+        character: { title: '角色', body: '在這裡你可以修改角色的名字和性別。\n\n改完記得按右邊的 ✓ 儲存。你的名字會影響 NPC 怎麼稱呼你，性別會影響故事中的互動和稱呼方式。\n\n「重選劇本」按鈕可以回到劇本選擇畫面，你的進度會自動保存。' },
+        ai: { title: 'AI 核心', body: '這裡選擇為你編寫故事的 AI 模型。\n\n不同模型就像不同的小說家——有的文筆華麗、有的邏輯嚴密、有的腦洞大開。預設的 MiniMax 免費使用，其他模型需要自行輸入 API Key 或啟用 VIP。\n\n切換模型後故事風格會明顯改變，就像換了一個說書人。\n\n右邊的版本號是遊戲版本，跟你的故事無關，別擔心。' },
+    };
+
+    const helpModal = document.getElementById('card-help-modal');
+    const helpTitle = document.getElementById('card-help-title');
+    const helpBody = document.getElementById('card-help-body');
+    const helpClose = document.getElementById('card-help-close');
+
+    document.querySelectorAll('.card-help-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.help;
+            const info = CARD_HELP[key];
+            if (!info || !helpModal) return;
+            helpTitle.textContent = info.title;
+            helpBody.innerHTML = info.body.replace(/\n/g, '<br>');
+            helpModal.style.display = 'flex';
+        });
+    });
+
+    if (helpClose) helpClose.addEventListener('click', () => { helpModal.style.display = 'none'; });
+    if (helpModal) helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.style.display = 'none'; });
+
     // --- API Key 彈窗邏輯 ---
     let _previousModel = null;
 

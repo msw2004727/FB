@@ -474,6 +474,83 @@ body.light-theme .reselect-scenario-btn:hover {
     margin-right: 0.3rem;
 }
 
+/* --- 卡片說明按鈕 --- */
+.card-help-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.3;
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0 2px;
+    vertical-align: middle;
+    transition: opacity 0.2s;
+}
+.card-help-btn:hover {
+    opacity: 0.7;
+}
+
+/* --- 卡片說明彈窗（毛玻璃） --- */
+.card-help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0,0,0,0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+.card-help-content {
+    max-width: 340px;
+    width: 85%;
+    padding: 1.5rem;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+    text-align: center;
+}
+body.light-theme .card-help-content {
+    background: rgba(255,255,255,0.75);
+    border-color: rgba(0,0,0,0.1);
+    color: #333;
+}
+.card-help-content h3 {
+    margin: 0 0 0.8rem;
+    font-size: 1.1rem;
+    font-family: var(--font-serif);
+}
+.card-help-content p {
+    margin: 0 0 1.2rem;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    text-align: left;
+    opacity: 0.9;
+}
+.card-help-close-btn {
+    padding: 0.5rem 1.5rem;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    color: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.card-help-close-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+body.light-theme .card-help-close-btn {
+    border-color: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.04);
+}
+body.light-theme .card-help-close-btn:hover {
+    background: rgba(0,0,0,0.08);
+}
+
 .info-card .money-container {
     display: flex;
     justify-content: space-between;
