@@ -47,16 +47,12 @@ const getActionClassifierPrompt = (playerAction, context) => {
     * **觸發關鍵詞**: "點頭", "微笑", "鞠躬", "拔刀相向", "冷笑", "攻擊", "切磋"。
     * **回傳細節**: \`details: { "gesture": "姿態描述", "target": "目標NPC (可選)" }\`
 
-9.  **\`SKILL_PRACTICE\`**: 玩家修練、練習或提升武學。
-    * **觸發關鍵詞**: "修練", "練習", "打坐", "閉關", "領悟"。
-    * **回傳細節**: \`details: { "skillName": "武學名稱" }\`
-
-10. **\`MOVEMENT\`**: 玩家要移動到新的地點。
+9. **\`MOVEMENT\`**: 玩家要移動到新的地點。
     * **觸發關鍵詞**: "前往", "離開", "去", "走進", "上山"。
     * **回傳細節**: \`details: { "destination": "目標地點" }\`
 
 ### --- 其他 ---
-11. **\`GENERAL_STORY\`**: 若指令極度模糊或不屬於以上任何類別，則歸於此類。這是最後的選擇。
+10. **\`GENERAL_STORY\`**: 若指令極度模糊或不屬於以上任何類別，則歸於此類。這是最後的選擇。
     * **回傳細節**: \`details: {}\`
 
 ## 判斷準則：
@@ -70,8 +66,6 @@ const getActionClassifierPrompt = (playerAction, context) => {
 ## 【上下文參考】:
 -   **當前地點**: ${context.location}
 -   **在場的NPC**: ${context.npcs.join('、') || '無'}
--   **玩家已學會的武學**: ${context.skills.join('、') || '無'}
-
 ---
 
 現在，請立即回傳你對此指令的分類JSON。

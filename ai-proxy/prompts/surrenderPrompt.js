@@ -57,8 +57,7 @@ const getSurrenderPrompt = (playerProfile, combatState) => {
   "outcome": {
     "summary": "一場友好的切磋結束了，你主動認輸。",
     "playerChanges": {
-      "PC": "經過一番切磋，你對武學似乎有了新的體悟。",
-      "powerChange": { "internal": 0, "external": 1, "lightness": 1 },
+      "PC": "經過一番切磋，雙方都對彼此的身手有了新的認識。",
       "moralityChange": 0,
       "itemChanges": []
     }
@@ -75,7 +74,6 @@ const getSurrenderPrompt = (playerProfile, combatState) => {
     "summary": "破財消災，你失去了所有金錢，但保住了性命。",
     "playerChanges": {
       "PC": "你感到一陣屈辱，但總算是活下來了。",
-      "powerChange": { "internal": 0, "external": 0, "lightness": 0 },
       "moralityChange": -5,
       "itemChanges": [
         { "action": "remove_all", "itemType": "財寶" }

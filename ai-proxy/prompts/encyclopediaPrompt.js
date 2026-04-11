@@ -66,15 +66,15 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     </div>
   </div>
 
-### 3. 武功譜 (Skills)
-- **目的**：記錄玩家習得的武學以及能力的變化。
-- **格式**：為每一項武學或能力變化建立條目。
+### 3. 物品圖鑑 (Items)
+- **目的**：記錄玩家擁有或曾擁有的重要物品。
+- **格式**：為每一項重要物品建立條目，包含來源和用途。
 - **範例**：
   <div class="chapter">
-    <h2 class="chapter-title">武功譜</h2>
+    <h2 class="chapter-title">物品圖鑑</h2>
     <div class="entry">
-      <h3 class="entry-title">基礎劍法</h3>
-      <p class="entry-content">一本泛黃的秘笈，閱讀後讓你的外功修為有所增長。</p>
+      <h3 class="entry-title">虎頭令牌</h3>
+      <p class="entry-content">從山賊頭目屍體上搜得的銅製令牌，用途不明。</p>
     </div>
     <div class="entry">
       <h3 class="entry-title">吐納心法</h3>

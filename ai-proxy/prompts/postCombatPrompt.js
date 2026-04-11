@@ -30,7 +30,6 @@ ${combatLog.slice(-5).join('\n')}
     - **絕對禁止**生成任何 'itemChanges' (戰利品)。
     - **絕對禁止**將NPC的狀態更新為 'isDeceased: true'。
     - **絕對禁止**有任何負面的好感度或立場值變化。
-    - 可以少量增加雙方的武學經驗或能力值('powerChange')。
     - 'summary' 應為「你與對手點到為止，雙方握手言和。」之類的中性描述。
 
 ### 意圖二：教訓
@@ -59,15 +58,7 @@ ${combatLog.slice(-5).join('\n')}
     "EVT": "一個客觀的事件總結，例如：『在街口擊殺了張三』或『被官兵擊敗後被捕』",
     "playerChanges": {
       "PC": "對玩家狀態的文字描述，例如：『你身中數刀，血流不止，但眼神依然銳利。』",
-      "powerChange": { "internal": 0, "external": 0, "lightness": 0 },
-      "moralityChange": 0,
-      "skillChanges": [
-        {
-          "isNewlyAcquired": false,
-          "skillName": "在戰鬥中使用過的武學名稱",
-          "expChange": 10
-        }
-      ]
+      "moralityChange": 0
     },
     "itemChanges": [
       {

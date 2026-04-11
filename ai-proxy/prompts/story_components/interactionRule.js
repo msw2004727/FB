@@ -12,7 +12,7 @@ NPC 對玩家的態度分 7 級：devoted > trusted > friendly > neutral > wary 
 2. 回傳 \`"enterCombat": true\`
 3. 回傳 \`"combatants"\`: 對手陣列 [{name, status}]
 4. 回傳 \`"combatIntro"\`: 50-100 字戰鬥開場描述
-5. 對手是不會武功的平民 → 直接在故事中描述結果，不觸發戰鬥系統
+5. 對手是毫無戰鬥力的平民 → 直接在故事中描述結果，不觸發戰鬥系統
 `;
 };
 

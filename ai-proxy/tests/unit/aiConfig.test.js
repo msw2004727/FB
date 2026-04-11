@@ -13,7 +13,7 @@ const REQUIRED_CONFIG_KEYS = [
     'npcProfile', 'npcChat', 'npcChatSummary', 'npcMemory',
     'giveItem', 'giveNarrative', 'proactiveChat', 'romanceEvent',
     'encyclopedia', 'relationGraph', 'bounty',
-    'itemTemplate', 'location', 'reward', 'skillTemplate'
+    'itemTemplate', 'location', 'reward'
 ];
 
 const VALID_MODELS = ['minimax', 'openai', 'gpt5.4', 'deepseek', 'grok', 'gemini', 'claude'];

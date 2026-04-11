@@ -56,7 +56,6 @@ const aiConfig = {
     itemTemplate: 'minimax',
     location: 'minimax',
     reward: 'minimax',
-    skillTemplate: 'minimax',
 };
 
 module.exports = { aiConfig };

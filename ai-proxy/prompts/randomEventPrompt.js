@@ -22,8 +22,7 @@ const getRandomEventPrompt = (eventType, playerProfile) => {
 2.  **遊戲效果 (effects)**: 必須是一個物件，用來定義此事件對遊戲數值的具體影響。可用的效果鍵如下：
     * \`PC\`: (字串) 對玩家狀態的文字描述，例如 "你感到一陣暖流，精神好了許多。"
     * \`itemChanges\`: (陣列) 物品的變化，遵循物品帳本系統格式，例如 \`[{"action": "add", "itemName": "金瘡藥", "quantity": 1}]\`。
-    * \`powerChange\`: (物件) 內外功的變化，格式為 \`{ "internal": X, "external": Y, "lightness": Z }\`。
-    * \`moralityChange\`: (數字) 正邪值的變化。
+    * \`moralityChange\`: (數字) 立場值的變化。
 
 ## 事件指令範例:
 
@@ -42,10 +41,9 @@ const getRandomEventPrompt = (eventType, playerProfile) => {
 - **你可能的回應 (JSON):**
   \`\`\`json
   {
-    "description": "你在溪邊練習拳腳時，無意間體會到水流的勁道，對力量的運用似乎有了新的感悟。",
+    "description": "你在溪邊靜坐時，無意間聽到水流聲中藏著的節奏，整個人神清氣爽。",
     "effects": {
-      "PC": "你的外功修為似乎有所精進。",
-      "powerChange": { "internal": 0, "external": 5, "lightness": 0 }
+      "PC": "你感到身心舒暢，精神飽滿。"
     }
   }
   \`\`\`
@@ -67,8 +65,7 @@ const getRandomEventPrompt = (eventType, playerProfile) => {
   {
     "description": "天降大雨，你在濕滑的路上不慎滑倒，重重地摔在地上，感覺筋骨一陣劇痛。",
     "effects": {
-      "PC": "摔傷導致你筋骨受創。",
-      "powerChange": { "internal": 0, "external": -5, "lightness": 0 }
+      "PC": "摔傷導致你行動不便。"
     }
   }
   \`\`\`
