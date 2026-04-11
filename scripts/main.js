@@ -91,25 +91,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── 劇本選擇 + 角色建立流程 ──────────────────────
 
-    const savedProfileId = localStorage.getItem('wenjiang_active_profile');
     let activeProfile = null;
-
-    if (savedProfileId) {
-        activeProfile = await clientDB.profiles.get(savedProfileId);
-    }
-    if (!activeProfile) {
-        const allProfiles = await clientDB.profiles.list();
-        if (allProfiles.length > 0) activeProfile = allProfiles[0];
-    }
 
     // 顯示劇本選擇頁面
     const scenarioSelect = document.getElementById('scenario-select');
-    const scenarioContinue = document.getElementById('scenario-continue');
-    const scenarioContinueBtn = document.getElementById('scenario-continue-btn');
+    const scenarioSaves = document.getElementById('scenario-saves');
 
-    // 有存檔 → 顯示「繼續冒險」按鈕
-    if (activeProfile) {
-        scenarioContinue.style.display = '';
+    // 列出所有存檔
+    const allProfiles = await clientDB.profiles.list();
+    const SCENARIO_ICONS = { wuxia: 'fa-yin-yang', school: 'fa-school', mecha: 'fa-robot', modern: 'fa-city', animal: 'fa-paw', hero: 'fa-mask' };
+
+    if (allProfiles.length > 0 && scenarioSaves) {
+        let savesHtml = '';
+        for (const p of allProfiles) {
+            const scn = getScenario(p.scenario || 'wuxia');
+            const icon = SCENARIO_ICONS[p.scenario] || 'fa-book';
+            const lastSave = await clientDB.saves.getLatest(p.id);
+            const round = lastSave?.R || 0;
+            savesHtml += `<button class="scenario-save-btn" data-profile-id="${p.id}">
+                <span class="scenario-save-icon"><i class="fas ${icon}"></i></span>
+                <span class="scenario-save-info">
+                    <span class="scenario-save-name">${scn.name} — ${p.username || '冒險者'}</span>
+                    <span class="scenario-save-detail">第 ${round} 回</span>
+                </span>
+            </button>`;
+        }
+        scenarioSaves.innerHTML = savesHtml;
+        scenarioSaves.style.display = '';
     }
 
     // 將劇本選擇頁移到 body 層級（避免被 game-container[hidden] 遮蔽）
@@ -118,26 +126,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     scenarioSelect.style.display = 'flex';
 
-    // 等待玩家選擇劇本或繼續
-    const scenarioChoice = await new Promise((resolve) => {
-        // 繼續按鈕
-        if (scenarioContinueBtn) {
-            scenarioContinueBtn.addEventListener('click', () => resolve('continue'));
+    // 等待玩家選擇：載入存檔 or 選新劇本
+    const choice = await new Promise((resolve) => {
+        // 存檔按鈕
+        if (scenarioSaves) {
+            scenarioSaves.querySelectorAll('.scenario-save-btn').forEach(btn => {
+                btn.addEventListener('click', () => resolve({ type: 'load', profileId: btn.dataset.profileId }));
+            });
         }
-        // 劇本按鈕（目前只有武俠可點）
+        // 新劇本按鈕
         scenarioSelect.querySelectorAll('.scenario-btn:not(.locked)').forEach(btn => {
-            btn.addEventListener('click', () => resolve(btn.dataset.scenario));
+            btn.addEventListener('click', () => resolve({ type: 'new', scenario: btn.dataset.scenario }));
         });
     });
 
     scenarioSelect.style.display = 'none';
     document.querySelector('.game-container').removeAttribute('hidden');
 
-    // 繼續上次 → 直接進遊戲
-    if (scenarioChoice === 'continue' && activeProfile) {
-        // 跳過建角，直接往下走
+    if (choice.type === 'load') {
+        // 載入已有存檔
+        activeProfile = await clientDB.profiles.get(choice.profileId);
     } else {
-        // 新劇本 → 顯示建角畫面
+        // 新劇本 → 建角
         const introModal = document.getElementById('intro-modal');
         const introNameInput = document.getElementById('intro-name-input');
         const introConfirmBtn = document.getElementById('intro-name-confirm');
@@ -145,6 +155,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const introGenderBtns = introModal.querySelector('.intro-gender-btns');
 
         introModal.style.display = 'flex';
+        introNameInput.value = '';
+        introNameInput.disabled = false;
+        introConfirmBtn.disabled = true;
+        introStory2.style.display = 'none';
+        introGenderBtns.style.display = 'none';
         introNameInput.focus();
 
         function confirmName() {
@@ -170,19 +185,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        const playerName = introNameInput.value.trim() || '無名俠客';
+        const playerName = introNameInput.value.trim() || '冒險者';
         introModal.style.display = 'none';
 
-        // 如果已有存檔，先改名再重置（確保 R0 故事使用新名字）
-        if (activeProfile) {
-            gameEngine.setActiveProfile(activeProfile.id);
-            await clientDB.profiles.update(activeProfile.id, { username: playerName, gender: genderSelected });
-            await gameEngine.startNewGame(scenarioChoice);
-            activeProfile = await clientDB.profiles.get(activeProfile.id);
-        } else {
-            const result = await gameEngine.createNewGame(playerName, genderSelected, scenarioChoice);
-            activeProfile = result.profile;
-        }
+        // 永遠建新 profile（不覆蓋舊存檔）
+        const result = await gameEngine.createNewGame(playerName, genderSelected, choice.scenario);
+        activeProfile = result.profile;
     }
 
     // 套用劇本主題 CSS class + 動態 UI 文字
