@@ -3,10 +3,8 @@ const { getNpcRule } = require('./story_components/npcRule.js');
 const { getInteractionRule } = require('./story_components/interactionRule.js');
 const { getPlayerAttributeRule } = require('./story_components/playerAttributeRule.js');
 const { getRomanceRule } = require('./story_components/romanceRule.js');
-const { getWorldviewAndProgressionRule } = require('./story_components/worldviewAndProgressionRule.js');
 const { getSystemInteractionRule } = require('./story_components/systemInteractionRule.js');
 const { getOutputStructureRule } = require('./story_components/outputStructureRule.js');
-const { getNarrativeStyleRule } = require('./story_components/narrativeStyleRule.js');
 const { getScenario } = require('../scenarios/index.js');
 
 // 將 recentHistory 陣列格式化為精簡文字（修復 [object Object] 亂碼）

@@ -28,8 +28,8 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
   <div class="chapter">
     <h2 class="chapter-title">人物誌</h2>
     <div class="entry">
-      <h3 class="entry-title">王大夫</h3>
-      <p class="entry-content">無名村的郎中，宅心仁厚。主角初至村中時身受重傷，得其所救，因此對主角抱持善意。曾請託主角尋找藥草，後主角完成任務，兩人關係更加鞏固。</p>
+      <h3 class="entry-title">某個NPC</h3>
+      <p class="entry-content">某個地點的郎中，宅心仁厚。主角初至村中時身受重傷，得其所救，因此對主角抱持善意。曾請託主角尋找藥草，後主角完成任務，兩人關係更加鞏固。</p>
       <div class="romance-meter">
           <span class="romance-label">心動：</span>
           <span class="fas fa-heart" title="心動值: 15"></span>
@@ -40,7 +40,7 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
       </div>
     </div>
     <div class="entry">
-      <h3 class="entry-title">山賊頭目</h3>
+      <h3 class="entry-title">某個敵人</h3>
       <p class="entry-content">盤踞在村外山頭的惡匪，孔武有力。在一次衝突中被主角擊殺，主角從其身上搜得一枚虎頭令牌。</p>
     </div>
   </div>
@@ -49,7 +49,7 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
 - **範例 (無心動值)**：
   \`\`\`html
   <div class="entry">
-    <h3 class="entry-title">山賊頭目</h3>
+    <h3 class="entry-title">某個敵人</h3>
     <p class="entry-content">盤踞在村外山頭的惡匪...</p>
     </div>
   \`\`\`
@@ -62,7 +62,7 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     <h2 class="chapter-title">神兵錄</h2>
     <div class="entry">
       <h3 class="entry-title">虎頭令牌</h3>
-      <p class="entry-content">從黑風寨山賊頭目屍體上搜得的銅製令牌，似乎是某種身份的象徵，其用途尚不明朗。</p>
+      <p class="entry-content">從敵方據點某個敵人屍體上搜得的銅製令牌，似乎是某種身份的象徵，其用途尚不明朗。</p>
     </div>
   </div>
 
@@ -74,7 +74,7 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     <h2 class="chapter-title">物品圖鑑</h2>
     <div class="entry">
       <h3 class="entry-title">虎頭令牌</h3>
-      <p class="entry-content">從山賊頭目屍體上搜得的銅製令牌，用途不明。</p>
+      <p class="entry-content">從某個敵人屍體上搜得的銅製令牌，用途不明。</p>
     </div>
     <div class="entry">
       <h3 class="entry-title">吐納心法</h3>
@@ -89,8 +89,8 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
   <div class="chapter">
     <h2 class="chapter-title">冒險紀事</h2>
     <div class="entry">
-      <h3 class="entry-title">無名村的委託</h3>
-      <p class="entry-content">接受了村民的請託，調查後山異響的原因，並在回報王大夫後完成任務。此事讓你獲得了村民的初步信任。</p>
+      <h3 class="entry-title">某個地點的委託</h3>
+      <p class="entry-content">接受了村民的請託，調查後山異響的原因，並在回報某個NPC後完成任務。此事讓你獲得了村民的初步信任。</p>
     </div>
     <div class="entry">
       <h3 class="entry-title">青龍會的傳聞</h3>

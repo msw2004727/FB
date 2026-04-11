@@ -362,9 +362,9 @@ body.dark-theme .footer-toggle {
 
 #player-input,
 #submit-button {
-    padding: 1.1rem 2rem;
-    font-size: 1.1rem;
-    line-height: 1.5;
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    line-height: 1.4;
     border: none;
     box-sizing: border-box;
 }
