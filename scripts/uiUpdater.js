@@ -191,10 +191,37 @@ const TIME_SVGS = {
     '深夜': `<svg viewBox="0 0 64 64" fill="none"><path d="M36 10 A18 18 0 1 0 36 50 A13 13 0 1 1 36 10Z" fill="#94A3B8"/><circle cx="14" cy="14" r="1.5" fill="#CBD5E1"/><circle cx="52" cy="10" r="1.8" fill="#CBD5E1"/><circle cx="8" cy="36" r="1.2" fill="#CBD5E1"/><circle cx="50" cy="44" r="1.5" fill="#CBD5E1"/><circle cx="56" cy="26" r="1" fill="#CBD5E1"/><circle cx="20" cy="50" r="0.8" fill="#CBD5E1"/><circle cx="42" cy="18" r="0.8" fill="#CBD5E1"/></svg>`,
 };
 
-function updateTimeIcon(timeOfDay) {
+// --- 天氣 SVG 圖示（優先於時辰） ---
+const WEATHER_SVGS = {
+    'rain': `<svg viewBox="0 0 64 64" fill="none"><ellipse cx="32" cy="22" rx="16" ry="10" fill="#94A3B8"/><ellipse cx="20" cy="24" rx="10" ry="8" fill="#A0AEC0"/><ellipse cx="44" cy="24" rx="10" ry="8" fill="#A0AEC0"/><line x1="20" y1="38" x2="18" y2="48" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/><line x1="32" y1="36" x2="30" y2="46" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/><line x1="44" y1="38" x2="42" y2="48" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/></svg>`,
+    'thunder': `<svg viewBox="0 0 64 64" fill="none"><ellipse cx="32" cy="20" rx="16" ry="10" fill="#64748B"/><ellipse cx="20" cy="22" rx="10" ry="8" fill="#475569"/><ellipse cx="44" cy="22" rx="10" ry="8" fill="#475569"/><polygon points="34,28 28,40 33,40 29,54 40,36 35,36 38,28" fill="#FBBF24"/><line x1="18" y1="36" x2="16" y2="44" stroke="#60A5FA" stroke-width="1.5" stroke-linecap="round"/><line x1="46" y1="36" x2="44" y2="44" stroke="#60A5FA" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    'snow': `<svg viewBox="0 0 64 64" fill="none"><ellipse cx="32" cy="20" rx="16" ry="10" fill="#CBD5E1"/><ellipse cx="20" cy="22" rx="10" ry="8" fill="#E2E8F0"/><ellipse cx="44" cy="22" rx="10" ry="8" fill="#E2E8F0"/><circle cx="20" cy="40" r="2" fill="#E2E8F0"/><circle cx="32" cy="44" r="2.5" fill="#E2E8F0"/><circle cx="44" cy="38" r="2" fill="#E2E8F0"/><circle cx="26" cy="50" r="1.5" fill="#E2E8F0"/><circle cx="38" cy="52" r="1.5" fill="#E2E8F0"/></svg>`,
+    'fog': `<svg viewBox="0 0 64 64" fill="none"><line x1="8" y1="20" x2="56" y2="20" stroke="#94A3B8" stroke-width="3" stroke-linecap="round" opacity="0.3"/><line x1="12" y1="30" x2="52" y2="30" stroke="#94A3B8" stroke-width="3" stroke-linecap="round" opacity="0.4"/><line x1="8" y1="40" x2="56" y2="40" stroke="#94A3B8" stroke-width="3" stroke-linecap="round" opacity="0.3"/><line x1="14" y1="50" x2="50" y2="50" stroke="#94A3B8" stroke-width="3" stroke-linecap="round" opacity="0.2"/></svg>`,
+    'wind': `<svg viewBox="0 0 64 64" fill="none"><path d="M8 24 Q20 20 32 24 Q44 28 52 22" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" fill="none"/><path d="M8 36 Q24 32 40 36 Q50 38 56 34" stroke="#A0AEC0" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M12 46 Q28 42 44 46" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>`,
+    'overcast': `<svg viewBox="0 0 64 64" fill="none"><ellipse cx="32" cy="28" rx="18" ry="12" fill="#94A3B8"/><ellipse cx="18" cy="30" rx="12" ry="9" fill="#A0AEC0"/><ellipse cx="46" cy="30" rx="12" ry="9" fill="#A0AEC0"/></svg>`,
+};
+
+function detectWeatherType(wrd) {
+    if (!wrd) return null;
+    const w = wrd.toLowerCase();
+    if (w.includes('雷') || w.includes('閃電')) return 'thunder';
+    if (w.includes('雪') || w.includes('冰雹')) return 'snow';
+    if (w.includes('雨') || w.includes('暴雨') || w.includes('陣雨') || w.includes('細雨')) return 'rain';
+    if (w.includes('霧') || w.includes('霾')) return 'fog';
+    if (w.includes('狂風') || w.includes('大風') || w.includes('風沙')) return 'wind';
+    if (w.includes('陰') || w.includes('多雲') || w.includes('烏雲')) return 'overcast';
+    return null;
+}
+
+function updateTimeIcon(timeOfDay, weather) {
     const el = document.getElementById('menu-toggle-time-icon');
     if (!el) return;
-    el.innerHTML = TIME_SVGS[timeOfDay] || TIME_SVGS['上午'];
+    const weatherType = detectWeatherType(weather);
+    if (weatherType && WEATHER_SVGS[weatherType]) {
+        el.innerHTML = WEATHER_SVGS[weatherType];
+    } else {
+        el.innerHTML = TIME_SVGS[timeOfDay] || TIME_SVGS['上午'];
+    }
 }
 
 // --- 時辰主題 ---
@@ -250,7 +277,7 @@ function updateStatusBar(roundData) {
             ${renderStatusRow('fa-map-marked-alt', '地點', location, { multiline: true })}
         </div>
     `;
-    updateTimeIcon(roundData.timeOfDay);
+    updateTimeIcon(roundData.timeOfDay, roundData.WRD);
     updateTimeTheme(roundData.timeOfDay);
 }
 
