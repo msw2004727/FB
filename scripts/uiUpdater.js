@@ -264,7 +264,11 @@ function updateTimeTheme(timeOfDay) {
 function updateStatusBar(roundData) {
     const weather = roundData.WRD || '晴朗';
     const location = roundData.LOC?.[0] || '未知之地';
-    const dateString = `${roundData.yearName || '元祐'}${roundData.year || 1}年${roundData.month || 1}月${roundData.day || 1}日`;
+    const y = (roundData.year || 1) - 1;
+    const m = (roundData.month || 1) - 1;
+    const d = (roundData.day || 1);
+    const totalDays = y * 360 + m * 30 + d;
+    const dateString = `第 ${totalDays} 天`;
     const timeString = `約${roundData.timeOfDay || '未知'}`;
 
     statusBarEl.innerHTML = `
