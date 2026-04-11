@@ -125,9 +125,10 @@ export function applyAiModelToSelector(selectorEl, model) {
 }
 
 export function restoreAiModelSelection(selectorEl) {
-    const stored = getStoredAiModel();
-    applyAiModelToSelector(selectorEl, stored);
-    return selectorEl?.value || stored;
+    // 每次開網頁預設回 minimax（VIP 也需重新驗證）
+    applyAiModelToSelector(selectorEl, DEFAULT_AI_MODEL);
+    setStoredAiModel(DEFAULT_AI_MODEL);
+    return DEFAULT_AI_MODEL;
 }
 
 export function resetAiModelSelectionToDefault(selectorEl) {
