@@ -1,7 +1,7 @@
 {
-  "name": "AI 文江 — 武俠文字冒險",
-  "short_name": "AI 文江",
-  "description": "AI 驅動的互動武俠文字冒險遊戲",
+  "name": "文字冒險故事",
+  "short_name": "文字冒險故事",
+  "description": "AI 驅動的多劇本文字冒險遊戲",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

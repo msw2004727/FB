@@ -1,4 +1,4 @@
-// sw.js — Service Worker for AI 文江 PWA
+// sw.js — Service Worker for 文字冒險故事 PWA
 const CACHE_NAME = 'wenjiang-v23';
 
 // 靜態資源快取列表（使用相對路徑，相容 GitHub Pages 子目錄部署）

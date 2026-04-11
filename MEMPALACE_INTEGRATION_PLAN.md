@@ -1,7 +1,7 @@
-# MemPalace x AI 文江 整合計劃書
+# MemPalace x 文字冒險故事 整合計劃書
 
 > **版本**: v1.0 | **日期**: 2026-04-10  
-> **專案**: AI 文江 (武俠文字冒險 PWA)  
+> **專案**: 文字冒險故事 (武俠文字冒險 PWA)  
 > **目標**: 整合 MemPalace 長期記憶系統，解決遊戲超過 ~10 回合後 AI 遺忘早期事件、NPC、劇情線的核心問題  
 
 ---
@@ -12,7 +12,7 @@
 
 **現況分析：**
 
-目前「AI 文江」的記憶架構由兩層組成：
+目前「文字冒險故事」的記憶架構由兩層組成：
 - **短期記憶**：Firebase Firestore 儲存最近 3 回合的 `game_saves`（由 `contextBuilder.js` 的 `savesSnapshot` 查詢）
 - **長期記憶**：1 份 AI 生成的摘要文字（`summaryDoc`），每回合由 `getAISummary()` 壓縮更新
 
