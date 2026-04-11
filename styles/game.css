@@ -273,6 +273,8 @@ body.dark-theme .system-message {
 
 .story-footer {
     margin-top: auto;
+    margin-left: -2rem;
+    margin-right: -2rem;
     padding-top: 1rem;
     border-top: 1px solid var(--time-border, var(--light-border));
     background: var(--time-bg, var(--light-surface-bg));
