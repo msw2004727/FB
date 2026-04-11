@@ -127,21 +127,30 @@ function _drawDust() {
     }
 }
 
-// === 中午：熱浪紋 ===
-let _heatPhase = 0;
-function _initHeatWave() { _heatPhase = 0; }
-function _drawHeatWave() {
-    _heatPhase += 0.015;
-    const y = _canvas.height - 40;
-    _ctx.beginPath();
-    for (let x = 0; x < _canvas.width; x += 2) {
-        const wave = Math.sin(x * 0.02 + _heatPhase) * 3 + Math.sin(x * 0.05 + _heatPhase * 1.5) * 2;
-        if (x === 0) _ctx.moveTo(x, y + wave);
-        else _ctx.lineTo(x, y + wave);
+// === 中午：熱氣光點緩慢上升 ===
+function _initHeatWave() {
+    _particles = [];
+    for (let i = 0; i < 10; i++) {
+        _particles.push({
+            x: Math.random() * _canvas.width,
+            y: _canvas.height * 0.5 + Math.random() * _canvas.height * 0.5,
+            r: 1.5 + Math.random() * 2,
+            vy: -0.15 - Math.random() * 0.1,
+            vx: (Math.random() - 0.5) * 0.1,
+            alpha: 0.06 + Math.random() * 0.06,
+        });
     }
-    _ctx.strokeStyle = 'rgba(255, 200, 50, 0.08)';
-    _ctx.lineWidth = 20;
-    _ctx.stroke();
+}
+function _drawHeatWave() {
+    for (const p of _particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < -5) { p.y = _canvas.height + 5; p.x = Math.random() * _canvas.width; }
+        _ctx.beginPath();
+        _ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        _ctx.fillStyle = `rgba(255, 220, 100, ${p.alpha})`;
+        _ctx.fill();
+    }
 }
 
 // === 下午：落葉飄飛 ===
