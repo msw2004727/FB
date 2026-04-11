@@ -290,23 +290,37 @@ body.dark-theme .story-footer {
     width: 100%;
     border: none;
     background: transparent;
-    color: var(--light-text-secondary);
+    color: var(--light-accent);
     cursor: pointer;
-    padding: 0.3rem 0;
+    padding: 0.4rem 0;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 body.dark-theme .footer-toggle {
-    color: var(--dark-text-secondary);
+    color: var(--dark-accent);
 }
 .footer-toggle-icon {
-    font-size: 0.65rem;
-    font-weight: 900;
+    font-size: 0.85rem;
     transition: transform 0.25s ease;
+    animation: footerBreath 2.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 3px currentColor);
+}
+@keyframes footerBreath {
+    0%, 100% { opacity: 0.5; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-2px); }
 }
 .story-footer.footer-collapsed .footer-toggle-icon {
-    transform: rotate(180deg);
+    animation-name: footerBreathCollapsed;
+}
+@keyframes footerBreathCollapsed {
+    0%, 100% { opacity: 0.5; transform: rotate(180deg) translateY(0); }
+    50% { opacity: 1; transform: rotate(180deg) translateY(-2px); }
+}
+/* 展開時停止呼吸動畫 */
+.story-footer:not(.footer-collapsed) .footer-toggle-icon {
+    animation: none;
+    opacity: 0.6;
 }
 
 /* 收折內容 */
