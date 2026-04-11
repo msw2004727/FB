@@ -151,6 +151,40 @@ body.light-theme .scenario-new-btn:hover {
     flex-direction: column;
     gap: 0.4rem;
 }
+.scenario-save-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: stretch;
+}
+.scenario-save-row .scenario-save-btn {
+    flex: 1;
+    min-width: 0;
+}
+.scenario-delete-btn {
+    flex-shrink: 0;
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 10px;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+.scenario-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
+}
+body.light-theme .scenario-delete-btn {
+    background: rgba(239, 68, 68, 0.06);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+body.light-theme .scenario-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+}
 .scenario-save-btn {
     width: 100%;
     padding: 0.6rem 0.8rem;

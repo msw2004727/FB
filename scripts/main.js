@@ -143,19 +143,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         let savesHtml = '';
         for (const p of saves) {
             const icon = SCENARIO_ICONS[scenarioId] || 'fa-book';
-            savesHtml += `<button class="scenario-save-btn" data-profile-id="${p.id}">
-                <span class="scenario-save-icon"><i class="fas ${icon}"></i></span>
-                <span class="scenario-save-info">
-                    <span class="scenario-save-name">${p.username || '冒險者'}</span>
-                    <span class="scenario-save-detail">第 ${p.lastRound} 回</span>
-                </span>
-            </button>`;
+            savesHtml += `<div class="scenario-save-row">
+                <button class="scenario-save-btn" data-profile-id="${p.id}">
+                    <span class="scenario-save-icon"><i class="fas ${icon}"></i></span>
+                    <span class="scenario-save-info">
+                        <span class="scenario-save-name">${p.username || '冒險者'}</span>
+                        <span class="scenario-save-detail">第 ${p.lastRound} 回</span>
+                    </span>
+                </button>
+                <button class="scenario-delete-btn" data-delete-id="${p.id}" data-delete-name="${p.username || '冒險者'}" title="刪除存檔"><i class="fas fa-trash-can"></i></button>
+            </div>`;
         }
         scenarioSaves.innerHTML = savesHtml;
 
         // 綁定存檔按鈕事件
         scenarioSaves.querySelectorAll('.scenario-save-btn').forEach(btn => {
             btn.addEventListener('click', () => resolveChoice({ type: 'load', profileId: btn.dataset.profileId }));
+        });
+
+        // 綁定刪除按鈕事件
+        scenarioSaves.querySelectorAll('.scenario-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.deleteId;
+                const name = btn.dataset.deleteName;
+                if (!confirm(`確定刪除「${name}」的存檔？\n此操作無法復原。`)) return;
+                await clientDB.resetProfile(id);
+                await clientDB.profiles.delete(id);
+                // 從本地資料移除
+                const sid = selectedScenario;
+                if (profilesByScenario[sid]) {
+                    profilesByScenario[sid] = profilesByScenario[sid].filter(p => p.id !== id);
+                }
+                // 重新渲染
+                selectScenario(sid);
+            });
         });
 
         scenarioActions.style.display = '';
