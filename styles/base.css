@@ -1,6 +1,25 @@
 /* --- 字體與基礎設定 --- */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@400;700&display=swap');
 
+/* 禁止長按選取 + 雙指縮放 */
+html {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+}
+/* 允許輸入框內選取文字 */
+input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}
+/* 允許故事內容選取（方便複製） */
+#story-text-wrapper {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
 :root {
     --font-serif: 'Noto Serif TC', serif;
     --font-sans: 'Noto Sans TC', sans-serif;
