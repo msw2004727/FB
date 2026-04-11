@@ -227,6 +227,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // 重選劇本按鈕 → reload 回到劇本選擇頁
+    const reselectBtn = document.getElementById('reselect-scenario-btn');
+    if (reselectBtn) {
+        reselectBtn.addEventListener('click', () => {
+            if (confirm('返回劇本選擇頁面？\n（當前進度已自動儲存）')) {
+                window.location.reload();
+            }
+        });
+    }
+
     // --- API Key 彈窗邏輯 ---
     let _previousModel = null;
 

@@ -444,6 +444,33 @@ body.light-theme .player-gender-select {
 .player-identity-save-btn:hover {
     background: rgba(195, 169, 138, 0.4);
 }
+.reselect-scenario-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.4rem;
+    font-size: 0.8rem;
+    font-family: var(--font-sans);
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: inherit;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+.reselect-scenario-btn:hover {
+    opacity: 0.8;
+    border-color: rgba(255,255,255,0.3);
+}
+body.light-theme .reselect-scenario-btn {
+    border-color: rgba(0,0,0,0.15);
+}
+body.light-theme .reselect-scenario-btn:hover {
+    border-color: rgba(0,0,0,0.3);
+}
+.reselect-scenario-btn i {
+    margin-right: 0.3rem;
+}
 
 .info-card .money-container {
     display: flex;
