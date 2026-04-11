@@ -112,6 +112,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         scenarioContinue.style.display = '';
     }
 
+    // 將劇本選擇頁移到 body 層級（避免被 game-container[hidden] 遮蔽）
+    if (scenarioSelect.parentElement !== document.body) {
+        document.body.appendChild(scenarioSelect);
+    }
     scenarioSelect.style.display = 'flex';
 
     // 等待玩家選擇劇本或繼續
