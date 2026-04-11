@@ -11,6 +11,11 @@
     justify-content: center;
     animation: fadeIn 0.4s ease;
 }
+.scenario-theme-toggle {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
 .scenario-content {
     max-width: 420px;
     width: 90%;

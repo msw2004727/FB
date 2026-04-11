@@ -76,6 +76,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         _deferredInstallPrompt = null;
     });
 
+    // ── 劇本頁主題開關（進遊戲前就能切換）──────────────
+    const scenarioThemeSwitcher = document.getElementById('scenario-theme-switcher');
+    if (scenarioThemeSwitcher) {
+        const curTheme = localStorage.getItem('game_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        scenarioThemeSwitcher.checked = curTheme === 'dark';
+        scenarioThemeSwitcher.addEventListener('change', () => {
+            const t = scenarioThemeSwitcher.checked ? 'dark' : 'light';
+            localStorage.setItem('game_theme', t);
+            document.body.className = `${t}-theme`;
+        });
+    }
+
     // ── 劇本選擇 + 角色建立流程 ──────────────────────
 
     const savedProfileId = localStorage.getItem('wenjiang_active_profile');
