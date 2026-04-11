@@ -15,8 +15,10 @@ if (storyFooter) {
 
     const toggleBtn = document.getElementById('footer-toggle');
     if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'false');
         toggleBtn.addEventListener('click', () => {
-            storyFooter.classList.toggle('footer-collapsed');
+            const collapsed = storyFooter.classList.toggle('footer-collapsed');
+            toggleBtn.setAttribute('aria-expanded', String(!collapsed));
         });
     }
 
@@ -83,12 +85,33 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     actionSuggestion.textContent = roundData.suggestion ? `${sugPrefix}${roundData.suggestion}` : '';
 }
 
+let _prevMilestoneCount = -1;
 function updateMilestoneRunes(count) {
     const container = document.getElementById('milestone-runes');
     if (!container) return;
     const runes = container.querySelectorAll('.rune');
     const lit = typeof count === 'number' ? count : 0;
     runes.forEach((r, i) => r.classList.toggle('lit', i < lit));
+
+    // 新里程碑達成 → toast 通知
+    if (_prevMilestoneCount >= 0 && lit > _prevMilestoneCount) {
+        const scn = window.__activeScenario;
+        const title = scn?.milestoneDisplay?.title || '里程碑';
+        showToast(`✨ ${title} ${lit}/8 達成！`);
+    }
+    _prevMilestoneCount = lit;
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'game-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
 }
 
 export function appendMessageToStory(htmlContent, className, options = {}) {
@@ -368,6 +391,7 @@ function updateStatusBar(roundData) {
     updateTimeTheme(roundData.timeOfDay);
 }
 
+let _prevMorality = null;
 function updateMoralityBar(morality) {
     const safeMorality = Number.isFinite(Number(morality)) ? Number(morality) : 0;
     if (moralityBarIndicator) {
@@ -378,6 +402,12 @@ function updateMoralityBar(morality) {
         else if (safeMorality < -10) colorVar = document.body.classList.contains('dark-theme') ? 'var(--morality-evil-dark)' : 'var(--morality-evil-light)';
         else colorVar = document.body.classList.contains('dark-theme') ? 'var(--dark-text-secondary)' : 'var(--morality-neutral-light)';
         moralityBarIndicator.style.backgroundColor = colorVar;
+        // 善惡值變化閃光
+        if (_prevMorality !== null && safeMorality !== _prevMorality) {
+            moralityBarIndicator.classList.add('morality-flash');
+            setTimeout(() => moralityBarIndicator.classList.remove('morality-flash'), 800);
+        }
+        _prevMorality = safeMorality;
     }
     const valueEl = document.getElementById('morality-value');
     if (valueEl) valueEl.textContent = safeMorality > 0 ? `(+${safeMorality})` : `(${safeMorality})`;

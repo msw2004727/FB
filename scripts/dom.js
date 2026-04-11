@@ -55,5 +55,7 @@ export function initializeDOM() {
         dom.aiThinkingLoader = aiThinkingLoader; 
     } else if (dom.mainContent) {
         dom.aiThinkingLoader = dom.mainContent.querySelector('.ai-thinking-loader');
+    } else {
+        dom.aiThinkingLoader = null;
     }
 }

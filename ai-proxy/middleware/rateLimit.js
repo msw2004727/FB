@@ -21,7 +21,7 @@ function rateLimit(maxRequests = 30, windowMs = 60 * 1000) {
     if (cleanupInterval.unref) cleanupInterval.unref();
 
     return (req, res, next) => {
-        const ip = req.ip || req.connection.remoteAddress || 'unknown';
+        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
         const now = Date.now();
 
         let entry = hits.get(ip);

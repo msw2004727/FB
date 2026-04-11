@@ -6,6 +6,7 @@ const cors = require('cors');
 const aiRoutes = require('./routes/aiRoutes');
 
 const app = express();
+app.set('trust proxy', true); // Cloud Run / reverse proxy
 const PORT = process.env.PORT || 3001;
 
 // --- CORS ---
@@ -15,8 +16,8 @@ const corsOptions = corsOrigins === '*'
     : { origin: corsOrigins.split(',').map(o => o.trim()) };
 app.use(cors(corsOptions));
 
-// --- Body parser (200KB limit for large game contexts) ---
-app.use(express.json({ limit: '200kb' }));
+// --- Body parser ---
+app.use(express.json({ limit: '500kb' }));
 
 // --- Health check ---
 app.get('/health', (_req, res) => {

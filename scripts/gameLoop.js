@@ -228,9 +228,11 @@ export function switchToOptionsMode(options, morality) {
     if (dom.actionOptionButtons) {
         dom.actionOptionButtons.forEach((btn, i) => {
             const textEl = btn.querySelector('.option-text');
-            if (textEl) textEl.textContent = options[i] || '';
-            else btn.textContent = options[i] || '';
+            const optText = options[i] || '';
+            if (textEl) textEl.textContent = optText;
+            else btn.textContent = optText;
             btn.disabled = false;
+            btn.setAttribute('aria-label', `選項${['一','二','三'][i]}：${optText}`);
             // 善惡徽章
             const m = gameState.currentActionMorality[i] || 0;
             let badge = btn.querySelector('.morality-badge');

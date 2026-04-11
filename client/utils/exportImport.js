@@ -42,6 +42,10 @@ export function importSave() {
             try {
                 const text = await file.text();
                 const data = JSON.parse(text);
+                // 基本驗證
+                if (!data.profile || !data.profile.id) throw new Error('存檔缺少角色資料');
+                if (!data.gameSaves || !Array.isArray(data.gameSaves)) throw new Error('存檔缺少遊戲回合資料');
+                if (!data.exportVersion) throw new Error('存檔格式不正確（缺少版本號）');
                 const profileId = await clientDB.importAll(data);
                 resolve(profileId);
             } catch (error) {

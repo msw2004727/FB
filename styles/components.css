@@ -1298,6 +1298,35 @@ body.dark-theme .morality-bar-background {
 body.dark-theme .morality-bar-indicator {
     background-color: var(--morality-neutral-dark);
 }
+.morality-flash {
+    animation: moralityPulse 0.8s ease;
+}
+@keyframes moralityPulse {
+    0%, 100% { box-shadow: none; transform: translateX(-50%) scaleY(1); }
+    50% { box-shadow: 0 0 10px currentColor; transform: translateX(-50%) scaleY(1.8); }
+}
+
+/* --- Toast 通知 --- */
+.game-toast {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: var(--font-serif);
+    z-index: 99999;
+    opacity: 0;
+    transition: opacity 0.4s, transform 0.4s;
+    pointer-events: none;
+}
+.game-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
 
 #pc-content {
     padding: 0.65rem 0.75rem;

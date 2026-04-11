@@ -1,5 +1,5 @@
 // sw.js — Service Worker for 文字冒險故事 PWA
-const CACHE_NAME = 'wenjiang-v0.14';
+const CACHE_NAME = 'wenjiang-v0.15';
 
 // 靜態資源快取列表（使用相對路徑，相容 GitHub Pages 子目錄部署）
 const STATIC_ASSETS = [
@@ -26,6 +26,7 @@ const STATIC_ASSETS = [
     './client/ai/aiProxy.js',
     './client/utils/gameUtils.js',
     './client/utils/exportImport.js',
+    './client/scenarios/scenarios.js',
 ];
 
 // 安裝：快取靜態資源
