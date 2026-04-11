@@ -851,27 +851,15 @@ body.dark-theme #ai-model-selector:focus {
     box-shadow: 0 0 0 2px rgba(195, 169, 138, 0.2);
 }
 
-/* --- 動作建議 --- */
+/* --- 動作建議（書僮） --- */
 .action-suggestion {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    width: 100%;
-    background-color: rgba(237, 231, 222, 0.9);
-    backdrop-filter: blur(2px);
-    border-bottom: 1px solid var(--light-border);
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--light-text-secondary);
-    padding: 0.4rem 1rem;
-    box-sizing: border-box;
-    min-height: 1.2em;
-    transition: all 0.3s;
-    pointer-events: none;
+    padding: 0.4rem 0.75rem 0.2rem;
+    min-height: 1em;
 }
 body.dark-theme .action-suggestion {
-    background-color: rgba(34, 34, 38, 0.85);
-    border-bottom-color: var(--dark-border);
     color: var(--dark-text-secondary);
 }
 
