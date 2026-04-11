@@ -27,19 +27,30 @@ export function resume() { _paused = false; }
 export function switchEffect(timeOfDay) {
     cancelAnimationFrame(_animId);
     _particles = [];
-    _currentEffect = timeOfDay;
     if (!_canvas || !_ctx) return;
     _resize();
     _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
 
-    switch (timeOfDay) {
-        case '清晨': _initBirds(); break;
-        case '上午': _initDust(); break;
-        case '中午': _initHeatWave(); break;
-        case '下午': _initLeaves(); break;
-        case '黃昏': _initSunsetGlow(); break;
-        case '夜晚': _initFireflies(); break;
-        case '深夜': _initShootingStar(); break;
+    // 映射學園時辰到通用特效
+    const effectMap = {
+        '清晨': 'dawn', '早自習': 'dawn',
+        '上午': 'morning', '上午課': 'morning',
+        '中午': 'noon', '午休': 'noon',
+        '下午': 'afternoon', '下午課': 'afternoon',
+        '黃昏': 'dusk', '放學': 'dusk',
+        '夜晚': 'night', '晚自習': 'night',
+        '深夜': 'midnight', '宵禁後': 'midnight',
+    };
+    const effect = effectMap[timeOfDay];
+    _currentEffect = effect;
+    switch (effect) {
+        case 'dawn': _initBirds(); break;
+        case 'morning': _initDust(); break;
+        case 'noon': _initHeatWave(); break;
+        case 'afternoon': _initLeaves(); break;
+        case 'dusk': _initSunsetGlow(); break;
+        case 'night': _initFireflies(); break;
+        case 'midnight': _initShootingStar(); break;
         default: return;
     }
     _loop();
@@ -50,13 +61,13 @@ function _loop() {
     if (!_paused) {
         _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
         switch (_currentEffect) {
-            case '清晨': _drawBirds(); break;
-            case '上午': _drawDust(); break;
-            case '中午': _drawHeatWave(); break;
-            case '下午': _drawLeaves(); break;
-            case '黃昏': _drawSunsetGlow(); break;
-            case '夜晚': _drawFireflies(); break;
-            case '深夜': _drawShootingStar(); break;
+            case 'dawn': _drawBirds(); break;
+            case 'morning': _drawDust(); break;
+            case 'noon': _drawHeatWave(); break;
+            case 'afternoon': _drawLeaves(); break;
+            case 'dusk': _drawSunsetGlow(); break;
+            case 'night': _drawFireflies(); break;
+            case 'midnight': _drawShootingStar(); break;
         }
     }
     _animId = requestAnimationFrame(_loop);
@@ -97,7 +108,7 @@ function _drawBirds() {
     }
     if (allGone) {
         _particles = [];
-        setTimeout(() => { if (_currentEffect === '清晨') _spawnBirdGroup(); }, 6000 + Math.random() * 8000);
+        setTimeout(() => { if (_currentEffect === 'dawn') _spawnBirdGroup(); }, 6000 + Math.random() * 8000);
     }
 }
 
@@ -180,7 +191,7 @@ function _drawLeaves() {
         p.rot += p.rotSpeed;
         if (p.y > _canvas.height + 20) {
             _particles.splice(i, 1);
-            if (_currentEffect === '下午') setTimeout(_spawnLeaf, 2000 + Math.random() * 4000);
+            if (_currentEffect === 'afternoon') setTimeout(_spawnLeaf, 2000 + Math.random() * 4000);
             continue;
         }
         _ctx.save();

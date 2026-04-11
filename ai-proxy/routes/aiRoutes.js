@@ -91,7 +91,7 @@ const TASK_HANDLERS = {
 
     'narrative': (ctx) => {
         const { getNarrativePrompt } = require('../prompts/narrativePrompt');
-        const prompt = getNarrativePrompt(ctx.roundData);
+        const prompt = getNarrativePrompt(ctx.roundData, ctx.player?.scenario);
         return { prompt, json: false, configKey: 'narrative' };
     },
 
@@ -109,7 +109,7 @@ const TASK_HANDLERS = {
 
     'death-cause': (ctx) => {
         const { getDeathCausePrompt } = require('../prompts/deathCausePrompt');
-        const prompt = getDeathCausePrompt(ctx.username, ctx.lastRoundData);
+        const prompt = getDeathCausePrompt(ctx.username, ctx.lastRoundData, ctx.player?.scenario);
         return { prompt, json: false, configKey: 'deathCause' };
     },
 
@@ -246,7 +246,7 @@ const TASK_HANDLERS = {
 
     'location-generator': (ctx) => {
         const { getLocationGeneratorPrompt } = require('../prompts/locationGeneratorPrompt');
-        const prompt = getLocationGeneratorPrompt(ctx.locationName, ctx.locationType, ctx.worldSummary);
+        const prompt = getLocationGeneratorPrompt(ctx.locationName, ctx.locationType, ctx.worldSummary, ctx.player?.scenario);
         return { prompt, json: true, configKey: 'location' };
     },
 };

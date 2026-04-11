@@ -181,11 +181,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 套用劇本主題 CSS class
+    // 套用劇本主題 CSS class + 動態 UI 文字
     const activeScenario = getScenario(activeProfile.scenario || 'wuxia');
     if (activeScenario.themeClass) {
         document.body.classList.add(activeScenario.themeClass);
     }
+    // 善惡標籤動態化
+    const lblNeg = document.getElementById('morality-label-neg');
+    const lblPos = document.getElementById('morality-label-pos');
+    if (lblNeg && activeScenario.moralityLabels) lblNeg.textContent = activeScenario.moralityLabels.negative;
+    if (lblPos && activeScenario.moralityLabels) lblPos.textContent = activeScenario.moralityLabels.positive;
+    // 里程碑 tooltip 動態化
+    const milestoneEl = document.getElementById('milestone-runes');
+    if (milestoneEl && activeScenario.milestoneDisplay) {
+        milestoneEl.title = `${activeScenario.milestoneDisplay.title} — ${activeScenario.milestoneDisplay.description}`;
+    }
+    // 儲存劇本 ID 供 tips 等使用
+    localStorage.setItem('wenjiang_scenario', activeProfile.scenario || 'wuxia');
 
     // 設定活躍檔案
     gameEngine.setActiveProfile(activeProfile.id);

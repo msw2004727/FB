@@ -11,7 +11,7 @@ const getCombatPrompt = (playerProfile, combatState, playerAction) => {
         ? enemies.map(e => `${e.name} (HP:${e.hp}/${e.maxHp})`).join('、')
         : '無';
 
-    return `你是回合制武俠戰鬥引擎。請根據目前戰況，推進「一個回合」的戰鬥，並只輸出 JSON。
+    return `你是回合制戰鬥引擎。請根據目前戰況，推進「一個回合」的戰鬥，並只輸出 JSON。
 
 [核心規則]
 1. 根據玩家指定的策略(strategy)和目標(target)，描述一回合的戰鬥。

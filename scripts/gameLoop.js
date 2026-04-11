@@ -3,7 +3,7 @@
 import { api } from './api.js';
 import { gameState } from './gameState.js';
 import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
-import { gameTips } from './tips.js';
+import { getScenarioTips } from './tips.js';
 import { dom } from './dom.js';
 
 // ... (setLoading, handlePlayerDeath, startProactiveChat ????????) ...
@@ -52,10 +52,11 @@ export function setLoading(isLoading, text = '') {
             rotateDisclaimer();
             disclaimerInterval = setInterval(rotateDisclaimer, 10000);
 
+            const scenarioTips = getScenarioTips(localStorage.getItem('wenjiang_scenario') || 'wuxia');
             const rotateTip = () => {
-                if (gameTips.length > 0) {
+                if (scenarioTips.length > 0) {
                     if (loaderTipElement) {
-                        loaderTipElement.innerHTML = gameTips.sort(() => 0.5 - Math.random())[0];
+                        loaderTipElement.innerHTML = scenarioTips.sort(() => 0.5 - Math.random())[0];
                     }
                 }
             };

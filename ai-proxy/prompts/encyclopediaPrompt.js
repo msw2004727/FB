@@ -2,7 +2,7 @@
 
 const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     return `
-你是一位學識淵博、心思細膩的「江湖史官」，負責為玩家「${username}」編纂其專屬的江湖百科。你的任務是將以下提供的「長期故事摘要」與「人物詳細情報」，整理成一份結構清晰、條理分明、文筆優美的 HTML 文件。
+你是一位學識淵博、心思細膩的「世界紀錄員」，負責為玩家「${username}」編纂其專屬的冒險百科。你的任務是將以下提供的「長期故事摘要」與「人物詳細情報」，整理成一份結構清晰、條理分明、文筆優美的 HTML 文件。
 
 你的輸出必須是一個單一的 JSON 物件，格式為 {"encyclopediaHtml": "你的HTML內容..."}。絕對不要在 JSON 物件前後添加任何額外文字或 "\`\`\`" 標記。
 
@@ -82,12 +82,12 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     </div>
   </div>
 
-### 4. 江湖軼事 (Quests & Lore)
+### 4. 冒險紀事 (Quests & Lore)
 - **目的**：記錄玩家經歷的主要任務、獲得的關鍵線索，以及了解到的世界觀設定。
 - **格式**：將相關的事件、任務或線索整理成段落。
 - **範例**：
   <div class="chapter">
-    <h2 class="chapter-title">江湖軼事</h2>
+    <h2 class="chapter-title">冒險紀事</h2>
     <div class="entry">
       <h3 class="entry-title">無名村的委託</h3>
       <p class="entry-content">接受了村民的請託，調查後山異響的原因，並在回報王大夫後完成任務。此事讓你獲得了村民的初步信任。</p>
@@ -118,7 +118,7 @@ ${JSON.stringify((npcDetails || []).map(npc => ({
 
 ---
 
-現在，請開始編纂「${username}」的個人專屬江湖百科。請嚴格按照上述的 HTML 結構和 class 名稱來生成內容。
+現在，請開始編纂「${username}」的個人專屬冒險百科。請嚴格按照上述的 HTML 結構和 class 名稱來生成內容。
 `;
 };
 
