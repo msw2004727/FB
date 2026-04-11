@@ -180,8 +180,17 @@ function renderStatusRow(iconClass, label, value, { multiline = false } = {}) {
     `;
 }
 
-// --- 時辰 SVG 圖示 ---
+// --- 時辰 SVG 圖示（武俠 + 學園共用，依 timeOfDay 名稱匹配）---
 const TIME_SVGS = {
+    // 學園時辰 → 映射到相同視覺
+    '早自習'  : null, // 下方統一填入
+    '上午課'  : null,
+    '午休'    : null,
+    '下午課'  : null,
+    '放學'    : null,
+    '晚自習'  : null,
+    '宵禁後'  : null,
+    // 武俠時辰
     '清晨': `<svg viewBox="0 0 64 64" fill="none"><path d="M22 36 a10 10 0 0 1 20 0" fill="#FBBF24"/><line x1="32" y1="20" x2="32" y2="14" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="18" y1="28" x2="14" y2="24" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="46" y1="28" x2="50" y2="24" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="12" y1="36" x2="6" y2="36" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="36" x2="58" y2="36" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/></svg>`,
     '上午': `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="10" fill="#FBBF24"/><line x1="32" y1="14" x2="32" y2="8" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="56" x2="32" y2="50" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="32" x2="8" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="32" x2="56" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="19" y1="19" x2="15" y2="15" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="45" y1="45" x2="49" y2="49" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="45" y1="19" x2="49" y2="15" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="19" y1="45" x2="15" y2="49" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/></svg>`,
     '中午': `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="12" fill="#F59E0B"/><line x1="32" y1="12" x2="32" y2="6" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="58" x2="32" y2="52" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="12" y1="32" x2="6" y2="32" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="32" x2="58" y2="32" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="17" y1="17" x2="13" y2="13" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="47" y1="47" x2="51" y2="51" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="47" y1="17" x2="51" y2="13" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="17" y1="47" x2="13" y2="51" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/></svg>`,
@@ -190,6 +199,14 @@ const TIME_SVGS = {
     '夜晚': `<svg viewBox="0 0 64 64" fill="none"><path d="M36 12 A16 16 0 1 0 36 48 A12 12 0 1 1 36 12Z" fill="#CBD5E1"/><circle cx="16" cy="16" r="1.2" fill="#E2E8F0"/><circle cx="50" cy="12" r="1.5" fill="#E2E8F0"/><circle cx="48" cy="40" r="1" fill="#E2E8F0"/><circle cx="12" cy="44" r="1.2" fill="#E2E8F0"/><circle cx="54" cy="28" r="0.8" fill="#E2E8F0"/></svg>`,
     '深夜': `<svg viewBox="0 0 64 64" fill="none"><path d="M36 10 A18 18 0 1 0 36 50 A13 13 0 1 1 36 10Z" fill="#94A3B8"/><circle cx="14" cy="14" r="1.5" fill="#CBD5E1"/><circle cx="52" cy="10" r="1.8" fill="#CBD5E1"/><circle cx="8" cy="36" r="1.2" fill="#CBD5E1"/><circle cx="50" cy="44" r="1.5" fill="#CBD5E1"/><circle cx="56" cy="26" r="1" fill="#CBD5E1"/><circle cx="20" cy="50" r="0.8" fill="#CBD5E1"/><circle cx="42" cy="18" r="0.8" fill="#CBD5E1"/></svg>`,
 };
+// 學園時辰 → 複用對應的武俠時辰圖示
+TIME_SVGS['早自習'] = TIME_SVGS['清晨'];
+TIME_SVGS['上午課'] = TIME_SVGS['上午'];
+TIME_SVGS['午休']   = TIME_SVGS['中午'];
+TIME_SVGS['下午課'] = TIME_SVGS['下午'];
+TIME_SVGS['放學']   = TIME_SVGS['黃昏'];
+TIME_SVGS['晚自習'] = TIME_SVGS['夜晚'];
+TIME_SVGS['宵禁後'] = TIME_SVGS['深夜'];
 
 // --- 天氣 SVG 圖示（優先於時辰） ---
 const WEATHER_SVGS = {
@@ -226,6 +243,7 @@ function updateTimeIcon(timeOfDay, weather) {
 
 // --- 時辰主題 ---
 const TIME_CLASS_MAP = {
+    // 武俠時辰
     '清晨': 'time-dawn',
     '上午': 'time-morning',
     '中午': 'time-noon',
@@ -233,6 +251,14 @@ const TIME_CLASS_MAP = {
     '黃昏': 'time-dusk',
     '夜晚': 'time-night',
     '深夜': 'time-midnight',
+    // 學園時辰 → 映射到相同 CSS class
+    '早自習': 'time-dawn',
+    '上午課': 'time-morning',
+    '午休':   'time-noon',
+    '下午課': 'time-afternoon',
+    '放學':   'time-dusk',
+    '晚自習': 'time-night',
+    '宵禁後': 'time-midnight',
 };
 let _timeEffectsInited = false;
 let _lastTimeClass = '';
