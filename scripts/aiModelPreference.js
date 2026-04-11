@@ -36,14 +36,43 @@ export function normalizeAiModelValue(value, fallback = DEFAULT_AI_MODEL) {
     return VALID_AI_MODELS.has(normalized) ? normalized : fallback;
 }
 
+/** VIP 驗證碼（簡易哈希，非明文存放） */
+const VIP_HASH = '0017045f00007bbc00006fe1000061fc';
+function simpleHash(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(16).padStart(8, '0') + (str.length * 7919).toString(16).padStart(8, '0') +
+           Array.from(str).reduce((a, c) => ((a << 3) ^ c.charCodeAt(0)) >>> 0, 0).toString(16).padStart(8, '0') +
+           (str.split('').reverse().join('').length * 6271).toString(16).padStart(8, '0');
+}
+
+/** 驗證 VIP 密碼 */
+export function verifyVipPassword(password) {
+    return simpleHash(String(password).trim()) === VIP_HASH;
+}
+
+/** 啟用 VIP */
+export function activateVip() {
+    if (!canUseBrowserStorage()) return;
+    localStorage.setItem('wenjiang_vip', 'true');
+}
+
+/** 是否為 VIP */
+export function isVip() {
+    if (!canUseBrowserStorage()) return false;
+    return localStorage.getItem('wenjiang_vip') === 'true';
+}
+
 /** 此模型是否需要用戶手動提供 API Key */
 export function needsUserApiKey(model) {
+    if (isVip()) return false;
     return !SERVER_KEY_MODELS.has(normalizeAiModelValue(model));
 }
 
 /** 取得用戶為某模型儲存的 API Key */
 export function getStoredApiKey(model) {
     if (!canUseBrowserStorage()) return null;
+    if (isVip()) return null; // VIP 不帶 key → server 用自己的
     try {
         return localStorage.getItem(API_KEY_PREFIX + normalizeAiModelValue(model)) || null;
     } catch {

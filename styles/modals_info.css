@@ -445,6 +445,17 @@ body.dark-theme .apikey-btn.save {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
+.apikey-btn.vip {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+}
+.apikey-btn.vip:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}
+
 .apikey-note {
     display: block;
     font-size: 0.78rem;

@@ -6,7 +6,7 @@ import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
 import { handleApiError } from './uiUpdater.js';
-import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO } from './aiModelPreference.js';
+import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO, verifyVipPassword, activateVip, isVip } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
 import { exportSave, importSave, shouldRemindBackup, markBackupReminded } from '../client/utils/exportImport.js';
@@ -335,6 +335,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dom.aiModelSelector.value = _previousModel;
             }
             closeApiKeyModal();
+        });
+    }
+
+    // VIP 按鈕 → 輸入密碼啟用
+    const vipBtn = document.getElementById('apikey-vip-btn');
+    if (vipBtn) {
+        vipBtn.addEventListener('click', () => {
+            const pw = prompt('請輸入 VIP 驗證碼：');
+            if (pw === null) return;
+            if (verifyVipPassword(pw)) {
+                activateVip();
+                const model = dom.aiModelSelector.value;
+                setStoredAiModel(model);
+                _previousModel = model;
+                closeApiKeyModal();
+                alert('VIP 已啟用！所有 AI 模型皆可免費使用。');
+            } else {
+                alert('驗證碼錯誤。');
+            }
         });
     }
 
