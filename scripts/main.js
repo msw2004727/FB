@@ -76,23 +76,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         _deferredInstallPrompt = null;
     });
 
-    // 檢查是否有活躍檔案
+    // ── 劇本選擇 + 角色建立流程 ──────────────────────
+
     const savedProfileId = localStorage.getItem('wenjiang_active_profile');
     let activeProfile = null;
 
     if (savedProfileId) {
         activeProfile = await clientDB.profiles.get(savedProfileId);
     }
-
     if (!activeProfile) {
         const allProfiles = await clientDB.profiles.list();
-        if (allProfiles.length > 0) {
-            activeProfile = allProfiles[0];
-        }
+        if (allProfiles.length > 0) activeProfile = allProfiles[0];
     }
 
-    // 第一次遊玩 → 顯示開局建角畫面
-    if (!activeProfile) {
+    // 顯示劇本選擇頁面
+    const scenarioSelect = document.getElementById('scenario-select');
+    const scenarioContinue = document.getElementById('scenario-continue');
+    const scenarioContinueBtn = document.getElementById('scenario-continue-btn');
+
+    // 有存檔 → 顯示「繼續冒險」按鈕
+    if (activeProfile) {
+        scenarioContinue.style.display = '';
+    }
+
+    scenarioSelect.style.display = 'flex';
+
+    // 等待玩家選擇劇本或繼續
+    const scenarioChoice = await new Promise((resolve) => {
+        // 繼續按鈕
+        if (scenarioContinueBtn) {
+            scenarioContinueBtn.addEventListener('click', () => resolve('continue'));
+        }
+        // 劇本按鈕（目前只有武俠可點）
+        scenarioSelect.querySelectorAll('.scenario-btn:not(.locked)').forEach(btn => {
+            btn.addEventListener('click', () => resolve(btn.dataset.scenario));
+        });
+    });
+
+    scenarioSelect.style.display = 'none';
+
+    // 繼續上次 → 直接進遊戲
+    if (scenarioChoice === 'continue' && activeProfile) {
+        // 跳過建角，直接往下走
+    } else {
+        // 新劇本 → 顯示建角畫面
         const introModal = document.getElementById('intro-modal');
         const introNameInput = document.getElementById('intro-name-input');
         const introConfirmBtn = document.getElementById('intro-name-confirm');
@@ -111,23 +138,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             introGenderBtns.style.display = '';
         }
 
-        // 輸入時即時啟用/禁用確認按鈕
         introNameInput.addEventListener('input', () => {
             introConfirmBtn.disabled = !introNameInput.value.trim();
         });
-
-        // Enter 鍵確認（桌面）
         introNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.isComposing) {
-                e.preventDefault();
-                confirmName();
-            }
+            if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); confirmName(); }
         });
-
-        // 確認按鈕點擊（手機友好）
         introConfirmBtn.addEventListener('click', confirmName);
 
-        // 選擇性別 → 建立角色並開始遊戲
         const genderSelected = await new Promise((resolve) => {
             introGenderBtns.querySelectorAll('.intro-gender-btn').forEach(btn => {
                 btn.addEventListener('click', () => resolve(btn.dataset.gender));
@@ -137,8 +155,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const playerName = introNameInput.value.trim() || '無名俠客';
         introModal.style.display = 'none';
 
-        const result = await gameEngine.createNewGame(playerName, genderSelected);
-        activeProfile = result.profile;
+        // 如果已有存檔，先重置再建新局
+        if (activeProfile) {
+            await gameEngine.startNewGame();
+            await clientDB.profiles.update(activeProfile.id, { username: playerName, gender: genderSelected });
+            activeProfile = await clientDB.profiles.get(activeProfile.id);
+        } else {
+            const result = await gameEngine.createNewGame(playerName, genderSelected);
+            activeProfile = result.profile;
+        }
     }
 
     // 設定活躍檔案

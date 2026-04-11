@@ -380,6 +380,53 @@
             </div>
         </div>
 
+        <!-- 劇本選擇 -->
+        <div id="scenario-select" class="scenario-overlay" style="display:none;">
+            <div class="scenario-content">
+                <div class="scenario-header">
+                    <h1 class="scenario-title">AI 文字江湖</h1>
+                    <p class="scenario-subtitle">選擇你的世界</p>
+                </div>
+                <div class="scenario-grid">
+                    <button class="scenario-btn active" data-scenario="wuxia">
+                        <i class="fas fa-yin-yang scenario-icon"></i>
+                        <span class="scenario-name">武俠</span>
+                        <span class="scenario-desc">穿越古代武林</span>
+                    </button>
+                    <button class="scenario-btn locked" data-scenario="school" disabled>
+                        <i class="fas fa-school scenario-icon"></i>
+                        <span class="scenario-name">學園</span>
+                        <span class="scenario-tag">籌畫中</span>
+                    </button>
+                    <button class="scenario-btn locked" data-scenario="mecha" disabled>
+                        <i class="fas fa-robot scenario-icon"></i>
+                        <span class="scenario-name">機甲</span>
+                        <span class="scenario-tag">籌畫中</span>
+                    </button>
+                    <button class="scenario-btn locked" data-scenario="modern" disabled>
+                        <i class="fas fa-city scenario-icon"></i>
+                        <span class="scenario-name">現代</span>
+                        <span class="scenario-tag">籌畫中</span>
+                    </button>
+                    <button class="scenario-btn locked" data-scenario="animal" disabled>
+                        <i class="fas fa-paw scenario-icon"></i>
+                        <span class="scenario-name">動物</span>
+                        <span class="scenario-tag">籌畫中</span>
+                    </button>
+                    <button class="scenario-btn locked" data-scenario="hero" disabled>
+                        <i class="fas fa-mask scenario-icon"></i>
+                        <span class="scenario-name">英雄</span>
+                        <span class="scenario-tag">籌畫中</span>
+                    </button>
+                </div>
+                <div id="scenario-continue" class="scenario-continue" style="display:none;">
+                    <button id="scenario-continue-btn" class="scenario-continue-btn">
+                        <i class="fas fa-play"></i> 繼續上次的冒險
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- 開局角色建立 -->
         <div id="intro-modal" class="intro-modal-overlay" style="display:none;">
             <div class="intro-modal-content">

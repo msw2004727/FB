@@ -1,5 +1,121 @@
 /* styles/modals_feedback.css */
 
+/* --- 劇本選擇頁面 --- */
+.scenario-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #0d0d1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.4s ease;
+}
+.scenario-content {
+    max-width: 420px;
+    width: 90%;
+    padding: 2rem 1.5rem;
+    text-align: center;
+}
+.scenario-header {
+    margin-bottom: 1.8rem;
+}
+.scenario-title {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    color: #c3a98a;
+    margin: 0 0 0.3rem;
+    letter-spacing: 0.15em;
+}
+.scenario-subtitle {
+    font-size: 0.9rem;
+    color: #888;
+    margin: 0;
+}
+.scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+}
+.scenario-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 1.2rem 0.5rem;
+    border: 1px solid rgba(195, 169, 138, 0.25);
+    border-radius: 10px;
+    background: rgba(195, 169, 138, 0.06);
+    color: #e0d5c8;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: var(--font-sans);
+}
+.scenario-btn:not(.locked):hover {
+    border-color: #c3a98a;
+    background: rgba(195, 169, 138, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+.scenario-btn:not(.locked):active {
+    transform: translateY(0);
+}
+.scenario-btn.active {
+    border-color: #c3a98a;
+    background: rgba(195, 169, 138, 0.12);
+}
+.scenario-btn.locked {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.scenario-icon {
+    font-size: 1.6rem;
+    color: #c3a98a;
+}
+.scenario-btn.locked .scenario-icon {
+    color: #666;
+}
+.scenario-name {
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-family: var(--font-serif);
+}
+.scenario-desc {
+    font-size: 0.75rem;
+    color: #999;
+}
+.scenario-tag {
+    font-size: 0.65rem;
+    color: #666;
+    background: rgba(255,255,255,0.05);
+    padding: 0.1rem 0.5rem;
+    border-radius: 10px;
+}
+.scenario-continue {
+    margin-top: 1.5rem;
+}
+.scenario-continue-btn {
+    width: 100%;
+    padding: 0.85rem;
+    font-size: 1rem;
+    font-family: var(--font-serif);
+    background: linear-gradient(135deg, rgba(195,169,138,0.2), rgba(195,169,138,0.08));
+    border: 1px solid rgba(195,169,138,0.35);
+    border-radius: 10px;
+    color: #c3a98a;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: 0.08em;
+}
+.scenario-continue-btn:hover {
+    background: linear-gradient(135deg, rgba(195,169,138,0.3), rgba(195,169,138,0.15));
+    border-color: #c3a98a;
+}
+.scenario-continue-btn i {
+    margin-right: 0.4rem;
+}
+
 /* --- 統一的 AI 回應等待動畫 --- */
 .ai-thinking-loader {
     position: absolute;
