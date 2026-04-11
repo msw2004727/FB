@@ -316,7 +316,8 @@ router.post('/generate', async (req, res, next) => {
                 callAI(modelToUse, getOptionsPrompt(
                     context.playerAction || '',
                     context.recentHistory?.[context.recentHistory.length - 1]?.EVT || '',
-                    context.player?.PC || ''
+                    context.player?.PC || '',
+                    context.player?.scenario || 'wuxia'
                 ), true, {}, apiKey || null),
             ];
             if (evalPrompt) promises.push(callAI('minimax', evalPrompt, true, {}));
