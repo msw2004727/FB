@@ -1,0 +1,29 @@
+/* styles/themes/modern.css — 現代主題：都市灰×霓虹琥珀×冷調 */
+
+body.modern-theme {
+    --font-serif: 'Noto Sans TC', sans-serif;
+
+    /* 淺色（水泥灰基調 + 琥珀點綴） */
+    --light-bg: #eceef1;
+    --light-surface-bg: #f8f9fa;
+    --light-text-primary: #212529;
+    --light-text-secondary: #6c757d;
+    --light-accent: #d4880f;
+    --light-border: #ced4da;
+
+    /* 深色（都市夜景：深灰 + 霓虹琥珀） */
+    --dark-bg: #111214;
+    --dark-surface-bg: #1a1c20;
+    --dark-text-primary: #dee2e6;
+    --dark-text-secondary: #868e96;
+    --dark-accent: #f0a530;
+    --dark-border: #2d3035;
+
+    /* 軸線：人情(暖琥珀) / 務實(冷鋼藍) */
+    --morality-justice-light: #d4880f;
+    --morality-evil-light: #4a7fb5;
+    --morality-neutral-light: #6c757d;
+    --morality-justice-dark: #f0a530;
+    --morality-evil-dark: #6ba3d6;
+    --morality-neutral-dark: #868e96;
+}

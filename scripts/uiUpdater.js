@@ -216,6 +216,26 @@ TIME_SVGS['第二班哨'] = TIME_SVGS['下午'];
 TIME_SVGS['黃昏警戒'] = TIME_SVGS['黃昏'];
 TIME_SVGS['夜間值勤'] = TIME_SVGS['夜晚'];
 TIME_SVGS['深夜靜默'] = TIME_SVGS['深夜'];
+// 動物時辰
+TIME_SVGS['晨露'] = TIME_SVGS['清晨'];
+TIME_SVGS['日昇'] = TIME_SVGS['上午'];
+TIME_SVGS['日中'] = TIME_SVGS['中午'];
+TIME_SVGS['午憩'] = TIME_SVGS['下午'];
+TIME_SVGS['斜陽'] = TIME_SVGS['黃昏'];
+TIME_SVGS['暮歸'] = TIME_SVGS['夜晚'];
+TIME_SVGS['月隱'] = TIME_SVGS['深夜'];
+// 現代時辰
+TIME_SVGS['早晨通勤'] = TIME_SVGS['清晨'];
+TIME_SVGS['下班尖峰'] = TIME_SVGS['黃昏'];
+TIME_SVGS['夜生活'] = TIME_SVGS['夜晚'];
+// 英雄時辰
+TIME_SVGS['晨光時段'] = TIME_SVGS['清晨'];
+TIME_SVGS['上午巡邏'] = TIME_SVGS['上午'];
+TIME_SVGS['正午休整'] = TIME_SVGS['中午'];
+TIME_SVGS['下午任務'] = TIME_SVGS['下午'];
+TIME_SVGS['黃昏警備'] = TIME_SVGS['黃昏'];
+TIME_SVGS['夜間值守'] = TIME_SVGS['夜晚'];
+TIME_SVGS['深夜潛行'] = TIME_SVGS['深夜'];
 
 // --- 天氣 SVG 圖示（優先於時辰） ---
 const WEATHER_SVGS = {
@@ -276,6 +296,26 @@ const TIME_CLASS_MAP = {
     '黃昏警戒': 'time-dusk',
     '夜間值勤': 'time-night',
     '深夜靜默': 'time-midnight',
+    // 動物時辰
+    '晨露': 'time-dawn',
+    '日昇': 'time-morning',
+    '日中': 'time-noon',
+    '午憩': 'time-afternoon',
+    '斜陽': 'time-dusk',
+    '暮歸': 'time-night',
+    '月隱': 'time-midnight',
+    // 現代時辰
+    '早晨通勤': 'time-dawn',
+    '下班尖峰': 'time-dusk',
+    '夜生活': 'time-night',
+    // 英雄時辰
+    '晨光時段': 'time-dawn',
+    '上午巡邏': 'time-morning',
+    '正午休整': 'time-noon',
+    '下午任務': 'time-afternoon',
+    '黃昏警備': 'time-dusk',
+    '夜間值守': 'time-night',
+    '深夜潛行': 'time-midnight',
 };
 let _timeEffectsInited = false;
 let _lastTimeClass = '';

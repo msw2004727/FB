@@ -1,0 +1,29 @@
+/* styles/themes/hero.css — 英雄主題：深紫×金色×暗夜 */
+
+body.hero-theme {
+    --font-serif: 'Noto Sans TC', sans-serif;
+
+    /* 淺色（金盾色基調） */
+    --light-bg: #f8f5ee;
+    --light-surface-bg: #fffdf7;
+    --light-text-primary: #2a2318;
+    --light-text-secondary: #6b5e4f;
+    --light-accent: #b8860b;
+    --light-border: #ddd5c4;
+
+    /* 深色（暗夜英雄基調） */
+    --dark-bg: #0d0a1a;
+    --dark-surface-bg: #1a1430;
+    --dark-text-primary: #e0dce8;
+    --dark-text-secondary: #8a80a4;
+    --dark-accent: #c4a24e;
+    --dark-border: #2e2548;
+
+    /* 軸線：正義(金色) / 真相(紫色) */
+    --morality-justice-light: #b8860b;
+    --morality-evil-light: #7c3aed;
+    --morality-neutral-light: #6b6680;
+    --morality-justice-dark: #daa520;
+    --morality-evil-dark: #a78bfa;
+    --morality-neutral-dark: #8a80a4;
+}

@@ -14,11 +14,14 @@ const getOutputStructureRule = (promptData) => {
     if (scenario && scenario.npcAddressExamples) {
         npcAddress = scenario.npcAddressExamples;
         evtExamples = scenario.evtExamples;
-        locExample = scenario.id === 'school'
-            ? '["私立青嵐高中", "教學大樓", "二年三班教室"]'
-            : scenario.id === 'mecha'
-            ? '["暮雲城", "零號格納庫", "駕駛艙"]'
-            : '["無名村", "藥鋪"]';
+        const LOC_EXAMPLES = {
+            school: '["私立青嵐高中", "教學大樓", "二年三班教室"]',
+            mecha: '["暮雲城", "零號格納庫", "駕駛艙"]',
+            hero: '["英雄管理局", "第七分局", "D-7諮商室"]',
+            animal: '["翠谷靈域", "東林", "醒魂坡"]',
+            modern: '["台北", "信義區", "市政府站"]',
+        };
+        locExample = LOC_EXAMPLES[scenario.id] || '["無名村", "藥鋪"]';
     } else {
         npcAddress = '「少俠」「兄台」「姑娘」「這位公子」「閣下」';
         evtExamples = '如「初探無名村」「偶遇黑衣人」「酒館密談」「夜襲危機」';

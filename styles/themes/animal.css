@@ -1,0 +1,29 @@
+/* styles/themes/animal.css — 動物主題：森林綠×泥土棕×晨光金 */
+
+body.animal-theme {
+    --font-serif: 'Noto Sans TC', sans-serif;
+
+    /* 淺色（森林晨光基調） */
+    --light-bg: #eef5e9;
+    --light-surface-bg: #f8faf5;
+    --light-text-primary: #1a2e1a;
+    --light-text-secondary: #5a7a52;
+    --light-accent: #4a8c3f;
+    --light-border: #c2d4b8;
+
+    /* 深色（夜間森林基調） */
+    --dark-bg: #0c1a0c;
+    --dark-surface-bg: #142114;
+    --dark-text-primary: #d0e0c8;
+    --dark-text-secondary: #7a9a70;
+    --dark-accent: #6abf5e;
+    --dark-border: #2a3a28;
+
+    /* 軸線：共生(翠綠) / 獨行(琥珀) */
+    --morality-justice-light: #2d8a4e;
+    --morality-evil-light: #c0862b;
+    --morality-neutral-light: #7a9a70;
+    --morality-justice-dark: #4ade80;
+    --morality-evil-dark: #f0b060;
+    --morality-neutral-dark: #7a9a70;
+}

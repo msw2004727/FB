@@ -31,7 +31,7 @@ export function switchEffect(timeOfDay) {
     _resize();
     _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
 
-    // 映射學園時辰到通用特效
+    // 映射各劇本時辰到通用特效
     const effectMap = {
         '清晨': 'dawn', '早自習': 'dawn',
         '上午': 'morning', '上午課': 'morning',
@@ -40,6 +40,18 @@ export function switchEffect(timeOfDay) {
         '黃昏': 'dusk', '放學': 'dusk',
         '夜晚': 'night', '晚自習': 'night',
         '深夜': 'midnight', '宵禁後': 'midnight',
+        // 機甲
+        '黎明戒備': 'dawn', '第一班哨': 'morning', '正午輪替': 'noon',
+        '第二班哨': 'afternoon', '黃昏警戒': 'dusk', '夜間值勤': 'night', '深夜靜默': 'midnight',
+        // 英雄
+        '晨光時段': 'dawn', '上午巡邏': 'morning', '正午休整': 'noon',
+        '下午任務': 'afternoon', '黃昏警備': 'dusk', '夜間值守': 'night', '深夜潛行': 'midnight',
+        // 現代
+        '早晨通勤': 'dawn', '上午工時': 'morning', '午餐時間': 'noon',
+        '下午工時': 'afternoon', '傍晚下班': 'dusk', '夜間自由': 'night', '深夜時分': 'midnight',
+        // 動物
+        '晨露': 'dawn', '日出覓食': 'morning', '正午休憩': 'noon',
+        '午後巡域': 'afternoon', '黃昏歸巢': 'dusk', '月夜': 'night', '子夜': 'midnight',
     };
     const effect = effectMap[timeOfDay];
     _currentEffect = effect;

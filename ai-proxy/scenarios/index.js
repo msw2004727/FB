@@ -4,8 +4,11 @@
 const wuxia = require('./wuxia');
 const school = require('./school');
 const mecha = require('./mecha');
+const animal = require('./animal');
+const modern = require('./modern');
+const hero = require('./hero');
 
-const SCENARIOS = { wuxia, school, mecha };
+const SCENARIOS = { wuxia, school, mecha, animal, modern, hero };
 
 function getScenario(scenarioId) {
     return SCENARIOS[scenarioId] || SCENARIOS.wuxia;
