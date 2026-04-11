@@ -1,5 +1,5 @@
 // sw.js — Service Worker for 文字冒險故事 PWA
-const CACHE_NAME = 'wenjiang-v0.22';
+const CACHE_NAME = 'wenjiang-v0.23';
 
 // 靜態資源快取列表（使用相對路徑，相容 GitHub Pages 子目錄部署）
 const STATIC_ASSETS = [

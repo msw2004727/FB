@@ -746,6 +746,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     if (!confirm('確定要重新開始嗎？\n（你可以先把結局截圖留念）')) return;
                 }
+                // 刪除死亡存檔再重新載入
+                try {
+                    const pid = localStorage.getItem('wenjiang_active_profile');
+                    if (pid) {
+                        await clientDB.resetProfile(pid);
+                        await clientDB.profiles.delete(pid);
+                        localStorage.removeItem('wenjiang_active_profile');
+                    }
+                } catch {}
                 window.location.reload();
             });
         }
