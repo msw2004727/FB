@@ -93,50 +93,85 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let activeProfile = null;
 
-    // 顯示劇本選擇頁面
+    // ── 劇本選擇（兩步驟：先選劇本 → 再選 NEW 或繼續）──
     const scenarioSelect = document.getElementById('scenario-select');
+    const scenarioActions = document.getElementById('scenario-actions');
+    const scenarioNewBtn = document.getElementById('scenario-new-btn');
     const scenarioSaves = document.getElementById('scenario-saves');
-
-    // 列出所有存檔
-    const allProfiles = await clientDB.profiles.list();
     const SCENARIO_ICONS = { wuxia: 'fa-yin-yang', school: 'fa-school', mecha: 'fa-robot', modern: 'fa-city', animal: 'fa-paw', hero: 'fa-mask' };
 
-    if (allProfiles.length > 0 && scenarioSaves) {
-        let savesHtml = '';
-        for (const p of allProfiles) {
-            const scn = getScenario(p.scenario || 'wuxia');
-            const icon = SCENARIO_ICONS[p.scenario] || 'fa-book';
-            const lastSave = await clientDB.saves.getLatest(p.id);
-            const round = lastSave?.R || 0;
-            savesHtml += `<button class="scenario-save-btn" data-profile-id="${p.id}">
-                <span class="scenario-save-icon"><i class="fas ${icon}"></i></span>
-                <span class="scenario-save-info">
-                    <span class="scenario-save-name">${scn.name} — ${p.username || '冒險者'}</span>
-                    <span class="scenario-save-detail">第 ${round} 回</span>
-                </span>
-            </button>`;
-        }
-        scenarioSaves.innerHTML = savesHtml;
-        scenarioSaves.style.display = '';
+    // 預載所有存檔
+    const allProfiles = await clientDB.profiles.list();
+    const profilesByScenario = {};
+    for (const p of allProfiles) {
+        const sid = p.scenario || 'wuxia';
+        if (!profilesByScenario[sid]) profilesByScenario[sid] = [];
+        const lastSave = await clientDB.saves.getLatest(p.id);
+        profilesByScenario[sid].push({ ...p, lastRound: lastSave?.R || 0 });
     }
 
-    // 將劇本選擇頁移到 body 層級（避免被 game-container[hidden] 遮蔽）
     if (scenarioSelect.parentElement !== document.body) {
         document.body.appendChild(scenarioSelect);
     }
     scenarioSelect.style.display = 'flex';
 
-    // 等待玩家選擇：載入存檔 or 選新劇本
-    const choice = await new Promise((resolve) => {
-        // 存檔按鈕
-        if (scenarioSaves) {
-            scenarioSaves.querySelectorAll('.scenario-save-btn').forEach(btn => {
-                btn.addEventListener('click', () => resolve({ type: 'load', profileId: btn.dataset.profileId }));
-            });
+    let selectedScenario = null;
+
+    // Step 1: 點劇本按鈕 → 預覽主題 + 顯示 NEW/存檔
+    function selectScenario(scenarioId) {
+        selectedScenario = scenarioId;
+        const scn = getScenario(scenarioId);
+
+        // 切換主題預覽
+        document.body.classList.remove('school-theme', 'mecha-theme');
+        if (scn.themeClass) document.body.classList.add(scn.themeClass);
+
+        // 高亮選中的按鈕
+        scenarioSelect.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('selected'));
+        const btn = scenarioSelect.querySelector(`.scenario-btn[data-scenario="${scenarioId}"]`);
+        if (btn) btn.classList.add('selected');
+
+        // 顯示該劇本的存檔
+        const saves = profilesByScenario[scenarioId] || [];
+        let savesHtml = '';
+        for (const p of saves) {
+            const icon = SCENARIO_ICONS[scenarioId] || 'fa-book';
+            savesHtml += `<button class="scenario-save-btn" data-profile-id="${p.id}">
+                <span class="scenario-save-icon"><i class="fas ${icon}"></i></span>
+                <span class="scenario-save-info">
+                    <span class="scenario-save-name">${p.username || '冒險者'}</span>
+                    <span class="scenario-save-detail">第 ${p.lastRound} 回</span>
+                </span>
+            </button>`;
         }
-        // 新劇本按鈕
+        scenarioSaves.innerHTML = savesHtml;
+
+        // 綁定存檔按鈕事件
+        scenarioSaves.querySelectorAll('.scenario-save-btn').forEach(btn => {
+            btn.addEventListener('click', () => resolveChoice({ type: 'load', profileId: btn.dataset.profileId }));
+        });
+
+        scenarioActions.style.display = '';
+    }
+
+    // Step 2: 等待最終選擇（NEW 或載入存檔）
+    let resolveChoice;
+    const choice = await new Promise((resolve) => {
+        resolveChoice = resolve;
+
+        // 劇本按鈕 → 預覽（不直接開始遊戲）
         scenarioSelect.querySelectorAll('.scenario-btn:not(.locked)').forEach(btn => {
-            btn.addEventListener('click', () => resolve({ type: 'new', scenario: btn.dataset.scenario }));
+            btn.addEventListener('click', () => selectScenario(btn.dataset.scenario));
+        });
+
+        // NEW 按鈕
+        scenarioNewBtn.addEventListener('click', () => {
+            if (!selectedScenario) return;
+            const existingSaves = profilesByScenario[selectedScenario] || [];
+            if (existingSaves.length > 0) {
+                if (!confirm('此劇本已有存檔，開始新遊戲將覆蓋舊存檔。\n確定要重新開始嗎？')) return;
+            }
+            resolve({ type: 'new', scenario: selectedScenario });
         });
     });
 
@@ -144,7 +179,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelector('.game-container').removeAttribute('hidden');
 
     if (choice.type === 'load') {
-        // 載入已有存檔
         activeProfile = await clientDB.profiles.get(choice.profileId);
     } else {
         // 新劇本 → 建角
@@ -188,9 +222,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const playerName = introNameInput.value.trim() || '冒險者';
         introModal.style.display = 'none';
 
-        // 永遠建新 profile（不覆蓋舊存檔）
-        const result = await gameEngine.createNewGame(playerName, genderSelected, choice.scenario);
-        activeProfile = result.profile;
+        // 覆蓋舊存檔（如果有）
+        const existingSaves = profilesByScenario[choice.scenario] || [];
+        if (existingSaves.length > 0) {
+            const old = existingSaves[0];
+            gameEngine.setActiveProfile(old.id);
+            await clientDB.profiles.update(old.id, { username: playerName, gender: genderSelected });
+            await gameEngine.startNewGame(choice.scenario);
+            activeProfile = await clientDB.profiles.get(old.id);
+        } else {
+            const result = await gameEngine.createNewGame(playerName, genderSelected, choice.scenario);
+            activeProfile = result.profile;
+        }
     }
 
     // 套用劇本主題 CSS class + 動態 UI 文字
