@@ -182,76 +182,13 @@ function renderStatusRow(iconClass, label, value, { multiline = false } = {}) {
 
 // --- 時辰 SVG 圖示 ---
 const TIME_SVGS = {
-    '清晨': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <line x1="32" y1="44" x2="32" y2="50" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="18" y1="40" x2="14" y2="44" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="46" y1="40" x2="50" y2="44" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="12" y1="32" x2="6" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="52" y1="32" x2="58" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="M22 32 a10 10 0 0 1 20 0" fill="#FBBF24"/>
-        <line x1="4" y1="32" x2="60" y2="32" stroke="#D97706" stroke-width="1.5"/>
-    </svg>`,
-    '上午': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="32" cy="30" r="11" fill="#FBBF24"/>
-        <line x1="32" y1="12" x2="32" y2="6" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="32" y1="48" x2="32" y2="54" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="14" y1="30" x2="8" y2="30" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="50" y1="30" x2="56" y2="30" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="19" y1="17" x2="15" y2="13" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="45" y1="43" x2="49" y2="47" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="45" y1="17" x2="49" y2="13" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="19" y1="43" x2="15" y2="47" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-    </svg>`,
-    '中午': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="32" cy="26" r="13" fill="#F59E0B"/>
-        <line x1="32" y1="6" x2="32" y2="2" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="32" y1="46" x2="32" y2="50" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="12" y1="26" x2="8" y2="26" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="52" y1="26" x2="56" y2="26" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="17" y1="11" x2="14" y2="8" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="47" y1="41" x2="50" y2="44" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="47" y1="11" x2="50" y2="8" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="17" y1="41" x2="14" y2="44" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="22" y1="56" x2="42" y2="56" stroke="#D97706" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-    </svg>`,
-    '下午': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="32" cy="30" r="11" fill="#FBBF24"/>
-        <line x1="32" y1="12" x2="32" y2="6" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="32" y1="48" x2="32" y2="54" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="14" y1="30" x2="8" y2="30" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="50" y1="30" x2="56" y2="30" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="19" y1="17" x2="15" y2="13" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="45" y1="43" x2="49" y2="47" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="45" y1="17" x2="49" y2="13" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="19" y1="43" x2="15" y2="47" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-    </svg>`,
-    '黃昏': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <line x1="4" y1="40" x2="60" y2="40" stroke="#DC2626" stroke-width="1.5"/>
-        <path d="M20 40 a12 12 0 0 1 24 0" fill="#F97316"/>
-        <line x1="32" y1="22" x2="32" y2="16" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="18" y1="30" x2="13" y2="26" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="46" y1="30" x2="51" y2="26" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/>
-        <rect x="4" y="40" width="56" height="16" fill="url(#dusk)" rx="2"/>
-        <defs><linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F97316" stop-opacity="0.3"/><stop offset="100%" stop-color="#7C3AED" stop-opacity="0.2"/></linearGradient></defs>
-    </svg>`,
-    '夜晚': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M36 12 A16 16 0 1 0 36 48 A12 12 0 1 1 36 12Z" fill="#CBD5E1"/>
-        <circle cx="16" cy="16" r="1" fill="#E2E8F0"/>
-        <circle cx="50" cy="12" r="1.2" fill="#E2E8F0"/>
-        <circle cx="48" cy="40" r="0.8" fill="#E2E8F0"/>
-        <circle cx="12" cy="44" r="1" fill="#E2E8F0"/>
-        <circle cx="54" cy="28" r="0.6" fill="#E2E8F0"/>
-    </svg>`,
-    '深夜': `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M36 10 A18 18 0 1 0 36 50 A13 13 0 1 1 36 10Z" fill="#94A3B8"/>
-        <circle cx="14" cy="14" r="1.2" fill="#CBD5E1"/>
-        <circle cx="52" cy="10" r="1.5" fill="#CBD5E1"/>
-        <circle cx="8" cy="36" r="1" fill="#CBD5E1"/>
-        <circle cx="50" cy="44" r="1.2" fill="#CBD5E1"/>
-        <circle cx="56" cy="26" r="0.8" fill="#CBD5E1"/>
-        <circle cx="20" cy="50" r="0.7" fill="#CBD5E1"/>
-        <circle cx="42" cy="18" r="0.6" fill="#CBD5E1"/>
-    </svg>`,
+    '清晨': `<svg viewBox="0 0 64 64" fill="none"><path d="M22 36 a10 10 0 0 1 20 0" fill="#FBBF24"/><line x1="32" y1="20" x2="32" y2="14" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="18" y1="28" x2="14" y2="24" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="46" y1="28" x2="50" y2="24" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="12" y1="36" x2="6" y2="36" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="36" x2="58" y2="36" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+    '上午': `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="10" fill="#FBBF24"/><line x1="32" y1="14" x2="32" y2="8" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="56" x2="32" y2="50" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="32" x2="8" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="32" x2="56" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="19" y1="19" x2="15" y2="15" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="45" y1="45" x2="49" y2="49" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="45" y1="19" x2="49" y2="15" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="19" y1="45" x2="15" y2="49" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+    '中午': `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="12" fill="#F59E0B"/><line x1="32" y1="12" x2="32" y2="6" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="58" x2="32" y2="52" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="12" y1="32" x2="6" y2="32" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="32" x2="58" y2="32" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="17" y1="17" x2="13" y2="13" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="47" y1="47" x2="51" y2="51" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="47" y1="17" x2="51" y2="13" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/><line x1="17" y1="47" x2="13" y2="51" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+    '下午': `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="10" fill="#FBBF24"/><line x1="32" y1="14" x2="32" y2="8" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="56" x2="32" y2="50" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="32" x2="8" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="32" x2="56" y2="32" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="19" y1="19" x2="15" y2="15" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="45" y1="45" x2="49" y2="49" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="45" y1="19" x2="49" y2="15" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/><line x1="19" y1="45" x2="15" y2="49" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+    '黃昏': `<svg viewBox="0 0 64 64" fill="none"><path d="M20 40 a12 12 0 0 1 24 0" fill="#F97316"/><line x1="32" y1="22" x2="32" y2="16" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/><line x1="18" y1="30" x2="13" y2="26" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/><line x1="46" y1="30" x2="51" y2="26" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/><rect x="4" y="40" width="56" height="20" rx="2" fill="#F97316" opacity="0.15"/></svg>`,
+    '夜晚': `<svg viewBox="0 0 64 64" fill="none"><path d="M36 12 A16 16 0 1 0 36 48 A12 12 0 1 1 36 12Z" fill="#CBD5E1"/><circle cx="16" cy="16" r="1.2" fill="#E2E8F0"/><circle cx="50" cy="12" r="1.5" fill="#E2E8F0"/><circle cx="48" cy="40" r="1" fill="#E2E8F0"/><circle cx="12" cy="44" r="1.2" fill="#E2E8F0"/><circle cx="54" cy="28" r="0.8" fill="#E2E8F0"/></svg>`,
+    '深夜': `<svg viewBox="0 0 64 64" fill="none"><path d="M36 10 A18 18 0 1 0 36 50 A13 13 0 1 1 36 10Z" fill="#94A3B8"/><circle cx="14" cy="14" r="1.5" fill="#CBD5E1"/><circle cx="52" cy="10" r="1.8" fill="#CBD5E1"/><circle cx="8" cy="36" r="1.2" fill="#CBD5E1"/><circle cx="50" cy="44" r="1.5" fill="#CBD5E1"/><circle cx="56" cy="26" r="1" fill="#CBD5E1"/><circle cx="20" cy="50" r="0.8" fill="#CBD5E1"/><circle cx="42" cy="18" r="0.8" fill="#CBD5E1"/></svg>`,
 };
 
 function updateTimeIcon(timeOfDay) {
