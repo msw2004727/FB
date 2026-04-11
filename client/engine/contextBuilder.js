@@ -75,7 +75,7 @@ export async function buildContext(profileId) {
 
     return {
         player: playerContext,
-        longTermSummary: summaryData?.text || summaryData || '遊戲剛剛開始...',
+        longTermSummary: String(summaryData?.text || summaryData || '遊戲剛剛開始...').slice(0, 2000),
         recentHistory: recentSaves,
         locationContext,
         npcContext,

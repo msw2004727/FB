@@ -267,6 +267,15 @@ export async function loadInitialGame() {
     setLoading(true, '正在連接你的世界，讀取記憶中...');
     try {
         const data = await api.getLatestGame();
+
+        // 存檔損壞偵測：如果 roundData 缺少關鍵欄位，自動重建 R0
+        if (data.roundData && (data.roundData.R === undefined || data.roundData.R === null)) {
+            console.warn('[GameLoop] 偵測到損壞存檔（R 欄位缺失），自動重建...');
+            await api.startNewGame();
+            window.location.reload();
+            return;
+        }
+
         dom.storyTextContainer.innerHTML = '';
         if (data.gameState === 'deceased') {
             if(data.roundData) {

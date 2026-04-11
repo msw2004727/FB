@@ -196,10 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // NEW 按鈕
         scenarioNewBtn.addEventListener('click', () => {
             if (!selectedScenario) return;
-            const existingSaves = profilesByScenario[selectedScenario] || [];
-            if (existingSaves.length > 0) {
-                if (!confirm('此劇本已有存檔，開始新遊戲將覆蓋舊存檔。\n確定要重新開始嗎？')) return;
-            }
+            // 直接建新存檔，不覆蓋舊的
             resolve({ type: 'new', scenario: selectedScenario });
         });
     });
@@ -256,15 +253,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const playerName = introNameInput.value.trim() || '冒險者';
         introModal.style.display = 'none';
 
-        // 覆蓋舊存檔（如果有）
-        const existingSaves = profilesByScenario[choice.scenario] || [];
-        if (existingSaves.length > 0) {
-            const old = existingSaves[0];
-            gameEngine.setActiveProfile(old.id);
-            await clientDB.profiles.update(old.id, { username: playerName, gender: genderSelected });
-            await gameEngine.startNewGame(choice.scenario);
-            activeProfile = await clientDB.profiles.get(old.id);
-        } else {
+        // 永遠建新 profile，不覆蓋舊存檔
+        {
             const result = await gameEngine.createNewGame(playerName, genderSelected, choice.scenario);
             activeProfile = result.profile;
         }
