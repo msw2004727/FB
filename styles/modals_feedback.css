@@ -121,6 +121,53 @@
     margin-right: 0.4rem;
 }
 
+/* 劇本選擇 — 淺色主題 */
+body.light-theme .scenario-overlay {
+    background: var(--light-bg);
+}
+body.light-theme .scenario-title {
+    color: var(--light-accent);
+}
+body.light-theme .scenario-subtitle {
+    color: var(--light-text-secondary);
+}
+body.light-theme .scenario-btn {
+    border-color: var(--light-border);
+    background: var(--light-surface-bg);
+    color: var(--light-text-primary);
+}
+body.light-theme .scenario-btn:not(.locked):hover {
+    border-color: var(--light-accent);
+    background: rgba(140, 111, 84, 0.08);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
+body.light-theme .scenario-btn.active {
+    border-color: var(--light-accent);
+    background: rgba(140, 111, 84, 0.06);
+}
+body.light-theme .scenario-icon {
+    color: var(--light-accent);
+}
+body.light-theme .scenario-btn.locked .scenario-icon {
+    color: #bbb;
+}
+body.light-theme .scenario-desc {
+    color: var(--light-text-secondary);
+}
+body.light-theme .scenario-tag {
+    color: #999;
+    background: rgba(0,0,0,0.04);
+}
+body.light-theme .scenario-continue-btn {
+    background: linear-gradient(135deg, rgba(140,111,84,0.1), rgba(140,111,84,0.04));
+    border-color: var(--light-border);
+    color: var(--light-accent);
+}
+body.light-theme .scenario-continue-btn:hover {
+    background: linear-gradient(135deg, rgba(140,111,84,0.15), rgba(140,111,84,0.08));
+    border-color: var(--light-accent);
+}
+
 /* --- 統一的 AI 回應等待動畫 --- */
 .ai-thinking-loader {
     position: absolute;
