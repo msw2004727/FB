@@ -21,7 +21,11 @@
     <link rel="stylesheet" href="styles/gmPanel.css">
     <link rel="stylesheet" href="styles/modals_info.css">
 </head>
-<body class="light-theme">
+<body>
+<script>
+// 防閃爍：在 DOM 繪製前立即設定主題
+(function(){var t=localStorage.getItem('game_theme');if(!t)t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.body.className=t+'-theme';})();
+</script>
     <div class="game-container">
         <button id="menu-toggle" class="menu-toggle" type="button" title="展開右側欄" aria-label="展開右側欄" aria-controls="dashboard" aria-expanded="false"><span id="menu-toggle-time-icon" class="menu-toggle-time-icon"></span></button>
 
@@ -100,9 +104,13 @@
         <aside id="dashboard" class="dashboard">
             <div class="dashboard-header">
                 <div class="header-buttons" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                    <button id="theme-switcher" class="theme-switcher" title="切換主題">
-                        <i class="fas fa-moon"></i>
-                    </button>
+                    <label class="theme-toggle" title="切換深淺主題">
+                        <input type="checkbox" id="theme-switcher">
+                        <span class="theme-toggle-slider">
+                            <i class="fas fa-sun theme-icon-light"></i>
+                            <i class="fas fa-moon theme-icon-dark"></i>
+                        </span>
+                    </label>
                     <button id="suicide-btn" class="header-link-btn" title="了卻此生">
                         <i class="fas fa-skull"></i>
                     </button>

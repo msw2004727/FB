@@ -694,8 +694,63 @@ body.dark-theme .card-header-flex {
     padding-bottom: 0;
 }
 
+/* --- 主題滑動開關 --- */
+.theme-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 48px;
+    height: 26px;
+    cursor: pointer;
+}
+.theme-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+.theme-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: #d4cfc7;
+    border-radius: 13px;
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 5px;
+}
+.theme-toggle-slider::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.theme-toggle input:checked + .theme-toggle-slider {
+    background: #4a4a5a;
+}
+.theme-toggle input:checked + .theme-toggle-slider::after {
+    transform: translateX(22px);
+    background: #222;
+}
+.theme-icon-light, .theme-icon-dark {
+    font-size: 0.65rem;
+    z-index: 1;
+    pointer-events: none;
+}
+.theme-icon-light { color: #e6a817; }
+.theme-icon-dark { color: #aaa; }
+.theme-toggle input:checked + .theme-toggle-slider .theme-icon-light { color: #777; }
+.theme-toggle input:checked + .theme-toggle-slider .theme-icon-dark { color: #e0d5c8; }
+
 /* --- 按鈕 --- */
-.theme-switcher, .header-link-btn {
+.header-link-btn {
     background: none;
     border: none;
     color: var(--light-text-secondary);
@@ -707,13 +762,13 @@ body.dark-theme .card-header-flex {
     justify-content: center;
     text-decoration: none;
 }
-body.dark-theme .theme-switcher, body.dark-theme .header-link-btn {
+body.dark-theme .header-link-btn {
     color: var(--dark-text-secondary);
 }
-.header-link-btn:hover, .theme-switcher:hover {
+.header-link-btn:hover {
     color: var(--light-accent);
 }
-body.dark-theme .header-link-btn:hover, body.dark-theme .theme-switcher:hover {
+body.dark-theme .header-link-btn:hover {
     color: var(--dark-accent);
 }
 .header-toggle-btn {

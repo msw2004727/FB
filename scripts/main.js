@@ -352,17 +352,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function initialize() {
-        let currentTheme = localStorage.getItem('game_theme') || 'light';
+        // 主題：localStorage > 系統偏好 > 預設淺色
+        const savedTheme = localStorage.getItem('game_theme');
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        let currentTheme = savedTheme || (systemDark ? 'dark' : 'light');
         document.body.className = `${currentTheme}-theme`;
 
         if (dom.themeSwitcher) {
-            const themeIcon = dom.themeSwitcher.querySelector('i');
-            if (themeIcon) themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-            dom.themeSwitcher.addEventListener('click', () => {
-                currentTheme = (document.body.classList.contains('light-theme')) ? 'dark' : 'light';
+            dom.themeSwitcher.checked = currentTheme === 'dark';
+            dom.themeSwitcher.addEventListener('change', () => {
+                currentTheme = dom.themeSwitcher.checked ? 'dark' : 'light';
                 localStorage.setItem('game_theme', currentTheme);
                 document.body.className = `${currentTheme}-theme`;
-                if (themeIcon) themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            });
+            // 監聽系統主題變化（使用者未手動選擇時跟隨）
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('game_theme')) {
+                    currentTheme = e.matches ? 'dark' : 'light';
+                    document.body.className = `${currentTheme}-theme`;
+                    dom.themeSwitcher.checked = e.matches;
+                }
             });
         }
 
