@@ -76,12 +76,13 @@ export const profiles = {
         const id = data.id || generateId();
         const profile = {
             id,
-            username: data.username || '無名俠客',
+            username: data.username || '冒險者',
             gender: data.gender || 'male',
+            scenario: data.scenario || 'wuxia',
             morality: 0,
             isDeceased: false,
-            timeOfDay: '上午',
-            yearName: '元祐', year: 1, month: 1, day: 1,
+            timeOfDay: '',
+            yearName: '', year: 0, month: 1, day: 1,
             createdAt: new Date().toISOString(),
             ...data,
             id

@@ -169,11 +169,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const playerName = introNameInput.value.trim() || '無名俠客';
         introModal.style.display = 'none';
 
-        // 如果已有存檔，先設定 activeProfile 再重置
+        // 如果已有存檔，先改名再重置（確保 R0 故事使用新名字）
         if (activeProfile) {
             gameEngine.setActiveProfile(activeProfile.id);
-            await gameEngine.startNewGame(scenarioChoice);
             await clientDB.profiles.update(activeProfile.id, { username: playerName, gender: genderSelected });
+            await gameEngine.startNewGame(scenarioChoice);
             activeProfile = await clientDB.profiles.get(activeProfile.id);
         } else {
             const result = await gameEngine.createNewGame(playerName, genderSelected, scenarioChoice);
@@ -387,20 +387,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         const savedTheme = localStorage.getItem('game_theme');
         const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         let currentTheme = savedTheme || (systemDark ? 'dark' : 'light');
-        document.body.className = `${currentTheme}-theme`;
+        document.body.classList.remove('light-theme', 'dark-theme');
+        document.body.classList.add(`${currentTheme}-theme`);
 
         if (dom.themeSwitcher) {
             dom.themeSwitcher.checked = currentTheme === 'dark';
             dom.themeSwitcher.addEventListener('change', () => {
                 currentTheme = dom.themeSwitcher.checked ? 'dark' : 'light';
                 localStorage.setItem('game_theme', currentTheme);
-                document.body.className = `${currentTheme}-theme`;
+                document.body.classList.remove('light-theme', 'dark-theme');
+                document.body.classList.add(`${currentTheme}-theme`);
             });
             // 監聽系統主題變化（使用者未手動選擇時跟隨）
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
                 if (!localStorage.getItem('game_theme')) {
                     currentTheme = e.matches ? 'dark' : 'light';
-                    document.body.className = `${currentTheme}-theme`;
+                    document.body.classList.remove('light-theme', 'dark-theme');
+                    document.body.classList.add(`${currentTheme}-theme`);
                     dom.themeSwitcher.checked = e.matches;
                 }
             });
