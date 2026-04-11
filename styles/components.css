@@ -404,7 +404,7 @@ body.dark-theme .info-card:hover {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 5px;
-    color: var(--text-primary, #f0e6d8);
+    color: inherit;
     outline: none;
     transition: border-color 0.2s;
 }
@@ -418,9 +418,14 @@ body.dark-theme .info-card:hover {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 5px;
-    color: var(--text-primary, #f0e6d8);
+    color: inherit;
     cursor: pointer;
     outline: none;
+}
+body.light-theme .player-name-input,
+body.light-theme .player-gender-select {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.15);
 }
 .player-identity-save-btn {
     padding: 0.35rem 0.55rem;
