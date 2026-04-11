@@ -99,8 +99,11 @@ export async function generateImage(prompt) {
  */
 export async function checkConnection() {
     try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
         const url = `${getProxyUrl()}/health`;
-        const response = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) });
+        const response = await fetch(url, { method: 'GET', signal: controller.signal });
+        clearTimeout(timer);
         return response.ok;
     } catch {
         return false;

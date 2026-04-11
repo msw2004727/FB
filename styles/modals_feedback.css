@@ -536,6 +536,7 @@ body.dark-theme .loader-tip {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.5s ease, visibility 0.5s ease;
+    -webkit-backdrop-filter: blur(5px);
     backdrop-filter: blur(5px);
 }
 
@@ -659,6 +660,7 @@ body.dark-theme .deceased-btn.restart-btn {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.5s ease;
+    -webkit-backdrop-filter: blur(5px);
     backdrop-filter: blur(5px);
 }
 
