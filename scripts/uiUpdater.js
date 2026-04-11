@@ -7,6 +7,35 @@ import * as timeEffects from './timeEffects.js';
 const storyPanelWrapper = document.querySelector('.story-panel');
 const storyTextContainer = document.getElementById('story-text-wrapper');
 const statusBarEl = document.getElementById('status-bar');
+const storyFooter = document.querySelector('.story-footer');
+
+// --- Footer 收折 + 滑到底抖動 ---
+if (storyFooter) {
+    storyFooter.classList.add('footer-collapsed');
+
+    const toggleBtn = document.getElementById('footer-toggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            storyFooter.classList.toggle('footer-collapsed');
+        });
+    }
+
+    if (storyPanelWrapper) {
+        let shakeTimer = null;
+        storyPanelWrapper.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = storyPanelWrapper;
+            const atBottom = scrollHeight - scrollTop - clientHeight < 30;
+            if (atBottom && storyFooter.classList.contains('footer-collapsed')) {
+                if (shakeTimer) return;
+                storyFooter.classList.add('footer-shake');
+                shakeTimer = setTimeout(() => {
+                    storyFooter.classList.remove('footer-shake');
+                    shakeTimer = null;
+                }, 600);
+            }
+        });
+    }
+}
 const pcContent = document.getElementById('pc-content');
 const moralityBarIndicator = document.getElementById('morality-bar-indicator');
 const actionSuggestion = document.getElementById('action-suggestion');

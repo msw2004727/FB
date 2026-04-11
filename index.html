@@ -67,8 +67,12 @@
                 <div id="story-text-wrapper">
                      <p class="system-message">正在連接你的世界，讀取記憶中...</p>
                 </div>
-
-                <footer class="story-footer">
+            </div>
+            <footer class="story-footer">
+                <button id="footer-toggle" class="footer-toggle" type="button" aria-label="展開行動面板">
+                    <i class="fas fa-chevron-up footer-toggle-icon"></i>
+                </button>
+                <div class="footer-body">
                     <div id="action-suggestion" class="action-suggestion"></div>
 
                     <div id="options-mode" class="input-mode" style="display:none;">
@@ -88,8 +92,8 @@
                             <button id="submit-button">動作</button>
                         </div>
                     </div>
-                </footer>
-            </div>
+                </div>
+            </footer>
         </main>
 
         <aside id="dashboard" class="dashboard">

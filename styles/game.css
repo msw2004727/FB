@@ -223,9 +223,7 @@ body.dark-theme .status-info-value { color: var(--dark-text-primary); }
     position: relative;
     flex-grow: 1;
     overflow-y: auto;
-    padding: 1rem 2rem 0;
-    display: flex;
-    flex-direction: column;
+    padding: 1rem 2rem;
 }
 .round-title {
     font-family: var(--font-serif);
@@ -272,19 +270,66 @@ body.dark-theme .system-message {
 }
 
 .story-footer {
-    margin-top: auto;
-    margin-left: -2rem;
-    margin-right: -2rem;
-    padding-top: 1rem;
+    position: sticky;
+    bottom: 0;
     border-top: 1px solid var(--time-border, var(--light-border));
     background: var(--time-bg, var(--light-surface-bg));
     color: var(--time-text, inherit);
+    z-index: 10;
+    flex-shrink: 0;
     transition: background-color 0.8s ease, color 0.8s ease, border-color 0.8s ease;
 }
 body.dark-theme .story-footer {
     border-top: 1px solid var(--time-border, var(--dark-border));
     background: var(--time-bg, var(--dark-surface-bg));
     color: var(--time-text, inherit);
+}
+
+/* 收折按鈕 */
+.footer-toggle {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--light-text-secondary);
+    cursor: pointer;
+    padding: 0.3rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+body.dark-theme .footer-toggle {
+    color: var(--dark-text-secondary);
+}
+.footer-toggle-icon {
+    font-size: 0.65rem;
+    transition: transform 0.25s ease;
+}
+.story-footer.footer-collapsed .footer-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* 收折內容 */
+.footer-body {
+    max-height: 300px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    opacity: 1;
+}
+.story-footer.footer-collapsed .footer-body {
+    max-height: 0;
+    opacity: 0;
+}
+
+/* 抖動動畫 */
+@keyframes footerShake {
+    0%, 100% { transform: translateY(0); }
+    20% { transform: translateY(-3px); }
+    40% { transform: translateY(2px); }
+    60% { transform: translateY(-2px); }
+    80% { transform: translateY(1px); }
+}
+.footer-shake {
+    animation: footerShake 0.5s ease;
 }
 
 .input-action-wrapper {
