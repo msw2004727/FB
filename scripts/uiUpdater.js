@@ -9,9 +9,10 @@ const storyTextContainer = document.getElementById('story-text-wrapper');
 const statusBarEl = document.getElementById('status-bar');
 const storyFooter = document.querySelector('.story-footer');
 
-// --- Footer 收折 + 滑到底抖動 ---
+// --- Footer 收折（僅手機版）---
+const isMobile = () => window.innerWidth <= 1024;
 if (storyFooter) {
-    storyFooter.classList.add('footer-collapsed');
+    if (isMobile()) storyFooter.classList.add('footer-collapsed');
 
     const toggleBtn = document.getElementById('footer-toggle');
     if (toggleBtn) {

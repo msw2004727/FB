@@ -343,6 +343,15 @@ body.dark-theme .footer-toggle {
     opacity: 0;
 }
 
+/* 電腦版：收折功能隱藏，footer 永遠展開 */
+@media (min-width: 1025px) {
+    .footer-toggle { display: none; }
+    .story-footer.footer-collapsed .footer-body {
+        max-height: 300px;
+        opacity: 1;
+    }
+}
+
 /* 抖動動畫 */
 @keyframes footerShake {
     0%, 100% { transform: translateY(0); }

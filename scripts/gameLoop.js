@@ -154,9 +154,9 @@ export async function processNewRoundData(data) {
     // ????????????????????????????????
     addRoundTitleToStory(data.roundData.EVT || `第${data.roundData.R}回合`);
 
-    // 每回合預設收起 footer
+    // 每回合預設收起 footer（僅手機版）
     const footer = document.querySelector('.story-footer');
-    if (footer) footer.classList.add('footer-collapsed');
+    if (footer && window.innerWidth <= 1024) footer.classList.add('footer-collapsed');
 
     // 同步 gameState
     Object.assign(gameState.roundData, data.roundData);
