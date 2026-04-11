@@ -720,9 +720,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (window.confirm(suicideMsg[scnId] || suicideMsg.wuxia)) {
                 gameLoop.setLoading(true, loadingMsg[scnId] || loadingMsg.wuxia);
                 try {
-                    const data = await api.forceSuicide({ model: dom.aiModelSelector.value });
-                    gameLoop.processNewRoundData(data);
-                    gameLoop.handlePlayerDeath();
+                    // 死因 + 結局並行呼叫（速度快一倍）
+                    const [deathData, epilogueData] = await Promise.all([
+                        api.forceSuicide({ model: dom.aiModelSelector.value }),
+                        api.getEpilogue().catch(() => ({ epilogue: null })),
+                    ]);
+                    gameLoop.processNewRoundData(deathData);
+                    gameLoop.handlePlayerDeath(epilogueData);
                 } catch (error) {
                     handleApiError(error);
                     gameLoop.setLoading(false);
@@ -730,6 +734,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+
+        // 結局彈窗「重新開始」按鈕 — 加 confirm 提醒
+        const epilogueRestartBtn = document.getElementById('epilogue-restart-btn');
+        if (epilogueRestartBtn) {
+            epilogueRestartBtn.addEventListener('click', async () => {
+                const epilogueStory = document.getElementById('epilogue-story');
+                const isStillLoading = epilogueStory?.querySelector('.epilogue-loading');
+                if (isStillLoading) {
+                    if (!confirm('結局回顧還在載入中！\n確定要跳過嗎？你可能會錯過 AI 為你撰寫的精彩結局。')) return;
+                } else {
+                    if (!confirm('確定要重新開始嗎？\n（你可以先把結局截圖留念）')) return;
+                }
+                window.location.reload();
+            });
+        }
 
         initializeGmPanel(dom.gmPanel, dom.gmCloseBtn, dom.gmMenu, dom.gmContent);
 

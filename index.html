@@ -184,7 +184,7 @@
                 </div>
 
                 <div class="info-card">
-                    <h4 style="display:flex;justify-content:space-between;align-items:center;"><span><i class="fas fa-microchip"></i> AI 核心 <button class="card-help-btn" data-help="ai"><i class="fas fa-circle-question"></i></button></span><span id="app-version" style="font-size:.65rem;font-weight:normal;opacity:.45;font-family:var(--font-sans);">V0.21</span></h4>
+                    <h4 style="display:flex;justify-content:space-between;align-items:center;"><span><i class="fas fa-microchip"></i> AI 核心 <button class="card-help-btn" data-help="ai"><i class="fas fa-circle-question"></i></button></span><span id="app-version" style="font-size:.65rem;font-weight:normal;opacity:.45;font-family:var(--font-sans);">V0.22</span></h4>
                     <div class="ai-model-row">
                         <div class="select-wrapper">
                             <select id="ai-model-selector">
@@ -319,18 +319,17 @@
         <div id="epilogue-modal" class="epilogue-modal-overlay">
             <div class="epilogue-modal-content">
                 <header class="epilogue-modal-header">
-                    <h2 id="epilogue-title">江湖路遠 有緣再會</h2>
+                    <h2 id="epilogue-title">旅程的終點</h2>
                 </header>
                 <div id="epilogue-story" class="epilogue-modal-body">
-                    <div class="loading-placeholder">
-                        <p>史官正在為您的人生撰寫終章...</p>
-                        <div class="loader-dots">
-                            <span></span><span></span><span></span>
-                        </div>
+                    <div class="epilogue-loading">
+                        <div class="loader-dots"><span></span><span></span><span></span></div>
+                        <p>AI 正在為你撰寫結局回顧，請稍候...</p>
+                        <p style="font-size:.75rem;opacity:.5;margin-top:.5rem;">精彩回顧即將呈現，請不要離開 ✨</p>
                     </div>
                 </div>
                 <footer class="epilogue-modal-footer">
-                    <button class="epilogue-btn" onclick="(async()=>{const{startNewGame}=await import('./client/engine/gameEngine.js');await startNewGame();window.location.reload();})()">
+                    <button class="epilogue-btn" id="epilogue-restart-btn">
                         <i class="fas fa-redo"></i> 重新開始
                     </button>
                 </footer>

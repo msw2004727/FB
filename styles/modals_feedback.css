@@ -750,15 +750,19 @@ body.dark-theme .epilogue-modal-footer {
     transform: scale(1.05);
 }
 
-.epilogue-modal-body .loading-placeholder {
+.epilogue-modal-body .loading-placeholder,
+.epilogue-loading {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100%;
     color: var(--light-text-secondary);
+    text-align: center;
+    padding: 2rem 0;
 }
 
-.epilogue-modal-body .loading-placeholder .loader-dots span {
+.epilogue-modal-body .loading-placeholder .loader-dots span,
+.epilogue-loading .loader-dots span {
     background-color: var(--light-accent);
 }

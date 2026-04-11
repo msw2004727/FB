@@ -84,23 +84,45 @@ export function setLoading(isLoading, text = '') {
 
 }
 
-export async function handlePlayerDeath() {
-    // 顯示結局
+export async function handlePlayerDeath(preloadedEpilogue = null) {
     const epilogueModal = document.getElementById('epilogue-modal');
     const epilogueStory = document.getElementById('epilogue-story');
-    const deceasedOverlay = document.getElementById('deceased-overlay');
+    const epilogueTitle = document.getElementById('epilogue-title');
 
-    if (epilogueModal) epilogueModal.classList.add('visible');
-    const epilogueLoading = {
-        wuxia: '正在回顧你在江湖的最後足跡...',
-        school: '正在回顧你在校園的最後時光...',
-        mecha: '正在回顧你在暮雲城的最後戰役...',
-        animal: '正在回顧你在翠谷的最後記憶...',
-        modern: '正在回顧你在這座城市的最後身影...',
-        hero: '正在回顧你在英雄世界的最後篇章...',
-    };
+    // 劇本感知的標題和載入提示
     const scnId = window.__activeScenario?.id || 'wuxia';
-    if (epilogueStory) epilogueStory.innerHTML = `<p>${epilogueLoading[scnId] || epilogueLoading.wuxia}</p>`;
+    const titles = {
+        wuxia: '江湖路遠 有緣再會', school: '校園的鐘聲已遠',
+        mecha: '鐵殼歸於寂靜', animal: '翠谷的風繼續吹',
+        modern: '城市依舊運轉', hero: '英雄的故事暫停',
+    };
+    const loadingHints = {
+        wuxia: 'AI 正在為你撰寫江湖結局回顧，請稍候...',
+        school: 'AI 正在為你撰寫校園結局回顧，請稍候...',
+        mecha: 'AI 正在為你撰寫最後的戰役紀錄，請稍候...',
+        animal: 'AI 正在為你撰寫翠谷最後的記憶，請稍候...',
+        modern: 'AI 正在為你撰寫在這座城市的最後篇章，請稍候...',
+        hero: 'AI 正在為你撰寫英雄世界的結局，請稍候...',
+    };
+
+    if (epilogueTitle) epilogueTitle.textContent = titles[scnId] || titles.wuxia;
+    if (epilogueModal) epilogueModal.classList.add('visible');
+
+    // 如果結局已預載（並行呼叫），直接顯示
+    if (preloadedEpilogue && preloadedEpilogue.epilogue) {
+        if (epilogueStory) epilogueStory.innerHTML = preloadedEpilogue.epilogue.replace(/\n/g, '<br><br>');
+        return;
+    }
+
+    // 否則顯示載入動畫 + 等待
+    if (epilogueStory) {
+        epilogueStory.innerHTML = `
+            <div class="epilogue-loading">
+                <div class="loader-dots"><span></span><span></span><span></span></div>
+                <p>${loadingHints[scnId] || loadingHints.wuxia}</p>
+                <p style="font-size:.75rem;opacity:.5;margin-top:.5rem;">精彩回顧即將呈現，請不要離開這個頁面 ✨</p>
+            </div>`;
+    }
 
     try {
         const data = await api.getEpilogue();
@@ -109,7 +131,6 @@ export async function handlePlayerDeath() {
         }
     } catch (error) {
         if (epilogueStory) epilogueStory.innerHTML = `<p>結局載入失敗。(${error.message})</p>`;
-        console.error('結局載入失敗:', error);
     }
 }
 
