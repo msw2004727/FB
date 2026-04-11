@@ -41,6 +41,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.8rem;
+    margin-top: 1.5rem;
 }
 .scenario-btn {
     position: relative;
@@ -106,7 +107,7 @@ body.light-theme .scenario-btn.selected {
     border-radius: 10px;
 }
 .scenario-actions {
-    margin-top: 1rem;
+    margin-top: 1.8rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
