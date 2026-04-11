@@ -208,6 +208,14 @@ TIME_SVGS['下午課'] = TIME_SVGS['下午'];
 TIME_SVGS['放學']   = TIME_SVGS['黃昏'];
 TIME_SVGS['晚自習'] = TIME_SVGS['夜晚'];
 TIME_SVGS['宵禁後'] = TIME_SVGS['深夜'];
+// 機甲時辰
+TIME_SVGS['黎明戒備'] = TIME_SVGS['清晨'];
+TIME_SVGS['第一班哨'] = TIME_SVGS['上午'];
+TIME_SVGS['正午輪替'] = TIME_SVGS['中午'];
+TIME_SVGS['第二班哨'] = TIME_SVGS['下午'];
+TIME_SVGS['黃昏警戒'] = TIME_SVGS['黃昏'];
+TIME_SVGS['夜間值勤'] = TIME_SVGS['夜晚'];
+TIME_SVGS['深夜靜默'] = TIME_SVGS['深夜'];
 
 // --- 天氣 SVG 圖示（優先於時辰） ---
 const WEATHER_SVGS = {
@@ -260,6 +268,14 @@ const TIME_CLASS_MAP = {
     '放學':   'time-dusk',
     '晚自習': 'time-night',
     '宵禁後': 'time-midnight',
+    // 機甲時辰
+    '黎明戒備': 'time-dawn',
+    '第一班哨': 'time-morning',
+    '正午輪替': 'time-noon',
+    '第二班哨': 'time-afternoon',
+    '黃昏警戒': 'time-dusk',
+    '夜間值勤': 'time-night',
+    '深夜靜默': 'time-midnight',
 };
 let _timeEffectsInited = false;
 let _lastTimeClass = '';

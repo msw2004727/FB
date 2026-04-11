@@ -1,0 +1,29 @@
+/* styles/themes/mecha.css — 機甲主題：鐵灰×血紅×冷藍 */
+
+body.mecha-theme {
+    --font-serif: 'Noto Sans TC', sans-serif;
+
+    /* 淺色（灰鋼色基調） */
+    --light-bg: #e8eaed;
+    --light-surface-bg: #f5f5f7;
+    --light-text-primary: #1a1a2e;
+    --light-text-secondary: #5a5a72;
+    --light-accent: #c0392b;
+    --light-border: #c8cad0;
+
+    /* 深色（暗艙室基調） */
+    --dark-bg: #0a0a12;
+    --dark-surface-bg: #14141f;
+    --dark-text-primary: #d0d0d8;
+    --dark-text-secondary: #7a7a8e;
+    --dark-accent: #e74c3c;
+    --dark-border: #2a2a3a;
+
+    /* 軸線：共感(紫藍) / 理性(冰藍) */
+    --morality-justice-light: #6c5ce7;
+    --morality-evil-light: #00b4d8;
+    --morality-neutral-light: #7a7a8e;
+    --morality-justice-dark: #a29bfe;
+    --morality-evil-dark: #48cae4;
+    --morality-neutral-dark: #7a7a8e;
+}

@@ -57,6 +57,34 @@ export const SCENARIOS = {
             suggestion: '課本上寫著你是「無劇情路人」。也許該先看看這個學校到底是什麼地方。'
         }),
     },
+
+    mecha: {
+        id: 'mecha',
+        milestoneIds: ['M1_AWAKENING_IN_IRON','M2_FIRST_SYNC','M3_ECHO_FRAGMENT','M4_TRUTH_OF_THE_RIFT','M5_BETRAYAL','M6_RESONANCE','M7_EVE_OF_DECISION','M8_BEYOND_THE_RIFT'],
+        milestoneChars: ['鐵','殼','裡','的','心','跳','迴','響'],
+        suggestionPrefix: '始核低語：',
+        questJournalDefault: '始核同調卡背面寫著：「若持有者死亡，始核將進入休眠」',
+        name: '機甲',
+        themeClass: 'mecha-theme',
+        defaultProfile: { yearName: '新曆', year: 47, month: 3, day: 14, timeOfDay: '第一班哨' },
+        moralityLabels: { positive: '共感', negative: '理性', axis: '同調傾向' },
+        milestoneDisplay: { title: '同調印記', description: '八段迴響全部覺醒時，裂隙彼方的門將開啟' },
+        getInitialRound: (username) => ({
+            R: 0,
+            EVT: '鐵殼裡醒來的人',
+            story: `頭痛。劇烈的頭痛。\n\n你睜開眼。\n\n映入眼簾的不是天花板，而是一圈環繞你的半透明螢幕，上面跳動著你完全看不懂的數據流。你的雙手插在兩個凝膠狀的操控球裡，背後有什麼東西貼著你的脊椎，微微發熱。\n\n「……同調率穩定，生命特徵正常。」一個冰冷的女聲從通訊器傳來。「零號機，請回報駕駛員狀態。」\n\n螢幕上方用紅色粗體字閃爍著：\n\n【始核同調鎖定完成。綁定不可逆。】\n\n「等一下，」你終於發出聲音，「什麼叫『不可逆』？」\n\n沒有人回答你。但你的脊椎後方那個發熱的裝置，溫度又升高了一點——像是某個東西在回應你。\n\n而且它感覺很……寂寞。`,
+            WRD: '鐵灰色天空，天裂微微發紅',
+            LOC: ['暮雲城', '零號格納庫', '駕駛艙'],
+            PC: `${username}剛穿越，被綁定在零號律體駕駛艙內，一臉懵。`,
+            NPC: [],
+            timeOfDay: '第一班哨',
+            morality: 0,
+            yearName: '新曆', year: 47, month: 3, day: 14,
+            playerState: 'alive',
+            moralityChange: 0,
+            suggestion: '你被困在巨型機器的駕駛艙裡，螢幕上說「綁定不可逆」。通訊器那頭有人在等你回話。'
+        }),
+    },
 };
 
 export function getScenario(scenarioId) {

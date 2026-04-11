@@ -16,6 +16,8 @@ const getOutputStructureRule = (promptData) => {
         evtExamples = scenario.evtExamples;
         locExample = scenario.id === 'school'
             ? '["私立青嵐高中", "教學大樓", "二年三班教室"]'
+            : scenario.id === 'mecha'
+            ? '["暮雲城", "零號格納庫", "駕駛艙"]'
             : '["無名村", "藥鋪"]';
     } else {
         npcAddress = '「少俠」「兄台」「姑娘」「這位公子」「閣下」';
