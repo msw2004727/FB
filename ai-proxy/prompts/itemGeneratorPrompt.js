@@ -6,7 +6,7 @@
  * @param {object} context - 該物品出現的遊戲情境
  * @param {string} context.location - 物品出現的地點
  * @param {string} context.sourceType - 物品來源類型 (例如: '敵人掉落', '寶箱', '任務獎勵')
- * @param {string} context.sourceName - 物品來源的具體名稱 (例如: '山賊', '精緻的木箱', '村長的委託')
+ * @param {string} context.sourceName - 物品來源的具體名稱 (例如: '敵人', '精緻的木箱', '村長的委託')
  * @param {number} context.playerLevel - 玩家的綜合實力參考 (例如: 1-100)
  * @returns {string} The complete prompt for the AI.
  */

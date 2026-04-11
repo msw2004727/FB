@@ -65,7 +65,7 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
 
     const specialEventInstruction = worldEventToWeave ? `
 ## 【最高優先級特殊劇情指令：世界事件編織】
-江湖中一樁大事正在發酵，你本回合的故事必須圍繞此事展開。這不是一個可選項，而是必須完成的核心任務！
+世界中一樁大事正在發酵，你本回合的故事必須圍繞此事展開。這不是一個可選項，而是必須完成的核心任務！
 - **事件類型**: ${worldEventToWeave.eventType}
 - **事件核心**: ${worldEventToWeave.eventData.summary}
 - **當前階段**: ${worldEventToWeave.currentStage}

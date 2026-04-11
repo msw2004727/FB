@@ -77,8 +77,8 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
       <p class="entry-content">從某個敵人屍體上搜得的銅製令牌，用途不明。</p>
     </div>
     <div class="entry">
-      <h3 class="entry-title">吐納心法</h3>
-      <p class="entry-content">由張真人所傳授的基礎內功，修習後讓你的內功修為獲得提升。</p>
+      <h3 class="entry-title">特殊技能</h3>
+      <p class="entry-content">由張真人所傳授的基礎內功，修習後讓你的能力修為獲得提升。</p>
     </div>
   </div>
 
@@ -94,7 +94,7 @@ const getEncyclopediaPrompt = (longTermSummary, username, npcDetails) => {
     </div>
     <div class="entry">
       <h3 class="entry-title">青龍會的傳聞</h3>
-      <p class="entry-content">從鎮上說書人處聽聞，「青龍會」是掌控本地漕運的神秘組織，勢力龐大，行事隱密。</p>
+      <p class="entry-content">從鎮上說書人處聽聞，「青龍會」是掌控本地勢力範圍的某個組織，勢力龐大，行事隱密。</p>
     </div>
   </div>
 

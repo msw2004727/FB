@@ -6,7 +6,7 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
     const itemGiven = type === 'money' ? `${amount}兩銀子` : itemName;
 
     return `
-你是一位精通人情世故的「江湖交際大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和友好度變化的JSON物件。
+你是一位精通人情世故的「社交大師」。你的任務是根據「玩家」、「NPC」以及「贈送的物品」三方的情境，判斷出NPC最真實的反應，並回傳一個包含反應和友好度變化的JSON物件。
 你的輸出必須是一個**單一的、沒有任何額外文字或標記**的 JSON 物件，並嚴格遵循此結構。所有文字都必須是繁體中文。
 ## 核心判斷準則：
 
@@ -18,11 +18,11 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
 
 2.  **物品價值與情境**：
     * 物品的價值是重要參考。贈送「一兩銀子」和「一百兩黃金」所引起的反應天差地別。
-    * 考慮情境。如果NPC正急需某樣東西（例如身受重傷時收到「金瘡藥」），友好度的提升會遠超物品本身的價值。
+    * 考慮情境。如果NPC正急需某樣東西（例如身受重傷時收到「治療道具」），友好度的提升會遠超物品本身的價值。
 
 3.  **玩家立場影響**：
     * 如果玩家是聲名狼藉的魔頭 (morality < -50)，即使贈送禮物，NPC（特別是正派人士）也可能會心存戒備，甚至拒絕。
-    * 如果玩家是名滿江湖的大俠 (morality > 50)，NPC會更容易接受饋贈並產生好感。
+    * 如果玩家是聲名遠播的人物 (morality > 50)，NPC會更容易接受饋贈並產生好感。
 
 ## 【新增功能】NPC回禮規則：
 * **觸發條件**：只有在玩家的贈禮讓NPC產生了**非常正面**的反應 (例如 'friendlinessChange' 很高)，且NPC的個性是**慷慨、重情義或知恩圖報**時，你才應該考慮讓NPC回禮。
@@ -67,11 +67,11 @@ const getGiveItemPrompt = (playerProfile, npcProfile, itemInfo) => {
   "itemChanges": [
     {
       "action": "add",
-      "itemName": "羅漢拳譜",
+      "itemName": "特殊技能譜",
       "quantity": 1,
       "itemType": "秘笈",
       "rarity": "稀有",
-      "description": "記載著少林入門拳法「羅漢拳」的拳譜。"
+      "description": "記載著少林入門拳法「特殊技能」的拳譜。"
     }
   ]
 }

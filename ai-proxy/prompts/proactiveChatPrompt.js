@@ -18,7 +18,7 @@ const getProactiveChatPrompt = (playerProfile, npcProfile, triggerEvent) => {
             giftInstruction = '這種情況下，絕對不應該贈送任何禮物。';
             break;
         case 'FAME_SPREADS':
-            eventDescription = `你聽聞了 ${playerProfile.username} 在江湖上的俠義之舉，對其充滿敬佩。你希望能與這位英雄結交。`;
+            eventDescription = `你聽聞了 ${playerProfile.username} 在世界中的重大事件，對其充滿敬佩。你希望能與這位英雄結交。`;
             giftInstruction = '你可以考慮贈送一些符合你身份的物品（如藥材、礦石）來表達結交的誠意。';
             break;
         case 'HIDDEN_GOAL_COMPLETED':

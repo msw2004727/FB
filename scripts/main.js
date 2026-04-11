@@ -700,8 +700,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (dom.suicideButton) dom.suicideButton.addEventListener('click', async () => {
             if (gameState.isRequesting) return;
-            if (window.confirm("你確定要了卻此生，讓名號永載史冊嗎？")) {
-                gameLoop.setLoading(true, '英雄末路，傳奇落幕...');
+            const suicideMsg = {
+                wuxia: '你確定要了卻此生，讓名號永載史冊嗎？',
+                school: '你確定要放棄這段校園生活嗎？',
+                mecha: '你確定要終止同調，讓律體永遠沉睡嗎？',
+                animal: '你確定要放棄這副獸軀嗎？',
+                modern: '你確定要在這個錯頻的世界中消逝嗎？',
+                hero: '你確定要放棄異能，從這個世界退場嗎？',
+            };
+            const loadingMsg = {
+                wuxia: '英雄末路，傳奇落幕...',
+                school: '校園生活的最後一頁...',
+                mecha: '同調信號逐漸歸零...',
+                animal: '靈魂從獸軀中抽離...',
+                modern: '你的身影在城市中淡去...',
+                hero: '共情連結斷裂中...',
+            };
+            const scnId = window.__activeScenario?.id || 'wuxia';
+            if (window.confirm(suicideMsg[scnId] || suicideMsg.wuxia)) {
+                gameLoop.setLoading(true, loadingMsg[scnId] || loadingMsg.wuxia);
                 try {
                     const data = await api.forceSuicide({ model: dom.aiModelSelector.value });
                     gameLoop.processNewRoundData(data);

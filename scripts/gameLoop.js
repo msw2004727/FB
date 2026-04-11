@@ -91,7 +91,16 @@ export async function handlePlayerDeath() {
     const deceasedOverlay = document.getElementById('deceased-overlay');
 
     if (epilogueModal) epilogueModal.classList.add('visible');
-    if (epilogueStory) epilogueStory.innerHTML = '<p>正在回顧你在江湖的最後足跡...</p>';
+    const epilogueLoading = {
+        wuxia: '正在回顧你在江湖的最後足跡...',
+        school: '正在回顧你在校園的最後時光...',
+        mecha: '正在回顧你在暮雲城的最後戰役...',
+        animal: '正在回顧你在翠谷的最後記憶...',
+        modern: '正在回顧你在這座城市的最後身影...',
+        hero: '正在回顧你在英雄世界的最後篇章...',
+    };
+    const scnId = window.__activeScenario?.id || 'wuxia';
+    if (epilogueStory) epilogueStory.innerHTML = `<p>${epilogueLoading[scnId] || epilogueLoading.wuxia}</p>`;
 
     try {
         const data = await api.getEpilogue();
