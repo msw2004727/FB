@@ -11,6 +11,7 @@ const DEFAULT_MAX_RETRIES = numberInRange(process.env.AI_MAX_RETRIES, 0, 0, 1);
 const DEFAULT_MAX_COMPLETION_TOKENS = numberInRange(process.env.AI_MAX_COMPLETION_TOKENS, 2048, 256, 4096);
 
 let _minimaxClient = null;
+const MINIMAX_QUOTA_CODES = new Set(['1008', '2056']);
 
 function numberInRange(value, fallback, min, max) {
     const parsed = Number(value);
@@ -116,6 +117,149 @@ function emitTelemetry(event, callback) {
     };
     console.log(JSON.stringify(payload));
     try { callback?.(payload); } catch (_) { /* telemetry must never break gameplay */ }
+}
+
+const PROVIDER_ERROR_MESSAGES = Object.freeze({
+    PROVIDER_QUOTA_EXHAUSTED: 'AI 供應額度目前已用完或受限。請在 AI 模型選單改用自備 API Key（BYOK），或更換有效金鑰後再試。',
+    BYOK_QUOTA_EXHAUSTED: '你的自備 API Key 額度已用完或受限。請至供應商後台確認額度，或更換有效金鑰後再試。',
+    PROVIDER_RESPONSE_REJECTED: 'AI 服務目前無法接受此請求，請稍後再試或改用自備 API Key（BYOK）。',
+    AI_ABORTED: 'AI 請求已取消或逾時。',
+    AI_PROVIDER_ERROR: 'AI 服務暫時無法完成請求，請稍後再試。',
+});
+
+function providerErrorMetadata(error) {
+    const candidates = [
+        error,
+        error?.error,
+        error?.raw,
+        error?.raw?.error,
+        error?.raw?.base_resp,
+        error?.body,
+        error?.body?.error,
+        error?.body?.base_resp,
+        error?.response,
+        error?.response?.data,
+        error?.response?.data?.error,
+        error?.response?.data?.base_resp,
+        error?.base_resp,
+        error?.cause,
+        error?.cause?.error,
+        error?.cause?.base_resp,
+    ].filter(Boolean);
+    const statuses = candidates
+        .map(candidate => Number(candidate?.status ?? candidate?.statusCode))
+        .filter(Number.isFinite);
+    const codes = candidates
+        .flatMap(candidate => [
+            candidate?.code,
+            candidate?.error_code,
+            candidate?.type,
+            candidate?.status_code,
+            candidate?.base_resp?.status_code,
+        ])
+        .filter(value => value !== undefined && value !== null)
+        .map(String);
+    return { status: statuses[0] || null, codes };
+}
+
+/**
+ * Convert provider SDK failures into a small public contract. Never copy the
+ * provider's message into this error: SSE errors are sent after headers have
+ * already been committed and therefore cannot rely on Express' 5xx redaction.
+ */
+function normalizeProviderError(error, options = {}) {
+    if (error?.isPublicProviderError) {
+        if (options.partial) error.partial = true;
+        return error;
+    }
+
+    const metadata = providerErrorMetadata(error);
+    const aborted = Boolean(options.aborted);
+    const providerRejected = Boolean(error?.isMinimaxBaseResponseError);
+    const quotaExhausted = metadata.status === 429
+        || metadata.codes.some(code => MINIMAX_QUOTA_CODES.has(code));
+    const code = aborted
+        ? 'AI_ABORTED'
+        : (quotaExhausted
+            ? 'PROVIDER_QUOTA_EXHAUSTED'
+            : (providerRejected ? 'PROVIDER_RESPONSE_REJECTED' : 'AI_PROVIDER_ERROR'));
+    const status = aborted ? 408 : ((quotaExhausted || providerRejected) ? 503 : 502);
+    const message = quotaExhausted && options.hasUserApiKey
+        ? PROVIDER_ERROR_MESSAGES.BYOK_QUOTA_EXHAUSTED
+        : PROVIDER_ERROR_MESSAGES[code];
+    const normalized = new Error(message);
+    normalized.name = 'AIProviderError';
+    normalized.code = code;
+    normalized.status = status;
+    normalized.retryable = code === 'AI_PROVIDER_ERROR' && !options.partial;
+    normalized.partial = Boolean(options.partial);
+    normalized.providerStatus = metadata.status;
+    normalized.isPublicProviderError = true;
+    normalized.cause = error;
+    return normalized;
+}
+
+function minimaxBaseResponseCode(payload) {
+    const value = payload?.base_resp?.status_code ?? payload?.status_code;
+    if (value === undefined || value === null || value === '') return null;
+    return String(value);
+}
+
+function assertMinimaxResponseSucceeded(payload) {
+    const code = minimaxBaseResponseCode(payload);
+    if (code === null || code === '0') return;
+    const providerError = new Error('MiniMax returned a non-success base response');
+    providerError.status_code = code;
+    providerError.base_resp = payload?.base_resp;
+    providerError.raw = payload;
+    providerError.isMinimaxBaseResponseError = true;
+    throw providerError;
+}
+
+function createMinimaxStreamProtocolError(payload = null) {
+    const providerError = new Error('MiniMax returned a non-SSE response to a streaming request');
+    providerError.status_code = minimaxBaseResponseCode(payload);
+    providerError.base_resp = payload?.base_resp;
+    providerError.raw = payload;
+    providerError.isMinimaxBaseResponseError = true;
+    return providerError;
+}
+
+async function inspectMinimaxStreamResponse(streamRequest) {
+    // OpenAI's APIPromise does not parse or consume the body when asResponse()
+    // is used. Inspect a clone before handing the original response to its SSE
+    // parser, because MiniMax can return HTTP 200 application/json errors for a
+    // stream request and the SDK then yields no chunks.
+    if (typeof streamRequest?.asResponse !== 'function') return;
+    const response = await streamRequest.asResponse();
+    const mediaType = String(response.headers.get('content-type') || '')
+        .split(';', 1)[0]
+        .trim()
+        .toLowerCase();
+    if (mediaType === 'text/event-stream') return;
+
+    let payload = null;
+    if (mediaType === 'application/json' || mediaType.endsWith('+json')) {
+        try { payload = await response.clone().json(); } catch (_) { /* reject below */ }
+    }
+    if (payload) assertMinimaxResponseSucceeded(payload);
+    throw createMinimaxStreamProtocolError(payload);
+}
+
+function setMinimaxClientForTests(client) {
+    _minimaxClient = client || null;
+}
+
+function publicProviderErrorPayload(error, requestId) {
+    if (!error?.isPublicProviderError) return null;
+    return {
+        success: false,
+        code: error.code,
+        error: error.message,
+        request_id: requestId,
+        retryable: Boolean(error.retryable),
+        status: error.status,
+    };
 }
 
 function providerRequestOptions(config, signal, timeoutMs) {
@@ -263,6 +407,7 @@ async function executeNonStreaming(modelName, prompt, isJsonExpected, config, us
             if (!process.env.MINIMAX_API_KEY) throw new Error('伺服器缺少 MiniMax API Key。');
             const body = minimaxOptions(prompt, isJsonExpected, config);
             const result = await getMinimax().chat.completions.create(body, requestOptions);
+            assertMinimaxResponseSucceeded(result);
             return {
                 text: stripThinking(result.choices?.[0]?.message?.content || ''),
                 providerModel: result.model || body.model,
@@ -307,6 +452,10 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
         return result.text;
     } catch (error) {
         const totalMs = Date.now() - startedAt;
+        const normalizedError = normalizeProviderError(error, {
+            aborted: deadline.signal.aborted,
+            hasUserApiKey: Boolean(userApiKey),
+        });
         emitTelemetry({
             request_id: config.requestId || null,
             task: config.task || 'unknown',
@@ -316,13 +465,10 @@ async function callAI(modelName, prompt, isJsonExpected = false, retryConfig = {
             status: deadline.signal.aborted ? 'aborted' : 'error',
             total_ms: totalMs,
             prompt_chars: String(prompt || '').length,
-            error: error?.message || String(error),
+            error_code: normalizedError.code,
+            provider_status: normalizedError.providerStatus,
         }, config.onTelemetry);
-        const detail = error?.message || String(error);
-        const wrapped = new Error(`AI模型 ${modelName || 'minimax'} 呼叫失敗: ${detail}`);
-        wrapped.cause = error;
-        wrapped.code = deadline.signal.aborted ? 'AI_ABORTED' : 'AI_PROVIDER_ERROR';
-        throw wrapped;
+        throw normalizedError;
     } finally {
         deadline.cleanup();
     }
@@ -357,11 +503,15 @@ async function streamAI(modelName, prompt, isJsonExpected = false, retryConfig =
 
     try {
         if (!process.env.MINIMAX_API_KEY) throw new Error('伺服器缺少 MiniMax API Key。');
-        const stream = await getMinimax().chat.completions.create(body, requestOptions);
+        const streamRequest = getMinimax().chat.completions.create(body, requestOptions);
+        await inspectMinimaxStreamResponse(streamRequest);
+        const stream = await streamRequest;
+        assertMinimaxResponseSucceeded(stream);
         providerRequestId = stream.request_id || stream._request_id || null;
 
         for await (const chunk of stream) {
             if (deadline.signal.aborted) break;
+            assertMinimaxResponseSucceeded(chunk);
             providerModel = chunk.model || providerModel;
             if (chunk.usage) usage = normalizeUsage(chunk.usage);
             const content = chunk.choices?.[0]?.delta?.content;
@@ -394,6 +544,11 @@ async function streamAI(modelName, prompt, isJsonExpected = false, retryConfig =
         return { text: cleanedText, streamed: true };
     } catch (error) {
         const totalMs = Date.now() - startedAt;
+        const normalizedError = normalizeProviderError(error, {
+            aborted: deadline.signal.aborted,
+            partial: textResponse.length > 0,
+            hasUserApiKey: Boolean(userApiKey),
+        });
         emitTelemetry({
             request_id: config.requestId || null,
             task: config.task || 'unknown',
@@ -405,13 +560,10 @@ async function streamAI(modelName, prompt, isJsonExpected = false, retryConfig =
             total_ms: totalMs,
             prompt_chars: String(prompt || '').length,
             usage,
-            error: error?.message || String(error),
+            error_code: normalizedError.code,
+            provider_status: normalizedError.providerStatus,
         }, config.onTelemetry);
-        const wrapped = new Error(`AI模型 ${modelName || 'minimax'} 串流失敗: ${error?.message || String(error)}`);
-        wrapped.cause = error;
-        wrapped.code = deadline.signal.aborted ? 'AI_ABORTED' : 'AI_PROVIDER_ERROR';
-        wrapped.partial = textResponse.length > 0;
-        throw wrapped;
+        throw normalizedError;
     } finally {
         deadline.cleanup();
     }
@@ -450,7 +602,14 @@ module.exports = {
     parseJsonResponse,
     stripThinking,
     normalizeUsage,
+    normalizeProviderError,
+    publicProviderErrorPayload,
     _internals: {
         minimaxOptions,
+        normalizeProviderError,
+        publicProviderErrorPayload,
+        assertMinimaxResponseSucceeded,
+        inspectMinimaxStreamResponse,
+        setMinimaxClientForTests,
     },
 };

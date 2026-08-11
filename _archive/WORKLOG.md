@@ -293,3 +293,11 @@ ame on changed enemies/allies entries and included a JSON example.
 - Closed final concurrency gaps: profile updates and profile/latest-save reads are now single IndexedDB transactions, with regressions for rename/death commits and concurrent load/death snapshots.
 - Added a safe Service Worker version handshake that defers reload while a paid request, draft input, API key entry, or offline state is active; legacy v0.26 still requires a Pages-first rollout window.
 - Key constraint: process-memory quotas reset across instances/revisions, so Cloud Run max instances and provider hard budgets/key rotation remain mandatory external controls.
+
+### Task: Normalize exhausted AI-provider quota safely (completed)
+- Normalized upstream HTTP 429 and MiniMax codes 1008/2056, including HTTP-200 `base_resp` failures, into a safe `503 PROVIDER_QUOTA_EXHAUSTED` response for JSON requests and pre-stream SSE failures.
+- Preserved the same non-retryable error contract in SSE after partial output without exposing provider response text, account details, or raw SDK errors.
+- Added a fixed Chinese BYOK explanation in the client and suppressed the retry button for quota exhaustion; no automatic owner-funded model fallback was introduced.
+- Added JSON, SSE-before-first-delta, SSE-after-partial-output, nested-code, real OpenAI-SDK HTTP-200 JSON-vs-SSE, client redaction, and retry-contract regressions.
+- Validation: 14 test files / 342 tests passed; production dependency audit reported 0 vulnerabilities.
+- Production note: the 2026-08-11 MiniMax canary is still externally blocked by exhausted Token Plan/Credits. Replenishing credits or upgrading the plan, rotating the key, and rerunning a successful JSON + SSE canary remain required before enabling strict anonymous sessions.

@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const aiRoutes = require('./routes/aiRoutes');
+const { publicProviderErrorPayload } = require('./services/aiService');
 const rateLimit = require('./middleware/rateLimit');
 const { createAnonymousSession } = require('./middleware/anonymousSession');
 const { createCostProtection } = require('./middleware/costProtection');
@@ -63,11 +64,12 @@ function createApp(env = process.env) {
     app.use((err, req, res, _next) => {
         const isBodyTooLarge = err?.type === 'entity.too.large';
         const isBadJson = err instanceof SyntaxError && err?.type === 'entity.parse.failed';
+        const providerError = publicProviderErrorPayload(err, req.id);
         const candidateStatus = Number(err?.status);
         const safeStatus = Number.isInteger(candidateStatus) && candidateStatus >= 400 && candidateStatus <= 599
             ? candidateStatus
             : 500;
-        const status = isBodyTooLarge ? 413 : (isBadJson ? 400 : safeStatus);
+        const status = providerError?.status || (isBodyTooLarge ? 413 : (isBadJson ? 400 : safeStatus));
         const expose = status < 500;
         console.error(JSON.stringify({
             event: 'server_error',
@@ -75,7 +77,8 @@ function createApp(env = process.env) {
             status,
             message: err?.message || String(err),
         }));
-        res.status(status).json({
+        if (providerError) return res.status(status).json(providerError);
+        return res.status(status).json({
             success: false,
             code: isBodyTooLarge ? 'PAYLOAD_TOO_LARGE' : (isBadJson ? 'INVALID_JSON' : 'INTERNAL_ERROR'),
             error: expose ? err.message : 'Internal server error',

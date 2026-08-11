@@ -8,6 +8,8 @@ const SESSION_KEY_PREFIX = 'fb_ai_proxy_session_';
 const SESSION_REFRESH_SKEW_MS = 30_000;
 const SESSION_ERROR_CODES = new Set(['SESSION_REQUIRED', 'SESSION_INVALID', 'SESSION_EXPIRED']);
 const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
+const PROVIDER_QUOTA_CODE = 'PROVIDER_QUOTA_EXHAUSTED';
+const PROVIDER_QUOTA_MESSAGE = 'AI 供應額度目前已用完或受限。請在 AI 模型選單改用自備 API Key（BYOK），或更換有效金鑰後再試。';
 
 const _sessionCache = new Map();
 const _sessionPromises = new Map();
@@ -207,14 +209,24 @@ function createRequestSignal(externalSignal, timeoutMs = DEFAULT_REQUEST_TIMEOUT
 
 async function throwProxyError(response, fallback) {
     const errorText = await response.text();
-    let errorMessage = fallback;
+    let payload = null;
     try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorJson.error || errorJson.message || errorText;
-    } catch {
-        if (errorText) errorMessage = errorText;
-    }
-    throw new Error(`AI Proxy 錯誤 (${response.status}): ${errorMessage}`);
+        payload = JSON.parse(errorText);
+    } catch { /* non-JSON failures use the local fallback */ }
+    throw createProxyError(payload, response.status, fallback);
+}
+
+function createProxyError(payload, status, fallback) {
+    const code = payload?.code || payload?.error?.code || null;
+    const upstreamMessage = payload?.error?.message || payload?.error || payload?.message;
+    const message = code === PROVIDER_QUOTA_CODE
+        ? PROVIDER_QUOTA_MESSAGE
+        : (typeof upstreamMessage === 'string' && upstreamMessage.trim() ? upstreamMessage : fallback);
+    const error = new Error(message);
+    error.code = code;
+    error.status = Number(status) || Number(payload?.status) || 0;
+    error.retryable = code === PROVIDER_QUOTA_CODE ? false : payload?.retryable !== false;
+    return error;
 }
 
 async function parseEventStream(response, onStoryDelta) {
@@ -238,9 +250,7 @@ async function parseEventStream(response, onStoryDelta) {
         if (eventName === 'story_delta' && payload.text) await onStoryDelta?.(payload.text);
         else if (eventName === 'result') finalPayload = payload;
         else if (eventName === 'error') {
-            const error = new Error(payload.error || 'AI 串流失敗');
-            error.code = payload.code;
-            throw error;
+            throw createProxyError(payload, payload.status || 200, 'AI 串流失敗');
         }
         eventName = 'message';
     };
@@ -269,7 +279,9 @@ async function parseEventStream(response, onStoryDelta) {
         reader.releaseLock();
     }
 
-    if (!finalPayload?.success) throw new Error(finalPayload?.error || 'AI 串流未回傳最終結果');
+    if (!finalPayload?.success) {
+        throw createProxyError(finalPayload, finalPayload?.status || 200, 'AI 串流未回傳最終結果');
+    }
     return finalPayload.data;
 }
 
@@ -323,7 +335,7 @@ export async function generate(task, model, context, options = {}) {
         }
 
         const data = await response.json();
-        if (!data.success) throw new Error(data.error || 'AI 生成失敗');
+        if (!data.success) throw createProxyError(data, response.status, 'AI 生成失敗');
         return data.data;
     } finally {
         request.cleanup();

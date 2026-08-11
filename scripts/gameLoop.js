@@ -305,17 +305,20 @@ export async function handlePlayerAction(actionOverride, optionMorality = 0) {
         const errorMessage = String(error.message || '');
         const retryContainer = document.createElement('div');
         retryContainer.className = 'system-message retry-message';
-        const retryButton = document.createElement('button');
-        retryButton.className = 'retry-btn';
-        retryButton.type = 'button';
-        retryButton.textContent = '重試';
-        retryContainer.append(document.createTextNode(`操作失敗：${errorMessage} `), retryButton);
-        retryButton.addEventListener('click', () => {
-            retryContainer.remove();
-            // actionOverride is undefined for typed input and the textbox was
-            // already cleared. Reuse the captured action so retry is real.
-            handlePlayerAction(actionText, optionMorality);
-        });
+        retryContainer.appendChild(document.createTextNode(`操作失敗：${errorMessage}`));
+        if (error.retryable !== false) {
+            const retryButton = document.createElement('button');
+            retryButton.className = 'retry-btn';
+            retryButton.type = 'button';
+            retryButton.textContent = '重試';
+            retryContainer.append(document.createTextNode(' '), retryButton);
+            retryButton.addEventListener('click', () => {
+                retryContainer.remove();
+                // actionOverride is undefined for typed input and the textbox was
+                // already cleared. Reuse the captured action so retry is real.
+                handlePlayerAction(actionText, optionMorality);
+            });
+        }
         const wrapper = document.getElementById('story-text-wrapper');
         if (wrapper) wrapper.appendChild(retryContainer);
     } finally {

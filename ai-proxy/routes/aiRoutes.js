@@ -684,24 +684,29 @@ router.post('/generate', async (req, res, next) => {
         // a single bounded non-streaming call inside the same SSE envelope.
         if (task === 'story') {
             if (wantsStream) {
-                res.status(200);
-                res.set({
-                    'Content-Type': 'text/event-stream; charset=utf-8',
-                    'Cache-Control': 'no-cache, no-transform',
-                    Connection: 'keep-alive',
-                    'X-Accel-Buffering': 'no',
-                    'X-Request-ID': requestId,
-                });
-                res.flushHeaders?.();
-                res.write(': connected\n\n');
-                sendSse(res, 'meta', { requestId, model: modelToUse, task });
-
                 let rawText = '';
                 let visibleStory = '';
-                const heartbeat = setInterval(() => {
-                    if (!res.writableEnded && !res.destroyed) res.write(': heartbeat\n\n');
-                }, 15_000);
-                heartbeat.unref?.();
+                let heartbeat = null;
+                let sseStarted = false;
+                const startSse = () => {
+                    if (sseStarted) return;
+                    sseStarted = true;
+                    res.status(200);
+                    res.set({
+                        'Content-Type': 'text/event-stream; charset=utf-8',
+                        'Cache-Control': 'no-cache, no-transform',
+                        Connection: 'keep-alive',
+                        'X-Accel-Buffering': 'no',
+                        'X-Request-ID': requestId,
+                    });
+                    res.flushHeaders?.();
+                    res.write(': connected\n\n');
+                    sendSse(res, 'meta', { requestId, model: modelToUse, task });
+                    heartbeat = setInterval(() => {
+                        if (!res.writableEnded && !res.destroyed) res.write(': heartbeat\n\n');
+                    }, 15_000);
+                    heartbeat.unref?.();
+                };
 
                 try {
                     req.providerCallStarted = true;
@@ -717,11 +722,13 @@ router.post('/generate', async (req, res, next) => {
                             if (partial.length > visibleStory.length) {
                                 const newText = partial.slice(visibleStory.length);
                                 visibleStory = partial;
+                                startSse();
                                 sendSse(res, 'story_delta', { text: newText });
                             }
                         }
                     );
                     const normalized = normalizeStoryResult(streamed.text, context, visibleStory);
+                    startSse();
                     if (normalized.data.story.length > visibleStory.length) {
                         sendSse(res, 'story_delta', {
                             text: normalized.data.story.slice(visibleStory.length),
@@ -737,18 +744,24 @@ router.post('/generate', async (req, res, next) => {
                         validation_warnings: normalized.warnings,
                     });
                     responseCompleted = true;
-                    clearInterval(heartbeat);
+                    if (heartbeat) clearInterval(heartbeat);
                     return res.end();
                 } catch (error) {
-                    clearInterval(heartbeat);
+                    if (heartbeat) clearInterval(heartbeat);
+                    const publicError = aiService.publicProviderErrorPayload(error, requestId) || {
+                        success: false,
+                        code: 'AI_STREAM_ERROR',
+                        error: 'AI 服務暫時無法完成請求，請稍後再試。',
+                        request_id: requestId,
+                        retryable: false,
+                        status: 502,
+                    };
+                    if (!sseStarted && !res.headersSent) {
+                        responseCompleted = true;
+                        return res.status(publicError.status).json(publicError);
+                    }
                     if (!res.destroyed && !res.writableEnded) {
-                        sendSse(res, 'error', {
-                            success: false,
-                            error: error.message || 'AI 串流失敗',
-                            code: error.code || 'AI_STREAM_ERROR',
-                            request_id: requestId,
-                            retryable: !error.partial,
-                        });
+                        sendSse(res, 'error', publicError);
                         responseCompleted = true;
                         return res.end();
                     }

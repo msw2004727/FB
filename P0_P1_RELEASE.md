@@ -31,6 +31,7 @@
 - 模型輸出的 NPC、日期推進與死亡狀態會在前後端雙重正規化；極端數字、空 NPC 與死後排隊動作不會卡死或污染存檔。
 - 固定 prompt 規則移到動態內容前，以提高 MiniMax prefix cache 命中機會；記錄 TTFT、總耗時、token、cache 與 reasoning telemetry。
 - MiniMax M2.x/M3 不傳送僅 MiniMax-Text-01 支援的 `response_format`；JSON 由固定契約、解析與 schema 正規化保證。
+- 供應商額度耗盡（HTTP 429／MiniMax 1008、2056，包含 HTTP 200 的 `base_resp` 錯誤）統一轉成安全的 `503 PROVIDER_QUOTA_EXHAUSTED`；JSON 與 SSE 行為一致、不洩漏供應商原文、不自動改用其他站方付費模型，前端改提示 BYOK 且不顯示無效重試按鈕。
 - 圖示與 Pages artifact 縮小；Service Worker 僅管理本 App cache，navigation 採 network-first 並可離線回退。
 
 ## Production 必要設定
@@ -48,6 +49,7 @@ SERVER_KEY_MODELS=minimax
 ENABLE_IMAGE_GENERATION=false
 MEMPALACE_ENABLED=false
 MAX_CONCURRENT_AI_REQUESTS=4
+AI_MAX_RETRIES=0
 RATE_LIMIT_SESSION_POINTS=24
 RATE_LIMIT_IP_POINTS=48
 INSTANCE_MAX_REQUESTS_PER_HOUR=300
@@ -61,6 +63,13 @@ Cloud Run 平台限制：`min-instances=0`、`max-instances=1`、`concurrency=4`
 
 首次由 v0.26 升級時必須先發布 Pages，再發布 Cloud Run。舊版頁面沒有新版 Service Worker 交握，採用窗口內先以 `REQUIRE_ANON_SESSION=false` 過渡；確認新版前端已自然或人工重新載入後才切成 `true`。仍開著的 v0.26 分頁不會自行顯示新版提示，若過早切成 strict 會收到 401。v0.27 之後會等待付費請求與未送出輸入結束，再安全刷新，不會強制中斷。
 
+## 2026-08-11 正式環境狀態
+
+- GitHub Pages v0.27 與 `us-central1` Cloud Run 已發布；Cloud Run 使用 Secret Manager、`max-instances=1`、`concurrency=4`，MemPalace／圖片生成均停用。
+- 相容窗口目前刻意維持 `REQUIRE_ANON_SESSION=false`。只有在新版前端採用窗口完成且真實 MiniMax JSON + SSE canary 成功後，才可切為 `true`。
+- 正式 MiniMax canary 目前被供應商帳戶的 Token Plan／Credits 額度耗盡（上游 429、code 2056）阻擋。必須先在 MiniMax 後台補充額度或升級方案並輪替金鑰，再重跑 canary；在成功前不得把本版本標成完整營運就緒。串流端也會在交給 SDK 前檢查原始 Content-Type，避免把 HTTP 200 JSON 錯誤誤當成空串流成功。
+- 程式已對上述配額錯誤 fail-safe：回傳非重試 503 與 BYOK 指引，不 fallback 到另一個站方付費模型。
+
 ## 發布 Gate
 
 1. 乾淨 `npm ci --ignore-scripts` 成功。
@@ -68,7 +77,7 @@ Cloud Run 平台限制：`min-instances=0`、`max-instances=1`、`concurrency=4`
 3. 所有 JavaScript syntax、JSON、Actions YAML、Pages allowlist 與 `git diff --check` 通過。
 4. PR 的 test/audit/container build 與 Pages quality workflow 全綠後才可合併。
 5. 正式 Pages 實機驗證桌面、390px 手機、IndexedDB 新局/續玩及離線啟動；確認新版 Service Worker 已發布後才收緊後端 session。
-6. Cloud Run canary 必須驗證：health、CORS、安全 headers、無 session 401、PoW session、圖片 404、SSE `story_delta` + `result`、一次 story 只有一次 provider call。
+6. Cloud Run canary 必須驗證：health、CORS、安全 headers、無 session 401、PoW session、圖片 404、JSON 成功、SSE `story_delta` + `result`、一次 story 只有一次 provider call。若供應商回配額錯誤，必須先確認安全 503 契約，再補足額度完成成功 canary，不能以失敗 canary 取代發布 Gate。
 
 ## 無法只靠程式碼封頂的風險
 

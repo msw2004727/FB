@@ -7,6 +7,7 @@ const providerMocks = {
 };
 
 const aiRoutes = require('../../routes/aiRoutes');
+const { normalizeProviderError, publicProviderErrorPayload } = require('../../services/aiService');
 
 const providerResult = JSON.stringify({
     story: '這是一段整合測試故事。'.repeat(42).slice(0, 470),
@@ -38,7 +39,11 @@ beforeAll(async () => {
     const app = express();
     app.use(express.json());
     app.use('/ai', aiRoutes);
-    app.use((error, _req, res, _next) => res.status(500).json({ success: false, error: error.message }));
+    app.use((error, req, res, _next) => {
+        const payload = publicProviderErrorPayload(error, req.id);
+        if (payload) return res.status(payload.status).json(payload);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    });
     await new Promise(resolve => {
         server = app.listen(0, '127.0.0.1', resolve);
     });
@@ -142,5 +147,75 @@ describe('POST /ai/generate story integration', () => {
         expect((await response.json()).success).toBe(true);
         expect(providerMocks.callAI).toHaveBeenCalledTimes(1);
         expect(providerMocks.streamAI).not.toHaveBeenCalled();
+    });
+
+    it('returns the safe quota contract with HTTP 503 in JSON mode', async () => {
+        providerMocks.callAI.mockRejectedValueOnce(normalizeProviderError({
+            status: 429,
+            code: 2056,
+            message: 'Token Plan usage limit reached: private provider detail',
+        }));
+
+        const response = await fetch(`${baseUrl}/ai/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(requestBody()),
+        });
+        const payload = await response.json();
+
+        expect(response.status).toBe(503);
+        expect(payload).toMatchObject({
+            success: false,
+            code: 'PROVIDER_QUOTA_EXHAUSTED',
+            retryable: false,
+            status: 503,
+        });
+        expect(payload.error).toContain('自備 API Key（BYOK）');
+        expect(JSON.stringify(payload)).not.toContain('Token Plan');
+    });
+
+    it('returns the same safe HTTP 503 contract before an SSE stream starts', async () => {
+        providerMocks.streamAI.mockRejectedValueOnce(normalizeProviderError({
+            status: 429,
+            message: 'upstream quota response must stay private',
+        }));
+
+        const response = await fetch(`${baseUrl}/ai/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify(requestBody()),
+        });
+        const payload = await response.json();
+
+        expect(response.status).toBe(503);
+        expect(response.headers.get('content-type')).toContain('application/json');
+        expect(payload).toMatchObject({
+            code: 'PROVIDER_QUOTA_EXHAUSTED',
+            retryable: false,
+            status: 503,
+        });
+        expect(JSON.stringify(payload)).not.toContain('upstream quota response');
+    });
+
+    it('emits the quota contract as a non-retryable SSE error after partial output', async () => {
+        providerMocks.streamAI.mockImplementationOnce(async (_model, _prompt, _json, _config, _key, onDelta) => {
+            await onDelta('{"story":"先顯示一段文字');
+            throw normalizeProviderError({ status: 429, code: 2056, message: 'private detail' }, { partial: true });
+        });
+
+        const response = await fetch(`${baseUrl}/ai/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify(requestBody()),
+        });
+        const body = await response.text();
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toContain('text/event-stream');
+        expect(body).toContain('event: error');
+        expect(body).toContain('PROVIDER_QUOTA_EXHAUSTED');
+        expect(body).toContain('"retryable":false');
+        expect(body).toContain('"status":503');
+        expect(body).not.toContain('private detail');
     });
 });
