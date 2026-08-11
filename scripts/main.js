@@ -5,22 +5,226 @@ import { initializeGmPanel } from './gmManager.js';
 import { gameState } from './gameState.js';
 import { initializeDOM, dom } from './dom.js';
 import { api } from './api.js';
-import { handleApiError } from './uiUpdater.js';
-import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, AI_MODEL_INFO, verifyVipPassword, activateVip, deactivateVip, isVip } from './aiModelPreference.js';
+import { handleApiError, setTextWithLineBreaks } from './uiUpdater.js';
+import { restoreAiModelSelection, setStoredAiModel, needsUserApiKey, getStoredApiKey, setStoredApiKey, migrateLegacyApiKeys, AI_MODEL_INFO } from './aiModelPreference.js';
 import clientDB from '../client/db/clientDB.js';
 import * as gameEngine from '../client/engine/gameEngine.js';
-import { exportSave, importSave, shouldRemindBackup, markBackupReminded } from '../client/utils/exportImport.js';
+import { exportSave, importSave, sanitizeFilenameSegment, shouldRemindBackup, markBackupReminded } from '../client/utils/exportImport.js';
 import { initStorageManager } from '../client/db/storageManager.js';
 import { getScenario } from '../client/scenarios/scenarios.js';
 
+export const CLIENT_APP_VERSION = 'v0.27.0';
+const SW_UPGRADE_MESSAGE = 'WENJIANG_SW_UPGRADE';
+const SW_CLIENT_READY_MESSAGE = 'WENJIANG_SW_CLIENT_READY';
+const SW_UPGRADE_MARKER = 'wenjiang-sw-version';
+const SW_RELOAD_ATTEMPT_KEY = 'wenjiang_sw_reload_attempt';
+let pendingServiceWorkerVersion = null;
+let serviceWorkerUpgradeTimer = null;
+
+function isVisible(element) {
+    if (!element || element.hidden || element.getAttribute?.('aria-hidden') === 'true') return false;
+    if (element.style?.display === 'none') return false;
+    if (typeof window.getComputedStyle === 'function') {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+    }
+    return true;
+}
+
+export function hasUnsafeUpgradeState() {
+    if (gameState.isRequesting) return true;
+
+    const active = document.activeElement;
+    if (active?.isContentEditable) return true;
+    if (active?.matches?.('input:not([type="hidden"]), textarea') && String(active.value || '').trim()) {
+        return true;
+    }
+
+    const playerInput = document.getElementById('player-input');
+    if (String(playerInput?.value || '').trim()) return true;
+
+    const introModal = document.getElementById('intro-modal');
+    const introInput = document.getElementById('intro-name-input');
+    if (isVisible(introModal) && String(introInput?.value || '').trim()) return true;
+
+    const apiKeyModal = document.getElementById('apikey-modal');
+    const apiKeyInput = document.getElementById('apikey-input');
+    return isVisible(apiKeyModal) && String(apiKeyInput?.value || '').trim().length > 0;
+}
+
+function notifyServiceWorker(decision = 'ready', target = navigator.serviceWorker?.controller) {
+    target?.postMessage({
+        type: SW_CLIENT_READY_MESSAGE,
+        clientVersion: CLIENT_APP_VERSION,
+        decision,
+    });
+}
+
+function clearCurrentUpgradeMarker() {
+    try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get(SW_UPGRADE_MARKER) !== CLIENT_APP_VERSION) return;
+        url.searchParams.delete(SW_UPGRADE_MARKER);
+        window.history.replaceState(window.history.state, '', url.href);
+    } catch {
+        // A malformed/embed URL must not stop application startup.
+    }
+}
+
+function hasUpgradeMarker(version) {
+    try {
+        return new URL(window.location.href).searchParams.get(SW_UPGRADE_MARKER) === version;
+    } catch {
+        return false;
+    }
+}
+
+function markUpgradeAttempt(version) {
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set(SW_UPGRADE_MARKER, version);
+        window.history.replaceState(window.history.state, '', url.href);
+    } catch {
+        // sessionStorage still provides the primary loop guard.
+    }
+}
+
+function attemptSafeServiceWorkerReload() {
+    if (!pendingServiceWorkerVersion) return;
+    if (navigator.onLine === false || hasUnsafeUpgradeState()) {
+        clearTimeout(serviceWorkerUpgradeTimer);
+        serviceWorkerUpgradeTimer = setTimeout(attemptSafeServiceWorkerReload, 1000);
+        return;
+    }
+
+    const targetVersion = pendingServiceWorkerVersion;
+    pendingServiceWorkerVersion = null;
+    clearTimeout(serviceWorkerUpgradeTimer);
+    try {
+        sessionStorage.setItem(SW_RELOAD_ATTEMPT_KEY, targetVersion);
+    } catch {
+        // The URL marker below remains available if storage is unavailable.
+    }
+    markUpgradeAttempt(targetVersion);
+    notifyServiceWorker('reloading');
+    window.location.reload();
+}
+
+function handleServiceWorkerUpgrade(event) {
+    const { type, version } = event.data || {};
+    if (type !== SW_UPGRADE_MESSAGE || typeof version !== 'string') return;
+
+    if (version === CLIENT_APP_VERSION) {
+        try {
+            sessionStorage.removeItem(SW_RELOAD_ATTEMPT_KEY);
+        } catch {}
+        clearCurrentUpgradeMarker();
+        notifyServiceWorker('current', event.source);
+        return;
+    }
+
+    let reloadAlreadyAttempted = hasUpgradeMarker(version);
+    try {
+        reloadAlreadyAttempted ||= sessionStorage.getItem(SW_RELOAD_ATTEMPT_KEY) === version;
+    } catch {}
+    if (reloadAlreadyAttempted) {
+        notifyServiceWorker('reload-already-attempted', event.source);
+        return;
+    }
+
+    pendingServiceWorkerVersion = version;
+    // Acknowledge immediately so the SW never force-navigates an upgrade-aware
+    // page. This page owns the safe timing and keeps any in-progress input intact.
+    notifyServiceWorker('deferred', event.source);
+    attemptSafeServiceWorkerReload();
+}
+
+export function setupServiceWorkerUpgrade() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerUpgrade);
+    navigator.serviceWorker.addEventListener('controllerchange', () => notifyServiceWorker('controller-changed'));
+    window.addEventListener('online', attemptSafeServiceWorkerReload);
+    document.addEventListener('input', attemptSafeServiceWorkerReload, { passive: true });
+    document.addEventListener('change', attemptSafeServiceWorkerReload, { passive: true });
+    clearCurrentUpgradeMarker();
+    notifyServiceWorker('page-ready');
+}
+
+setupServiceWorkerUpgrade();
+
+/** 顯示不依賴 innerHTML 的啟動失敗畫面，確保 IndexedDB 故障時不會永久卡遮罩。 */
+export function showFatalStartupError(error) {
+    // 用新節點取代舊 loading screen，避免先前排程的 fade-out timer
+    // 在錯誤畫面顯示後又把它移除。
+    document.getElementById('app-loading-screen')?.remove();
+    const screen = document.createElement('div');
+    screen.id = 'app-loading-screen';
+    document.body.appendChild(screen);
+
+    screen.setAttribute('role', 'alert');
+    screen.setAttribute('aria-live', 'assertive');
+    Object.assign(screen.style, {
+        position: 'fixed',
+        inset: '0',
+        zIndex: '99999',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+        opacity: '1',
+        background: 'rgba(15, 15, 24, 0.96)',
+        color: '#fff',
+    });
+
+    const panel = document.createElement('section');
+    panel.style.cssText = 'max-width:32rem;text-align:center;line-height:1.6;';
+    const title = document.createElement('h1');
+    title.style.fontSize = '1.35rem';
+    title.textContent = '遊戲無法啟動';
+    const message = document.createElement('p');
+    const safeReason = String(error?.message || '瀏覽器儲存空間目前無法使用').slice(0, 300);
+    message.textContent = `請確認瀏覽器允許網站儲存資料後再重試。錯誤：${safeReason}`;
+    const retryButton = document.createElement('button');
+    retryButton.type = 'button';
+    retryButton.textContent = '重新載入';
+    retryButton.style.cssText = 'margin-top:1rem;padding:.65rem 1.1rem;border:0;border-radius:8px;cursor:pointer;';
+    retryButton.addEventListener('click', () => window.location.reload());
+    panel.append(title, message, retryButton);
+    screen.replaceChildren(panel);
+}
+
+// 原本放在 index.html 的 inline script；移到外部模組後可用嚴格 CSP 禁止 inline script。
+try {
+    const storedTheme = localStorage.getItem('game_theme');
+    const theme = storedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.body.classList.remove('light-theme', 'dark-theme');
+    document.body.classList.add(`${theme === 'dark' ? 'dark' : 'light'}-theme`);
+} catch {
+    document.body.classList.remove('dark-theme');
+    document.body.classList.add('light-theme');
+}
+
+// 將舊版長期保存的 BYOK 搬到分頁工作階段儲存，並刪除 localStorage 舊值。
+migrateLegacyApiKeys();
+try {
+    if (localStorage.getItem('jwt_token') === 'local-pwa-token') {
+        localStorage.removeItem('jwt_token');
+    }
+} catch {
+    // localStorage 可能被瀏覽器停用；正式啟動流程會顯示可重試錯誤。
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    try {
     // 初始化 IndexedDB + 請求持久化儲存
     await clientDB.init();
     initStorageManager().catch(() => {});
 
     // 註冊 Service Worker (PWA)
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => notifyServiceWorker('registered'))
+            .catch(err => {
             console.warn('[SW] Service Worker 註冊失敗:', err);
         });
     }
@@ -140,34 +344,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 顯示該劇本的存檔
         const saves = profilesByScenario[scenarioId] || [];
-        let savesHtml = '';
+        scenarioSaves.replaceChildren();
         for (const p of saves) {
             const icon = SCENARIO_ICONS[scenarioId] || 'fa-book';
-            savesHtml += `<div class="scenario-save-row">
-                <button class="scenario-save-btn" data-profile-id="${p.id}">
-                    <span class="scenario-save-icon"><i class="fas ${icon}"></i></span>
-                    <span class="scenario-save-info">
-                        <span class="scenario-save-name">${p.username || '冒險者'}</span>
-                        <span class="scenario-save-detail">第 ${p.lastRound} 回</span>
-                    </span>
-                </button>
-                <button class="scenario-delete-btn" data-delete-id="${p.id}" data-delete-name="${p.username || '冒險者'}" title="刪除存檔"><i class="fas fa-trash-can"></i></button>
-            </div>`;
-        }
-        scenarioSaves.innerHTML = savesHtml;
+            const profileId = String(p.id ?? '');
+            const profileName = String(p.username || '冒險者');
 
-        // 綁定存檔按鈕事件
-        scenarioSaves.querySelectorAll('.scenario-save-btn').forEach(btn => {
-            btn.addEventListener('click', () => resolveChoice({ type: 'load', profileId: btn.dataset.profileId }));
-        });
+            const row = document.createElement('div');
+            row.className = 'scenario-save-row';
+            const loadButton = document.createElement('button');
+            loadButton.type = 'button';
+            loadButton.className = 'scenario-save-btn';
+            loadButton.dataset.profileId = profileId;
 
-        // 綁定刪除按鈕事件
-        scenarioSaves.querySelectorAll('.scenario-delete-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
+            const iconContainer = document.createElement('span');
+            iconContainer.className = 'scenario-save-icon';
+            const iconGlyph = document.createElement('i');
+            iconGlyph.className = `fas ${icon}`;
+            iconContainer.appendChild(iconGlyph);
+            const info = document.createElement('span');
+            info.className = 'scenario-save-info';
+            const name = document.createElement('span');
+            name.className = 'scenario-save-name';
+            name.textContent = profileName;
+            const detail = document.createElement('span');
+            detail.className = 'scenario-save-detail';
+            detail.textContent = `第 ${String(p.lastRound ?? 0)} 回`;
+            info.append(name, detail);
+            loadButton.append(iconContainer, info);
+            loadButton.addEventListener('click', () => resolveChoice({ type: 'load', profileId }));
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'scenario-delete-btn';
+            deleteButton.dataset.deleteId = profileId;
+            deleteButton.dataset.deleteName = profileName;
+            deleteButton.title = '刪除存檔';
+            const deleteIcon = document.createElement('i');
+            deleteIcon.className = 'fas fa-trash-can';
+            deleteButton.appendChild(deleteIcon);
+            deleteButton.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                const id = btn.dataset.deleteId;
-                const name = btn.dataset.deleteName;
-                if (!confirm(`確定刪除「${name}」的存檔？\n此操作無法復原。`)) return;
+                const id = deleteButton.dataset.deleteId;
+                const selectedName = deleteButton.dataset.deleteName;
+                if (!confirm(`確定刪除「${selectedName}」的存檔？\n此操作無法復原。`)) return;
                 await clientDB.resetProfile(id);
                 await clientDB.profiles.delete(id);
                 // 從本地資料移除
@@ -178,7 +398,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // 重新渲染
                 selectScenario(sid);
             });
-        });
+            row.append(loadButton, deleteButton);
+            scenarioSaves.appendChild(row);
+        }
 
         scenarioActions.style.display = '';
     }
@@ -295,9 +517,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     gameEngine.setActiveProfile(activeProfile.id);
     localStorage.setItem('wenjiang_active_profile', activeProfile.id);
     localStorage.setItem('username', activeProfile.username);
-    if (!localStorage.getItem('jwt_token')) {
-        localStorage.setItem('jwt_token', 'local-pwa-token');
-    }
 
     initializeDOM();
 
@@ -356,15 +575,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         forceUpdateBtn.addEventListener('click', async () => {
             if (!confirm('檢查並更新到最新版本？\n（遊戲存檔不會受影響）')) return;
             try {
-                // 1. 清除所有 SW 快取
+                // 1. 只清除本遊戲命名空間的快取，避免影響同網域其他 App。
                 const keys = await caches.keys();
-                await Promise.all(keys.map(k => caches.delete(k)));
-                // 2. 註銷 SW
-                const regs = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(regs.map(r => r.unregister()));
+                await Promise.all(keys.filter(key => key.startsWith('wenjiang-')).map(key => caches.delete(key)));
+                // 2. 只註銷 scope 正好屬於目前 App 路徑的 SW。
+                if ('serviceWorker' in navigator) {
+                    const appScope = new URL('./', document.baseURI);
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    const appRegs = regs.filter((registration) => {
+                        const scope = new URL(registration.scope);
+                        return scope.origin === appScope.origin && scope.pathname === appScope.pathname;
+                    });
+                    await Promise.all(appRegs.map(registration => registration.unregister()));
+                }
                 // 3. 強制重新載入（略過快取）
                 alert('快取已清除！頁面將重新載入。');
-                window.location.reload(true);
+                window.location.reload();
             } catch (e) {
                 alert('更新失敗：' + e.message + '\n\n請手動清除瀏覽器快取。');
             }
@@ -377,7 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         morality: { title: '立場傾向', body: '這條軸線反映你在這個世界裡的行事風格。\n\n每個劇本的兩端含義不同——可能是正義與邪惡、秩序與自由、共感與理性等等。\n\n你的每一個選擇都會微妙地推動這個數值。NPC 們會根據你的立場傾向，用不同的態度對待你。\n\n沒有所謂的「正確」方向，走到哪邊都有獨特的故事體驗。' },
         journey: { title: '旅程', body: '這裡記錄你的主線進度和目前的回合數。\n\n上面那排神秘的字元是里程碑標記——每當你觸發一個重大劇情轉折，就會點亮一個。集滿全部就能到達結局。\n\n下方的文字是你目前的主線任務提示。如果你迷路了，看看這裡也許能找到方向。\n\n（但說真的，迷路也是冒險的一部分不是嗎？）' },
         character: { title: '角色', body: '在這裡你可以修改角色的名字和性別。\n\n改完記得按右邊的 ✓ 儲存。你的名字會影響 NPC 怎麼稱呼你，性別會影響故事中的互動和稱呼方式。\n\n「重選劇本」按鈕可以回到劇本選擇畫面，你的進度會自動保存。' },
-        ai: { title: 'AI 核心', body: '這裡選擇為你編寫故事的 AI 模型。\n\n不同模型就像不同的小說家——有的文筆華麗、有的邏輯嚴密、有的腦洞大開。預設的 MiniMax 免費使用，其他模型需要自行輸入 API Key 或啟用 VIP。\n\n切換模型後故事風格會明顯改變，就像換了一個說書人。\n\n右邊的版本號是遊戲版本，跟你的故事無關，別擔心。' },
+        ai: { title: 'AI 核心', body: '這裡選擇為你編寫故事的 AI 模型。\n\n不同模型就像不同的小說家——有的文筆華麗、有的邏輯嚴密、有的腦洞大開。預設的 MiniMax 使用站方提供的限額；其他模型必須自行輸入 API Key。\n\n切換模型後故事風格會明顯改變，就像換了一個說書人。\n\n右邊的版本號是遊戲版本，跟你的故事無關，別擔心。' },
     };
 
     const helpModal = document.getElementById('card-help-modal');
@@ -392,7 +618,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const info = CARD_HELP[key];
             if (!info || !helpModal) return;
             helpTitle.textContent = info.title;
-            helpBody.innerHTML = info.body.replace(/\n/g, '<br>');
+            setTextWithLineBreaks(helpBody, info.body);
             helpModal.style.display = 'flex';
         });
     });
@@ -467,52 +693,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // VIP 按鈕 → 輸入密碼啟用
-    const vipBtn = document.getElementById('apikey-vip-btn');
-    const cancelVipBtn = document.getElementById('cancel-vip-btn');
-
-    function updateVipUI() {
-        if (cancelVipBtn) cancelVipBtn.style.display = isVip() ? '' : 'none';
-    }
-
-    if (vipBtn) {
-        vipBtn.addEventListener('click', () => {
-            const pw = prompt('請輸入 VIP 驗證碼：');
-            if (pw === null) return;
-            if (verifyVipPassword(pw)) {
-                activateVip();
-                const model = dom.aiModelSelector.value;
-                setStoredAiModel(model);
-                _previousModel = model;
-                closeApiKeyModal();
-                updateVipUI();
-                alert('VIP 已啟用！本次瀏覽期間所有 AI 模型皆可免費使用。');
-            } else {
-                alert('驗證碼錯誤。');
-            }
-        });
-    }
-
-    // 取消 VIP 按鈕
-    if (cancelVipBtn) {
-        cancelVipBtn.addEventListener('click', () => {
-            if (confirm('確定取消 VIP？\n取消後需要自行輸入 API Key 才能使用非預設模型。')) {
-                deactivateVip();
-                updateVipUI();
-                // 如果當前模型需要 key，切回 minimax
-                const current = dom.aiModelSelector?.value;
-                if (needsUserApiKey(current) && !getStoredApiKey(current)) {
-                    dom.aiModelSelector.value = 'minimax';
-                    setStoredAiModel('minimax');
-                    _previousModel = 'minimax';
-                }
-                alert('VIP 已取消。');
-            }
-        });
-    }
-
-    updateVipUI();
-
     // 顯示/隱藏密碼
     if (dom.apikeyToggleBtn) {
         dom.apikeyToggleBtn.addEventListener('click', () => {
@@ -582,7 +762,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function initialize() {
+    async function initialize() {
         // 主題：localStorage > 系統偏好 > 預設淺色
         const savedTheme = localStorage.getItem('game_theme');
         const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -708,7 +888,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `story_${localStorage.getItem('username') || 'archive'}_R${chapters.length}.txt`;
+                    const safeArchiveName = sanitizeFilenameSegment(localStorage.getItem('username'), 'archive');
+                    a.download = `story_${safeArchiveName}_R${chapters.length}.txt`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -741,13 +922,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (window.confirm(suicideMsg[scnId] || suicideMsg.wuxia)) {
                 gameLoop.setLoading(true, loadingMsg[scnId] || loadingMsg.wuxia);
                 try {
-                    // 死因 + 結局並行呼叫（速度快一倍）
-                    const [deathData, epilogueData] = await Promise.all([
-                        api.forceSuicide({ model: dom.aiModelSelector.value }),
-                        api.getEpilogue().catch(() => ({ epilogue: null })),
-                    ]);
+                    // 先提交死亡回合，再由 processNewRoundData 只生成一次結局。
+                    // 結局需要讀到已提交的死因，不能和死亡回合並行預取。
+                    const deathData = await api.forceSuicide({ model: dom.aiModelSelector.value });
                     gameLoop.processNewRoundData(deathData);
-                    gameLoop.handlePlayerDeath(epilogueData);
                 } catch (error) {
                     handleApiError(error);
                     gameLoop.setLoading(false);
@@ -813,8 +991,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         setGameContainerHeight();
         window.addEventListener('resize', setGameContainerHeight);
 
-        gameLoop.loadInitialGame();
+        await gameLoop.loadInitialGame();
     }
 
-    initialize();
+    await initialize();
+    } catch (error) {
+        console.error('[Startup] 遊戲啟動失敗:', error);
+        showFatalStartupError(error);
+    }
 });

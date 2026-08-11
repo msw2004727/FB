@@ -1,0 +1,20 @@
+title: 文字冒險故事
+description: AI 驅動的多劇本文字冒險遊戲
+
+# GitHub Pages 僅發布執行 PWA 所需內容。後端、測試與封存程式仍保留在
+# repository 供稽核，但不再成為公開網站路徑的一部分。
+exclude:
+  - ai-proxy
+  - _archive
+  - .github
+  - AI模型型號.md
+  - CHANGELOG.md
+  - CLAUDE.md
+  - claude-memory.md
+  - MEMORY_SYSTEM_UPGRADE_PLAN.md
+  - MEMPALACE_INTEGRATION_PLAN.md
+  - MEMPALACE_OPTIMIZATION_PLAN.md
+  - PWA_MIGRATION_PLAN.md
+
+keep_files:
+  - .well-known

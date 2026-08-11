@@ -74,10 +74,11 @@ describe('aiRoutes TASK_HANDLERS — prompt loading', () => {
             const exportedFns = Object.keys(mod);
             expect(exportedFns.length).toBeGreaterThan(0);
 
-            // 每個 prompt 應 export 至少一個函式
-            exportedFns.forEach(fnName => {
-                expect(typeof mod[fnName]).toBe('function');
-            });
+            // Prompt modules may also export declarative constants (for example
+            // progressEvaluatorPrompt.MILESTONES), but each module must expose
+            // at least one callable prompt builder.
+            const callableExports = exportedFns.filter(fnName => typeof mod[fnName] === 'function');
+            expect(callableExports.length).toBeGreaterThan(0);
         });
     });
 });

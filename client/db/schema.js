@@ -1,13 +1,14 @@
 // client/db/schema.js
-// IndexedDB Schema Definition — 精簡版（移除已刪除功能的 Store）
+// IndexedDB Schema Definition — 保守升級版
 
 export const DB_NAME = 'WenJiang_Game';
-export const DB_VERSION = 2; // 升版：移除廢棄 Store
+// v2 已包含目前所有 active stores。沒有真正 schema 變更時不可升版：
+// 舊 v0.26 分頁不會主動關閉連線，無意義升版會讓新版分頁永久 blocked。
+export const DB_VERSION = 2;
 
 /**
- * 只保留實際使用中的 Store。
- * 已移除：inventory, skills, npc_states, npc_templates,
- *         item_templates, skill_templates, bounties
+ * 目前程式會使用的 Store。舊版本建立的其他 Store 會原樣保留，
+ * 避免使用者僅因開啟新版網站便永久失去資料。
  */
 export const STORES = {
     profiles: {
@@ -52,14 +53,6 @@ export const STORES = {
  * 在 onupgradeneeded 中呼叫，建立或升級所有 Store。
  */
 export function applySchema(db) {
-    // 移除舊版廢棄的 Store
-    const deprecated = ['inventory', 'skills', 'npc_states', 'npc_templates', 'item_templates', 'skill_templates', 'bounties'];
-    for (const name of deprecated) {
-        if (db.objectStoreNames.contains(name)) {
-            db.deleteObjectStore(name);
-        }
-    }
-
     // 建立新 Store（如果不存在）
     for (const [storeName, config] of Object.entries(STORES)) {
         if (db.objectStoreNames.contains(storeName)) continue;

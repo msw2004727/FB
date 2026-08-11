@@ -59,7 +59,7 @@ export function updateUI(storyText, roundData, randomEvent, locationData) {
     }
 
     if (storyText) {
-        appendMessageToStory(storyText, 'story-text', { allowHtml: true });
+        appendMessageToStory(storyText, 'story-text');
     }
     if (!roundData) return;
 
@@ -115,21 +115,36 @@ function showToast(message) {
     }, 3000);
 }
 
-export function appendMessageToStory(htmlContent, className, options = {}) {
+/**
+ * 將不可信文字加入節點，並以真正的 <br> 保留換行。
+ * 這個 helper 刻意不接受 HTML，避免 AI、匯入檔或玩家輸入成為 XSS。
+ */
+export function appendTextWithLineBreaks(container, value, { doubleBreaks = false } = {}) {
+    if (!container) return;
+    const lines = String(value ?? '').replace(/\r\n?/g, '\n').split('\n');
+    const fragment = document.createDocumentFragment();
+
+    lines.forEach((line, index) => {
+        if (index > 0) {
+            fragment.appendChild(document.createElement('br'));
+            if (doubleBreaks) fragment.appendChild(document.createElement('br'));
+        }
+        fragment.appendChild(document.createTextNode(line));
+    });
+
+    container.appendChild(fragment);
+}
+
+export function setTextWithLineBreaks(container, value, options = {}) {
+    if (!container) return;
+    container.replaceChildren();
+    appendTextWithLineBreaks(container, value, options);
+}
+
+export function appendMessageToStory(textContent, className) {
     const p = document.createElement('p');
     if (className) p.className = className;
-    const allowHtml = options.allowHtml === true;
-
-    if (allowHtml) {
-        p.innerHTML = typeof htmlContent === 'string' ? htmlContent.replace(/\n/g, '<br>') : String(htmlContent ?? '');
-    } else {
-        const safeText = String(htmlContent ?? '');
-        const lines = safeText.split('\n');
-        lines.forEach((line, index) => {
-            if (index > 0) p.appendChild(document.createElement('br'));
-            p.appendChild(document.createTextNode(line));
-        });
-    }
+    appendTextWithLineBreaks(p, textContent);
 
     storyTextContainer.appendChild(p);
 
@@ -156,53 +171,50 @@ export function addRoundTitleToStory(titleText) {
     });
 }
 
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-const ALLOWED_NPC_FRIENDLINESS_CLASSES = new Set([
-    'devoted',
-    'trusted',
-    'friendly',
-    'neutral',
-    'wary',
-    'hostile',
-    'sworn_enemy'
-]);
-
-function normalizeNpcFriendlinessClass(value) {
-    const normalized = String(value || 'neutral').trim();
-    return ALLOWED_NPC_FRIENDLINESS_CLASSES.has(normalized) ? normalized : 'neutral';
-}
-
 function renderStatusChip(iconClass, label, value) {
-    return `
-        <div class="status-chip">
-            <span class="status-chip-icon" aria-hidden="true"><i class="fas ${iconClass}"></i></span>
-            <div class="status-chip-body">
-                <span class="status-chip-label">${escapeHtml(label)}</span>
-                <span class="status-chip-value">${escapeHtml(value)}</span>
-            </div>
-        </div>
-    `;
+    const chip = document.createElement('div');
+    chip.className = 'status-chip';
+
+    const icon = document.createElement('span');
+    icon.className = 'status-chip-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const iconGlyph = document.createElement('i');
+    iconGlyph.className = `fas ${iconClass}`;
+    icon.appendChild(iconGlyph);
+
+    const body = document.createElement('div');
+    body.className = 'status-chip-body';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'status-chip-label';
+    labelEl.textContent = String(label ?? '');
+    const valueEl = document.createElement('span');
+    valueEl.className = 'status-chip-value';
+    valueEl.textContent = String(value ?? '');
+    body.append(labelEl, valueEl);
+    chip.append(icon, body);
+    return chip;
 }
 
 function renderStatusRow(iconClass, label, value, { multiline = false } = {}) {
-    const rowClass = multiline ? 'status-info-row status-info-row-multiline' : 'status-info-row';
-    const valueClass = multiline ? 'status-info-value status-info-value-clamp-2' : 'status-info-value';
+    const row = document.createElement('div');
+    row.className = multiline ? 'status-info-row status-info-row-multiline' : 'status-info-row';
+    row.title = String(value ?? '');
 
-    return `
-        <div class="${rowClass}" title="${escapeHtml(value)}">
-            <span class="status-info-icon" aria-hidden="true"><i class="fas ${iconClass}"></i></span>
-            <span class="status-info-label">${escapeHtml(label)}</span>
-            <span class="${valueClass}">${escapeHtml(value)}</span>
-        </div>
-    `;
+    const icon = document.createElement('span');
+    icon.className = 'status-info-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const iconGlyph = document.createElement('i');
+    iconGlyph.className = `fas ${iconClass}`;
+    icon.appendChild(iconGlyph);
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'status-info-label';
+    labelEl.textContent = String(label ?? '');
+    const valueEl = document.createElement('span');
+    valueEl.className = multiline ? 'status-info-value status-info-value-clamp-2' : 'status-info-value';
+    valueEl.textContent = String(value ?? '');
+    row.append(icon, labelEl, valueEl);
+    return row;
 }
 
 // --- 時辰 SVG 圖示（武俠 + 學園共用，依 timeOfDay 名稱匹配）---
@@ -378,16 +390,21 @@ function updateStatusBar(roundData) {
     const dateString = `第 ${totalDays} 天`;
     const timeString = `約${roundData.timeOfDay || '未知'}`;
 
-    statusBarEl.innerHTML = `
-        <div class="status-chip-grid">
-            ${renderStatusChip('fa-calendar-alt', '日期', dateString)}
-            ${renderStatusChip('fa-clock', '時辰', timeString)}
-        </div>
-        <div class="status-info-list">
-            ${renderStatusRow('fa-cloud-sun', '天氣', weather)}
-            ${renderStatusRow('fa-map-marked-alt', '地點', location, { multiline: true })}
-        </div>
-    `;
+    if (!statusBarEl) return;
+    const chipGrid = document.createElement('div');
+    chipGrid.className = 'status-chip-grid';
+    chipGrid.append(
+        renderStatusChip('fa-calendar-alt', '日期', dateString),
+        renderStatusChip('fa-clock', '時辰', timeString)
+    );
+
+    const infoList = document.createElement('div');
+    infoList.className = 'status-info-list';
+    infoList.append(
+        renderStatusRow('fa-cloud-sun', '天氣', weather),
+        renderStatusRow('fa-map-marked-alt', '地點', location, { multiline: true })
+    );
+    statusBarEl.replaceChildren(chipGrid, infoList);
     updateTimeIcon(roundData.timeOfDay, roundData.WRD);
     updateTimeTheme(roundData.timeOfDay);
 }
@@ -423,33 +440,15 @@ function updateDeathCountdownUI(countdownValue) {
             countdownEl.className = 'death-countdown';
             pcContent.parentNode.insertBefore(countdownEl, pcContent.nextSibling);
         }
-        countdownEl.innerHTML = `<i class="fas fa-hourglass-half"></i> 氣息將絕 (剩餘 ${countdownValue} 回合)`;
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-hourglass-half';
+        icon.setAttribute('aria-hidden', 'true');
+        countdownEl.replaceChildren(icon, document.createTextNode(` 氣息將絕 (剩餘 ${countdownValue} 回合)`));
     } else if (countdownEl) {
         countdownEl.remove();
     }
 }
 
-
-function highlightNpcNames(text, npcs) {
-    if (!text) return '';
-    let highlightedText = escapeHtml(text);
-    if (npcs && Array.isArray(npcs) && npcs.length > 0) {
-        const sortedNpcs = [...npcs].sort((a, b) => String(b?.name || '').length - String(a?.name || '').length);
-        sortedNpcs.forEach(npc => {
-            const rawNpcName = String(npc?.name || '').trim();
-            if (!rawNpcName) return;
-
-            const safeNpcName = escapeHtml(rawNpcName);
-            const npcNamePattern = safeNpcName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(npcNamePattern, 'g');
-            const friendlinessClass = normalizeNpcFriendlinessClass(npc.friendliness);
-            const isDeceasedAttr = npc.isDeceased ? ' data-is-deceased="true"' : '';
-            const replacement = `<span class="npc-name npc-${friendlinessClass}" data-npc-name="${safeNpcName}"${isDeceasedAttr}>${safeNpcName}</span>`;
-            highlightedText = highlightedText.replace(regex, replacement);
-        });
-    }
-    return highlightedText;
-}
 
 export function handleApiError(error) {
     console.error('API error:', error);

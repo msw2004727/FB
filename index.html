@@ -2,15 +2,20 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
+    <!--
+      CSP 盤點：程式碼只載入同源 ES modules；Font Awesome、Google Fonts 是既有 CDN。
+      目前大量既有 style 屬性需要 style-src 'unsafe-inline'，但 script 不再允許 inline/eval。
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://wenjiang-ai-proxy-322557520154.us-central1.run.app http://localhost:3001 http://127.0.0.1:3001; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#e94560">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icons/icon02.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>文字冒險故事</title>
-    <link rel="icon" href="icons/icon02.png" type="image/png">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="styles/base.css">
     <link rel="stylesheet" href="styles/game.css">
@@ -26,12 +31,8 @@
     <link rel="stylesheet" href="styles/themes/modern.css">
     <link rel="stylesheet" href="styles/themes/hero.css">
 </head>
-<body>
+<body class="light-theme">
 <div id="app-loading-screen" style="position:fixed;inset:0;z-index:99999;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;transition:opacity 0.4s ease;"><div style="color:#fff;font-family:serif;font-size:1.2rem;opacity:0.7;letter-spacing:0.1em;">載入中⋯</div></div>
-<script>
-// 防閃爍：在 DOM 繪製前立即設定主題
-(function(){var t=localStorage.getItem('game_theme');if(!t)t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.body.classList.add(t+'-theme');})();
-</script>
     <div class="game-container" hidden>
         <button id="menu-toggle" class="menu-toggle" type="button" title="展開右側欄" aria-label="展開右側欄" aria-controls="dashboard" aria-expanded="false"><span id="menu-toggle-time-icon" class="menu-toggle-time-icon"></span></button>
 
@@ -184,7 +185,7 @@
                 </div>
 
                 <div class="info-card">
-                    <h4 style="display:flex;justify-content:space-between;align-items:center;"><span><i class="fas fa-microchip"></i> AI 核心 <button class="card-help-btn" data-help="ai"><i class="fas fa-circle-question"></i></button></span><span id="app-version" style="font-size:.65rem;font-weight:normal;opacity:.45;font-family:var(--font-sans);">V0.26 <button id="force-update-btn" title="檢查更新" style="background:none;border:none;cursor:pointer;opacity:.6;font-size:.6rem;padding:0 0 0 2px;color:inherit;vertical-align:middle;"><i class="fas fa-arrows-rotate"></i></button></span></h4>
+                    <h4 style="display:flex;justify-content:space-between;align-items:center;"><span><i class="fas fa-microchip"></i> AI 核心 <button class="card-help-btn" data-help="ai"><i class="fas fa-circle-question"></i></button></span><span id="app-version" style="font-size:.65rem;font-weight:normal;opacity:.45;font-family:var(--font-sans);">V0.27 <button id="force-update-btn" title="檢查更新" style="background:none;border:none;cursor:pointer;opacity:.6;font-size:.6rem;padding:0 0 0 2px;color:inherit;vertical-align:middle;"><i class="fas fa-arrows-rotate"></i></button></span></h4>
                     <div class="ai-model-row">
                         <div class="select-wrapper">
                             <select id="ai-model-selector">
@@ -200,11 +201,8 @@
                         <button id="edit-apikey-btn" class="edit-apikey-btn" title="設定 API Key">
                             <i class="fas fa-key"></i>
                         </button>
-                        <button id="cancel-vip-btn" class="cancel-vip-btn" title="取消 VIP" style="display:none;">
-                            <i class="fas fa-crown"></i>
-                        </button>
                     </div>
-                    <small class="ai-switcher-note">注意：更換核心後，故事風格與文筆將會改變。</small>
+                    <small class="ai-switcher-note">MiniMax 使用站方限額；其他模型需提供您自己的 API Key。</small>
                 </div>
 
                 <div id="backup-remind-banner" class="backup-remind-banner" style="display:none;">
@@ -219,7 +217,7 @@
                 <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;">
                     <div class="pwa-install-wrapper">
                         <button id="pwa-install-btn" class="pwa-install-btn" title="安裝到桌面">
-                            <img src="icons/icon02.png" alt="" class="pwa-install-bg" />
+                            <img src="icons/icon-512.png" alt="" class="pwa-install-bg" />
                             <div class="pwa-install-glare"></div>
                             <div class="pwa-install-overlay">
                                 <span class="pwa-install-text">安裝遊戲到桌面</span>
@@ -401,9 +399,8 @@
                 <div class="apikey-modal-actions">
                     <button id="apikey-cancel-btn" class="apikey-btn cancel">取消</button>
                     <button id="apikey-save-btn" class="apikey-btn save">儲存並啟用</button>
-                    <button id="apikey-vip-btn" class="apikey-btn vip">VIP</button>
                 </div>
-                <small class="apikey-note">API Key 僅儲存在您的瀏覽器本機，不會上傳至任何伺服器。</small>
+                <small class="apikey-note">API Key 只暫存在此分頁工作階段，並會透過文江 AI Proxy 轉送給您選擇的 AI 供應商；伺服器不應保存此金鑰。</small>
             </div>
         </div>
 

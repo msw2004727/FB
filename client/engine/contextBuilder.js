@@ -21,7 +21,16 @@ export async function buildContext(profileId) {
     const latestSave = await clientDB.saves.getLatest(profileId);
     const currentRound = latestSave?.R || 0;
     const recentCount = currentRound <= 5 ? Math.max(currentRound, 1) : (currentRound <= 20 ? 5 : 3);
-    const recentSaves = await clientDB.saves.getRecent(profileId, recentCount);
+    const storedRecentSaves = await clientDB.saves.getRecent(profileId, recentCount);
+    // Old saves and provider output may contain null/non-object NPC entries.
+    // Sanitize the context copy so one malformed historic round cannot prevent
+    // every later paid turn from being built.
+    const recentSaves = storedRecentSaves.map(save => ({
+        ...save,
+        NPC: Array.isArray(save?.NPC)
+            ? save.NPC.filter(npc => npc && typeof npc === 'object' && !Array.isArray(npc))
+            : [],
+    }));
 
     const lastSave = recentSaves.length > 0 ? recentSaves[recentSaves.length - 1] : null;
 
@@ -56,13 +65,20 @@ export async function buildContext(profileId) {
 
     // 從最近存檔組裝 NPC 上下文（名字、狀態、好感度）
     const npcContext = {};
-    const actorCandidates = [];
+    const knownActorNames = new Set();
+    for (const save of recentSaves) {
+        for (const npc of save.NPC) {
+            const name = typeof npc?.name === 'string' ? npc.name.trim().slice(0, 60) : '';
+            if (name) knownActorNames.add(name);
+        }
+    }
+    const actorCandidates = [...knownActorNames];
     if (lastSave?.NPC && Array.isArray(lastSave.NPC)) {
         for (const npc of lastSave.NPC) {
-            if (npc.name) {
-                actorCandidates.push(npc.name);
-                npcContext[npc.name] = {
-                    name: npc.name,
+            const name = typeof npc?.name === 'string' ? npc.name.trim().slice(0, 60) : '';
+            if (name) {
+                npcContext[name] = {
+                    name,
                     status: npc.status || '',
                     friendliness: npc.friendliness || 'neutral',
                     friendlinessChange: npc.friendlinessChange || 0,

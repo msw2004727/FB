@@ -6,12 +6,28 @@
 //   4. 寫入時去重 (dedup flag)
 //   5. KG Timeline 查詢
 
-const MEMPALACE_URL = process.env.MEMPALACE_URL || 'https://mempalace-server-322557520154.asia-east2.run.app';
+const MEMPALACE_URL = String(process.env.MEMPALACE_URL || '').trim();
 const TIMEOUT_MS = 3000;
 const TOKEN_BUDGET = 800;
+// Opt-in only. The game must never depend on a second Cloud Run service by default.
+const MEMPALACE_REQUESTED = process.env.MEMPALACE_ENABLED === 'true';
+function isValidHttpUrl(value) {
+    try {
+        const parsed = new URL(value);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && Boolean(parsed.hostname);
+    } catch {
+        return false;
+    }
+}
+const MEMPALACE_URL_VALID = isValidHttpUrl(MEMPALACE_URL);
+const MEMPALACE_ENABLED = MEMPALACE_REQUESTED && MEMPALACE_URL_VALID;
+if (MEMPALACE_REQUESTED && !MEMPALACE_URL_VALID) {
+    console.warn('[MemPalace] MEMPALACE_ENABLED=true 但未提供有效的 MEMPALACE_URL；已安全停用。');
+}
 let _timeoutCount = 0;
 
 async function request(path, body) {
+    if (!MEMPALACE_ENABLED) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
@@ -68,6 +84,7 @@ function estimateImportance(roundData, story) {
 // ── Phase 1: 寫入記憶 ──────────────────────────────────
 
 function addMemory(wing, room, content, metadata = {}, dedup = false) {
+    if (!MEMPALACE_ENABLED) return false;
     request('/add', { wing, room, content, metadata, dedup }).then(r => {
         if (r && r.success) {
             const tag = r.deduplicated ? 'DEDUP' : 'NEW';
@@ -80,9 +97,11 @@ function addMemory(wing, room, content, metadata = {}, dedup = false) {
     }).catch(err => {
         console.warn(`[MemPalace] Write error ${wing}/${room}:`, err.message);
     });
+    return true;
 }
 
 function saveRoundMemory(playerId, roundData, story) {
+    if (!MEMPALACE_ENABLED) return false;
     const wing = `player_${playerId}`;
     const roundNum = roundData.R || 0;
     const roundId = `R${roundNum}`;
@@ -140,6 +159,7 @@ function saveRoundMemory(playerId, roundData, story) {
         const direction = roundData.moralityChange > 0 ? '偏正' : '偏邪';
         addFact(wing, '主角', 'morality_shift', direction, roundId);
     }
+    return true;
 }
 
 // ── Phase 2: 讀取記憶 ──────────────────────────────────
@@ -193,6 +213,7 @@ function estimateTokens(text) {
  * v3.0 核心：組裝深度記憶上下文（含 recency + timeline + token 預算）
  */
 async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], currentRound = 0) {
+    if (!MEMPALACE_ENABLED) return '';
     const wing = `player_${playerId}`;
 
     try {
@@ -277,7 +298,9 @@ async function buildDeepMemoryContext(playerId, playerAction, npcNames = [], cur
 // ── Phase 3: 知識圖譜 ──────────────────────────────────
 
 function addFact(wing, subject, predicate, object, validFrom = '') {
+    if (!MEMPALACE_ENABLED) return false;
     request('/kg/add', { wing, subject, predicate, object, valid_from: validFrom }).catch(() => {});
+    return true;
 }
 
 async function queryEntity(entity, wing = null) {
@@ -286,12 +309,15 @@ async function queryEntity(entity, wing = null) {
 }
 
 function invalidateFact(wing, subject, predicate, object = '', ended = '') {
+    if (!MEMPALACE_ENABLED) return false;
     request('/kg/invalidate', { wing, subject, predicate, object, ended }).catch(() => {});
+    return true;
 }
 
 // ── Health check ─────────────────────────────────────────
 
 async function isAvailable() {
+    if (!MEMPALACE_ENABLED) return false;
     try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 1000);
@@ -303,5 +329,6 @@ async function isAvailable() {
 
 module.exports = {
     addMemory, search, searchRanked, saveRoundMemory, buildDeepMemoryContext,
-    addFact, queryEntity, invalidateFact, getTimeline, isAvailable
+    addFact, queryEntity, invalidateFact, getTimeline, isAvailable,
+    isEnabled: () => MEMPALACE_ENABLED,
 };

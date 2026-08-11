@@ -1,11 +1,10 @@
 // client/db/storageManager.js
-// IndexedDB 容量管理 — 自動清理老舊資料 + 持久化儲存
+// IndexedDB 容量管理 — 保守清理 + 持久化儲存
 
 import clientDB from './clientDB.js';
 
 const SAVE_RETENTION = 10;
 const CHECKPOINT_INTERVAL = 10;
-const CHAPTER_RETENTION = 20;
 const CLUE_SUMMARY_MAX_CHARS = 2000;
 const CLUE_SUMMARY_TRIGGER = 3000;
 const CLEANUP_INTERVAL_ROUNDS = 10;
@@ -52,34 +51,6 @@ async function pruneGameSaves(profileId) {
 }
 
 /**
- * 清理舊章節：保留最近 N 筆
- */
-async function pruneNovelChapters(profileId) {
-    const allChapters = await clientDB.novel.getAll(profileId);
-    if (allChapters.length <= CHAPTER_RETENTION) return 0;
-
-    const sorted = [...allChapters].sort((a, b) => (b.round || 0) - (a.round || 0));
-    const toKeep = new Set(sorted.slice(0, CHAPTER_RETENTION).map(c => c.round));
-    const toDelete = allChapters.filter(c => !toKeep.has(c.round));
-
-    if (toDelete.length === 0) return 0;
-
-    const db = await clientDB.init();
-    const tx = db.transaction('novel_chapters', 'readwrite');
-    const store = tx.objectStore('novel_chapters');
-    for (const ch of toDelete) {
-        store.delete([ch.profileId, ch.round]);
-    }
-    await new Promise((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-
-    console.debug(`[StorageManager] 清理了 ${toDelete.length} 筆舊章節`);
-    return toDelete.length;
-}
-
-/**
  * 截斷過長的 clues_summary
  */
 async function trimCluesSummary(profileId) {
@@ -115,17 +86,19 @@ export async function runCleanup(profileId, currentRound) {
     if (currentRound > 0 && currentRound % CLEANUP_INTERVAL_ROUNDS !== 0) return;
 
     try {
-        const [savedCount, chapterCount] = await Promise.all([
-            pruneGameSaves(profileId),
-            pruneNovelChapters(profileId),
-        ]);
+        // 故事章節是使用者內容，永不自動刪除。只有瀏覽器配額使用率超過
+        // 80% 時才壓縮可重建的回合快照，並保留近期回合與檢查點。
+        let savedCount = 0;
+        let estimate = null;
+        if (navigator.storage?.estimate) {
+            estimate = await navigator.storage.estimate();
+            const ratio = estimate.quota ? (estimate.usage || 0) / estimate.quota : 0;
+            if (ratio >= 0.8) savedCount = await pruneGameSaves(profileId);
+        }
         await trimCluesSummary(profileId);
 
-        if (savedCount > 0 || chapterCount > 0) {
-            if (navigator.storage && navigator.storage.estimate) {
-                const est = await navigator.storage.estimate();
-                console.debug(`[StorageManager] 使用量: ${((est.usage || 0) / 1024 / 1024).toFixed(2)} MB`);
-            }
+        if (savedCount > 0 && estimate) {
+            console.debug(`[StorageManager] 使用量: ${((estimate.usage || 0) / 1024 / 1024).toFixed(2)} MB`);
         }
     } catch (err) {
         console.warn('[StorageManager] 清理失敗（不影響遊戲）:', err.message);

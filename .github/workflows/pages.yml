@@ -1,0 +1,146 @@
+name: Publish active PWA to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "manifest.json"
+      - "sw.js"
+      - "favicon.ico"
+      - "client/**"
+      - "scripts/**"
+      - "styles/**"
+      - "icons/icon-192.png"
+      - "icons/icon-512.png"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ai-proxy/package-lock.json
+
+      - name: Install exactly from lockfile
+        working-directory: ai-proxy
+        run: npm ci --ignore-scripts
+
+      - name: Run backend and PWA tests
+        working-directory: ai-proxy
+        run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: quality
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Stage only the active PWA allowlist
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          while IFS= read -r file; do
+            mkdir -p "_site/$(dirname "$file")"
+            cp -- "$file" "_site/$file"
+          done <<'PWA_ALLOWLIST'
+          index.html
+          manifest.json
+          sw.js
+          favicon.ico
+          scripts/main.js
+          scripts/gameLoop.js
+          scripts/api.js
+          scripts/gameState.js
+          scripts/uiUpdater.js
+          scripts/dom.js
+          scripts/tips.js
+          scripts/config.js
+          scripts/aiModelPreference.js
+          scripts/gmManager.js
+          scripts/timeEffects.js
+          client/db/clientDB.js
+          client/db/schema.js
+          client/db/storageManager.js
+          client/engine/gameEngine.js
+          client/engine/stateManager.js
+          client/engine/contextBuilder.js
+          client/ai/aiProxy.js
+          client/utils/gameUtils.js
+          client/utils/exportImport.js
+          client/scenarios/scenarios.js
+          styles/base.css
+          styles/game.css
+          styles/components.css
+          styles/modals_feedback.css
+          styles/modals_interaction.css
+          styles/modals_location.css
+          styles/gmPanel.css
+          styles/modals_info.css
+          styles/themes/school.css
+          styles/themes/mecha.css
+          styles/themes/animal.css
+          styles/themes/modern.css
+          styles/themes/hero.css
+          icons/icon-192.png
+          icons/icon-512.png
+          PWA_ALLOWLIST
+
+          if find _site -type l -print -quit | grep -q .; then
+            echo "Refusing to publish symbolic links"
+            exit 1
+          fi
+
+          for forbidden in _archive ai-proxy tests docs .git .github; do
+            if [ -e "_site/$forbidden" ]; then
+              echo "Forbidden publish path found: $forbidden"
+              exit 1
+            fi
+          done
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload allowlisted artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

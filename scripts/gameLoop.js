@@ -2,7 +2,14 @@
 
 import { api } from './api.js';
 import { gameState } from './gameState.js';
-import { updateUI, handleApiError, appendMessageToStory, addRoundTitleToStory } from './uiUpdater.js';
+import {
+    updateUI,
+    handleApiError,
+    appendMessageToStory,
+    addRoundTitleToStory,
+    appendTextWithLineBreaks,
+    setTextWithLineBreaks,
+} from './uiUpdater.js';
 import { getScenarioTips } from './tips.js';
 import { dom } from './dom.js';
 
@@ -18,6 +25,18 @@ let tipInterval = null;
 let disclaimerInterval = null;
 let timerInterval = null;
 let timerStart = 0;
+
+export function hideThinkingOverlayForStream() {
+    // 第一段正文已到達時只收起遮罩；請求鎖與輸入 disabled 狀態仍在
+    // 整個請求完成後才解除。
+    clearInterval(tipInterval);
+    clearInterval(disclaimerInterval);
+    clearInterval(timerInterval);
+    tipInterval = null;
+    disclaimerInterval = null;
+    timerInterval = null;
+    dom.aiThinkingLoader?.classList.remove('visible');
+}
 
 export function setLoading(isLoading, text = '') {
     gameState.isRequesting = isLoading;
@@ -45,7 +64,7 @@ export function setLoading(isLoading, text = '') {
             const rotateDisclaimer = () => {
                 if (loadingDisclaimers.length > 0) {
                     if(loaderDisclaimerElement) {
-                        loaderDisclaimerElement.innerHTML = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
+                        loaderDisclaimerElement.textContent = loadingDisclaimers.sort(() => 0.5 - Math.random())[0];
                     }
                 }
             };
@@ -56,7 +75,7 @@ export function setLoading(isLoading, text = '') {
             const rotateTip = () => {
                 if (scenarioTips.length > 0) {
                     if (loaderTipElement) {
-                        loaderTipElement.innerHTML = scenarioTips.sort(() => 0.5 - Math.random())[0];
+                        loaderTipElement.textContent = scenarioTips.sort(() => 0.5 - Math.random())[0];
                     }
                 }
             };
@@ -76,6 +95,7 @@ export function setLoading(isLoading, text = '') {
             clearInterval(tipInterval);
             clearInterval(disclaimerInterval);
             clearInterval(timerInterval);
+            tipInterval = null;
             disclaimerInterval = null;
             timerInterval = null;
         }
@@ -84,7 +104,7 @@ export function setLoading(isLoading, text = '') {
 
 }
 
-export async function handlePlayerDeath(preloadedEpilogue = null) {
+export async function handlePlayerDeath(preloadedEpilogue = null, model = null) {
     const epilogueModal = document.getElementById('epilogue-modal');
     const epilogueStory = document.getElementById('epilogue-story');
     const epilogueTitle = document.getElementById('epilogue-title');
@@ -110,27 +130,37 @@ export async function handlePlayerDeath(preloadedEpilogue = null) {
 
     // 如果結局已預載（並行呼叫），直接顯示
     if (preloadedEpilogue && preloadedEpilogue.epilogue) {
-        if (epilogueStory) epilogueStory.innerHTML = preloadedEpilogue.epilogue.replace(/\n/g, '<br><br>');
+        setTextWithLineBreaks(epilogueStory, preloadedEpilogue.epilogue, { doubleBreaks: true });
         return;
     }
 
     // 否則顯示載入動畫 + 等待
     if (epilogueStory) {
-        epilogueStory.innerHTML = `
-            <div class="epilogue-loading">
-                <div class="loader-dots"><span></span><span></span><span></span></div>
-                <p>${loadingHints[scnId] || loadingHints.wuxia}</p>
-                <p style="font-size:.75rem;opacity:.5;margin-top:.5rem;">精彩回顧即將呈現，請不要離開這個頁面 ✨</p>
-            </div>`;
+        const loading = document.createElement('div');
+        loading.className = 'epilogue-loading';
+        const dots = document.createElement('div');
+        dots.className = 'loader-dots';
+        dots.append(document.createElement('span'), document.createElement('span'), document.createElement('span'));
+        const hint = document.createElement('p');
+        hint.textContent = loadingHints[scnId] || loadingHints.wuxia;
+        const reminder = document.createElement('p');
+        reminder.style.cssText = 'font-size:.75rem;opacity:.5;margin-top:.5rem;';
+        reminder.textContent = '精彩回顧即將呈現，請不要離開這個頁面 ✨';
+        loading.append(dots, hint, reminder);
+        epilogueStory.replaceChildren(loading);
     }
 
     try {
-        const data = await api.getEpilogue();
+        const data = await api.getEpilogue({ model });
         if (data && data.epilogue) {
-            if (epilogueStory) epilogueStory.innerHTML = data.epilogue.replace(/\n/g, '<br><br>');
+            setTextWithLineBreaks(epilogueStory, data.epilogue, { doubleBreaks: true });
         }
     } catch (error) {
-        if (epilogueStory) epilogueStory.innerHTML = `<p>結局載入失敗。(${error.message})</p>`;
+        if (epilogueStory) {
+            const errorParagraph = document.createElement('p');
+            errorParagraph.textContent = `結局載入失敗。(${String(error?.message || '未知錯誤')})`;
+            epilogueStory.replaceChildren(errorParagraph);
+        }
     }
 }
 
@@ -168,7 +198,7 @@ export async function processNewRoundData(data) {
 
     if (data.roundData.playerState === 'dead') {
         setLoading(false);
-        handlePlayerDeath();
+        handlePlayerDeath(null, data.roundData.epilogueModel || dom.aiModelSelector?.value || null);
         return;
     }
 
@@ -209,11 +239,44 @@ export async function handlePlayerAction(actionOverride, optionMorality = 0) {
 
     const prequelElement = dom.storyTextContainer.querySelector('.prequel-summary');
     if (prequelElement) {
-        dom.storyTextContainer.innerHTML = '';
+        dom.storyTextContainer.replaceChildren();
     }
 
     setLoading(true, '正在處理你的行動...');
     appendMessageToStory(`> ${actionText}`, 'player-action-log');
+
+    // aiProxy 會為 story SSE 的每個新增片段送出此事件。listener 僅存活於
+    // 本次 interact，避免重試或多回合累積重複 listener。
+    let streamingStoryElement = null;
+    let streamedStoryText = '';
+    let streamingFrame = null;
+    const flushStreamingStory = () => {
+        streamingFrame = null;
+        if (!streamingStoryElement) {
+            streamingStoryElement = document.createElement('p');
+            streamingStoryElement.className = 'story-text story-streaming';
+            streamingStoryElement.style.whiteSpace = 'pre-wrap';
+            streamingStoryElement.setAttribute('aria-live', 'polite');
+            streamingStoryElement.setAttribute('aria-atomic', 'false');
+            dom.storyTextContainer.appendChild(streamingStoryElement);
+        }
+        streamingStoryElement.textContent = streamedStoryText;
+        const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+        streamingStoryElement.scrollIntoView({
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+            block: 'end',
+        });
+    };
+    const handleStoryDelta = (event) => {
+        const delta = event?.detail?.text;
+        if (typeof delta !== 'string' || delta.length === 0) return;
+        if (streamedStoryText.length === 0) hideThinkingOverlayForStream();
+        streamedStoryText += delta;
+        if (streamingFrame === null) {
+            streamingFrame = requestAnimationFrame(flushStreamingStory);
+        }
+    };
+    window.addEventListener('wenjiang:story-delta', handleStoryDelta);
 
     try {
         const data = await api.interact({
@@ -224,6 +287,14 @@ export async function handlePlayerAction(actionOverride, optionMorality = 0) {
         });
         
         if (data && data.roundData) {
+            // 最終完整正文會由 processNewRoundData 安全渲染；先移除暫存節點，
+            // 避免串流文字和最終文字各顯示一次。
+            if (streamingFrame !== null) {
+                cancelAnimationFrame(streamingFrame);
+                streamingFrame = null;
+            }
+            streamingStoryElement?.remove();
+            streamingStoryElement = null;
             processNewRoundData(data);
         } else {
             throw new Error('API 未回傳有效的 roundData。');
@@ -234,14 +305,30 @@ export async function handlePlayerAction(actionOverride, optionMorality = 0) {
         const errorMessage = String(error.message || '');
         const retryContainer = document.createElement('div');
         retryContainer.className = 'system-message retry-message';
-        retryContainer.innerHTML = `操作失敗：${errorMessage.replace(/</g,'&lt;')} <button class="retry-btn">重試</button>`;
-        retryContainer.querySelector('.retry-btn').addEventListener('click', () => {
+        const retryButton = document.createElement('button');
+        retryButton.className = 'retry-btn';
+        retryButton.type = 'button';
+        retryButton.textContent = '重試';
+        retryContainer.append(document.createTextNode(`操作失敗：${errorMessage} `), retryButton);
+        retryButton.addEventListener('click', () => {
             retryContainer.remove();
-            handlePlayerAction(actionOverride, optionMorality);
+            // actionOverride is undefined for typed input and the textbox was
+            // already cleared. Reuse the captured action so retry is real.
+            handlePlayerAction(actionText, optionMorality);
         });
         const wrapper = document.getElementById('story-text-wrapper');
         if (wrapper) wrapper.appendChild(retryContainer);
     } finally {
+        window.removeEventListener('wenjiang:story-delta', handleStoryDelta);
+        if (streamingFrame !== null) {
+            cancelAnimationFrame(streamingFrame);
+            flushStreamingStory();
+        }
+        if (streamingStoryElement && streamedStoryText) {
+            streamingStoryElement.classList.remove('story-streaming');
+            streamingStoryElement.classList.add('story-streaming-interrupted');
+            streamingStoryElement.removeAttribute('aria-live');
+        }
         if (!document.getElementById('epilogue-modal').classList.contains('visible')) {
              setLoading(false);
         }
@@ -306,18 +393,22 @@ export async function loadInitialGame() {
             return;
         }
 
-        dom.storyTextContainer.innerHTML = '';
+        dom.storyTextContainer.replaceChildren();
         if (data.gameState === 'deceased') {
             if(data.roundData) {
                 if (data.locationData) gameState.currentLocationData = data.locationData;
                 updateUI('', data.roundData, null, data.locationData);
             }
-            handlePlayerDeath();
+            handlePlayerDeath(null, data.roundData?.epilogueModel || dom.aiModelSelector?.value || null);
         } else {
             if (data.prequel) {
                 const prequelDiv = document.createElement('div');
                 prequelDiv.className = 'prequel-summary';
-                prequelDiv.innerHTML = `<h3>前情提要</h3><p>${data.prequel.replace(/\n/g, '<br>')}</p>`;
+                const prequelTitle = document.createElement('h3');
+                prequelTitle.textContent = '前情提要';
+                const prequelText = document.createElement('p');
+                appendTextWithLineBreaks(prequelText, data.prequel);
+                prequelDiv.append(prequelTitle, prequelText);
                 dom.storyTextContainer.appendChild(prequelDiv);
             }
             // ?????????????????????????????????????????????? gameState

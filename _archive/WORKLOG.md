@@ -263,7 +263,7 @@ ode --check.
 ode --check.
 
 ### Task: Fix invalid NPC attack intention payload (completed)
-- Restored NPC attack intention button data-intention values in scripts/interactionHandlers.js to the backend whitelist values (¤Á½R, ±Ð°V, ¥´¦º) after they were corrupted to question marks, which caused /initiateCombat to return µL®Äªº°Ê¤â·N¹Ï¡C`r
+- Restored NPC attack intention button data-intention values in scripts/interactionHandlers.js to the backend whitelist values (ï¿½ï¿½ï¿½R, ï¿½Ð°V, ï¿½ï¿½ï¿½ï¿½) after they were corrupted to question marks, which caused /initiateCombat to return ï¿½Lï¿½Äªï¿½ï¿½Ê¤ï¿½Nï¿½Ï¡C`r
 - Also restored the attack confirmation prompt text and attack-loading text for the NPC interaction menu.
 
 ### Task: Stop local preview server (completed)
@@ -283,3 +283,13 @@ ode --check.
 - Updated prompts/combatPrompt.js to explicitly require 
 ame on changed enemies/allies entries and included a JSON example.
 - Improved combat card DOM lookup robustness in scripts/modalManager.js by escaping data-name selector values.
+
+### Task: P0/P1 AI cost, latency, security, and release hardening (completed)
+- Removed the archived admin page's hard-coded password; archived admin API now requires a production `ADMIN_TOKEN` of at least 32 characters and compares it with `timingSafeEqual`.
+- Replaced the active runtime with one canonical GitHub Pages + Cloud Run path, strict CORS/session/rate/budget/concurrency controls, single-call story generation, SSE, bounded summaries, and default-off MemPalace/image generation.
+- Hardened active PWA rendering, BYOK storage, imports, IndexedDB migrations/transactions, Service Worker cache scope, icons, and allowlisted Pages publishing.
+- Added CI quality, security, story-pipeline, transport, frontend, and IndexedDB rollback tests; the release procedure and required production limits are documented in `P0_P1_RELEASE.md`.
+- Removed MiniMax M2.x/M3's unsupported `response_format`, added an explicit transport contract, and kept JSON enforcement in the prompt/parser/normalizer path.
+- Closed final concurrency gaps: profile updates and profile/latest-save reads are now single IndexedDB transactions, with regressions for rename/death commits and concurrent load/death snapshots.
+- Added a safe Service Worker version handshake that defers reload while a paid request, draft input, API key entry, or offline state is active; legacy v0.26 still requires a Pages-first rollout window.
+- Key constraint: process-memory quotas reset across instances/revisions, so Cloud Run max instances and provider hard budgets/key rotation remain mandatory external controls.

@@ -39,7 +39,7 @@ export const api = {
     forceSuicide: (body) => safeCall(() => gameEngine.forceSuicide({ model: body?.model })),
 
     // ── Epilogue ─────────────────────────────
-    getEpilogue: () => safeCall(() => gameEngine.getEpilogue()),
+    getEpilogue: (body = {}) => safeCall(() => gameEngine.getEpilogue(body.model)),
 
     // ── GM Panel ─────────────────────────────
     getPlayerStateForGM: () => safeCall(async () => {

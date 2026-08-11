@@ -9,7 +9,7 @@ import { runCleanup } from '../db/storageManager.js';
 /**
  * 將 AI 回傳的 roundData 完整應用到本機資料庫
  */
-export async function applyAllChanges(profileId, roundData) {
+export async function applyAllChanges(profileId, roundData, stateUpdates = {}) {
     if (!roundData) return;
 
     const profile = await clientDB.profiles.get(profileId);
@@ -30,8 +30,11 @@ export async function applyAllChanges(profileId, roundData) {
         day: toFiniteNumber(roundData.day, profile.day)
     };
 
-    if (roundData.daysToAdvance > 0) {
-        dateData = advanceDate(dateData, roundData.daysToAdvance);
+    const safeDaysToAdvance = typeof roundData.daysToAdvance === 'number' && Number.isFinite(roundData.daysToAdvance)
+        ? clamp(Math.trunc(roundData.daysToAdvance), 0, 3650)
+        : 0;
+    if (safeDaysToAdvance > 0) {
+        dateData = advanceDate(dateData, safeDaysToAdvance);
     }
 
     // 3. 更新玩家檔案
@@ -45,26 +48,27 @@ export async function applyAllChanges(profileId, roundData) {
         profileUpdates.isDeceased = true;
     }
 
-    await clientDB.profiles.update(profileId, profileUpdates);
-
-    // 4. 儲存回合
+    // 4. 組合回合資料
     const saveData = {
         ...roundData,
+        daysToAdvance: safeDaysToAdvance,
         morality: newMorality,
         timeOfDay,
         ...dateData
     };
-    await clientDB.saves.add(profileId, saveData);
 
-    // 5. 更新小說章節
-    if (roundData.story) {
-        await clientDB.novel.addChapter(profileId, roundData.R, roundData.story);
-    }
+    // 5. 原子提交 profile、save、chapter 與衍生狀態。若其他分頁已先提交
+    // 同一回合，commitRound 會拒絕而不是以舊結果覆蓋新進度。
+    const committed = await clientDB.commitRound(profileId, saveData, {
+        profileUpdates,
+        stateUpdates,
+        expectedPreviousRound: Number(roundData.R) - 1,
+    });
 
     // Phase 2: 定期清理舊資料（每 10 回合，fire-and-forget）
     runCleanup(profileId, roundData.R).catch(() => {});
 
     return {
-        profile: await clientDB.profiles.get(profileId)
+        profile: committed.profile
     };
 }

@@ -10,7 +10,7 @@
 
 - **類型**: PWA 單頁應用 + Node.js AI 代理伺服器
 - **語言**: 全繁體中文（程式碼註解、UI、AI 輸出皆為繁體中文）
-- **部署**: 前端 GitHub Pages / 後端 Vercel + Google Cloud Run
+- **部署**: 前端 GitHub Pages / 後端單一 Google Cloud Run（`us-central1`）
 
 ---
 
@@ -25,10 +25,10 @@
                ▼
 ┌──────────────────────────────────────┐
 │  AI Proxy Server (Node.js + Express) │
-│  Vercel / Google Cloud Run           │
-│  ├─ 50+ AI 任務端點                  │
+│  Google Cloud Run (us-central1)      │
+│  ├─ 嚴格任務 allowlist               │
 │  ├─ 多模型路由 (MiniMax 預設)        │
-│  └─ MemPalace 記憶系統整合           │
+│  └─ PoW session / 配額 / 串流        │
 └──────────────┬───────────────────────┘
                │
     ┌──────────┼──────────┐
@@ -134,11 +134,11 @@ fb/
 | 前端 | Vanilla JS (ES6 Modules) | 無框架、無打包工具 |
 | 資料庫 | IndexedDB | 6 Store，全客戶端 |
 | PWA | Service Worker + manifest | 可安裝、離線快取靜態資源 |
-| 後端 | Node.js 18+ / Express 4 | CommonJS |
+| 後端 | Node.js 22.12+ / Express 4 | CommonJS；production image 使用 Node 24 |
 | AI SDK | OpenAI, Anthropic, Google AI | 透過 ai-proxy 統一路由 |
 | 預設模型 | MiniMax M2.7 | 內建 Key，免費供玩家使用 |
 | 測試 | Vitest 4 | 單元 + 整合測試 |
-| 部署 | GitHub Pages (前端) / Vercel + GCR (後端) | |
+| 部署 | GitHub Pages (前端) / Cloud Run us-central1 (後端) | 單一正式代理 |
 
 ---
 
@@ -208,10 +208,9 @@ npm run test:coverage
     → aiProxy.generate('story', model, context)
       → POST /ai/generate  # AI Proxy
         → TASK_HANDLERS['story']  # 組裝 Prompt
-        → callAI(model, prompt)   # 呼叫 AI
-        → MemPalace 讀寫          # 記憶系統
-        → 回傳 JSON
-    → stateManager.applyAllChanges()  # 寫入 IndexedDB
+        → streamAI(model, prompt) # story 一次呼叫、SSE 回傳
+        → 同一結果包含選項與進度判定
+    → stateManager.applyAllChanges()  # 原子寫入 IndexedDB
   → processNewRoundData()  # 更新 UI
 ```
 
@@ -241,7 +240,7 @@ npm run test:coverage
 | `gemini` | Google AI | 是 | Gemini 3.1 Pro |
 | `claude` | Anthropic | 是 | Claude Opus 4.6 |
 
-Fallback 機制：非預設模型失敗時自動切換回 MiniMax。
+非 MiniMax 模型皆為 BYOK；供應商失敗時不會偷用站方 MiniMax Key 回退。
 
 ---
 
@@ -250,8 +249,11 @@ Fallback 機制：非預設模型失敗時自動切換回 MiniMax。
 | 服務 | 平台 | URL |
 |------|------|-----|
 | 前端 | GitHub Pages | `https://msw2004727.github.io/FB/` |
-| AI Proxy (主) | Vercel | `https://ai-proxy-cyan.vercel.app` |
-| AI Proxy (備) | Google Cloud Run (asia-east2) | `https://wenjiang-ai-proxy-*.run.app` |
+| AI Proxy (唯一正式入口) | Google Cloud Run (`us-central1`) | `https://wenjiang-ai-proxy-322557520154.us-central1.run.app` |
+
+GitHub Pages 只發布 `.github/workflows/pages.yml` 的明確 allowlist。舊 Vercel、
+`asia-east2` proxy 與 MemPalace 服務不屬於正式流量路徑，必須保持停用或非公開。
+完整環境變數、驗收及回滾方式見 `P0_P1_RELEASE.md`。
 
 ---
 
@@ -263,8 +265,8 @@ Fallback 機制：非預設模型失敗時自動切換回 MiniMax。
 4. **所有 UI 已移除但保留 CSS 的功能**：`skills.css`、`trade.css` 等暫留供未來改版
 5. **`gameLoop.js` 有亂碼註解**：歷史遺留的編碼問題，不影響功能
 6. **GM 面板**：輸入 `/*GM` 可開啟上帝模式面板
-7. **MemPalace 為可選**：記憶系統不可用時遊戲正常運作（降級機制）
-8. **AI Proxy URL 可配置**：localStorage `wenjiang_ai_proxy_url` 可覆蓋預設
+7. **MemPalace 正式環境預設關閉**：只有明確設定 `MEMPALACE_ENABLED=true` 且 URL 合法時才啟用；不可放在 story critical path
+8. **AI Proxy URL fail-closed**：程式仍可覆蓋 URL，但正式 CSP 只允許既定 Cloud Run 與 localhost 開發入口
 9. **繁體中文雙層防護**：`aiService.js` 全域注入 `LANG_SYSTEM_RULE`（system message），且每個 prompt 檔案都有「語言鐵律」
 
 ---
@@ -276,7 +278,7 @@ Fallback 機制：非預設模型失敗時自動切換回 MiniMax。
 - **第三方分析**：https://github.com/lhl/agentic-memory/blob/main/ANALYSIS-mempalace.md
 - **架構**：Python + ChromaDB（向量記憶）+ SQLite（知識圖譜），MCP Server 19 工具
 
-### 本專案實作（自建 HTTP Server，非官方 MCP）
+### 歷史實作（自建 HTTP Server，非官方 MCP）
 
 ```
 ai-proxy/mempalace_server.py    # Python HTTP server (port 8200)
@@ -284,10 +286,9 @@ ai-proxy/services/mempalaceClient.js  # Node.js 客戶端
 ai-proxy/mempalace/Dockerfile   # 容器化部署
 ```
 
-- **寫入**：每回合 fire-and-forget 寫入 3 類記憶（main_story / npc_interactions / events）+ KG 事實
-- **讀取**：故事生成前呼叫 `buildDeepMemoryContext()`，語義搜索 + KG 查詢，注入 prompt
-- **降級**：2 秒 timeout，不可用時回傳空字串，遊戲正常運作
-- **部署**：Google Cloud Run (asia-east2)
+- **正式狀態**：P0/P1 發布後預設完全關閉，不讀、不寫，也不阻塞故事生成
+- **啟用條件**：`MEMPALACE_ENABLED=true` 且 `MEMPALACE_URL` 是合法 `http(s)` URL
+- **限制**：舊 Cloud Run 容器檔案系統不是可靠持久化儲存；未完成 durable store、租戶隔離與 batch API 前不可重新上線
 
 ### 目前使用率 vs 官方功能
 

@@ -1,6 +1,7 @@
 export const DEFAULT_AI_MODEL = 'minimax';
 export const AI_MODEL_STORAGE_KEY = 'fb_ai_model_core_selection';
 const API_KEY_PREFIX = 'fb_ai_apikey_';
+const apiKeyMemory = new Map();
 
 const VALID_AI_MODELS = new Set([
     'openai',
@@ -30,82 +31,124 @@ function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
 
+function getSessionStorage() {
+    if (typeof window === 'undefined') return null;
+    try {
+        if (typeof sessionStorage !== 'undefined') return sessionStorage;
+        return window.sessionStorage || null;
+    } catch {
+        return null;
+    }
+}
+
+function removeLegacyApiKey(storageKey) {
+    if (!canUseBrowserStorage()) return;
+    try {
+        localStorage.removeItem(storageKey);
+    } catch {
+        // Ignore storage errors; the in-memory/session copy remains usable.
+    }
+}
+
 export function normalizeAiModelValue(value, fallback = DEFAULT_AI_MODEL) {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'cluade') return 'claude';
     return VALID_AI_MODELS.has(normalized) ? normalized : fallback;
 }
 
-/** VIP 驗證碼（簡易哈希，非明文存放） */
-const VIP_HASH = '0017045f00007bbc00006fe1000061fc';
-function simpleHash(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
-    return (h >>> 0).toString(16).padStart(8, '0') + (str.length * 7919).toString(16).padStart(8, '0') +
-           Array.from(str).reduce((a, c) => ((a << 3) ^ c.charCodeAt(0)) >>> 0, 0).toString(16).padStart(8, '0') +
-           (str.split('').reverse().join('').length * 6271).toString(16).padStart(8, '0');
-}
-
-/** 驗證 VIP 密碼 */
-export function verifyVipPassword(password) {
-    return simpleHash(String(password).trim()) === VIP_HASH;
-}
-
-/** 啟用 VIP（6 小時有效） */
-const VIP_STORAGE_KEY = 'wenjiang_vip_until';
-
-export function activateVip() {
-    if (!canUseBrowserStorage()) return;
-    const expiry = Date.now() + 6 * 60 * 60 * 1000; // 6 小時
-    localStorage.setItem(VIP_STORAGE_KEY, String(expiry));
-}
-
-/** 取消 VIP */
-export function deactivateVip() {
-    if (!canUseBrowserStorage()) return;
-    localStorage.removeItem(VIP_STORAGE_KEY);
-}
-
-/** 是否為 VIP */
-export function isVip() {
-    if (!canUseBrowserStorage()) return false;
-    const expiry = parseInt(localStorage.getItem(VIP_STORAGE_KEY) || '0', 10);
-    if (expiry > Date.now()) return true;
-    // 過期了，清除
-    if (expiry > 0) localStorage.removeItem(VIP_STORAGE_KEY);
-    return false;
-}
-
 /** 此模型是否需要用戶手動提供 API Key */
 export function needsUserApiKey(model) {
-    if (isVip()) return false;
     return !SERVER_KEY_MODELS.has(normalizeAiModelValue(model));
 }
 
-/** 取得用戶為某模型儲存的 API Key */
-export function getStoredApiKey(model) {
-    if (!canUseBrowserStorage()) return null;
-    if (isVip()) return null; // VIP 不帶 key → server 用自己的
+/**
+ * 將舊版 localStorage 中的 BYOK 搬到本分頁的 sessionStorage/記憶體後刪除。
+ * 可重複呼叫，方便從舊版快取升級而不留下長期憑證。
+ */
+export function migrateLegacyApiKeys() {
+    if (!canUseBrowserStorage()) return;
+    const session = getSessionStorage();
+    const legacyModelNames = [...VALID_AI_MODELS, 'cluade'];
+
+    for (const legacyModel of legacyModelNames) {
+        const legacyStorageKey = API_KEY_PREFIX + legacyModel;
+        let legacyValue = null;
+        try {
+            legacyValue = localStorage.getItem(legacyStorageKey);
+        } catch {
+            // localStorage may be disabled.
+        }
+
+        if (legacyValue) {
+            const normalizedStorageKey = API_KEY_PREFIX + normalizeAiModelValue(legacyModel);
+            const normalizedValue = String(legacyValue).trim();
+            let existingSessionValue = null;
+            try {
+                existingSessionValue = session?.getItem(normalizedStorageKey) || null;
+            } catch {
+                // sessionStorage may be disabled; memory storage still works.
+            }
+            if (normalizedValue && !apiKeyMemory.has(normalizedStorageKey) && !existingSessionValue) {
+                apiKeyMemory.set(normalizedStorageKey, normalizedValue);
+                try {
+                    session?.setItem(normalizedStorageKey, normalizedValue);
+                } catch {
+                    // sessionStorage may be disabled; memory storage still works.
+                }
+            }
+        }
+        removeLegacyApiKey(legacyStorageKey);
+    }
+
+    // 舊版 VIP 僅是可偽造的前端旗標，不具伺服器授權效力。
     try {
-        return localStorage.getItem(API_KEY_PREFIX + normalizeAiModelValue(model)) || null;
+        localStorage.removeItem('wenjiang_vip_until');
+    } catch {
+        // Ignore storage errors.
+    }
+}
+
+/** 取得用戶為某模型暫存的 API Key（只存於本分頁工作階段） */
+export function getStoredApiKey(model) {
+    const storageKey = API_KEY_PREFIX + normalizeAiModelValue(model);
+    const memoryValue = apiKeyMemory.get(storageKey);
+    if (memoryValue) return memoryValue;
+
+    try {
+        const sessionValue = getSessionStorage()?.getItem(storageKey);
+        if (!sessionValue) return null;
+        apiKeyMemory.set(storageKey, sessionValue);
+        return sessionValue;
     } catch {
         return null;
     }
 }
 
-/** 儲存用戶的 API Key */
+/** 暫存用戶的 API Key；關閉分頁後 sessionStorage 自動清除。 */
 export function setStoredApiKey(model, apiKey) {
-    if (!canUseBrowserStorage()) return;
+    const storageKey = API_KEY_PREFIX + normalizeAiModelValue(model);
+    const normalizedValue = String(apiKey || '').trim();
+    const session = getSessionStorage();
+
+    if (normalizedValue) {
+        apiKeyMemory.set(storageKey, normalizedValue);
+    } else {
+        apiKeyMemory.delete(storageKey);
+    }
+
     try {
-        const key = API_KEY_PREFIX + normalizeAiModelValue(model);
-        if (apiKey) {
-            localStorage.setItem(key, apiKey.trim());
+        if (normalizedValue) {
+            session?.setItem(storageKey, normalizedValue);
         } else {
-            localStorage.removeItem(key);
+            session?.removeItem(storageKey);
         }
     } catch {
-        // Ignore storage errors.
+        // sessionStorage may be disabled; memory storage still works.
     }
+
+    // 無論寫入或刪除，都移除舊版長期保存的副本。
+    removeLegacyApiKey(storageKey);
+    if (normalizeAiModelValue(model) === 'claude') removeLegacyApiKey(API_KEY_PREFIX + 'cluade');
 }
 
 export function getStoredAiModel() {
@@ -134,7 +177,7 @@ export function applyAiModelToSelector(selectorEl, model) {
 }
 
 export function restoreAiModelSelection(selectorEl) {
-    // 每次開網頁預設回 minimax（VIP 也需重新驗證）
+    // 每次開網頁預設回 minimax，避免在沒有 BYOK 時誤選付費模型。
     applyAiModelToSelector(selectorEl, DEFAULT_AI_MODEL);
     setStoredAiModel(DEFAULT_AI_MODEL);
     return DEFAULT_AI_MODEL;

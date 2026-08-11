@@ -51,19 +51,24 @@ export function isLeapYear(year) {
 
 export function advanceDate(date, daysToAdvance = 0) {
     let { yearName, year, month, day } = date;
-    year = toSafeNumber(year, 1);
-    month = toSafeNumber(month, 1);
-    day = toSafeNumber(day, 1);
+    year = clamp(Math.trunc(toSafeNumber(year, 1)), 1, 9999);
+    month = clamp(Math.trunc(toSafeNumber(month, 1)), 1, 12);
+    day = clamp(Math.trunc(toSafeNumber(day, 1)), 1, 31);
+    const safeDays = typeof daysToAdvance === 'number' && Number.isFinite(daysToAdvance)
+        ? clamp(Math.trunc(daysToAdvance), 0, 3650)
+        : 0;
 
-    const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-    day += daysToAdvance;
-    while (day > (daysInMonth[month - 1] || 30)) {
-        day -= (daysInMonth[month - 1] || 30);
-        month++;
-        if (month > 12) { month = 1; year++; }
-    }
-    return { yearName: yearName || '元祐', year, month, day };
+    // Native calendar normalization is bounded and cannot be trapped in a
+    // model-controlled month-by-month loop.
+    const result = new Date(0);
+    result.setUTCHours(0, 0, 0, 0);
+    result.setUTCFullYear(year, month - 1, day + safeDays);
+    return {
+        yearName: yearName || '元祐',
+        year: result.getUTCFullYear(),
+        month: result.getUTCMonth() + 1,
+        day: result.getUTCDate(),
+    };
 }
 
 // ── 地點相關 ────────────────────────────────────────

@@ -10,3 +10,4 @@ test_mempalace.py
 *.sqlite3
 chroma_db/
 ai-proxy/.env.vercel
+.npm-cache/

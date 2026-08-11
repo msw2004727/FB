@@ -1,0 +1,71 @@
+name: AI proxy security checks
+
+on:
+  pull_request:
+    paths:
+      - "ai-proxy/**"
+      - "client/**"
+      - "scripts/**"
+      - "styles/**"
+      - "icons/icon-192.png"
+      - "icons/icon-512.png"
+      - "index.html"
+      - "manifest.json"
+      - "sw.js"
+      - "favicon.ico"
+      - ".github/workflows/ai-proxy-ci.yml"
+      - ".github/workflows/pages.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ai-proxy/**"
+      - "client/**"
+      - "scripts/**"
+      - "styles/**"
+      - "icons/icon-192.png"
+      - "icons/icon-512.png"
+      - "index.html"
+      - "manifest.json"
+      - "sw.js"
+      - "favicon.ico"
+      - ".github/workflows/ai-proxy-ci.yml"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-proxy-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-audit-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ai-proxy
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ai-proxy/package-lock.json
+
+      - name: Install exactly from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Run tests
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build production container
+        working-directory: .
+        run: docker build --file ai-proxy/Dockerfile ai-proxy

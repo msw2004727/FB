@@ -13,8 +13,8 @@ export default defineConfig({
                 'middleware/**',
                 'routes/**',
                 'prompts/**',
-                'aiConfig.js'
-            ]
-        }
-    }
+                'aiConfig.js',
+            ],
+        },
+    },
 });

@@ -12,7 +12,10 @@ function formatRecentHistory(saves) {
     if (!saves || !Array.isArray(saves) || saves.length === 0) return '（無近期記錄）';
     return saves.map(s => {
         const loc = Array.isArray(s.LOC) ? s.LOC.join('/') : (s.LOC || '');
-        const npcs = (s.NPC || []).map(n => `${n.name}(${n.friendliness || '?'})`).join(', ');
+        const npcs = (Array.isArray(s.NPC) ? s.NPC : [])
+            .filter(n => n && typeof n === 'object' && typeof n.name === 'string' && n.name.trim())
+            .map(n => `${n.name.trim().slice(0, 60)}(${typeof n.friendliness === 'string' ? n.friendliness : '?'})`)
+            .join(', ');
         const time = s.timeOfDay || '';
         const story = s.story ? s.story.slice(0, 150) + (s.story.length > 150 ? '...' : '') : '';
         return `【R${s.R || '?'} ${time} ${loc}】${s.EVT || ''}\nPC: ${s.PC || ''}\nNPC: ${npcs || '無'}\n${story}`;
@@ -109,20 +112,22 @@ const getStoryPrompt = (longTermSummary, recentHistory, playerAction, userProfil
     return `
 你是一位頂尖的故事大師AI。你的職責是根據玩家的行動，產生接下來發生的故事。
 ${narrativeStyle}
+${spatialContextRule}
+${npcRule}
+${interactionRule}
+${romanceRules}
+${outputStructureRules}
+
+## 【本回合動態資訊】
 ${blackShadowRule}
 ${specialEventInstruction}
 ${romanceInstruction}
 ${dyingInstruction}
 ${worldviewAndProgressionRules}
-${spatialContextRule}
 ${playerAttributeRules}
-${npcRule}
-${interactionRule}
-${romanceRules}
 ${systemInteractionRules}
 ${locationContextInstruction}
 ${npcContextInstruction}
-${outputStructureRules}
 
 ## 長期故事摘要 (世界核心記憶):
 ${longTermSummary}

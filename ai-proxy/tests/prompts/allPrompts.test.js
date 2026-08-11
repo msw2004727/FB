@@ -93,8 +93,6 @@ const promptModules = {
     postCombatPrompt: require('../../prompts/postCombatPrompt'),
     npcMemoryPrompt: require('../../prompts/npcMemoryPrompt'),
     tradeSummaryPrompt: require('../../prompts/tradeSummaryPrompt'),
-    cultivationPrompt: require('../../prompts/cultivationPrompt'),
-    forgetSkillPrompt: require('../../prompts/forgetSkillPrompt'),
 };
 
 // ── 測試定義 ──────────────────────────────────────
@@ -264,18 +262,6 @@ const PROMPT_TEST_CASES = [
             '測試俠客', '王大夫', { playerOfferItems: [], npcOfferItems: [] }, mockLongTermSummary
         ),
         mustContain: ['測試俠客', '王大夫']
-    },
-    {
-        name: 'cultivationPrompt',
-        fn: () => promptModules.cultivationPrompt.getCultivationPrompt(
-            { ...mockPlayerProfile }, { skillName: '太極拳', level: 1 }, 7, 'success', '修為有成'
-        ),
-        mustContain: ['太極拳']
-    },
-    {
-        name: 'forgetSkillPrompt',
-        fn: () => promptModules.forgetSkillPrompt.getForgetSkillPrompt(mockPlayerProfile, '太極拳'),
-        mustContain: ['太極拳']
     },
 ];
 
