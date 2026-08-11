@@ -14,7 +14,10 @@ exclude:
   - MEMORY_SYSTEM_UPGRADE_PLAN.md
   - MEMPALACE_INTEGRATION_PLAN.md
   - MEMPALACE_OPTIMIZATION_PLAN.md
+  - P0_P1_RELEASE.md
   - PWA_MIGRATION_PLAN.md
+  - icons/icon01.png
+  - icons/icon02.png
 
 keep_files:
   - .well-known
