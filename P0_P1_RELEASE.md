@@ -65,7 +65,7 @@ Cloud Run 平台限制：`min-instances=0`、`max-instances=1`、`concurrency=4`
 
 ## 2026-08-11 正式環境狀態
 
-- GitHub Pages v0.27 與 `us-central1` Cloud Run 已發布；Cloud Run 使用 Secret Manager、`max-instances=1`、`concurrency=4`，MemPalace／圖片生成均停用。
+- GitHub Pages v0.27.1 與 `us-central1` Cloud Run 已發布；Cloud Run 使用 Secret Manager、`max-instances=1`、`concurrency=4`，MemPalace／圖片生成均停用。v0.27.1 會建立新的 App cache，確保既有 v0.27.0 使用者取得配額錯誤處理更新。
 - 相容窗口目前刻意維持 `REQUIRE_ANON_SESSION=false`。只有在新版前端採用窗口完成且真實 MiniMax JSON + SSE canary 成功後，才可切為 `true`。
 - 正式 MiniMax canary 目前被供應商帳戶的 Token Plan／Credits 額度耗盡（上游 429、code 2056）阻擋。必須先在 MiniMax 後台補充額度或升級方案並輪替金鑰，再重跑 canary；在成功前不得把本版本標成完整營運就緒。串流端也會在交給 SDK 前檢查原始 Content-Type，避免把 HTTP 200 JSON 錯誤誤當成空串流成功。
 - 程式已對上述配額錯誤 fail-safe：回傳非重試 503 與 BYOK 指引，不 fallback 到另一個站方付費模型。

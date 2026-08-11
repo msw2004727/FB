@@ -1,6 +1,6 @@
 // sw.js — Service Worker for 文字冒險故事 PWA
 const CACHE_PREFIX = 'wenjiang-';
-const APP_VERSION = 'v0.27.0';
+const APP_VERSION = 'v0.27.1';
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 const UPGRADE_MESSAGE = 'WENJIANG_SW_UPGRADE';
 const CLIENT_READY_MESSAGE = 'WENJIANG_SW_CLIENT_READY';

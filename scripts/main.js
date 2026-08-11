@@ -13,7 +13,7 @@ import { exportSave, importSave, sanitizeFilenameSegment, shouldRemindBackup, ma
 import { initStorageManager } from '../client/db/storageManager.js';
 import { getScenario } from '../client/scenarios/scenarios.js';
 
-export const CLIENT_APP_VERSION = 'v0.27.0';
+export const CLIENT_APP_VERSION = 'v0.27.1';
 const SW_UPGRADE_MESSAGE = 'WENJIANG_SW_UPGRADE';
 const SW_CLIENT_READY_MESSAGE = 'WENJIANG_SW_CLIENT_READY';
 const SW_UPGRADE_MARKER = 'wenjiang-sw-version';

@@ -4,6 +4,8 @@ import vm from 'node:vm';
 
 const swSource = readFileSync(new URL('../../../sw.js', import.meta.url), 'utf8');
 const mainSource = readFileSync(new URL('../../../scripts/main.js', import.meta.url), 'utf8');
+const indexSource = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+const releaseVersion = 'v0.27.1';
 
 function createWorkerHarness(client) {
     const handlers = Object.create(null);
@@ -66,7 +68,7 @@ describe('Service Worker version handoff', () => {
 
         expect(client.postMessage).toHaveBeenCalledWith({
             type: 'WENJIANG_SW_UPGRADE',
-            version: 'v0.27.0',
+            version: releaseVersion,
         });
     });
 
@@ -79,7 +81,7 @@ describe('Service Worker version handoff', () => {
         const harness = createWorkerHarness(client);
         client.postMessage = vi.fn(() => {
             harness.handlers.message({
-                data: { type: 'WENJIANG_SW_CLIENT_READY', clientVersion: 'v0.27.0' },
+                data: { type: 'WENJIANG_SW_CLIENT_READY', clientVersion: releaseVersion },
                 source: { id: client.id },
             });
         });
@@ -88,7 +90,7 @@ describe('Service Worker version handoff', () => {
 
         expect(client.postMessage).toHaveBeenCalledWith({
             type: 'WENJIANG_SW_UPGRADE',
-            version: 'v0.27.0',
+            version: releaseVersion,
         });
         expect(client.navigate).not.toHaveBeenCalled();
         expect(harness.caches.delete).toHaveBeenCalledWith('wenjiang-v0.26.0');
@@ -108,7 +110,7 @@ describe('Service Worker version handoff', () => {
 
         expect(client.postMessage).toHaveBeenCalledWith({
             type: 'WENJIANG_SW_UPGRADE',
-            version: 'v0.27.0',
+            version: releaseVersion,
         });
         expect(client.navigate).not.toHaveBeenCalled();
         expect(swSource).not.toContain('.navigate(');
@@ -131,6 +133,12 @@ describe('Service Worker version handoff', () => {
 });
 
 describe('upgrade-aware page safety contract', () => {
+    it('keeps the worker cache, client handshake, and visible release version aligned', () => {
+        expect(swSource).toContain(`const APP_VERSION = '${releaseVersion}'`);
+        expect(mainSource).toContain(`CLIENT_APP_VERSION = '${releaseVersion}'`);
+        expect(indexSource).toContain('V0.27.1');
+    });
+
     it('acknowledges before reload and defers for input, paid requests, or offline state', () => {
         const deferredAck = mainSource.indexOf("notifyServiceWorker('deferred'");
         const reload = mainSource.indexOf('window.location.reload()', deferredAck);
